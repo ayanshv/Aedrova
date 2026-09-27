@@ -137,3 +137,20 @@ def test_official_sdk_uses_user_bearer_and_disables_persistence():
     assert requests[-1].headers["authorization"] == "Bearer renewed-access"
     assert requests[-1].headers["apikey"] == KEY
     assert client.auth._persist_session is False
+
+
+def test_frozen_app_ignores_environment_backend_override(monkeypatch):
+    import sys
+
+    expected = Connection(URL, KEY)
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(Connection, "from_bundle", lambda: expected)
+    monkeypatch.setattr(Connection, "from_environment", lambda: pytest.fail("Environment used"))
+    assert Connection.for_application() == expected
+
+
+def test_partial_development_configuration_fails_closed(monkeypatch):
+    monkeypatch.setenv("AEDROVA_SUPABASE_URL", URL)
+    monkeypatch.delenv("AEDROVA_SUPABASE_PUBLISHABLE_KEY", raising=False)
+    with pytest.raises(ValueError):
+        Connection.from_environment()

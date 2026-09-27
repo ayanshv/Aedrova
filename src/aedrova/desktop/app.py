@@ -18,6 +18,7 @@ def main():
     parser.add_argument("--smoke-report", type=Path)
     parser.add_argument("--settings-file", type=Path)
     parser.add_argument("--thread", action="store_true")
+    parser.add_argument("--demo", action="store_true", help="Open the local sample chat preview")
     parser.add_argument("--account", action="store_true", help="Open account and workspace setup")
     parser.add_argument("--width", type=int, default=1440)
     parser.add_argument("--height", type=int, default=940)
@@ -36,10 +37,12 @@ def main():
     if args.theme:
         window.set_theme(args.theme, persist=False)
     window.resize(args.width, args.height)
-    window.show()
+    account_first = args.account or (not args.demo and not args.smoke_report)
+    if not account_first:
+        window.show()
     if args.thread:
         window.open_pinned()
-    if args.account:
+    if account_first:
         window.show_account()
     if args.smoke_report:
 

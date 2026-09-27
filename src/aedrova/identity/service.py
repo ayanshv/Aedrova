@@ -4,7 +4,9 @@ import base64
 import json
 import os
 import re
+import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
@@ -46,7 +48,24 @@ class Connection:
     @classmethod
     def from_environment(cls):
         url, key = os.getenv("AEDROVA_SUPABASE_URL"), os.getenv("AEDROVA_SUPABASE_PUBLISHABLE_KEY")
+        if bool(url) != bool(key):
+            raise ValueError("Both public connection settings are required.")
         return cls(url.rstrip("/"), key) if url and key else None
+
+    @classmethod
+    def from_bundle(cls):
+        path = Path(__file__).parents[1] / "desktop" / "assets" / "public-config.json"
+        if not path.exists():
+            return None
+        config = json.loads(path.read_text())
+        return cls(config["supabase_url"], config["supabase_publishable_key"])
+
+    @classmethod
+    def for_application(cls):
+        # A distributed app cannot be redirected by ambient environment or old QSettings.
+        if getattr(sys, "frozen", False):
+            return cls.from_bundle()
+        return cls.from_environment() or cls.from_bundle()
 
 
 class IdentityService:
@@ -56,12 +75,29 @@ class IdentityService:
             connection.url,
             connection.public_key,
             options=ClientOptions(
+                flow_type="pkce",
                 persist_session=False,
                 auto_refresh_token=False,
                 httpx_client=httpx.Client(timeout=15, follow_redirects=False),
             ),
         )
         self.user = None
+
+    def google_authorization_url(self, redirect):
+        result = self.client.auth.sign_in_with_oauth(
+            {
+                "provider": "google",
+                "options": {"redirect_to": redirect, "scopes": "openid email profile"},
+            }
+        )
+        return result.url
+
+    def finish_google_sign_in(self, code):
+        result = self.client.auth.exchange_code_for_session({"auth_code": code})
+        if result.session is None or result.user is None:
+            raise PermissionError("Sign-in did not return a session")
+        self.user = result.user
+        return self.user
 
     def sign_in(self, email, password):
         result = self.client.auth.sign_in_with_password(
@@ -124,6 +160,10 @@ class IdentityService:
             .data
         )
         return {
+            "agent_preferences": self.client.table("workspace_agent_preferences")
+            .select("workspace_id,nickname,provider")
+            .execute()
+            .data,
             "workspaces": workspaces,
             "members": memberships,
             "channels": channels,
@@ -133,6 +173,8 @@ class IdentityService:
     def rpc(self, name, parameters):
         allowed = {
             "create_workspace",
+            "onboard_workspace",
+            "set_agent_preferences",
             "create_channel",
             "create_invitation",
             "accept_invitation",

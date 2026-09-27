@@ -48,7 +48,9 @@ import fs from 'node:fs';
 const db = new PGlite();
 try {
  for(const file of ['supabase/tests/bootstrap.sql',
-   'supabase/migrations/202609260001_identity.sql','supabase/tests/identity.sql']) {
+   'supabase/migrations/202609260001_identity.sql',
+   'supabase/migrations/202609270001_agent_onboarding.sql',
+   'supabase/tests/identity.sql','supabase/tests/agent_onboarding.sql']) {
   await db.exec(fs.readFileSync(file,'utf8'));
   console.log('PASS '+file);
  }

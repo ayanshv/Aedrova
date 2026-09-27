@@ -17,13 +17,14 @@ def dialog(qtbot, tmp_path):
     return widget
 
 
-def test_invalid_config_never_starts_network(qtbot, tmp_path):
+def test_missing_configuration_never_starts_network(qtbot, tmp_path, monkeypatch):
+    from aedrova.identity.service import Connection
+
+    monkeypatch.setattr(Connection, "for_application", lambda: None)
     widget = dialog(qtbot, tmp_path)
-    widget.url.setText("https://example.supabase.co")
-    widget.key.setText("sb_secret_not_allowed")
-    widget.authenticate("signin")
+    widget.start_google()
     assert not widget.busy
-    assert "forbidden" in widget.status.text()
+    assert "not available" in widget.status.text()
 
 
 def test_worker_does_not_block_event_loop_or_close_during_request(qtbot, tmp_path):
@@ -58,23 +59,63 @@ def test_errors_clear_cached_roster_and_never_show_provider_details(qtbot, tmp_p
     assert "sensitive-token" not in widget.status.text()
 
 
-def test_password_removed_before_background_auth_and_not_saved(qtbot, tmp_path):
+def test_customer_login_has_no_password_or_infrastructure_fields(qtbot, tmp_path):
     widget = dialog(qtbot, tmp_path)
-    widget.url.setText("https://example.supabase.co")
-    widget.key.setText("sb_publishable_abcdefghijk1234567890")
-    widget.email.setText("a@b.test")
-    widget.password.setText("secret-password")
+    assert widget.google_button.isVisible()
+    for attribute in ("url", "key", "email", "password", "code", "connection_dialog"):
+        assert not hasattr(widget, attribute)
 
-    class Service:
-        user = None
 
-        def sign_up(self, email, password):
-            assert password == "secret-password"
-            return None
+def test_new_google_user_gets_onboarding(qtbot, tmp_path):
+    widget = dialog(qtbot, tmp_path)
+    widget.service = SimpleNamespace(user=SimpleNamespace(id="user", email="u@example.com"))
+    widget.loaded(
+        {
+            "workspaces": [],
+            "channels": [],
+            "members": [],
+            "invitations": [],
+            "agent_preferences": [],
+        }
+    )
+    assert widget.pages.currentIndex() == 2
+    assert widget.onboarding_nickname.text() == "Nova"
+    assert "Aedrova" in widget.windowTitle()
 
-    widget.factory = lambda config: Service()
-    widget.authenticate("signup")
-    assert widget.password.text() == ""
-    qtbot.waitUntil(lambda: not widget.busy)
-    assert "confirm" in widget.status.text()
-    assert all("password" not in key.lower() for key in widget.settings.allKeys())
+
+def test_onboarding_sends_shared_nickname_and_provider(qtbot, tmp_path):
+    widget = dialog(qtbot, tmp_path)
+    calls = []
+    widget.mutate = lambda name, data: calls.append((name, data))
+    widget.onboarding_workspace.setText("Our team")
+    widget.onboarding_nickname.setText("Sparky")
+    widget.onboarding_provider.setCurrentIndex(1)
+    widget.complete_onboarding()
+    assert calls == [
+        (
+            "onboard_workspace",
+            {"p_name": "Our team", "p_nickname": "Sparky", "p_provider": "claude_code"},
+        )
+    ]
+    widget.onboarding_nickname.setText("<admin>")
+    widget.complete_onboarding()
+    assert len(calls) == 1
+
+
+def test_member_cannot_edit_team_agent_preference(qtbot, tmp_path):
+    widget = dialog(qtbot, tmp_path)
+    widget.service = SimpleNamespace(user=SimpleNamespace(id="user"))
+    widget.loaded(
+        {
+            "workspaces": [{"id": "w", "name": "Team"}],
+            "channels": [],
+            "members": [{"workspace_id": "w", "user_id": "user", "role": "member"}],
+            "invitations": [],
+            "agent_preferences": [{"workspace_id": "w", "nickname": "Atlas", "provider": "codex"}],
+        }
+    )
+    assert widget.agent_name.text() == "Atlas"
+    assert not widget.save_agent.isEnabled()
+    widget.snapshot["members"][0]["role"] = "owner"
+    widget.render_workspace()
+    assert widget.save_agent.isEnabled()

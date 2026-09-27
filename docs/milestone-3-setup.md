@@ -3,32 +3,37 @@
 Status: local implementation; hosted end-to-end validation is still required. Milestone 4
 must not begin until the milestone 3 gate passes and the owner approves it.
 
-## Connect a development Supabase project
+## Required owner actions
 
-1. Create or select a dedicated development project. Use a fresh project for this initial
-   migration; it intentionally does not silently replace existing policies or tables.
-2. Apply `supabase/migrations/202609260001_identity.sql` in the project's SQL Editor or
-   your Supabase migration workflow. Do NOT apply `supabase/tests/bootstrap.sql`; it is
-   only a facsimile of Supabase schemas for embedded PostgreSQL testing.
-3. Enable email/password Auth and email confirmation. Configure the Auth site/redirect
-   URL to a page you control. Users confirm via the emailed link and then sign in to the
-   desktop. To use the optional code entry, include `{{ .Token }}` in the signup email
-   template. Configure SMTP for reliable delivery; signup may hit provider rate limits.
-4. In Realtime settings, disable public channel access. Future subscriptions must use
-   private channels and `channel:<channel UUID>` topics. Only authorized server broadcasts
-   are readable; client broadcasts and presence are denied in this milestone.
-5. Launch the app and choose **Account → Account & workspaces…**. Enter the project URL
-   and public publishable key (legacy anon JWTs also work). Service-role and secret keys
-   are rejected. Optional environment values are documented in `.env.example`; the app
-   does not automatically read `.env` files.
-6. Create and confirm accounts. Sign in, create a workspace, create invitation codes and
-   share those codes manually with their named recipients. No invitation email is sent
-   by Aedrova. Invitees sign in with a matching confirmed email and enter the code.
+Customers use Google OAuth against Aedrova's one managed backend. Workspace membership
+and RLS isolate each team's data. Customers never enter a project URL, API key or database
+password, and never need a Supabase account.
 
-Public connection configuration is saved in QSettings. Passwords, session/refresh tokens
-and invitation codes are never written there. Sessions are memory-only: restarting the
-app requires sign-in. SDK session refresh and user verification precede each operation.
-Requests run in a Qt thread-pool job; all UI updates return through a Qt signal.
+1. Create/select a fresh development Supabase project.
+2. In its SQL Editor, apply these migrations in order:
+   - `supabase/migrations/202609260001_identity.sql`
+   - `supabase/migrations/202609270001_agent_onboarding.sql`
+   If the first migration was already applied successfully, apply only the second. Do not
+   apply `supabase/tests/bootstrap.sql`; that is only for the embedded test database.
+3. Configure Google Cloud's OAuth consent/branding and a Web application OAuth client.
+   Register the exact Supabase callback URL displayed in its Google provider settings.
+   Add two Google test users while your consent app is in testing.
+4. Enable Google in Supabase Authentication providers and enter the Google client ID/secret
+   directly there. Disable Email for this Google-only release. No SMTP setup is required.
+5. Add `http://127.0.0.1:43827/auth/**` to Supabase Authentication's redirect URL allowlist.
+6. Disable **Allow public access** in Supabase Realtime settings. Keep Auth abuse/rate-limit
+   protections enabled. Application RPC rate limits are a required safety milestone 4A task.
+7. Provide the project URL and PUBLIC publishable key to the build process. We can package
+   them into the app; there is no customer configuration form. Never send Google secrets,
+   service-role keys or database passwords in chat. See `google-sign-in.md` for details.
+8. Complete Google consent in the browser, then create/join a workspace. Choose a team-wide
+   agent nickname and preferred provider. Test with both accounts, including separate
+   workspaces and an invitation. These live checks are required before milestone 3 completes.
+
+The generated public configuration is bundled in the app. Passwords and session/refresh
+tokens are never written to QSettings or disk. Sessions currently stay in memory; restart
+requires Google sign-in. Background operations keep the UI responsive. Workspace invitations
+are manually shared, single-use codes; the app does not claim to send invitation emails.
 
 ## Authorization contract
 
@@ -70,7 +75,7 @@ engine; no JavaScript ships in the product. This exercises SQL/RLS/grants, not G
 PostgREST, the Storage HTTP API or Realtime sockets. SDK HTTP tests use mocked transport.
 
 For a disposable hosted/local Supabase database, apply the migration normally and execute
-`supabase/tests/identity.sql` through psql with `ON_ERROR_STOP=1`. Its fixtures roll back.
+`supabase/tests/identity.sql` and `supabase/tests/agent_onboarding.sql` through psql with `ON_ERROR_STOP=1`. Its fixtures roll back.
 It uses fixed test user IDs; never run it against production. Then perform live checks:
 
 - Two confirmed accounts in separate workspaces; login, refresh, logout and relaunch.

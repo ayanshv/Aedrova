@@ -10,9 +10,21 @@ Never interpret a passed unit test as a passed live integration.
    synthetic media interoperability, permissions/context/build/approval contracts and documented limits.
 2. **Desktop shell and visual system** — workspace/channel/tab navigation, chat and thread layout,
    keyboard behavior, accessibility and light/dark themes with realistic fixtures.
-3. **Identity and tenant isolation** — Supabase login, invitations, roles, private channels,
+3. **Identity and tenant isolation** — Google-only Supabase login, team agent nickname onboarding,
+   invitations, roles, private channels,
    data/storage/realtime policies; negative cross-tenant tests.
 4. **Reliable communication** — messages, threads, DMs, attachments, unread state, reconnect and retries.
+
+**4A. Application safety and abuse prevention — required before milestone 5 and any public multi-tenant rollout.** Audit tracked
+source, history and release artifacts for leaked `.env` content, embedded secrets and
+privileged keys; add CI/release gates and dependency vulnerability checks. Review auth,
+tenant isolation, hidden admin paths/backdoors, object access and session lifecycle.
+Implement server-enforced per-user/workspace rate limits, quotas, invitation/signup abuse
+controls and bounded file uploads. Validate audit logs/redaction, incident response and
+credential rotation. Threat-model agent tool permissions, prompt injection, checkout
+isolation and network egress before enabling code execution. Repeat relevant gates before
+paid beta and public release; this milestone cannot certify the absence of all vulnerabilities.
+
 5. **First real build** — one repo/provider, scoped context, plan approval, isolated implementation,
    tests, cancellation and streamed results. Internal alpha.
 6. **Project context** — indexed retrieval, confirmed decisions, source citations, stale/deleted and

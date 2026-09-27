@@ -10,7 +10,9 @@ workspaces, channels and tabs; write local messages; open threads; create local 
 read sample documents; switch light/dark/system appearance.
 
 **Local preview:** messages, drafts and created spaces reset when the app closes. Only
-appearance, reduced-effects preferences and public Supabase configuration are saved. Account and workspace administration is available through **Account → Account & workspaces…**
+appearance and reduced-effects preferences are saved. Public backend configuration is bundled
+by the build process. Google login and workspace onboarding open on launch; account administration is also available
+through **Account → Account & workspaces…**
 when configured with Supabase. See [identity setup](docs/milestone-3-setup.md). Hosted validation
 is still pending. Realtime chat, AI execution, calls and billing are not connected.
 
@@ -21,6 +23,8 @@ Requires macOS and uv. Python 3.12 is pinned; uv.lock records exact dependency v
 ```sh
 uv sync --frozen
 uv run aedrova
+# Local sample chat only:
+uv run aedrova --demo
 ```
 
 Optional: `uv run aedrova --theme light` or `--theme dark`. The View menu also offers
@@ -68,6 +72,8 @@ not access a camera, microphone, repository, or cloud meeting. No API keys are r
 - `docs/milestone-1-results.md`: first milestone evidence.
 - `docs/milestone-2-design.md`: UI behavior, keyboard controls and scope.
 - `docs/milestone-2-results.md`: second milestone evidence.
+- `docs/owner-actions-google-onboarding.md`: required owner setup and next gates.
+- `docs/google-sign-in.md`: Google-first login and one-time owner setup.
 - `docs/milestone-3-setup.md`: Supabase configuration and live validation gates.
 - `docs/milestone-3-results.md`: local identity implementation evidence.
 - `docs/brand-integration.md`: logo, Dock icon, brand motion and packaging.
