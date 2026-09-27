@@ -10,8 +10,9 @@ workspaces, channels and tabs; write local messages; open threads; create local 
 read sample documents; switch light/dark/system appearance.
 
 **Local preview:** messages, drafts and created spaces reset when the app closes. Only
-appearance and reduced-effects preferences are saved. Accounts, realtime chat, AI execution, calls and billing
-are not connected. Milestone 3 requires the owner's permission before work begins.
+appearance, reduced-effects preferences and public Supabase configuration are saved. Account and workspace administration is available through **Account → Account & workspaces…**
+when configured with Supabase. See [identity setup](docs/milestone-3-setup.md). Hosted validation
+is still pending. Realtime chat, AI execution, calls and billing are not connected.
 
 ## Run
 
@@ -67,6 +68,8 @@ not access a camera, microphone, repository, or cloud meeting. No API keys are r
 - `docs/milestone-1-results.md`: first milestone evidence.
 - `docs/milestone-2-design.md`: UI behavior, keyboard controls and scope.
 - `docs/milestone-2-results.md`: second milestone evidence.
+- `docs/milestone-3-setup.md`: Supabase configuration and live validation gates.
+- `docs/milestone-3-results.md`: local identity implementation evidence.
 - `docs/brand-integration.md`: logo, Dock icon, brand motion and packaging.
 - `docs/design-revision-results.md`: Apple-inspired visual revision and verification.
 

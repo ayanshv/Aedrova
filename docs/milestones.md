@@ -1,6 +1,6 @@
 # Delivery gates
 
-Current status: milestones 1 and 2 complete, including the requested Apple-inspired design revision. Milestone 3 awaits owner approval.
+Current status: milestones 1 and 2 complete, including the requested Apple-inspired design revision. Milestone 3 is approved and in progress; hosted Supabase validation remains required.
 
 The owner requested sequential milestones. At the end of each: run necessary checks,
 report evidence and limitations, then ask permission before beginning the next.

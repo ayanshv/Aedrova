@@ -18,6 +18,7 @@ def main():
     parser.add_argument("--smoke-report", type=Path)
     parser.add_argument("--settings-file", type=Path)
     parser.add_argument("--thread", action="store_true")
+    parser.add_argument("--account", action="store_true", help="Open account and workspace setup")
     parser.add_argument("--width", type=int, default=1440)
     parser.add_argument("--height", type=int, default=940)
     args = parser.parse_args()
@@ -38,13 +39,17 @@ def main():
     window.show()
     if args.thread:
         window.open_pinned()
+    if args.account:
+        window.show_account()
     if args.smoke_report:
 
         def capture():
             args.smoke_report.parent.mkdir(parents=True, exist_ok=True)
-            saved = window.grab().save(str(args.smoke_report.with_suffix(".png")))
+            target = window.account_dialog if args.account else window
+            saved = target.grab().save(str(args.smoke_report.with_suffix(".png")))
             result = {
-                "milestone": 2,
+                "milestone": 3 if args.account else 2,
+                "account_screen": args.account,
                 "packaged": bool(getattr(sys, "frozen", False)),
                 "theme": window.theme.name,
                 "workspace": window.workspace.name,

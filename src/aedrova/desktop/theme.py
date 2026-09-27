@@ -92,7 +92,16 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     selected = "#FFFFFF" if white else "#444448"
     return f"""
     QWidget {{ color: {t.text}; font-size: 14px; }}
-    QMainWindow, QDialog {{ background: {t.bg}; }}
+    QMainWindow, QDialog, QStackedWidget#AccountPages {{ background: {t.bg}; }}
+    QComboBox {{ background: {t.surface}; border: 1px solid {t.border};
+        border-radius: 12px; padding: 10px; min-width: 75px; }}
+    QComboBox QAbstractItemView {{ background: {t.bg}; color: {t.text};
+        selection-background-color: {t.accent_bg}; }}
+    QListWidget[accountList="true"] {{ background: {t.surface};
+        border: 1px solid {t.border}; border-radius: 12px; padding: 6px; }}
+    QListWidget[accountList="true"]::item {{ padding: 7px; border-radius: 6px; }}
+    QListWidget[accountList="true"]::item:selected {{
+        background: {t.accent_bg}; color: {t.accent_text}; }}
     QWidget#Chat, QWidget#Thread, QFrame#Rail, QFrame#Topbar,
     QFrame#ChannelHeader {{ background: transparent; border: none; }}
     QLabel {{ background: transparent; border: none; }}

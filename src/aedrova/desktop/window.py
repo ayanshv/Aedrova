@@ -385,6 +385,8 @@ class AedrovaWindow(QMainWindow):
         theme_shortcut.activated.connect(self.toggle_theme)
         escape = QShortcut(QKeySequence("Escape"), self)
         escape.activated.connect(self.close_thread)
+        account_menu = self.menuBar().addMenu("Account")
+        account_menu.addAction("Account & workspaces…", self.show_account)
         help_menu = self.menuBar().addMenu("Help")
         help_menu.addAction("About this preview", self.show_about)
 
@@ -881,7 +883,8 @@ class AedrovaWindow(QMainWindow):
                 "This is an interactive local preview. Sample conversations and new messages "
                 "stay in memory and reset when the app closes. Your appearance and accessibility "
                 "preferences "
-                "are saved. Accounts, realtime chat, agents, billing, and calls are not connected.",
+                "are saved. Account setup is available in the Account menu. Shared chat, agents, "
+                "billing, and calls are not connected.",
                 wrap=True,
             )
         )
@@ -889,3 +892,14 @@ class AedrovaWindow(QMainWindow):
         done.clicked.connect(self.dialog.accept)
         layout.addWidget(done)
         self.dialog.open()
+
+    def show_account(self):
+        from aedrova.desktop.account import AccountDialog
+
+        if not hasattr(self, "account_dialog"):
+            self.account_dialog = AccountDialog(self, settings=self.settings)
+        elif self.account_dialog.service and self.account_dialog.service.user:
+            self.account_dialog.refresh()
+        self.account_dialog.show()
+        self.account_dialog.raise_()
+        self.account_dialog.activateWindow()
