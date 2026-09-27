@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aedrova"
+version = "0.1.0"
+description = "A Python-first workspace where teams and AI build together"
+requires-python = ">=3.12,<3.13"
+dependencies = ["PySide6>=6.8,<7", "pydantic>=2.10,<3"]
+
+[project.optional-dependencies]
+spikes = ["claude-agent-sdk", "livekit"]
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "pytest-qt>=4.4,<5", "ruff", "pyinstaller>=6,<7"]
+
+[project.scripts]
+aedrova = "aedrova.desktop.app:main"
+aedrova-probe = "aedrova.desktop.probe:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+qt_api = "pyside6"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aedrova"]
