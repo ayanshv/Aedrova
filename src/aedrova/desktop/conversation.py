@@ -1,11 +1,13 @@
 """Virtualized variable-height messages and keyboard-first composer."""
 
+import re
 from collections import OrderedDict
 from math import ceil
 
 from PySide6.QtCore import (
     QAbstractListModel,
     QPersistentModelIndex,
+    QPoint,
     QRectF,
     QSize,
     Qt,
@@ -16,9 +18,11 @@ from PySide6.QtGui import (
     QAbstractTextDocumentLayout,
     QColor,
     QFont,
+    QFontMetrics,
     QKeySequence,
     QPainter,
     QPalette,
+    QTextCursor,
     QTextDocument,
 )
 from PySide6.QtWidgets import (
@@ -123,7 +127,8 @@ class MessageDelegate(QStyledItemDelegate):
         extra = (58 if message.attachment else 0) + (
             26 if message.replies and self.view.allow_threads else 0
         )
-        return QSize(width, 44 + ceil(document.size().height()) + extra + 22)
+        header = QFontMetrics(font(14, True)).height() + 6
+        return QSize(width, 18 + header + ceil(document.size().height()) + extra + 22)
 
     def paint(self, painter: QPainter, option, index):
         message = index.data(MESSAGE_ROLE)
@@ -131,6 +136,7 @@ class MessageDelegate(QStyledItemDelegate):
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = option.rect
+        painter.setClipRect(rect)
         selected = option.state & QStyle.StateFlag.State_Selected
         hovered = option.state & QStyle.StateFlag.State_MouseOver
         if selected or hovered:
@@ -146,28 +152,58 @@ class MessageDelegate(QStyledItemDelegate):
         painter.setFont(font(11, True))
         painter.drawText(QRectF(x, y, 34, 34), Qt.AlignmentFlag.AlignCenter, message.initials)
         x += 46
+        header_height = QFontMetrics(font(14, True)).height() + 6
+        available = max(0, rect.width() - 94)
+        badge_width = 76 if message.decision else 0
+        timestamp = message.delivery or message.time
+        time_metrics = QFontMetrics(font(11))
+        time_width = min(
+            time_metrics.horizontalAdvance(timestamp) + 2,
+            max(0, int((available - badge_width) * 0.65)),
+        )
+        name_width = max(
+            0,
+            min(
+                QFontMetrics(font(14, True)).horizontalAdvance(message.author) + 4,
+                available - time_width - badge_width - 12,
+            ),
+        )
+        line_flags = Qt.AlignmentFlag.AlignVCenter | Qt.TextFlag.TextSingleLine
         painter.setFont(font(14, True))
-        painter.drawText(QRectF(x, y - 1, rect.width() - 94, 20), message.author)
-        name_width = painter.fontMetrics().horizontalAdvance(message.author)
+        painter.drawText(
+            QRectF(x, y, name_width, header_height - 6),
+            line_flags,
+            painter.fontMetrics().elidedText(
+                message.author, Qt.TextElideMode.ElideRight, int(name_width)
+            ),
+        )
         painter.setFont(font(11))
         painter.setPen(QColor(t.muted))
-        painter.drawText(QRectF(x + name_width + 12, y, 65, 18), message.time)
+        painter.drawText(
+            QRectF(x + name_width + 12, y, time_width, header_height - 6),
+            line_flags,
+            time_metrics.elidedText(timestamp, Qt.TextElideMode.ElideRight, int(time_width)),
+        )
         if message.decision:
-            bx = x + name_width + 65
+            bx = x + name_width + time_width + 20
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(QColor(t.surface))
-            painter.drawRoundedRect(QRectF(bx, y - 1, 66, 19), 8, 8)
+            painter.drawRoundedRect(QRectF(bx, y, 66, header_height - 6), 8, 8)
             painter.setPen(QColor(t.muted))
             painter.setFont(font(9, True))
-            painter.drawText(QRectF(bx, y - 1, 66, 19), Qt.AlignmentFlag.AlignCenter, "DECISION")
+            painter.drawText(
+                QRectF(bx, y, 66, header_height - 6),
+                Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextSingleLine,
+                "DECISION",
+            )
         document = self.document(message, rect.width() - 94)
         painter.save()
-        painter.translate(x, y + 24)
+        painter.translate(x, y + header_height)
         context = QAbstractTextDocumentLayout.PaintContext()
         context.palette.setColor(QPalette.ColorRole.Text, QColor(t.secondary))
         document.documentLayout().draw(painter, context)
         painter.restore()
-        bottom = y + 24 + document.size().height()
+        bottom = y + header_height + document.size().height()
         if message.attachment:
             painter.setPen(QColor(t.border))
             painter.setBrush(QColor(t.surface))
@@ -290,9 +326,24 @@ class MessageView(QListView):
         self.viewport().update()
 
     def show_messages(self, messages):
+        if self.conversation_model.messages == list(messages):
+            return
+        bar = self.verticalScrollBar()
+        at_bottom = bar.value() >= bar.maximum() - 4
+        index = self.indexAt(QPoint(self.viewport().width() // 2, 1))
+        anchor = index.data(MESSAGE_ROLE).id if index.isValid() else None
+        offset = self.visualRect(index).top() if index.isValid() else 0
         self._scroll_target = None
-        self.delegate.documents.clear()
         self.conversation_model.replace(messages)
+        if at_bottom:
+            self.scrollToBottom()
+        elif anchor:
+            for row, message in enumerate(self.conversation_model.messages):
+                if message.id == anchor:
+                    index = self.model().index(row)
+                    self.doItemsLayout()
+                    bar.setValue(bar.value() + self.visualRect(index).top() - offset)
+                    break
 
     def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
@@ -302,6 +353,7 @@ class MessageView(QListView):
 class MessageEditor(QPlainTextEdit):
     submitted = Signal()
     focus_changed = Signal(bool)
+    completion = None
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -316,6 +368,8 @@ class MessageEditor(QPlainTextEdit):
         self.focus_changed.emit(False)
 
     def keyPressEvent(self, event):  # noqa: N802
+        if self.completion and self.completion(event):
+            return
         if (
             event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
             and not event.modifiers() & Qt.KeyboardModifier.ShiftModifier
@@ -344,13 +398,22 @@ class Composer(QFrame):
         self.editor.setAccessibleDescription("Return sends. Shift Return adds a new line.")
         self.editor.setFixedHeight(67)
         self.editor.document().documentLayout().documentSizeChanged.connect(self._resize_editor)
+        self.suggestion = SpringButton("@Aedrova    ·    Tab or ↵")
+        self.suggestion.setProperty("role", "outline")
+        self.suggestion.setAccessibleName("Complete mention @Aedrova. Tab or Return.")
+        self.suggestion.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.suggestion.hide()
+        self.suggestion.clicked.connect(self.complete_mention)
+        self.editor.completion = self.completion_key
+        self.editor.cursorPositionChanged.connect(self.update_suggestion)
+        layout.addWidget(self.suggestion)
         layout.addWidget(self.editor)
         bottom = QHBoxLayout()
         self.mention = SpringButton("@")
         self.mention.setProperty("role", "icon")
         self.mention.setFixedSize(30, 29)
         self.mention.setAccessibleName("Mention Aedrova")
-        self.mention.setToolTip("Insert @Aedrova · agent execution isn’t connected in this preview")
+        self.mention.setToolTip("Insert @Aedrova · ask your agent to build")
         self.mention.clicked.connect(self.insert_mention)
         bottom.addWidget(self.mention)
         self.hint = QLabel("Shift ↵ for a new line")
@@ -382,6 +445,49 @@ class Composer(QFrame):
         if self.editor.height() != height:
             self.editor.setFixedHeight(height)
 
+    def mention_start(self):
+        cursor = self.editor.textCursor()
+        if cursor.hasSelection():
+            return None
+        prefix = (
+            self.editor.toPlainText()
+            .encode("utf-16-le")[: cursor.position() * 2]
+            .decode("utf-16-le")
+        )
+        match = re.search(r"(?<!\S)@([A-Za-z]*)$", prefix)
+        if match and "aedrova".startswith(match[1].lower()):
+            return len(prefix[: match.start()].encode("utf-16-le")) // 2
+        return None
+
+    def update_suggestion(self):
+        self.suggestion.setVisible(self.mention_start() is not None)
+
+    def completion_key(self, event):
+        if self.suggestion.isHidden():
+            return False
+        if event.key() == Qt.Key.Key_Escape:
+            self.suggestion.hide()
+        elif (
+            event.key() in (Qt.Key.Key_Tab, Qt.Key.Key_Return, Qt.Key.Key_Enter)
+            and not event.modifiers()
+        ):
+            self.complete_mention()
+        else:
+            return False
+        event.accept()
+        return True
+
+    def complete_mention(self):
+        start = self.mention_start()
+        if start is None:
+            return
+        cursor = self.editor.textCursor()
+        cursor.setPosition(start, QTextCursor.MoveMode.KeepAnchor)
+        cursor.insertText("@Aedrova ")
+        self.editor.setTextCursor(cursor)
+        self.editor.setFocus()
+        self.suggestion.hide()
+
     def insert_mention(self):
         cursor = self.editor.textCursor()
         before = self.editor.toPlainText().encode("utf-16-le")[: cursor.selectionStart() * 2]
@@ -392,6 +498,7 @@ class Composer(QFrame):
         self.editor.setFocus()
 
     def _changed(self):
+        self.update_suggestion()
         text = self.editor.toPlainText().strip()
         self.send.setEnabled(bool(text) and len(text) <= 10_000)
         if len(text) > 10_000:

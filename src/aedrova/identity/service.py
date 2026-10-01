@@ -1,6 +1,7 @@
 """User-token-only access. Sessions live in memory, never QSettings or project files."""
 
 import base64
+import hashlib
 import json
 import os
 import re
@@ -10,6 +11,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
+from supabase_auth.errors import AuthRetryableError
 
 from supabase import ClientOptions, create_client
 
@@ -71,6 +73,10 @@ class Connection:
 class IdentityService:
     def __init__(self, connection, *, client=None):
         self.connection = connection
+        self._transport = (
+            httpx.Client(timeout=15, follow_redirects=False) if client is None else None
+        )
+        self.is_context_clone = False
         self.client = client or create_client(
             connection.url,
             connection.public_key,
@@ -78,10 +84,32 @@ class IdentityService:
                 flow_type="pkce",
                 persist_session=False,
                 auto_refresh_token=False,
-                httpx_client=httpx.Client(timeout=15, follow_redirects=False),
+                httpx_client=self._transport,
             ),
         )
         self.user = None
+
+    def fork_for_context(self):
+        """Called in the serialized transport worker; never expose tokens to UI/logs."""
+        self._authenticated()
+        session = self.client.auth.get_session()
+        fork = IdentityService(self.connection)
+        fork.is_context_clone = True
+        try:
+            result = fork.client.auth.set_session(session.access_token, session.refresh_token)
+            fork.user = result.user
+            if fork.user is None or str(fork.user.id) != str(self.user.id):
+                raise PermissionError("Session changed. Sign in again.")
+            return fork
+        except Exception:
+            fork.close_context()
+            raise
+
+    def close_context(self):
+        if self.is_context_clone and self._transport:
+            self._transport.close()
+            self.client = None
+            self.user = None
 
     def google_authorization_url(self, redirect):
         result = self.client.auth.sign_in_with_oauth(
@@ -118,6 +146,13 @@ class IdentityService:
         self.user = result.user
         return self.user
 
+    def update_profile(self, name):
+        self._authenticated()
+        name = name.strip()
+        if not 1 <= len(name) <= 80:
+            raise ValueError("Display name must be 1–80 characters.")
+        self.user = self.client.auth.update_user({"data": {"full_name": name}}).user
+
     def sign_out(self):
         try:
             self.client.auth.sign_out({"scope": "local"})
@@ -137,6 +172,8 @@ class IdentityService:
             self.user = self.client.auth.get_user().user
             if self.user is None:
                 raise PermissionError("Session expired. Sign in again.")
+        except (httpx.TransportError, AuthRetryableError):
+            raise
         except Exception:
             self.user = None
             raise
@@ -147,7 +184,7 @@ class IdentityService:
         memberships = self.client.rpc("list_members", {}).execute().data
         channels = (
             self.client.table("channels")
-            .select("id,workspace_id,name,private")
+            .select("id,workspace_id,name,private,kind,dm_low,dm_high")
             .order("name")
             .execute()
             .data
@@ -160,6 +197,8 @@ class IdentityService:
             .data
         )
         return {
+            "directory": self.client.rpc("team_directory", {}).execute().data,
+            "unread": self.client.rpc("unread_counts", {}).execute().data,
             "agent_preferences": self.client.table("workspace_agent_preferences")
             .select("workspace_id,nickname,provider")
             .execute()
@@ -172,6 +211,11 @@ class IdentityService:
 
     def rpc(self, name, parameters):
         allowed = {
+            "start_direct_message",
+            "mark_channel_read",
+            "reserve_attachment",
+            "finish_attachment",
+            "send_message",
             "create_workspace",
             "onboard_workspace",
             "set_agent_preferences",
@@ -187,3 +231,219 @@ class IdentityService:
             raise ValueError("Unsupported account operation")
         self._authenticated()
         return self.client.rpc(name, parameters).execute().data
+
+    def messages(self, channel_id):
+        self._authenticated()
+        rows = (
+            self.client.table("messages")
+            .select("id,channel_id,sender_id,body,parent_id,created_at")
+            .eq("channel_id", channel_id)
+            .order("created_at", desc=True)
+            .order("id", desc=True)
+            .limit(500)
+            .execute()
+            .data
+        )
+        return list(reversed(rows))
+
+    def message_page(self, channel_id, *, before=None, after=None, parent=None, limit=100):
+        self._authenticated()
+        return (
+            self.client.rpc(
+                "message_page",
+                {
+                    "p_channel": channel_id,
+                    "p_before": before,
+                    "p_after": after,
+                    "p_parent": parent,
+                    "p_limit": limit,
+                },
+            )
+            .execute()
+            .data
+        )
+
+    def context_page(self, channel_id, *, after=0):
+        """All roots AND replies, filtered by the signed-in user's existing RLS."""
+        self._authenticated()
+        return (
+            self.client.table("messages")
+            .select("id,channel_id,sender_id,body,parent_id,created_at,sequence")
+            .eq("channel_id", channel_id)
+            .gt("sequence", after)
+            .order("sequence")
+            .limit(100)
+            .execute()
+            .data
+        )
+
+    def context_revision(self, channel):
+        self._authenticated()
+        return self.client.rpc("context_revision", {"p_channel": channel}).execute().data
+
+    def context_snapshot(self, workspace, cancelled=lambda: False):
+        """Scoped inventory with keyset paging instead of dashboard row ceilings."""
+        self._authenticated()
+        channels, cursor = [], None
+        while True:
+            if cancelled():
+                raise InterruptedError("Cancelled")
+            query = (
+                self.client.table("channels")
+                .select("id,workspace_id,name,private")
+                .eq("workspace_id", workspace)
+                .order("id")
+                .limit(100)
+            )
+            if cursor:
+                query = query.gt("id", cursor)
+            page = query.execute().data
+            if not page:
+                break
+            if cursor and page[-1]["id"] <= cursor:
+                raise ValueError("Invalid channel inventory pagination.")
+            channels.extend(page)
+            cursor = page[-1]["id"]
+            if len(channels) > 10000:
+                raise ValueError("Workspace exceeds the 10,000-channel context limit.")
+        return {
+            "workspaces": self.client.table("workspaces")
+            .select("id,name")
+            .eq("id", workspace)
+            .execute()
+            .data,
+            "members": self.client.table("workspace_members")
+            .select("workspace_id,user_id,role")
+            .eq("workspace_id", workspace)
+            .eq("user_id", str(self.user.id))
+            .execute()
+            .data,
+            "channels": channels,
+            "agent_preferences": self.client.table("workspace_agent_preferences")
+            .select("workspace_id,nickname,provider")
+            .eq("workspace_id", workspace)
+            .execute()
+            .data,
+        }
+
+    def context_decisions(self, channel_id):
+        self._authenticated()
+        rows, cursor = [], None
+        while True:
+            query = (
+                self.client.table("context_decisions")
+                .select("*")
+                .eq("channel_id", channel_id)
+                .order("message_id")
+                .limit(100)
+            )
+            if cursor:
+                query = query.gt("message_id", cursor)
+            page = query.execute().data
+            if not page:
+                return rows
+            rows.extend(page)
+            cursor = page[-1]["message_id"]
+            if len(rows) > 20000:
+                raise ValueError("Decision inventory exceeds the supported limit.")
+
+    def set_context_decision(self, message_id, body, confirmed):
+        self._authenticated()
+        return (
+            self.client.rpc(
+                "set_context_decision",
+                {
+                    "p_message": message_id,
+                    "p_body": body,
+                    "p_confirmed": confirmed,
+                },
+            )
+            .execute()
+            .data
+        )
+
+    def attachments_for(self, message_ids):
+        self._authenticated()
+        if not message_ids:
+            return []
+        return (
+            self.client.table("attachments")
+            .select("id,channel_id,message_id,filename,byte_size,sha256,object_path")
+            .in_("message_id", message_ids)
+            .execute()
+            .data
+        )
+
+    def realtime_credentials(self):
+        # Called only by the serialized transport worker, after a validated read.
+        session = self.client.auth.get_session()
+        return (
+            self.connection.url,
+            self.connection.public_key,
+            session.access_token,
+            str(self.user.id),
+        )
+
+    def upload_attachment(self, identifier, channel_id, path, parent=None):
+        from aedrova.identity.transfers import read_upload
+
+        name, data, digest = read_upload(path)
+        object_path = self.rpc(
+            "reserve_attachment",
+            {
+                "p_id": identifier,
+                "p_channel": channel_id,
+                "p_filename": name,
+                "p_size": len(data),
+                "p_sha256": digest,
+            },
+        )
+        try:
+            self.client.storage.from_("aedrova-files").upload(
+                object_path, data, {"content-type": "application/octet-stream", "upsert": "false"}
+            )
+        except Exception:
+            # An upload may have succeeded before its response was lost. The server checks
+            # the reserved immutable path and actual stored size before publishing it.
+            return self.rpc("finish_attachment", {"p_id": identifier, "p_parent": parent})
+        return self.rpc("finish_attachment", {"p_id": identifier, "p_parent": parent})
+
+    def download_attachment(self, identifier):
+        from aedrova.identity.transfers import MAX_BYTES
+
+        self._authenticated()
+        records = (
+            self.client.table("attachments")
+            .select("id,object_path,byte_size,sha256,message_id")
+            .eq("id", identifier)
+            .execute()
+            .data
+        )
+        if len(records) != 1 or not records[0]["message_id"]:
+            raise PermissionError("Attachment unavailable")
+        record = records[0]
+        if not 1 <= record["byte_size"] <= MAX_BYTES:
+            raise ValueError("Invalid attachment size")
+        path = record["object_path"]
+        if not re.fullmatch(r"[a-f0-9-]{36}/[a-f0-9-]{36}/[a-f0-9-]{36}", path):
+            raise ValueError("Invalid object path")
+        token = self.client.auth.get_session().access_token
+        headers = {"apikey": self.connection.public_key, "Authorization": "Bearer " + token}
+        content = bytearray()
+        with httpx.Client(timeout=30, follow_redirects=False) as client:
+            with client.stream(
+                "GET",
+                self.connection.url + "/storage/v1/object/authenticated/aedrova-files/" + path,
+                headers=headers,
+            ) as response:
+                response.raise_for_status()
+                for chunk in response.iter_bytes():
+                    if len(content) + len(chunk) > record["byte_size"]:
+                        raise ValueError("Attachment exceeded declared size")
+                    content.extend(chunk)
+        if (
+            len(content) != record["byte_size"]
+            or hashlib.sha256(content).hexdigest() != record["sha256"]
+        ):
+            raise ValueError("Attachment integrity check failed")
+        return bytes(content)

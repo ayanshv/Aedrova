@@ -1,0 +1,167 @@
+"""Ephemeral full-text index of an already-authorized, freshly collected corpus.
+
+No shared disk cache, credentials, embeddings service, or inferred team decisions.
+"""
+
+import hashlib
+import json
+import re
+import sqlite3
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Source:
+    citation: str
+    message_id: str
+    channel: str
+    body: str
+    parent_id: str | None
+    created_at: str
+    decision: str
+    confirmed_by: str
+    fingerprint: str
+    attachment: str = ""
+
+    def record(self):
+        return vars(self)
+
+
+class ContextIndex:
+    def __init__(self, context):
+        self.connection = sqlite3.connect(":memory:")
+        self.connection.execute(
+            "CREATE VIRTUAL TABLE evidence USING fts5(body, channel, tokenize='porter unicode61')"
+        )
+        self.sources = []
+        records = [json.loads(line) for line in context.text.splitlines() if line]
+        channels = {r["channel"]: r["name"] for r in records if "channel" in r}
+        messages = {
+            r["message"]["id"]: r["message"] for r in records if isinstance(r.get("message"), dict)
+        }
+        decisions = {r["decision"]["message_id"]: r["decision"] for r in records if "decision" in r}
+        for identifier, message in messages.items():
+            if message["channel_id"] not in context.channel_ids:
+                raise PermissionError("Evidence contains a channel outside this snapshot.")
+            body = message["body"]
+            decision = decisions.get(identifier, {})
+            state = "discussion"
+            if decision:
+                state = (
+                    "retired"
+                    if not decision["confirmed"]
+                    else ("confirmed" if decision["source_body"] == body else "stale")
+                )
+            self._add(
+                Source(
+                    f"message:{identifier}",
+                    identifier,
+                    channels.get(message["channel_id"], "channel"),
+                    body,
+                    message.get("parent_id"),
+                    message.get("created_at", ""),
+                    state,
+                    decision.get("confirmed_by", ""),
+                    hashlib.sha256(body.encode()).hexdigest(),
+                )
+            )
+        for record in records:
+            if "attachment" not in record:
+                continue
+            message = messages.get(record["message"])
+            if message is None:
+                raise PermissionError("Attachment has no permitted source message.")
+            body = record["content"]
+            self._add(
+                Source(
+                    f"attachment:{record['attachment']}",
+                    message["id"],
+                    channels.get(message["channel_id"], "channel"),
+                    body,
+                    message.get("parent_id"),
+                    message.get("created_at", ""),
+                    "attachment",
+                    "",
+                    hashlib.sha256(body.encode()).hexdigest(),
+                    record["filename"],
+                )
+            )
+
+    def _add(self, source):
+        self.sources.append(source)
+        self.connection.execute(
+            "INSERT INTO evidence(rowid, body, channel) VALUES (?, ?, ?)",
+            (len(self.sources), source.body, source.channel),
+        )
+
+    def search(self, query, limit=12):
+        reference = query.strip().strip("[]")
+        exact = [s for s in self.sources if reference in {s.citation, s.message_id}]
+        if exact:
+            return exact[:limit]
+        # Quote individual terms: punctuation/FTS operators can never become query syntax.
+        terms = list(dict.fromkeys(re.findall(r"[^\W_]+", query.lower(), re.UNICODE)))[:64]
+        if not terms:
+            return self.sources[:limit]
+        expression = " OR ".join('"' + term + '"' for term in terms)
+        rows = self.connection.execute(
+            "SELECT rowid FROM evidence WHERE evidence MATCH ? "
+            "ORDER BY bm25(evidence), rowid LIMIT ?",
+            (expression, min(max(limit, 1), 200)),
+        )
+        return [self.sources[row[0] - 1] for row in rows]
+
+    def retrieve(self, query):
+        matches = self.search(query)
+        selected = {s.citation: s for s in matches}
+        # Retain nearby thread evidence, including contradictions rather than picking a winner.
+        roots = {s.parent_id or s.message_id for s in matches[:4]}
+        related = [s for s in self.sources if (s.parent_id or s.message_id) in roots]
+        for source in related[:24]:
+            selected[source.citation] = source
+        decisions = [s for s in self.sources if s.decision in {"confirmed", "stale", "retired"}]
+        return {
+            "retrieval": {
+                "query": query,
+                "method": "FTS5 BM25 with thread expansion",
+                "matched": len(matches),
+                "total_sources": len(self.sources),
+                "sources": [s.record() for s in selected.values()],
+                "decision_inventory": [s.record() for s in decisions],
+                "notice": "Ranked leads, not exhaustive requirements. Full evidence follows. "
+                "Confirmed means a member recorded this message, not unanimous agreement. "
+                "Stale/retired decisions are not current. Resolve conflicts with the user.",
+            }
+        }
+
+    def close(self):
+        self.connection.close()
+
+
+def retrieval_record(context, query):
+    index = ContextIndex(context)
+    try:
+        return json.dumps(index.retrieve(query), ensure_ascii=False)
+    finally:
+        index.close()
+
+
+def validate_citations(context, plan):
+    """Verify source existence, not whether a model's interpretation is correct."""
+    index = ContextIndex(context)
+    try:
+        available = {s.citation for s in index.sources}
+        cited = set(re.findall(r"(?:message|attachment):[A-Za-z0-9_-]+", plan))
+        unknown = cited - available
+        if unknown:
+            raise ValueError(
+                "Plan contains unknown source citations. Create a fresh plan: "
+                + ", ".join(sorted(unknown)[:5])
+            )
+        if available and not cited:
+            raise ValueError(
+                "The plan omitted source citations. Create a fresh plan before approval."
+            )
+        return sorted(cited)
+    finally:
+        index.close()

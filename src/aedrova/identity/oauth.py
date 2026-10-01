@@ -8,6 +8,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Event, Thread
 from urllib.parse import parse_qs, urlsplit
 
+from aedrova.identity.callback_page import CSP, render_callback
+
 PORT = 43827
 REDIRECT_ALLOWLIST = f"http://127.0.0.1:{PORT}/auth/**"
 
@@ -59,21 +61,22 @@ def google_sign_in(service, cancel=None, *, opener=webbrowser.open, timeout=180,
             codes = query.get("code", [])
             if len(codes) == 1 and codes[0] and len(codes[0]) <= 4096 and "error" not in query:
                 result["code"] = codes[0]
-                text = "Return to Aedrova to finish signing in. You can close this tab."
+                page = render_callback(True)
             elif "error" in query:
                 result["error"] = True
-                text = "Sign-in was not completed. Return to Aedrova to try again."
+                page = render_callback(False)
             else:
                 self.send_error(400)
                 return
             self.send_response(200)
-            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Security-Policy", CSP)
             self.send_header("Cache-Control", "no-store")
             self.send_header("Referrer-Policy", "no-referrer")
             self.send_header("X-Content-Type-Options", "nosniff")
-            self.send_header("Content-Length", str(len(text.encode())))
+            self.send_header("Content-Length", str(len(page)))
             self.end_headers()
-            self.wfile.write(text.encode())
+            self.wfile.write(page)
 
     with LoopbackServer(("127.0.0.1", port), Callback) as server:
         server.timeout = 0.25

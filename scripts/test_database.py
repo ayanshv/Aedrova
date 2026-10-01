@@ -50,7 +50,13 @@ try {
  for(const file of ['supabase/tests/bootstrap.sql',
    'supabase/migrations/202609260001_identity.sql',
    'supabase/migrations/202609270001_agent_onboarding.sql',
-   'supabase/tests/identity.sql','supabase/tests/agent_onboarding.sql']) {
+   'supabase/migrations/202609270002_messages.sql',
+   'supabase/tests/identity.sql','supabase/tests/agent_onboarding.sql',
+   'supabase/tests/messages.sql',
+   'supabase/migrations/202609280001_communication.sql',
+   'supabase/tests/communication.sql',
+   'supabase/migrations/202609290001_context_decisions.sql',
+   'supabase/tests/context_decisions.sql']) {
   await db.exec(fs.readFileSync(file,'utf8'));
   console.log('PASS '+file);
  }

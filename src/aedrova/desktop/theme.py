@@ -96,8 +96,24 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QComboBox {{ background: {t.surface}; border: 1px solid {t.border};
         border-radius: 12px; padding: 10px; min-width: 75px; }}
     QComboBox::drop-down {{ border: none; width: 30px; background: transparent; }}
-    QComboBox QAbstractItemView {{ background: {t.bg}; color: {t.text};
-        selection-background-color: {t.accent_bg}; }}
+    QComboBox:focus {{ border-color: {t.accent}; }}
+    QComboBox::down-arrow {{ image: none; border: none; width: 0px; height: 0px; }}
+    QComboBox QAbstractItemView {{ background: {t.surface}; color: {t.text};
+        border: 1px solid {t.border}; border-radius: 12px; padding: 6px;
+        selection-background-color: {t.accent_bg}; selection-color: {t.accent_text};
+        outline: none; }}
+    QComboBox QAbstractItemView::item {{ min-height: 30px; padding: 5px 12px;
+        border-radius: 8px; }}
+    QCheckBox {{ spacing: 9px; padding: 4px 0; }}
+    QCheckBox::indicator {{ width: 16px; height: 16px; border: 1px solid {t.muted};
+        border-radius: 5px; background: {t.surface}; }}
+    QCheckBox::indicator:checked {{ background: {t.accent}; border-color: {t.accent}; }}
+    QProgressBar {{ border: none; border-radius: 3px; background: {t.surface};
+        max-height: 6px; min-height: 6px; }}
+    QProgressBar::chunk {{ background: {t.accent}; border-radius: 3px; }}
+    QTabWidget::pane {{ border: 1px solid {t.border}; border-radius: 14px; }}
+    QTabBar::tab {{ background: {t.surface}; padding: 10px 18px; }}
+    QTabBar::tab:selected {{ background: {t.accent_bg}; color: {t.accent_text}; }}
     QListWidget[accountList="true"] {{ background: {t.surface};
         border: 1px solid {t.border}; border-radius: 12px; padding: 6px; }}
     QListWidget[accountList="true"]::item {{ padding: 7px; border-radius: 6px; }}

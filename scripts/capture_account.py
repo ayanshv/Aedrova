@@ -21,9 +21,13 @@ for mode in ("light", "dark"):
     QTest.qWait(200)
     if not window.account_dialog.grab().save(str(OUTPUT / f"account-{mode}.png")):
         raise RuntimeError("Screenshot failed")
-window.set_theme("light", persist=False)
-window.account_dialog.pages.setCurrentIndex(2)
-QTest.qWait(200)
-window.account_dialog.grab().save(str(OUTPUT / "onboarding-light.png"))
+for mode in ("light", "dark"):
+    window.set_theme(mode, persist=False)
+    window.account_dialog.pages.setCurrentIndex(2)
+    for index, name in enumerate(("workspace", "agent", "ready", "invite")):
+        window.account_dialog.onboarding_steps.setCurrentIndex(index)
+        window.account_dialog.ready_summary.setText("Northstar Labs")
+        QTest.qWait(200)
+        window.account_dialog.grab().save(str(OUTPUT / f"onboarding-{name}-{mode}.png"))
 window.account_dialog.close()
 window.close()

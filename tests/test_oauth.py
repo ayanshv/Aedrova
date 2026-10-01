@@ -43,7 +43,11 @@ def test_loopback_ignores_wrong_path_and_exchanges_only_valid_code():
         assert not service.exchanged
         with urlopen(service.redirect + "?code=valid-code", timeout=2) as response:
             assert response.headers["Cache-Control"] == "no-store"
-            assert b"valid-code" not in response.read()
+            assert response.headers["Content-Type"] == "text/html; charset=utf-8"
+            assert "default-src 'none'" in response.headers["Content-Security-Policy"]
+            body = response.read()
+            assert b"valid-code" not in body
+            assert b"Your space is waiting." in body
         assert future.result(3) == "signed-in-user"
     assert service.exchanged == ["valid-code"]
 
@@ -224,3 +228,20 @@ def test_cancellation_interrupts_incomplete_http_headers():
             with pytest.raises(InterruptedError):
                 future.result(2)
     assert service.exchanged == []
+
+
+def test_callback_page_is_branded_self_contained_and_has_safe_error_variant():
+    from aedrova.identity.callback_page import CSP, render_callback
+
+    for success in (True, False):
+        page = render_callback(success).decode()
+        assert "<title>Aedrova" in page
+        assert "data:image/png;base64," in page
+        assert "prefers-color-scheme:dark" in page
+        assert "prefers-reduced-motion" in page
+        assert "<script" not in page
+        assert "https://" not in page
+    assert "Your space is waiting." in render_callback(True).decode()
+    assert "Sign-in was not completed." in render_callback(False).decode()
+    assert "default-src 'none'" in CSP
+    assert "frame-ancestors 'none'" in CSP

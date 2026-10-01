@@ -11,11 +11,11 @@ ROOT = Path(__file__).resolve().parents[1]
 subprocess.run([sys.executable, str(ROOT / "scripts/check_release_secrets.py")], check=True)
 configuration_args = []
 asset_args = []
-for asset in ("aedrova.png", "aedrova.icns"):
+for asset in ("aedrova.png", "aedrova.icns", "google-g.png"):
     asset_args.extend(
         ["--add-data", f"{ROOT / 'src/aedrova/desktop/assets' / asset}:aedrova/desktop/assets"]
     )
-connection = Connection.from_environment()
+connection = Connection.from_environment() or Connection.from_bundle()
 if connection:
     config_path = ROOT / "work" / "public-config.json"
     config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -39,6 +39,8 @@ subprocess.run(
         "--noconfirm",
         "--clean",
         "--windowed",
+        "--collect-all",
+        "claude_agent_sdk",
         "--name",
         "Aedrova",
         "--icon",

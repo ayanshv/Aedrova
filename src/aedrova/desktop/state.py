@@ -16,6 +16,9 @@ class Message:
     decision: bool = False
     attachment: str = ""
     replies: list["Message"] = field(default_factory=list)
+    attachment_id: str = ""
+    sequence: int = 0
+    delivery: str = ""
 
 
 @dataclass

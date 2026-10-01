@@ -7,6 +7,7 @@ name = "aedrova"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "claude-agent-sdk" },
     { name = "pydantic" },
     { name = "pyside6" },
     { name = "supabase" },
@@ -14,7 +15,6 @@ dependencies = [
 
 [package.optional-dependencies]
 spikes = [
-    { name = "claude-agent-sdk" },
     { name = "livekit" },
 ]
 
@@ -28,7 +28,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "claude-agent-sdk", marker = "extra == 'spikes'" },
+    { name = "claude-agent-sdk", specifier = "==0.2.160" },
     { name = "livekit", marker = "extra == 'spikes'" },
     { name = "pydantic", specifier = ">=2.10,<3" },
     { name = "pyside6", specifier = ">=6.8,<7" },

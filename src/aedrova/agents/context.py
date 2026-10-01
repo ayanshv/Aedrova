@@ -1,0 +1,169 @@
+"""Explicit, RLS-backed context snapshots. Never run during ordinary chat."""
+
+import json
+import re
+import time
+from dataclasses import dataclass
+
+MAX_CONTEXT_BYTES = 8 * 1024 * 1024
+TEXT_EXTENSIONS = {".txt", ".md", ".py", ".json", ".csv", ".html", ".css", ".js", ".ts", ".sql"}
+
+
+@dataclass(frozen=True)
+class WorkspaceContext:
+    workspace_id: str
+    user_id: str
+    channel_ids: frozenset[str]
+    text: str
+    count: int
+    nickname: str
+    provider: str
+
+
+def authorize(snapshot, workspace, user):
+    if not any(w["id"] == workspace for w in snapshot["workspaces"]):
+        raise PermissionError("Workspace access is no longer available.")
+    if not any(
+        m["workspace_id"] == workspace
+        and m["user_id"] == user
+        and m["role"] in {"owner", "admin", "member"}
+        for m in snapshot["members"]
+    ):
+        raise PermissionError("A workspace member account is required to run builds.")
+    return frozenset(c["id"] for c in snapshot["channels"] if c["workspace_id"] == workspace)
+
+
+def gather(service, workspace, cancelled=lambda: False, progress=lambda _: None):
+    """Read every permitted channel and reply, keyset-paged, with explicit limits.
+
+    The file is evidence, not instructions. Results remain local and are never posted
+    to a channel. Re-check membership and channel access before returning it.
+    """
+    started = time.monotonic()
+    progress("Checking workspace access…")
+
+    def inventory():
+        if hasattr(service, "context_snapshot"):
+            return service.context_snapshot(workspace, cancelled)
+        return service.snapshot()
+
+    snapshot = inventory()
+    # The existing dashboard inventory uses PostgREST's default 1,000-row ceiling.
+    # Never advertise an entire workspace if that inventory may have been truncated.
+    if not hasattr(service, "context_snapshot") and len(snapshot["channels"]) >= 1000:
+        raise ValueError(
+            "The channel inventory reached the alpha limit. "
+            "No partial workspace context will be used."
+        )
+    user = str(service.user.id)
+    channels = authorize(snapshot, workspace, user)
+    revisions = {}
+    if hasattr(service, "context_revision"):
+        for channel in sorted(channels):
+            if cancelled():
+                raise InterruptedError("Cancelled")
+            revisions[channel] = service.context_revision(channel)
+    preference = next(
+        (p for p in snapshot.get("agent_preferences", []) if p["workspace_id"] == workspace), {}
+    )
+    lines, size, count = [], 0, 0
+
+    def add(record):
+        nonlocal size
+        line = json.dumps(record, ensure_ascii=False)
+        size += len(line.encode("utf-8")) + 1
+        if size > MAX_CONTEXT_BYTES:
+            raise ValueError(
+                "Workspace context exceeds the 8 MiB alpha limit. No partial build started."
+            )
+        lines.append(line)
+
+    for channel in sorted(snapshot["channels"], key=lambda c: c["id"]):
+        if channel["id"] not in channels:
+            continue
+        add({"channel": channel["id"], "name": channel["name"], "private": channel["private"]})
+        if hasattr(service, "context_decisions"):
+            for decision in service.context_decisions(channel["id"]):
+                if decision["channel_id"] != channel["id"]:
+                    raise PermissionError("Decision scope changed. Refresh context.")
+                add({"decision": decision})
+        cursor = 0
+        while True:
+            if cancelled():
+                raise InterruptedError("Cancelled")
+            if time.monotonic() - started > 180:
+                raise TimeoutError("Context retrieval timed out. Check your connection and retry.")
+            progress(f"Reading #{channel['name']} · {count} messages gathered…")
+            rows = service.context_page(channel["id"], after=cursor)
+            if not rows:
+                break
+            for row in rows:
+                if row["channel_id"] != channel["id"] or row["sequence"] <= cursor:
+                    raise ValueError("Invalid context pagination; build stopped.")
+                cursor = row["sequence"]
+                add({"message": row})
+                count += 1
+            attachments = service.attachments_for([r["id"] for r in rows])
+            if len(attachments) >= 1000:
+                raise ValueError("Attachment inventory may be truncated. No partial context used.")
+            for attachment in sorted(attachments, key=lambda item: item["id"]):
+                if attachment["message_id"] not in {r["id"] for r in rows}:
+                    raise PermissionError("Attachment is outside the requested source messages.")
+                from pathlib import Path
+
+                entry = {
+                    "attachment": attachment["id"],
+                    "message": attachment["message_id"],
+                    "filename": attachment["filename"],
+                    "content": "Metadata only",
+                }
+                if (
+                    Path(attachment["filename"]).suffix.lower() in TEXT_EXTENSIONS
+                    and attachment["byte_size"] <= 256 * 1024
+                ):
+                    if cancelled():
+                        raise InterruptedError("Cancelled")
+                    data = service.download_attachment(attachment["id"])
+                    try:
+                        entry["content"] = data.decode("utf-8")
+                    except UnicodeDecodeError:
+                        entry["content"] = "Binary content omitted"
+                add(entry)
+    current = authorize(inventory(), workspace, user)
+    if cancelled():
+        raise InterruptedError("Cancelled")
+    if str(service.user.id) != user:
+        raise PermissionError("The signed-in account changed during retrieval.")
+    if channels != current:
+        raise PermissionError("Channel access changed while gathering context. Please retry.")
+    for channel, revision in revisions.items():
+        if cancelled():
+            raise InterruptedError("Cancelled")
+        if service.context_revision(channel) != revision:
+            raise ValueError("Workspace evidence changed during retrieval. Refresh and try again.")
+    return WorkspaceContext(
+        workspace,
+        user,
+        channels,
+        "\n".join(lines),
+        count,
+        preference.get("nickname", "Aedrova"),
+        preference.get("provider", "codex"),
+    )
+
+
+def build_command(text, nickname="Aedrova"):
+    """Explicit leading mentions open the agent; mentions in ordinary prose stay silent."""
+    value = text.strip()
+    slash = re.match(r"^/build(?:\s+(.*))?$", value, re.IGNORECASE | re.DOTALL)
+    if slash:
+        return (slash.group(1) or "").strip()
+    mention = re.match(
+        r"^@(?:Aedrova|" + re.escape(nickname) + r")[,:]?(?:\s+(.*))?$",
+        value,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if not mention:
+        return None
+    request = (mention.group(1) or "").strip()
+    return re.sub(r"^build(?:\s+|$)", "", request, count=1, flags=re.IGNORECASE).strip()
