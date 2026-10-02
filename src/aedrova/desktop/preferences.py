@@ -1,7 +1,20 @@
 """Working account and desktop preferences; no placeholder account actions."""
 
-from PySide6.QtWidgets import QCheckBox, QDialog, QHBoxLayout, QLineEdit, QVBoxLayout
+from urllib.parse import quote
 
+from PySide6.QtCore import QUrl
+from PySide6.QtGui import QDesktopServices
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QDialog,
+    QHBoxLayout,
+    QLineEdit,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
+
+from aedrova.agents.managed import ManagedClient, application_origin
 from aedrova.desktop.controls import ChoiceBox
 from aedrova.desktop.dialogs import button, label
 
@@ -12,7 +25,16 @@ class SettingsDialog(QDialog):
         self.window = window
         self.setWindowTitle("Aedrova · Settings")
         self.setMinimumWidth(560)
-        layout = QVBoxLayout(self)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        content = QWidget()
+        scroll.setWidget(content)
+        outer.addWidget(scroll)
+        layout = QVBoxLayout(content)
+        self.resize(600, 760)
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(16)
         layout.addWidget(label("Make yourself at home.", "heading"))
@@ -69,6 +91,38 @@ class SettingsDialog(QDialog):
             lambda value: window.settings.setValue("editor", value)
         )
         layout.addWidget(self.editor)
+        self.billing_origin = application_origin()
+        if self.user:
+            layout.addWidget(label("PLAN & INCLUDED AI", "section"))
+            self.billing_status = label(
+                "Checking your workspace’s plan…"
+                if self.billing_origin
+                else (
+                    "Included AI is being prepared. This internal alpha uses "
+                    "separate provider access."
+                ),
+                "muted",
+                wrap=True,
+            )
+            layout.addWidget(self.billing_status)
+            if self.billing_origin:
+                row = QHBoxLayout()
+                manage = button("Plan & billing", role="outline")
+                manage.clicked.connect(
+                    lambda: QDesktopServices.openUrl(
+                        QUrl(
+                            self.billing_origin
+                            + "/account?workspace="
+                            + quote(window.workspace_id, safe="")
+                        )
+                    )
+                )
+                refresh = button("Refresh usage", role="outline")
+                refresh.clicked.connect(self.load_balance)
+                row.addWidget(manage)
+                row.addWidget(refresh)
+                layout.addLayout(row)
+                self.load_balance()
         self.status = label("Preferences are saved on this Mac.", "muted", wrap=True)
         layout.addWidget(self.status)
         actions = QHBoxLayout()
@@ -84,6 +138,48 @@ class SettingsDialog(QDialog):
         done.clicked.connect(self.accept)
         actions.addWidget(done)
         layout.addLayout(actions)
+
+    def load_balance(self):
+        if not self.user or not self.billing_origin or not self.window.connected:
+            return
+        workspace, expected = self.window.workspace_id, str(self.user.id)
+        self.billing_status.setText("Checking your workspace’s plan…")
+
+        def operation():
+            try:
+                _, _, access, user = self.account.service.realtime_credentials()
+                if user != expected:
+                    return {"error": "Your account changed. Sign in again."}
+                return ManagedClient(self.billing_origin, access).balance(workspace)
+            except Exception:
+                return {
+                    "error": "Could not load included AI usage. Check your connection and retry."
+                }
+
+        def completed(result):
+            if (
+                not self.user
+                or str(self.user.id) != expected
+                or self.window.workspace_id != workspace
+            ):
+                return
+            if result.get("error"):
+                self.billing_status.setText(result["error"])
+            elif result.get("status") == "active":
+                self.billing_status.setText(
+                    f"{result['plan'].title()} plan · ${result['available'] / 1_000_000:.2f} "
+                    f"AI allowance available · ${result['spent'] / 1_000_000:.2f} used. "
+                    "No automatic overage charges."
+                )
+            else:
+                self.billing_status.setText(
+                    "No active Aedrova plan for this workspace. View plans on the website."
+                )
+
+        if not self.window.connected.enqueue(
+            ("managed-balance", expected, workspace), operation, completed
+        ):
+            self.billing_status.setText("Connection busy. Refresh usage shortly.")
 
     def workspace_settings(self):
         self.close()

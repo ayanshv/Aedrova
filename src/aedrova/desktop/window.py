@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
-    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QScrollArea,
@@ -20,8 +19,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from aedrova.desktop.agent_activity import AgentActivity
+from aedrova.desktop.agent_activity import AgentActivity, AgentClock
+from aedrova.desktop.agent_stream import AgentStream
 from aedrova.desktop.brand import BrandMark, app_icon
+from aedrova.desktop.controls import AppMenu
 from aedrova.desktop.conversation import Composer, MessageView
 from aedrova.desktop.dialogs import CreateDialog, SwitcherDialog, button, label
 from aedrova.desktop.materials import (
@@ -334,6 +335,8 @@ class AedrovaWindow(QMainWindow):
         self.build_activity.clicked.connect(self.open_agent_activity)
         activity_row = QHBoxLayout()
         activity_row.addWidget(self.build_activity, 1)
+        self.agent_clock = AgentClock()
+        activity_row.addWidget(self.agent_clock)
         self.stop_agent = button("Stop", "Stop background build", "outline")
         self.stop_agent.hide()
         self.stop_agent.clicked.connect(self.cancel_agent)
@@ -348,16 +351,7 @@ class AedrovaWindow(QMainWindow):
         self.build_history.clicked.connect(show_builds)
         activity_row.addWidget(self.build_history)
         composition.addLayout(activity_row)
-        self.agent_feed = QPlainTextEdit()
-        self.agent_feed.setReadOnly(True)
-        self.agent_feed.setAccessibleName("Agent updates and actions")
-        self.agent_feed.setObjectName("AgentFeed")
-        self.agent_feed.setStyleSheet(
-            "QPlainTextEdit#AgentFeed { background: transparent; border: none; padding: 4px; }"
-        )
-        self.agent_feed.setMaximumHeight(125)
-        self.agent_feed.document().setMaximumBlockCount(100)
-        self.agent_feed.hide()
+        self.agent_feed = AgentStream()
         self.last_agent_event = ""
         composition.addWidget(self.agent_feed)
         composition.addWidget(self.composer)
@@ -640,6 +634,9 @@ class AedrovaWindow(QMainWindow):
             and (build.pending or build.background_transition)
         )
         self.stop_agent.setVisible(active)
+        self.agent_clock.set_active(active)
+        if not active and hasattr(self, "agent_feed"):
+            self.agent_feed.finish_pending()
         self.build_activity.configure(self.theme, self.reduced_motion, active)
 
     def agent_event(self, workspace, text):
@@ -662,7 +659,7 @@ class AedrovaWindow(QMainWindow):
         else:
             summary = text[:1400]
         self.activity_workspace = workspace
-        self.agent_feed.appendPlainText(summary)
+        self.agent_feed.add_event(text)
         self.agent_feed.show()
         if self.messages.model().rowCount() == 0:
             self.message_stack.setCurrentIndex(0)
@@ -686,7 +683,7 @@ class AedrovaWindow(QMainWindow):
         nickname = next(
             (p["nickname"] for p in preferences if p["workspace_id"] == workspace), "Aedrova"
         )
-        self.build_activity.setText(nickname + " · " + text[:105] + "  →")
+        self.build_activity.setText(nickname + " · " + text[:105])
         self.build_activity.setToolTip(text + "\nPrivate build activity. Click for details.")
         self.build_activity.setVisible(workspace == self.workspace_id)
         self.update_agent_cancel()
@@ -856,7 +853,7 @@ class AedrovaWindow(QMainWindow):
         self.notice.setText("Local preview · messages and new spaces reset when the app closes.")
 
     def workspace_menu(self):
-        menu = QMenu(self)
+        menu = AppMenu(self)
         for workspace in self.store.workspaces:
             menu.addAction(
                 workspace.name, lambda checked=False, wid=workspace.id: self.switch_workspace(wid)
@@ -1188,7 +1185,7 @@ class AedrovaWindow(QMainWindow):
 
     def open_profile_menu(self):
         self.update_profile_button()
-        menu = QMenu(self)
+        menu = AppMenu(self)
         user = self.current_user()
         if user:
             identity = menu.addAction(getattr(user, "email", None) or "Signed in")

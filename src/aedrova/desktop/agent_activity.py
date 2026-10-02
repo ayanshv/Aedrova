@@ -2,7 +2,7 @@
 
 from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPen
-from PySide6.QtWidgets import QPushButton
+from PySide6.QtWidgets import QLabel, QPushButton
 
 from aedrova.desktop.materials import system_font
 from aedrova.desktop.theme import DARK
@@ -76,3 +76,46 @@ class AgentActivity(QPushButton):
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.setPen(QColor(self.theme.accent))
             painter.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1), 6, 6)
+
+
+class AgentClock(QLabel):
+    """Elapsed work time only; no fabricated token or reasoning progress."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        import time
+
+        self.now = time.monotonic
+        self.started = None
+        self.active = False
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.setProperty("role", "muted")
+        self.setAccessibleName("Elapsed agent work time")
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.refresh)
+        self.timer.setInterval(1000)
+        self.hide()
+
+    def reset(self):
+        self.started = None
+        self.active = False
+        self.timer.stop()
+        self.hide()
+
+    def set_active(self, active):
+        if active and self.started is None:
+            self.started = self.now()
+        self.active = active
+        if active:
+            self.timer.start()
+            self.show()
+        else:
+            self.timer.stop()
+            self.hide()
+        self.refresh()
+
+    def refresh(self):
+        seconds = int(self.now() - self.started) if self.started is not None else 0
+        self.setText(f"{seconds // 60}:{seconds % 60:02d}")
+        self.setToolTip("Elapsed work time on this Mac")

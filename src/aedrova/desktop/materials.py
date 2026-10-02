@@ -231,9 +231,13 @@ class SpringMotion(QObject):
             self.effect.set_scale(1.0)
 
     def eventFilter(self, watched, event):  # noqa: N802
-        if event.type() == QEvent.Type.Enter and self.widget.isEnabled():
+        if (
+            event.type() == QEvent.Type.Enter
+            and self.widget.isEnabled()
+            and not self.widget.isDown()
+        ):
             self.animate(1.015)
-        elif event.type() == QEvent.Type.Leave:
+        elif event.type() == QEvent.Type.Leave and not self.widget.isDown():
             self.animate(1.0)
         elif event.type() == QEvent.Type.EnabledChange and not self.widget.isEnabled():
             self.animate(1.0)

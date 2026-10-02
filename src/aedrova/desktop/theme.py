@@ -179,8 +179,20 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
     QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
     QMenu {{ background: {t.bg}; border: 1px solid {t.border}; padding: 7px; border-radius: 12px; }}
-    QMenu::item {{ padding: 8px 24px 8px 12px; }}
+    QMenu::item {{ padding: 10px 24px 10px 12px; border-radius: 8px; }}
+    QMenu::separator {{ height: 1px; background: {t.border}; margin: 6px 8px; }}
+    QMenu::item:disabled {{ color: {t.muted}; }}
     QMenu::item:selected {{ background: {t.accent_bg}; }}
+    QScrollArea#AgentStream, QWidget#AgentStreamContent,
+    QFrame#AgentMessage {{ background: transparent; border: none; }}
+    QFrame#AgentTool {{ background: {t.surface}; border: 1px solid {t.border};
+        border-radius: 12px; }}
+    QPushButton#AgentDisclosure {{ background: transparent; border: none;
+        color: {t.muted}; text-align: left; padding: 0; font-size: 12px; }}
+    QPushButton#AgentDisclosure:hover {{ color: {t.text}; }}
+    QPushButton#AgentDisclosure:focus {{ border: 1px solid {t.accent}; border-radius: 6px; }}
+    QPlainTextEdit#AgentCommandOutput {{ background: transparent; border: none;
+        padding: 4px; font-size: 12px; }}
     QToolTip {{ background: {t.surface}; color: {t.text}; border: 1px solid {t.border};
         padding: 6px; }}
     """

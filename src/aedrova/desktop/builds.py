@@ -4,6 +4,7 @@ import json
 import threading
 import time
 from pathlib import Path
+from uuid import uuid4
 
 from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, QTimer, QUrl, Signal, Slot
 from PySide6.QtGui import QDesktopServices
@@ -20,6 +21,7 @@ from PySide6.QtWidgets import (
 
 from aedrova.agents.checkout import changes, git, prepare
 from aedrova.agents.context import authorize, gather
+from aedrova.agents.managed import ManagedClient, application_origin
 from aedrova.agents.retrieval import retrieval_record, validate_citations
 from aedrova.agents.runtime import BuildCancelled, LocalRunner, instructions
 from aedrova.desktop.controls import ChoiceBox, choose_project
@@ -33,11 +35,12 @@ class Signals(QObject):
 
 
 class ContextJob(QRunnable):
-    def __init__(self, service, workspace, cancelled, generation):
+    def __init__(self, service, workspace, cancelled, generation, managed_origin=""):
         super().__init__()
         self.signals = Signals()
         self.service, self.workspace = service, workspace
         self.cancelled, self.generation = cancelled, generation
+        self.managed_origin = managed_origin
 
     def run(self):
         try:
@@ -46,6 +49,11 @@ class ContextJob(QRunnable):
                     self.service, self.workspace, self.cancelled.is_set, self.signals.progress.emit
                 )
             }
+            if self.managed_origin:
+                _, _, access, user = self.service.realtime_credentials()
+                if user != str(self.service.user.id):
+                    raise PermissionError("Your build account changed. Sign in again.")
+                result["managed"] = ManagedClient(self.managed_origin, access)
         except (PermissionError, ValueError, InterruptedError, TimeoutError) as exc:
             result = {"error": str(exc)}
         except Exception:
@@ -71,6 +79,7 @@ class BuildJob(QRunnable):
         self.context, self.repository, self.task = context, repository, task
         self.provider, self.plan, self.project, self.approved = provider, plan, project, approved
         self.ledger = None
+        self.managed_client = None
         self.run_id = None
         self.runner = LocalRunner(self.signals.progress.emit, self.permission)
 
@@ -115,6 +124,11 @@ class BuildJob(QRunnable):
             prompt = instructions(
                 self.task, context_file, plan=self.plan, approved_plan=self.approved
             )
+            if self.managed_client:
+                self.signals.progress.emit("Checking your workspace’s included AI access…")
+                self.runner.managed = self.managed_client.begin(
+                    self.context.workspace_id, self.provider, str(uuid4())
+                )
             result = self.runner.run(self.provider, self.project, prompt, plan=self.plan)
             if self.runner.cancelled.is_set():
                 raise BuildCancelled()
@@ -145,6 +159,15 @@ class BuildJob(QRunnable):
         finally:
             if context_file:
                 context_file.unlink(missing_ok=True)
+            if self.managed_client:
+                try:
+                    self.managed_client.close()
+                except RuntimeError:
+                    self.signals.progress.emit(
+                        "Build access cleanup could not sync. It expires automatically; "
+                        "check workspace usage before retrying."
+                    )
+                self.runner.managed = None
         if self.ledger and self.run_id:
             self.ledger.record_usage(
                 self.run_id,
@@ -458,7 +481,10 @@ class BuildDialog(QDialog):
         def connect_context():
             try:
                 factory = getattr(service, "fork_for_context", None)
-                return {"service": factory() if factory else service}
+                return {
+                    "service": factory() if factory else service,
+                    "managed_origin": application_origin(),
+                }
             except Exception:
                 return {"error": "Could not connect to your workspace. Sign in again and retry."}
 
@@ -473,7 +499,13 @@ class BuildDialog(QDialog):
                 self.window.agent_activity(self.workspace, result["error"])
                 self.set_busy(False)
                 return
-            job = ContextJob(result["service"], self.workspace, cancelled, generation)
+            job = ContextJob(
+                result["service"],
+                self.workspace,
+                cancelled,
+                generation,
+                result.get("managed_origin", ""),
+            )
             self.context_jobs[generation] = job
             self.context_callbacks[generation] = collected
             job.signals.progress.connect(self.context_progress)
@@ -533,6 +565,7 @@ class BuildDialog(QDialog):
                 self.approved_plan,
                 self.baseline,
             )
+            self.job.managed_client = result.get("managed")
             if self.execution_queue and self.run_id:
                 self.job.ledger = self.execution_queue.ledger
                 self.job.run_id = self.run_id
@@ -819,6 +852,7 @@ def _start_background_build(window, task):
     dialog.consent.setChecked(True)
     dialog.background_settings = (saved["folder"], saved.get("provider", "codex"), True)
     dialog.background_run = True
+    window.agent_clock.reset()
     window.agent_feed.clear()
     window.agent_feed.hide()
     window.last_agent_event = ""

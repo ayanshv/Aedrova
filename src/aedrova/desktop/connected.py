@@ -8,8 +8,9 @@ from uuid import uuid4
 
 from PySide6.QtCore import QEvent, QObject, Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog
+from PySide6.QtWidgets import QApplication, QFileDialog
 
+from aedrova.desktop.controls import choose_teammate
 from aedrova.desktop.conversation import MESSAGE_ROLE
 from aedrova.desktop.state import Channel, DemoStore, Message, Workspace
 from aedrova.identity.realtime import RealtimeWakeups
@@ -200,6 +201,7 @@ class ConnectedDashboard(QObject):
         self.window.store.workspaces.clear()
         self.window.build_activity.hide()
         self.window.stop_agent.hide()
+        self.window.agent_clock.reset()
         self.window.agent_feed.clear()
         self.window.agent_feed.hide()
         self.window.last_agent_event = ""
@@ -581,9 +583,7 @@ class ConnectedDashboard(QObject):
                 self.window.notify("Invite a teammate before starting a direct message.")
                 return
             labels = [r["display_name"] + " · " + r["user_id"][:8] for r in people]
-            label, ok = QInputDialog.getItem(
-                self.window, "Direct message", "Teammate", labels, 0, False
-            )
+            label, ok = choose_teammate(self.window, labels)
             if not ok:
                 return
             recipient = people[labels.index(label)]["user_id"]

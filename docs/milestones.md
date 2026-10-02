@@ -1,6 +1,11 @@
 # Delivery gates
 
-Current status (latest): M7 and its guided GitHub CLI setup follow-up are implemented and locally verified; live GitHub publication still needs owner browser authorization and acceptance in a test repository. M8 is not started. See `milestone-7-delivery.md`.
+Current status: Milestone 9 was approved and its website/billing/managed-access implementation
+is locally verified. Live paid-beta acceptance remains blocked on owner server/Stripe/provider
+configuration, public signing and cost measurement. See `milestone-9-billing.md` and the website's
+`docs/owner-setup.md`. Milestone 10 has not started.
+
+Earlier status:  M7 and its guided GitHub CLI setup follow-up are implemented and locally verified; live GitHub publication still needs owner browser authorization and acceptance in a test repository. M8 local execution durability is implemented; its complete live Codex acceptance reached a provider quota limit. See `milestone-7-delivery.md`.
 
 Earlier milestones: milestones 1 and 2 complete. Milestone 3 Google login and the first chat migration are confirmed by the owner; the owner has confirmed that messages do not leak between separate workspaces. Milestone 4 code is implemented and locally tested, including DMs, attachments, unread state, keyset history, private realtime invalidations and reconnect/retries. The owner confirms applying the final communication migration and clarifies that the two-account observation was a successful isolation check, not a delivery failure. Same-workspace delivery and remaining hosted acceptance scenarios are not established by that check. The owner moved the full safety audit to the end of feature development; it is now milestone 13.
 
@@ -56,7 +61,7 @@ Never interpret a passed unit test as a passed live integration.
 12. **Expansion** — second provider, more integrations/environments/platforms and multi-repo agents.
 13. **Application safety and release audit** — run the full safety review after feature development and before public launch. Audit source, history, dependencies and release artifacts for secrets; review tenant/session permissions and hidden administrative access; harden server-enforced rate limits, quotas, signup/invitation abuse controls, file cleanup, audit logs/redaction and incident recovery. Review agent prompt injection, checkout isolation, tool approvals and network access. This is the rescheduled full audit, formerly 4A.
 
-Essential access checks, isolation, safe credential handling, and explicit code execution/push approvals remain part of implementing each feature. The rescheduled full audit does not remove existing protections. Milestone 5 was explicitly approved and implemented. Milestone 6 was approved and implemented; the owner applied its migration and the single-account hosted context-to-plan acceptance passed. Live two-account revocation remains unverified; local isolation suites pass. Milestone 7 was approved. Its account, project binding, local review/application, IDE, static preview and GitHub delivery code is implemented; see `milestone-7-delivery.md`. Live GitHub acceptance still requires owner authentication. Milestone 8 remains the next approval gate.
+Essential access checks, isolation, safe credential handling, and explicit code execution/push approvals remain part of implementing each feature. The rescheduled full audit does not remove existing protections. Milestone 5 was explicitly approved and implemented. Milestone 6 was approved and implemented; the owner applied its migration and the single-account hosted context-to-plan acceptance passed. Live two-account revocation remains unverified; local isolation suites pass. Milestone 7 was approved. Its account, project binding, local review/application, IDE, static preview and GitHub delivery code is implemented; see `milestone-7-delivery.md`. Live GitHub acceptance still requires owner authentication. Milestone 8 was approved and locally implemented; see milestone-8-execution.md. Milestone 9 was subsequently approved; see its latest delivery record below.
 
 Live model execution, connected Supabase/GitHub/Stripe, conferencing and release signing require
 appropriate service accounts at their milestones. Local protocol probes do not replace those gates.
@@ -165,4 +170,43 @@ Implemented: saved automatic planning/execution permission, background mentions,
 activity/actions with reduced-motion-aware shimmer, Stop, and corrected Codex stream recovery
 and terminal error reporting. No visible Create plan step remains. See `autonomous-agent.md`
 for setup, tests, provider limitations and still-outstanding live GitHub authorization.
-M8 remains unstarted; M9 retains included AI subscription billing.
+M8 was approved and locally implemented; M9 retains included AI subscription billing.
+
+## M8 delivery — 2026-09-30
+
+Durable local queue/recovery, concurrency and duplicate prevention, scoped run history, usage telemetry,
+resource gates and @Aedrova keyboard/click completion implemented. 276 Python tests and all embedded
+PostgreSQL suites pass; package/signature/secrets checks pass. A real Codex attempt wrote the feature
+and passed four generated tests but reached provider quota before its final success result; complete
+live M8 provider acceptance remains unverified. No new SQL or OAuth setup. See milestone-8-execution.md.
+The owner separately authorized an agent-working UI and component/menu consistency follow-up after M8.
+At this earlier handoff M9 had not started; see its latest delivery record below.
+
+## Agent working UI delivery — 2026-09-30
+
+The owner’s separately authorized follow-up adds Codex-style public agent updates and expandable
+commands/files, elapsed time, shimmer and distinct terminal states in chat; account/workspace/message
+menus and the remaining DM selector now share Aedrova’s themed controls. See agent-working-ui.md.
+The remainder of the dashboard and branding retain their existing layout. At this earlier handoff M9 had not started; see its latest delivery record below.
+
+Final combined M8/UI regression: 282 tests passed, database suites passed, both-theme synthetic
+visuals and resize checks passed, package launch/signature/baseline secret checks passed. See
+agent-working-ui.md. The live Codex quota limitation is recorded in milestone-8-execution.md.
+
+## M9 implementation and local verification — 2026-09-30
+
+The owner approved the separate Python website and Stripe/managed AI work. Prices: $10/week,
+$49/month and negotiated enterprise; delegated initial allowances: $1/week, $10/month, one run
+per workspace, no automatic overages. Optional explicit $10 credit purchases provide $5 usage.
+Implemented private billing ledger, signed/idempotent/canonical webhooks, allowance/credit
+reservation and reconciliation, provider gateway, ephemeral desktop access, fresh membership
+checks, usage/settings, public app configuration, original Aedrova naming, actual desktop site
+captures, five-second scenery rotation, and installer/notarization tooling. Codex and Claude
+runtimes are bundled; managed builds never fall back to a customer's personal provider login.
+
+294 desktop tests and 72 website tests pass; existing PostgreSQL suites and new private billing
+DDL validation pass. Installed runtimes completed local file writes through loopback protocol
+fixtures. Preview package/DMG, both-theme smoke, signature and baseline secret checks pass.
+These are not live paid-provider, real PostgreSQL concurrency, Stripe, website OAuth or public
+signing acceptance. Owner setup instructions are required before calling M9 or the paid beta
+live-ready. Website remote is connected; no push/deployment occurred. No M10 work was started.

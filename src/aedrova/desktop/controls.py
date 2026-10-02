@@ -2,7 +2,16 @@
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPainter, QPainterPath, QPalette, QPen
-from PySide6.QtWidgets import QComboBox, QFileDialog, QListView, QStyleFactory
+from PySide6.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QFileDialog,
+    QHBoxLayout,
+    QListView,
+    QMenu,
+    QStyleFactory,
+    QVBoxLayout,
+)
 
 
 class ChoiceBox(QComboBox):
@@ -36,3 +45,41 @@ def choose_project(parent, initial=""):
         initial,
         QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontUseNativeDialog,
     )
+
+
+class AppMenu(QMenu):
+    """Use the app's styled popup renderer rather than macOS native menu fallbacks."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._menu_style = QStyleFactory.create("Fusion")
+        self.setStyle(self._menu_style)
+        self.setObjectName("AppMenu")
+        self.setMinimumWidth(220)
+        self.setSeparatorsCollapsible(True)
+
+
+def choose_teammate(parent, names):
+    from aedrova.desktop.dialogs import button, label
+
+    dialog = QDialog(parent)
+    dialog.setWindowTitle("Aedrova · Direct message")
+    dialog.setMinimumWidth(380)
+    layout = QVBoxLayout(dialog)
+    layout.setContentsMargins(24, 24, 24, 24)
+    layout.setSpacing(16)
+    layout.addWidget(label("Start a conversation", "title"))
+    choice = ChoiceBox(dialog)
+    choice.setAccessibleName("Choose a teammate")
+    choice.addItems(names)
+    layout.addWidget(choice)
+    actions = QHBoxLayout()
+    cancel = button("Cancel", role="outline")
+    cancel.clicked.connect(dialog.reject)
+    start = button("Message", role="primary")
+    start.clicked.connect(dialog.accept)
+    actions.addWidget(cancel)
+    actions.addWidget(start)
+    layout.addLayout(actions)
+    accepted = dialog.exec() == QDialog.DialogCode.Accepted
+    return choice.currentText(), accepted

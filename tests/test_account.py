@@ -79,7 +79,7 @@ def test_new_google_user_gets_onboarding(qtbot, tmp_path):
         }
     )
     assert widget.pages.currentIndex() == 2
-    assert widget.onboarding_nickname.text() == "Nova"
+    assert widget.onboarding_nickname.text() == "Aedrova"
     assert "Aedrova" in widget.windowTitle()
 
 
@@ -136,7 +136,7 @@ def test_create_intent_survives_sign_in_and_existing_workspaces(qtbot, tmp_path)
     )
     assert widget.pages.currentIndex() == 2
     assert widget.pending_intent is None
-    assert widget.onboarding_nickname.text() == "Nova"
+    assert widget.onboarding_nickname.text() == "Aedrova"
 
 
 def test_invitation_copy_and_access(qtbot, tmp_path):

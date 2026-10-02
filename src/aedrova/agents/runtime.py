@@ -7,9 +7,11 @@ import selectors
 import shutil
 import signal
 import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 
 class BuildCancelled(Exception):
@@ -17,6 +19,11 @@ class BuildCancelled(Exception):
 
 
 def executable(name):
+    if name == "codex" and getattr(sys, "frozen", False):
+        bundled = Path(__file__).parent / "bin" / "codex"
+        if bundled.is_file() and os.access(bundled, os.X_OK):
+            return str(bundled)
+        raise ValueError("The bundled coding runtime is missing. Reinstall Aedrova.")
     found = shutil.which(name)
     if found:
         return found
@@ -179,6 +186,7 @@ class LocalRunner:
         self.process = None
         self.usage = {}
         self.lease_fd = None
+        self.managed = None
 
     def cancel(self):
         self.cancelled.set()
@@ -202,6 +210,14 @@ class LocalRunner:
         raise ValueError("Unsupported coding provider")
 
     def codex(self, project, prompt, *, plan):
+        if self.managed:
+            # An empty private home prevents an incompatible CLI from silently
+            # consuming the customer's personal ChatGPT login instead of our gateway.
+            with TemporaryDirectory(prefix="aedrova-managed-codex-") as managed_home:
+                return self._codex(project, prompt, plan=plan, managed_home=managed_home)
+        return self._codex(project, prompt, plan=plan)
+
+    def _codex(self, project, prompt, *, plan, managed_home=None):
         command = [
             executable("codex"),
             "exec",
@@ -223,13 +239,41 @@ class LocalRunner:
             str(project),
             "-",
         ]
+        provider_env = environment()
+        if self.managed:
+            access = self.managed
+            if access.provider != "codex":
+                raise ValueError("Managed provider does not match this build.")
+            overrides = {
+                "model_provider": "aedrova_managed",
+                "model": access.model,
+                "model_providers.aedrova_managed.name": "Aedrova included AI",
+                "model_providers.aedrova_managed.base_url": access.base_url,
+                "model_providers.aedrova_managed.env_key": "AEDROVA_BUILD_TOKEN",
+                "model_providers.aedrova_managed.wire_api": "responses",
+                "model_providers.aedrova_managed.requires_openai_auth": False,
+                "model_providers.aedrova_managed.supports_websockets": False,
+                "model_providers.aedrova_managed.request_max_retries": 0,
+                "model_providers.aedrova_managed.stream_max_retries": 0,
+                "web_search": "disabled",
+                "features.multi_agent": False,
+                "features.multi_agent_v2": False,
+                "features.hooks": False,
+                "features.plugins": False,
+                "model_context_window": 200000,
+                "model_auto_compact_token_limit": 150000,
+            }
+            for key, value in overrides.items():
+                command[2:2] = ["-c", key + "=" + json.dumps(value)]
+            provider_env["AEDROVA_BUILD_TOKEN"] = access.token
+            provider_env["CODEX_HOME"] = managed_home
         started, final, completed = time.monotonic(), "", False
         process = subprocess.Popen(
             command,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            env=environment(),
+            env=provider_env,
             start_new_session=True,
             **({"pass_fds": (self.lease_fd,)} if self.lease_fd is not None else {}),
         )
@@ -295,14 +339,14 @@ class LocalRunner:
                                 last_error = str(event.get("message") or event.get("error") or "")
                                 self.emit("Codex is recovering; waiting for its final status…")
                             elif kind == "turn.failed":
-                                raise codex_failure(event.get("error") or last_error)
+                                raise self.failure(event.get("error") or last_error)
                     if not selector.get_map():
                         break
             code = process.wait(timeout=5)
             if self.cancelled.is_set():
                 raise BuildCancelled()
             if code or not completed or not final:
-                raise codex_failure(last_error or diagnostics.decode("utf-8", errors="replace"))
+                raise self.failure(last_error or diagnostics.decode("utf-8", errors="replace"))
             return final
         finally:
             try:
@@ -317,8 +361,16 @@ class LocalRunner:
             process.stderr.close()
             self.process = None
 
+    def failure(self, message):
+        if self.managed:
+            return RuntimeError(
+                "The included AI run did not complete. Check your workspace plan, remaining "
+                "allowance and connection in Settings. Partial work is retained for review."
+            )
+        return codex_failure(message)
+
     async def claude(self, project, prompt, *, plan):
-        if not os.environ.get("ANTHROPIC_API_KEY"):
+        if not self.managed and not os.environ.get("ANTHROPIC_API_KEY"):
             raise ValueError(
                 "Claude requires an Anthropic API key for this integration. "
                 "Launch Aedrova with ANTHROPIC_API_KEY configured; "
@@ -374,6 +426,19 @@ class LocalRunner:
 
         clean = {key: "" for key in os.environ}
         clean.update(environment(anthropic=True))
+        managed_options = {}
+        if self.managed:
+            if self.managed.provider != "claude_code":
+                raise ValueError("Managed provider does not match this build.")
+            clean.update(
+                {
+                    "ANTHROPIC_API_KEY": self.managed.token,
+                    "ANTHROPIC_BASE_URL": self.managed.base_url,
+                    "ANTHROPIC_AUTH_TOKEN": "",
+                    "DISABLE_NONESSENTIAL_TRAFFIC": "1",
+                }
+            )
+            managed_options["model"] = self.managed.model
         options = ClaudeAgentOptions(
             cwd=str(project),
             setting_sources=[],
@@ -394,6 +459,7 @@ class LocalRunner:
             max_turns=60,
             max_budget_usd=5.0,
             stderr=lambda _: None,
+            **managed_options,
         )
 
         async def execute():

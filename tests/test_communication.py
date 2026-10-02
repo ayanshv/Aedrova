@@ -251,7 +251,6 @@ def test_upload_lost_response_finalizes_same_reservation(tmp_path):
 
 
 def test_direct_message_action_uses_selected_teammate(qtbot, tmp_path, monkeypatch):
-    from PySide6.QtWidgets import QInputDialog
 
     window, service = setup(qtbot, tmp_path)
     data = snapshot()
@@ -276,7 +275,9 @@ def test_direct_message_action_uses_selected_teammate(qtbot, tmp_path, monkeypat
             return "dm"
 
     service.rpc = rpc
-    monkeypatch.setattr(QInputDialog, "getItem", lambda *a: ("Morgan · peer", True))
+    monkeypatch.setattr(
+        "aedrova.desktop.connected.choose_teammate", lambda *a: ("Morgan · peer", True)
+    )
     window.connected.start_dm()
     qtbot.waitUntil(lambda: window.channel_id == "dm" and not window.account_dialog.busy)
     assert calls == [{"p_workspace": "w", "p_user": "peer"}]

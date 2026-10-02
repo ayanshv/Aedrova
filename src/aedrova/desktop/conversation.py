@@ -6,6 +6,7 @@ from math import ceil
 
 from PySide6.QtCore import (
     QAbstractListModel,
+    QEvent,
     QPersistentModelIndex,
     QPoint,
     QRectF,
@@ -31,13 +32,13 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QListView,
-    QMenu,
     QPlainTextEdit,
     QStyle,
     QStyledItemDelegate,
     QVBoxLayout,
 )
 
+from aedrova.desktop.controls import AppMenu
 from aedrova.desktop.materials import SpringButton, system_font
 from aedrova.desktop.theme import LIGHT, Theme
 
@@ -286,7 +287,7 @@ class MessageView(QListView):
         if not index.isValid():
             return
         self.setCurrentIndex(index)
-        menu = QMenu(self)
+        menu = AppMenu(self)
         if self.allow_threads:
             menu.addAction("Reply in thread", lambda: self._request_thread(index))
         menu.addAction("Copy message", self.copy_current)
@@ -366,6 +367,18 @@ class MessageEditor(QPlainTextEdit):
     def focusOutEvent(self, event):  # noqa: N802
         super().focusOutEvent(event)
         self.focus_changed.emit(False)
+
+    def event(self, event):
+        # QWidget handles Tab traversal before keyPressEvent. Complete an active
+        # mention here, while keeping ordinary Tab/Shift Tab focus navigation.
+        if (
+            event.type() == QEvent.Type.KeyPress
+            and event.key() == Qt.Key.Key_Tab
+            and self.completion
+            and self.completion(event)
+        ):
+            return True
+        return super().event(event)
 
     def keyPressEvent(self, event):  # noqa: N802
         if self.completion and self.completion(event):

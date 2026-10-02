@@ -182,6 +182,7 @@ class RunHistory(QDialog):
             )
         )
         self.list = QListWidget()
+        self.list.setProperty("accountList", True)
         layout.addWidget(self.list, 1)
         self.details = QPlainTextEdit()
         self.details.setReadOnly(True)

@@ -380,7 +380,7 @@ class AccountDialog(QDialog):
         )
         self.onboarding_nickname = self.field("Agent nickname")
         self.onboarding_nickname.setMaxLength(32)
-        self.onboarding_nickname.setText("Nova")
+        self.onboarding_nickname.setText("Aedrova")
         self.onboarding_nickname.setMinimumHeight(48)
         second.addWidget(self.onboarding_nickname)
         second.addWidget(label("Powered by", "muted"))
@@ -513,7 +513,7 @@ class AccountDialog(QDialog):
     def begin_onboarding(self):
         self.pending_intent = None
         self.onboarding_workspace.clear()
-        self.onboarding_nickname.setText("Nova")
+        self.onboarding_nickname.setText("Aedrova")
         self.onboarding_provider.setCurrentIndex(0)
         self.onboarding_steps.setCurrentIndex(0)
         self.pages.setCurrentIndex(2)
@@ -838,7 +838,7 @@ class AccountDialog(QDialog):
         self.session_closed.emit()
         self.clear_connected()
         self.onboarding_workspace.clear()
-        self.onboarding_nickname.setText("Nova")
+        self.onboarding_nickname.setText("Aedrova")
         self.onboarding_steps.setCurrentIndex(0)
         self.pending_intent = None
 
