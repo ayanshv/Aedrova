@@ -1,9 +1,142 @@
 # Delivery gates
 
-Current status: Milestone 9 was approved and its website/billing/managed-access implementation
-is locally verified. Live paid-beta acceptance remains blocked on owner server/Stripe/provider
-configuration, public signing and cost measurement. See `milestone-9-billing.md` and the website's
-`docs/owner-setup.md`. Milestone 10 has not started.
+Domain follow-up, October 2: owner confirms applying workspace archive SQL, bought
+aedrova.com at Cloudflare (registrar email verified) and selected Render. Website-only
+deployment is now requested. Render authorization/hosting/private PostgreSQL/server
+secrets and DNS/TLS/OAuth acceptance remain pending; preparation is in the website
+repository docs/domain-deployment.md. Apple Developer/signing remains at M13. Domain
+ownership does not enable live checkout, managed AI, meetings or public DMG downloads.
+
+M12 started — October 2, 2026: owner approved remaining integration work and explicitly
+deferred Apple Developer enrollment/signing setup and custom-domain setup to the latest
+possible stage. Keep both out of M12 prerequisites. Developer ID/notarization/fresh-Mac
+acceptance remain mandatory before public DMG release in the M13 launch gate; a custom
+domain is optional, and a provider's stable HTTPS URL can support hosted acceptance.
+Neither public download nor live checkout is enabled by this approval.
+
+M12A — personal workspace cleanup: Archive for me and Restore are implemented.
+Personal archival does not delete chats/files, change permissions or affect teammates
+or subscriptions. Finish local active builds/calls before archiving; controls enforce
+this and recheck at confirmation. Archived-only accounts get a restore screen instead
+of a forced new-workspace wizard. New SQL 202610020002_workspace_archive.sql must be
+applied by the owner before this rebuilt desktop can load its workspace inventory.
+Local test evidence and the next-task handoff are in milestone-12-workspace-cleanup.md.
+M12 is not complete: consented transcription/meeting context and the remaining integration
+acceptance follow, with task-by-task owner permission as previously requested.
+
+Pre-M12 hardening — October 2, 2026: owner requested audit-first production reliability
+work. Incremental backend/database/AI/context/realtime bounds and sanitized observability
+are implemented; 408 desktop and 154 website tests pass. Full audit is in the website
+repository docs/production-readiness-audit.md; updates are explained in app-updates.md.
+Owner confirmed applying 202610020001_scalability.sql on October 2, 2026.
+The hosted search RPC rejects anonymous execution (401 / 42501); authenticated
+indexed-context and rate-budget acceptance still require a signed-in check.
+Hosted load, PostgreSQL concurrency, storage quotas, realtime fan-out, commercial AI and
+public signing acceptance remain open. No large-scale capacity claim or M12 start.
+
+Current M11 update — October 2, 2026: owner approved M11. Local optional setup,
+17-step chaptered spotlight tour, explicit update checks and installer/download preparation
+are implemented and tested (404 desktop / 135 website tests). See
+`milestone-11-release.md` for exact owner actions and verification. Public acceptance
+remains blocked by Developer ID/notarization, stable HTTPS hosting/managed services
+and a fresh-Mac test. No public download, live checkout, push or deployment was enabled.
+M12 still requires permission. Older status entries below are historical.
+
+
+Current task update — October 2, 2026: owner requested the M9 Stripe configuration and
+checkout acceptance before M11. Plans/onboarding/account/confirmation and isolated sandbox
+configuration and real Stripe sandbox acceptance are complete. Both approved plans, signed
+webhooks, portal cancellation, declined payment/3DS, timed renewal/failure/recovery and replay
+checks passed. New invoice API and workspace-selection defects are fixed; 132 website and
+15 desktop managed-access tests pass. Owner credential/redirect setup is complete.
+See website `docs/stripe-sandbox-setup.md`. No live checkout or M11 approval is implied.
+After sandbox acceptance, ask permission again before starting M11.
+
+Current status — October 2, 2026: the final UI polish of implemented desktop and
+website surfaces is locally verified; see `final-ui-polish.md`. M11 has not started
+and requires fresh owner approval. M9 code is locally verified, but paid-beta activation
+still requires Stripe/provider/server setup, measured usage and live acceptance.
+
+The owner deferred the remaining M10 work because shared hosting and a second Mac are
+unavailable. Preserve the tested local call implementation. Move shared HTTPS deployment,
+two-device physical audio acceptance, consented transcription and scoped meeting context
+into **M12's deferred meeting completion**. M10 is not fully accepted. Those prerequisites
+do not block the approved visual pass or a separately approved M11 preparation task.
+
+Next sequence: M11 premium desktop setup/tour and Mac distribution preparation (approval
+required) → M12 deferred meeting completion and remaining PRD integration gaps → M9
+commercial activation acceptance when owner setup is ready → M13 final safety/public
+launch gate. A purchased domain remains optional during preparation; public notarized
+release and paid access remain gated.
+
+The following October 1 sequence is historical and is superseded by this status.
+
+## Current next-task sequence — October 1, 2026
+
+Completed this task: hosted two-account meetings with the owner's approved school
+account, generated camera/screen frames, repeated heartbeats, scoped/private-channel
+negative checks, leave/rejoin, server-forced membership removal, cached-token rejection,
+and host end. This is two real authenticated accounts on one Mac, not two-device
+physical audio acceptance. Report: `work/hosted-meeting-check.json`.
+
+Fixed a rapid Google-sign-in listener reuse bug and the meeting-origin/AI-authentication
+coupling. The internal development package explicitly uses local provider access;
+commercial releases explicitly require included access and cannot fall back to personal
+credentials. Real local Codex file creation passed in an isolated test project. Managed
+API execution and paid checkout still require owner commercial credentials/configuration.
+
+The owner authorized completing the remaining M10 scope on October 1. Hosting and a
+second Mac are currently unavailable (owner confirmed). M10C deployment preparation
+now includes a non-root container, separate worker command, durable external-guard
+health, fail-closed joins, atomic duplicate-lease rejection and a credential-safe HTTPS
+preflight. No deployment or Docker image build has been performed. See the website
+repository's `docs/meeting-hosting.md` for exact setup and physical acceptance checks.
+M10 remains in progress; transcription/retrieval are not implemented or enabled.
+Resume already-authorized M10 when the live media prerequisites are available; request
+permission before moving to M9 activation, M11 or another milestone.
+
+Proceed through these remaining tasks:
+
+1. **M10C — shared HTTPS service and two-device call acceptance.** Prepare a shared
+   service address using a hosting provider's HTTPS URL; a purchased/custom domain is
+   not required. Keep the independently supervised access guard, encrypted durable
+   leases and logging redaction. Owner needs a second Mac and two Google accounts in
+   the same test workspace/channel. Validate microphone/speaker audio in both directions,
+   headphones and speaker echo, camera/screen rendering, device stop/permissions,
+   network loss/reconnection, leave/rejoin and host end. Do not expose the localhost API
+   publicly or transmit deployment credentials without separate approval/setup.
+2. **M10D — consented transcription.** After the media gate passes, implement explicit
+   per-participant transcription/AI-context consent, a clear active indicator, revocation
+   on roster/revision changes, speaker attribution and retention/deletion controls. Select
+   and configure a server-side speech provider; no credentials in the app. Validate consent
+   races, participant removal and failed/partial transcripts before enabling the feature.
+3. **M10E — meeting context for the agent.** Scoped meeting transcripts, reviewed decisions
+   and citations enter workspace retrieval. Verify cross-workspace/private-channel isolation,
+   revoked access, expired retention and precise context-to-build behavior. Finish M10 only
+   after live acceptance; no silent recording or automatic consent.
+4. **M9 activation follow-up — managed AI and Stripe test acceptance.** Owner configures
+   commercial provider billing/keys and server models, Stripe test Prices/webhooks and hosted
+   service secrets. Verify real Codex/Claude gateway builds, measured costs, allowance stops,
+   subscription lifecycle and reconciliation. Keep $10/week, $49/month and Enterprise
+   Contact Us presentation; approve any later allowance adjustments before live checkout.
+5. **M11 — Mac release and website delivery.** Developer ID signing/notarization (development
+   signing is insufficient), distributable DMG, updates/recovery, fresh-Mac acceptance and
+   hosted website/download flow. Complete premium setup and the skippable dashboard tour,
+   covering all implemented functions; verify website onboarding, real screenshots and billing
+   continuity. A custom domain can remain a final launch follow-up.
+6. **M12 — remaining feature/integration completion.** Reconcile the PRD with implemented
+   features and website claims; finish any confirmed gaps in files/design/decision context,
+   GitHub/IDE acceptance, provider parity and workspace management, including archiving test
+   workspaces. Extend platforms/multi-repo only after the agreed macOS scope is accepted.
+7. **M13 — final app safety audit and public launch.** Audit secrets in source/history/builds,
+   dependencies, auth/tenant isolation, rate limits, billing/usage abuse, hidden administrative
+   access, prompt injection/tool approvals, redaction, backup/incident recovery and release
+   artifacts. Resolve findings before public paid access. A custom domain and final live-key
+   checkout/release switches belong to this launch gate, not the current local test task.
+
+No new owner SQL or secrets are required for the completed two-account/local-AI fixes.
+Next-task manual setup: second Mac availability and a shared HTTPS hosting environment.
+Commercial AI setup instructions remain in the website's `docs/owner-setup.md`, section 4.
 
 Earlier status:  M7 and its guided GitHub CLI setup follow-up are implemented and locally verified; live GitHub publication still needs owner browser authorization and acceptance in a test repository. M8 local execution durability is implemented; its complete live Codex acceptance reached a provider quota limit. See `milestone-7-delivery.md`.
 
@@ -210,3 +343,46 @@ fixtures. Preview package/DMG, both-theme smoke, signature and baseline secret c
 These are not live paid-provider, real PostgreSQL concurrency, Stripe, website OAuth or public
 signing acceptance. Owner setup instructions are required before calling M9 or the paid beta
 live-ready. Website remote is connected; no push/deployment occurred. No M10 work was started.
+
+## Domain deferral — 2026-10-01
+
+Custom domain purchase, DNS setup and final production URL configuration move to
+M11 release preparation. They do not block M10 meetings or local feature work.
+M9 live acceptance remains pending; localhost development can continue, and a
+stable host-provided HTTPS staging URL can be evaluated separately if needed.
+OAuth redirects, Stripe webhooks and desktop managed origin must use the actual
+chosen environment URL and be reconfigured and verified before public release.
+No deployment, public checkout activation or M10 implementation is authorized
+by this roadmap adjustment alone.
+
+## M10 started — 2026-10-01
+
+Implemented channel-scoped meeting/consent SQL, guarded room credential issuance,
+client credential validation, fail-closed capture permits and a two-peer synthetic
+media acceptance harness. Calls, device capture, transcription and meeting-to-agent
+retrieval are not yet available. LiveKit Cloud project configuration and the meeting
+SQL migration are the next owner actions; see milestone-10-meetings.md. The final
+media client must pass the architecture's two-participant gate before integration.
+Do not start M11 or mark M10 complete based on these foundation checks.
+
+M10 live transport follow-up: corrected LiveKit credentials pass two-peer synthetic
+audio/camera/screen-share reception, Qt pixel checks and forced TURN relay. Owner
+confirms applying meeting SQL. Native physical capture/playback, echo handling,
+reconnection, participant revocation and consented transcription/retrieval remain
+required before calls can be advertised or M10 marked complete.
+
+M10 task 1: native local meeting-device setup is implemented. Camera/screen preview,
+microphone meter and generated speaker tone require explicit enablement; device
+cleanup and stale callback protection are covered by automated tests. Packaged macOS
+usage descriptions and release device entitlements were added. Owner hardware
+permission/preview verification remains required; see docs/milestone-10-meetings.md.
+Do not start the next task (real-device media validation and channel call connection)
+without the owner's permission. M10 is not complete and calls remain gated.
+
+M10 task 2 code: candidate native channel calls and durable Cloud access revocation
+are implemented and tested with synthetic media; 356 desktop and 96 backend tests
+pass. Live Cloud worker video/removal/cached-token rejection passed. Physical device,
+echo, true network reconnect and hosted two-account acceptance remain open. Keep
+meetings disabled pending owner device preflight; continue this approved task's live
+validation when ready. Do not start transcription/AI meeting context without asking
+after call validation. A separate supervised lease guard is required for production.

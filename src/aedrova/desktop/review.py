@@ -5,7 +5,6 @@ import threading
 from PySide6.QtCore import QThreadPool, QUrl, Slot
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QDialog,
     QHBoxLayout,
     QListWidget,
     QMessageBox,
@@ -17,11 +16,12 @@ from aedrova.agents.context import authorize
 from aedrova.delivery.files import apply_review, make_review
 from aedrova.delivery.github import GitHub, prepare_publication, publish
 from aedrova.delivery.preview import StaticPreview
+from aedrova.desktop.controls import AppDialog
 from aedrova.desktop.dialogs import button, label
 from aedrova.desktop.projects import Job, binding, open_editor
 
 
-class ReviewDialog(QDialog):
+class ReviewDialog(AppDialog):
     def __init__(self, studio):
         super().__init__(studio)
         self.studio, self.window = studio, studio.window

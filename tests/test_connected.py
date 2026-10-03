@@ -62,6 +62,28 @@ def test_dashboard_uses_real_workspaces_and_messages(qtbot, tmp_path):
     assert window.isVisible()
 
 
+def test_archived_last_workspace_leaves_dashboard_and_can_restore(qtbot, tmp_path):
+    window, service = setup(qtbot, tmp_path)
+    archived = snapshot()
+    archived["archived_workspaces"] = archived["workspaces"]
+    archived["workspaces"] = []
+    service.snapshot = lambda: archived
+    window.account_dialog.loaded(archived)
+    assert not window.connected.active
+    assert window.store.workspaces == []
+    assert window.account_dialog.pages.currentIndex() == 4
+    assert window.account_dialog.archived_workspaces.currentData() == "w"
+    restored = snapshot()
+    restored["archived_workspaces"] = []
+    service.snapshot = lambda: restored
+    window.account_dialog.loaded(restored)
+    window.account_dialog.open_dashboard()
+    window.connected.timer.stop()
+    assert window.connected.active
+    assert window.workspace_id == "w"
+    assert window.channel_id == "c"
+
+
 def test_failed_send_keeps_draft_and_reuses_message_id(qtbot, tmp_path):
     window, service = setup(qtbot, tmp_path)
     calls = []
@@ -120,3 +142,24 @@ def test_successful_send_persists_and_clears_only_sent_draft(qtbot, tmp_path):
     assert calls[0][1]["p_body"] == "Hello"
     assert window.composer.editor.toPlainText() == ""
     assert window.channel.messages[0].body == "Hello"
+
+
+def test_signed_in_meetings_opens_device_setup_and_signout_closes_it(qtbot, tmp_path):
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QPushButton
+
+    window, _ = setup(qtbot, tmp_path)
+    window.pages.setCurrentIndex(4)
+    # Rebuilding the connected dashboard must preserve both tab and device action.
+    window._render_pages()
+    assert window.pages.currentIndex() == 4
+    page = window.pages.widget(4)
+    actions = [b for b in page.findChildren(QPushButton)
+               if b.text() == "Check meeting devices"]
+    assert len(actions) == 1
+    qtbot.mouseClick(actions[0], Qt.MouseButton.LeftButton)
+    assert window.meeting_setup.isVisible()
+    assert not window.meeting_setup.check.handles
+    window.account_dialog.session_closed.emit()
+    assert not window.meeting_setup.isVisible()
+    assert window.meeting_setup.check.closed

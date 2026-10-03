@@ -4,7 +4,6 @@ import threading
 
 from PySide6.QtCore import Qt, QThreadPool, Slot
 from PySide6.QtWidgets import (
-    QDialog,
     QHBoxLayout,
     QLineEdit,
     QListWidget,
@@ -14,10 +13,11 @@ from PySide6.QtWidgets import (
 
 from aedrova.agents.context import authorize
 from aedrova.agents.retrieval import ContextIndex
+from aedrova.desktop.controls import AppDialog
 from aedrova.desktop.dialogs import button, label
 
 
-class ContextBrowser(QDialog):
+class ContextBrowser(AppDialog):
     def __init__(self, studio):
         super().__init__(studio)
         self.studio = studio

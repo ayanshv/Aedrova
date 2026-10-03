@@ -4,9 +4,9 @@ from PySide6.QtCore import QSettings, Qt, QTimer
 from PySide6.QtGui import QAction, QActionGroup, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
-    QDialog,
     QFrame,
     QHBoxLayout,
+    QLayout,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
 from aedrova.desktop.agent_activity import AgentActivity, AgentClock
 from aedrova.desktop.agent_stream import AgentStream
 from aedrova.desktop.brand import BrandMark, app_icon
-from aedrova.desktop.controls import AppMenu
+from aedrova.desktop.controls import AppDialog, AppMenu
 from aedrova.desktop.conversation import Composer, MessageView
 from aedrova.desktop.dialogs import CreateDialog, SwitcherDialog, button, label
 from aedrova.desktop.materials import (
@@ -60,6 +60,7 @@ class AedrovaWindow(QMainWindow):
         self.resize(1440, 940)
         self.setMinimumSize(900, 650)
         self.dialog = None
+        self.tour = None
         self.workspace_buttons = {}
         self.tab_buttons = []
         self._build_shell()
@@ -325,6 +326,7 @@ class AedrovaWindow(QMainWindow):
         chat.addWidget(self.message_stack, 1)
         compose_area = QWidget()
         composition = QVBoxLayout(compose_area)
+        composition.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         composition.setContentsMargins(28, 12, 28, 18)
         composition.setSpacing(9)
         self.composer = Composer()
@@ -424,13 +426,18 @@ class AedrovaWindow(QMainWindow):
         theme_shortcut = QShortcut(QKeySequence("Ctrl+Shift+L"), self)
         theme_shortcut.activated.connect(self.toggle_theme)
         escape = QShortcut(QKeySequence("Escape"), self)
-        escape.activated.connect(self.close_thread)
+        escape.activated.connect(
+            lambda: self.tour.finish("paused") if self.tour else self.close_thread()
+        )
         account_menu = self.menuBar().addMenu("Account")
         account_menu.addAction("Account & workspaces…", self.show_account)
         settings = account_menu.addAction("Settings…", self.show_settings)
         settings.setShortcut(QKeySequence("Ctrl+,"))
         account_menu.addAction("Log out", self.log_out)
         help_menu = self.menuBar().addMenu("Help")
+        help_menu.addAction("Getting started…", self.show_setup)
+        help_menu.addAction("Explore Aedrova…", self.show_tour)
+        help_menu.addAction("Check for updates…", self.show_updates)
         help_menu.addAction("About this preview", self.show_about)
 
     def _populate_rail(self):
@@ -614,6 +621,11 @@ class AedrovaWindow(QMainWindow):
             self._adapt_thread()
             QTimer.singleShot(0, self._adapt_thread)
             self.members_label.setVisible(self.width() >= 1100)
+            compact = self.height() < 760
+            self.header.setFixedHeight(96 if compact else 112)
+            self.conversation_date.setContentsMargins(
+                0, 8 if compact else 20, 0, 6 if compact else 10
+            )
 
     def open_agent_activity(self):
         if getattr(self, "agent_setup_needed", False):
@@ -789,7 +801,10 @@ class AedrovaWindow(QMainWindow):
             and QApplication.instance().styleHints().colorScheme() == Qt.ColorScheme.Dark
         )
         self.theme = DARK if dark else LIGHT
+        QApplication.instance().setPalette(palette(self.theme))
         self.setPalette(palette(self.theme))
+        for dialog in self.findChildren(AppDialog):
+            dialog.setPalette(palette(self.theme))
         self.setStyleSheet(stylesheet(self.theme, reduced_transparency=self.reduced_transparency))
         self.build_activity.configure(self.theme, self.reduced_motion, self.build_activity.active)
         self.messages.set_theme(self.theme)
@@ -964,6 +979,9 @@ class AedrovaWindow(QMainWindow):
                     layout.addWidget(editor)
                 layout.addStretch()
                 self.pages.insertWidget(index, page)
+            elif index == 4:
+                # Local device checks are available in both shared and preview workspaces.
+                self.pages.insertWidget(index, builder())
             elif self.connected and self.connected.active:
                 page, layout = self._page(
                     "YOUR WORKSPACE",
@@ -1091,21 +1109,31 @@ class AedrovaWindow(QMainWindow):
         return page
 
     def _meetings_page(self):
+        from aedrova.desktop.meeting_setup import open_meeting_setup
+
         page, layout = self._page(
             "WORKSPACE / MEETINGS",
             "Make room for the conversation.",
-            "Calls and meeting context are coming in a later release.",
+            "Meet in this channel. Device checks are local; calls require the meeting service.",
         )
         layout.addWidget(
             self._card(
                 "Together, in the same room.",
                 "Start a call from a channel, share your screen, and keep the decisions close "
                 "to the work. Transcription and AI access will always be explicit choices.",
+                "Check meeting devices",
+                lambda: open_meeting_setup(self),
             )
         )
+        from aedrova.desktop.meeting_call import open_channel_call
+
+        call = button("Open channel call", role="primary")
+        call.clicked.connect(lambda: open_channel_call(self))
+        layout.addWidget(call)
         layout.addWidget(
             label(
-                "No microphone, camera, or recording is active in this preview.", "muted", wrap=True
+                "Your devices stay off until you enable a check. No checks are recorded.",
+                "muted", wrap=True
             )
         )
         layout.addStretch()
@@ -1131,7 +1159,7 @@ class AedrovaWindow(QMainWindow):
                 "Aedrova waits to be invited. Important external actions require approval."
             ),
         }
-        self.dialog = QDialog(self)
+        self.dialog = AppDialog(self)
         self.dialog.setWindowTitle(name)
         self.dialog.resize(620, 560)
         layout = QVBoxLayout(self.dialog)
@@ -1147,22 +1175,21 @@ class AedrovaWindow(QMainWindow):
         self.dialog.open()
 
     def show_about(self):
-        self.dialog = QDialog(self)
-        self.dialog.setWindowTitle("About Aedrova preview")
-        self.dialog.resize(440, 250)
+        self.dialog = AppDialog(self)
+        self.dialog.setWindowTitle("About Aedrova")
+        self.dialog.resize(480, 430)
         layout = QVBoxLayout(self.dialog)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.addWidget(BrandMark(112), 0, Qt.AlignmentFlag.AlignHCenter)
         layout.addWidget(label("Aedrova", "heading"))
         layout.addWidget(label("Where teams and AI build together.", "muted"))
-        layout.addWidget(label("Milestone 2 · Desktop experience", "muted"))
+        layout.addWidget(label("Internal preview", "muted"))
         layout.addWidget(
             label(
-                "This is an interactive local preview. Sample conversations and new messages "
-                "stay in memory and reset when the app closes. Your appearance and accessibility "
-                "preferences "
-                "are saved. Account setup is available in the Account menu. Shared chat, agents, "
-                "billing, and calls are not connected.",
+                "Your team’s conversations, shared context and coding agent in one workspace. "
+                "Aedrova is being prepared for release. Service availability depends on setup. "
+                "Local sample workspaces use preview data; your appearance and accessibility "
+                "preferences are saved on this Mac.",
                 wrap=True,
             )
         )
@@ -1230,6 +1257,10 @@ class AedrovaWindow(QMainWindow):
             if choice != QMessageBox.StandardButton.Yes:
                 return
         account.show()
+        if self.tour:
+            self.tour.finish("paused")
+        if getattr(self, "setup_dialog", None):
+            self.setup_dialog.close()
         account.sign_out()
         self.update_profile_button()
 
@@ -1259,11 +1290,7 @@ class AedrovaWindow(QMainWindow):
                 self.connected = ConnectedDashboard(self, account)
             self.connected.activate()
             self.select_tab(0)
-            if not getattr(self, "github_setup_offered", False) and not self.settings.value(
-                "githubHelperOnboarded", False, type=bool
-            ):
-                self.github_setup_offered = True
-                QTimer.singleShot(0, self.offer_github_setup)
+            QTimer.singleShot(0, self.offer_setup)
             return
         # Explicit local-preview navigation remains available in demo mode.
         self.select_tab(0)
@@ -1276,3 +1303,38 @@ class AedrovaWindow(QMainWindow):
             from aedrova.desktop.github_setup import open_github_setup
 
             open_github_setup(self)
+
+    def offer_setup(self):
+        from aedrova.desktop.onboarding import account_key
+
+        key = account_key(self)
+        if not self.current_user() or getattr(self, "setup_offered", None) == key:
+            return
+        self.setup_offered = key
+        if not self.settings.value(key + "/setup", False, type=bool) and not self.settings.value(
+            key + "/deferred", False, type=bool
+        ):
+            self.show_setup()
+
+    def show_setup(self):
+        from aedrova.desktop.onboarding import SetupDialog
+
+        if self.tour:
+            self.tour.finish("paused")
+        self.setup_dialog = SetupDialog(self)
+        self.setup_dialog.show()
+        self.setup_dialog.raise_()
+
+    def show_tour(self):
+        from aedrova.desktop.onboarding import SpotlightTour
+
+        if self.tour:
+            self.tour.raise_()
+            return
+        self.tour = SpotlightTour(self)
+
+    def show_updates(self):
+        from aedrova.desktop.release_check import ReleaseDialog
+
+        self.release_dialog = ReleaseDialog(self)
+        self.release_dialog.show()

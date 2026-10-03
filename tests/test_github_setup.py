@@ -163,7 +163,8 @@ def test_login_code_is_parsed_and_signout_cancels(qtbot, tmp_path, monkeypatch, 
 def test_first_dashboard_offers_setup_once(qtbot, tmp_path, monkeypatch):
     window, _ = setup(qtbot, tmp_path)
     calls = []
-    monkeypatch.setattr("aedrova.desktop.github_setup.open_github_setup", lambda w: calls.append(w))
+    # M11 replaces the immediate GitHub popup with the unified optional setup guide.
+    monkeypatch.setattr(window, "show_setup", lambda: calls.append(window))
     window.settings.setValue("githubHelperOnboarded", False)
     window.open_dashboard()
     qtbot.waitUntil(lambda: len(calls) == 1)

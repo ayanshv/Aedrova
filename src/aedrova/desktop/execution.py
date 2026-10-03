@@ -6,10 +6,11 @@ from types import SimpleNamespace
 
 from PySide6.QtCore import QObject, QSettings, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QDialog, QHBoxLayout, QListWidget, QPlainTextEdit, QVBoxLayout
+from PySide6.QtWidgets import QHBoxLayout, QListWidget, QPlainTextEdit, QVBoxLayout
 
 from aedrova.agents.context import authorize
 from aedrova.agents.ledger import RunLedger
+from aedrova.desktop.controls import AppDialog
 from aedrova.desktop.dialogs import button, label
 from aedrova.desktop.projects import binding
 
@@ -162,7 +163,7 @@ class ExecutionQueue(QObject):
         self.dialog.show()
 
 
-class RunHistory(QDialog):
+class RunHistory(AppDialog):
     def __init__(self, queue):
         super().__init__(queue.window)
         self.queue = queue

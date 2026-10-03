@@ -1,0 +1,91 @@
+"""Strict, short-lived room access received from the trusted Aedrova backend."""
+
+import base64
+import json
+import time
+from dataclasses import dataclass, field
+from urllib.parse import urlparse
+from uuid import UUID
+
+from aedrova.agents.managed import ManagedClient
+
+
+@dataclass(frozen=True)
+class MeetingAccess:
+    meeting_id: str
+    workspace_id: str
+    channel_id: str
+    user_id: str
+    url: str
+    token: str = field(repr=False)
+    expires_at: int
+
+    @classmethod
+    def parse(cls, result, *, workspace, channel, user, now=None):
+        now = time.time() if now is None else now
+        try:
+            meeting = str(UUID(result['meeting_id']))
+            if (result['workspace_id'], result['channel_id'], result['user_id']) != (
+                workspace, channel, user
+            ):
+                raise ValueError('scope')
+            parsed = urlparse(result['url'])
+            if (parsed.scheme != 'wss' or not parsed.hostname or parsed.username
+                    or parsed.password or parsed.query or parsed.fragment
+                    or parsed.path not in {'', '/'}):
+                raise ValueError('url')
+            token = result['token']
+            if not isinstance(token, str) or len(token) > 8192 or len(token.split('.')) != 3:
+                raise ValueError('token')
+            payload = token.split('.')[1]
+            claims = json.loads(base64.urlsafe_b64decode(payload + '=' * (-len(payload) % 4)))
+            # Server is the trust boundary; these checks prevent confused-room client mistakes.
+            grant = claims['video']
+            room = f'aedrova-{workspace}-{channel}-{meeting}'
+            expiry = result['expires_at']
+            if (claims['sub'] != user or grant.get('room') != room
+                    or grant.get('roomJoin') is not True or grant.get('roomAdmin')
+                    or grant.get('canPublishData') is not False
+                    or type(expiry) is not int or not now < expiry <= now + 330
+                    or claims['exp'] != expiry):
+                raise ValueError('grant')
+        except (KeyError, TypeError, ValueError, UnicodeDecodeError) as error:
+            raise RuntimeError('Aedrova returned invalid meeting access. No device was started.') \
+                from error
+        return cls(meeting, workspace, channel, user, result['url'], token, expiry)
+
+
+class MeetingClient(ManagedClient):
+    def start(self, channel):
+        channel = str(UUID(channel))
+        existing = self.request('/api/meetings/channel/' + channel)
+        if existing:
+            return str(UUID(existing[0]['id']))
+        return str(UUID(self.request('/api/meetings/start/' + channel, {})['meeting']))
+
+    def pulse(self, meeting):
+        return self.request('/api/meetings/pulse', {'meeting': meeting})
+
+    def leave(self, meeting):
+        return self.request('/api/meetings/leave', {'meeting': meeting})
+
+    def end(self, meeting):
+        return self.request('/api/meetings/end', {'meeting': meeting})
+
+    def join(self, meeting, *, workspace, channel, user):
+        result = self.request('/api/meetings/join', {'meeting': meeting})
+        return MeetingAccess.parse(result, workspace=workspace, channel=channel, user=user)
+
+
+def transport_failure(error):
+    """Classify HTTP authentication failures without echoing credential-bearing errors."""
+    seen = set()
+    while error is not None and id(error) not in seen:
+        seen.add(id(error))
+        if getattr(error, 'status', None) in {401, 403}:
+            return ('LiveKit rejected the project credentials (401/403). Check that the '
+                    'URL, API key and paired API secret all belong to the same project. '
+                    'No physical device capture or transcription was started.')
+        error = error.__context__
+    return ('Meeting transport check did not pass. Check the local LiveKit configuration '
+            'and network. No physical device capture or transcription was started.')

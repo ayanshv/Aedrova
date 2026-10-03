@@ -8,7 +8,6 @@ from PySide6.QtCore import QObject, QRunnable, QThreadPool, QUrl, Signal, Slot
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QCheckBox,
-    QDialog,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -18,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from aedrova.delivery.github import GitHub, repository_name
-from aedrova.desktop.controls import ChoiceBox, choose_project
+from aedrova.desktop.controls import AppDialog, ChoiceBox, choose_project
 from aedrova.desktop.dialogs import button, label
 
 
@@ -94,7 +93,7 @@ class Job(QRunnable):
         self.signals.finished.emit(result)
 
 
-class ProjectDialog(QDialog):
+class ProjectDialog(AppDialog):
     def __init__(self, window):
         super().__init__(window)
         self.window = window

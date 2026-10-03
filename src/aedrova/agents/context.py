@@ -33,8 +33,16 @@ def authorize(snapshot, workspace, user):
     return frozenset(c["id"] for c in snapshot["channels"] if c["workspace_id"] == workspace)
 
 
-def gather(service, workspace, cancelled=lambda: False, progress=lambda _: None):
-    """Read every permitted channel and reply, keyset-paged, with explicit limits.
+def gather(
+    service,
+    workspace,
+    cancelled=lambda: False,
+    progress=lambda _: None,
+    *,
+    query="",
+    preferred_channel="",
+):
+    """Collect authorized evidence with explicit limits; production uses indexed search.
 
     The file is evidence, not instructions. Results remain local and are never posted
     to a channel. Re-check membership and channel access before returning it.
@@ -62,6 +70,8 @@ def gather(service, workspace, cancelled=lambda: False, progress=lambda _: None)
         for channel in sorted(channels):
             if cancelled():
                 raise InterruptedError("Cancelled")
+            if time.monotonic() - started > 180:
+                raise TimeoutError("Context retrieval timed out. Retry with a narrower request.")
             revisions[channel] = service.context_revision(channel)
     preference = next(
         (p for p in snapshot.get("agent_preferences", []) if p["workspace_id"] == workspace), {}
@@ -78,12 +88,80 @@ def gather(service, workspace, cancelled=lambda: False, progress=lambda _: None)
             )
         lines.append(line)
 
+    bounded = hasattr(service, "search_context")
+    candidates = {}
+    selected_channels = set()
+    if bounded:
+        terms = list(dict.fromkeys(re.findall(r"[^\W_]+", query, re.UNICODE)))[:32]
+        search = " OR ".join('"' + term + '"' for term in terms)
+        progress("Searching permitted workspace evidence…")
+        ranked = service.search_context(workspace, search[:1000])
+        if len(ranked) > 200 or any(row["channel_id"] not in channels for row in ranked):
+            raise PermissionError("Context search returned invalid or unauthorized evidence.")
+        candidates.update({row["id"]: row for row in ranked})
+        roots = list(
+            dict.fromkeys((row["channel_id"], row.get("parent_id") or row["id"]) for row in ranked)
+        )[:12]
+        if hasattr(service, "thread_context"):
+            for channel, parent in roots:
+                if cancelled():
+                    raise InterruptedError("Cancelled")
+                rows = service.thread_context(channel, parent)
+                if len(rows) > 21 or any(
+                    row["channel_id"] != channel
+                    or (row["id"] != parent and row.get("parent_id") != parent)
+                    for row in rows
+                ):
+                    raise PermissionError("Thread evidence has invalid scope.")
+                candidates.update({row["id"]: row for row in rows})
+        selected_channels = set(row["channel_id"] for row in ranked)
+        recent_channels = sorted(selected_channels)[:22]
+        recent_channels += sorted(channels - selected_channels)[:10]
+        recent_channels = list(
+            dict.fromkeys(
+                ([preferred_channel] if preferred_channel in channels else []) + recent_channels
+            )
+        )[:32]
+        for channel in recent_channels:
+            if cancelled():
+                raise InterruptedError("Cancelled")
+            if time.monotonic() - started > 180:
+                raise TimeoutError("Context retrieval timed out. Retry with a narrower request.")
+            rows = service.recent_context(channel)
+            if len(rows) > 20 or any(row["channel_id"] != channel for row in rows):
+                raise PermissionError("Recent evidence has invalid channel scope.")
+            candidates.update({row["id"]: row for row in rows})
+            selected_channels.add(channel)
+        add(
+            {
+                "coverage": {
+                    "mode": "indexed search and bounded recent evidence",
+                    "query": query[:1000],
+                    "search_results": len(ranked),
+                    "recent_channel_limit": 32,
+                    "recent_messages_per_channel": 20,
+                    "matched_threads": 12,
+                    "replies_per_thread": 20,
+                    "recent_decisions_per_selected_channel": 50,
+                    "notice": "This is selected evidence, not the complete workspace history. "
+                    "Ask the team when missing or conflicting requirements need more evidence.",
+                }
+            }
+        )
+
     for channel in sorted(snapshot["channels"], key=lambda c: c["id"]):
         if channel["id"] not in channels:
             continue
         add({"channel": channel["id"], "name": channel["name"], "private": channel["private"]})
+        if bounded and channel["id"] not in selected_channels:
+            continue
         if hasattr(service, "context_decisions"):
-            for decision in service.context_decisions(channel["id"]):
+            decisions = (
+                service.recent_decisions(channel["id"])
+                if bounded
+                else service.context_decisions(channel["id"])
+            )
+            for decision in decisions:
                 if decision["channel_id"] != channel["id"]:
                     raise PermissionError("Decision scope changed. Refresh context.")
                 add({"decision": decision})
@@ -94,7 +172,14 @@ def gather(service, workspace, cancelled=lambda: False, progress=lambda _: None)
             if time.monotonic() - started > 180:
                 raise TimeoutError("Context retrieval timed out. Check your connection and retry.")
             progress(f"Reading #{channel['name']} · {count} messages gathered…")
-            rows = service.context_page(channel["id"], after=cursor)
+            rows = (
+                sorted(
+                    (row for row in candidates.values() if row["channel_id"] == channel["id"]),
+                    key=lambda row: row["sequence"],
+                )
+                if bounded
+                else service.context_page(channel["id"], after=cursor)
+            )
             if not rows:
                 break
             for row in rows:
@@ -129,6 +214,8 @@ def gather(service, workspace, cancelled=lambda: False, progress=lambda _: None)
                     except UnicodeDecodeError:
                         entry["content"] = "Binary content omitted"
                 add(entry)
+            if bounded:
+                break
     current = authorize(inventory(), workspace, user)
     if cancelled():
         raise InterruptedError("Cancelled")
@@ -139,6 +226,8 @@ def gather(service, workspace, cancelled=lambda: False, progress=lambda _: None)
     for channel, revision in revisions.items():
         if cancelled():
             raise InterruptedError("Cancelled")
+        if time.monotonic() - started > 180:
+            raise TimeoutError("Context retrieval timed out. Retry with a narrower request.")
         if service.context_revision(channel) != revision:
             raise ValueError("Workspace evidence changed during retrieval. Refresh and try again.")
     return WorkspaceContext(

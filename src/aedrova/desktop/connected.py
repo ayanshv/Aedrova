@@ -175,6 +175,10 @@ class ConnectedDashboard(QObject):
             self.apply(self.account.snapshot, [], self.window.workspace_id, self.window.channel_id)
 
     def disconnect(self):
+        if self.window.tour:
+            self.window.tour.finish("paused")
+        if getattr(self.window, "setup_dialog", None):
+            self.window.setup_dialog.close()
         build = getattr(self.window, "build_dialog", None)
         if build:
             build.invalidate()

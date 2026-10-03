@@ -11,7 +11,6 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
-    QDialog,
     QHBoxLayout,
     QLineEdit,
     QMessageBox,
@@ -21,10 +20,10 @@ from PySide6.QtWidgets import (
 
 from aedrova.agents.checkout import changes, git, prepare
 from aedrova.agents.context import authorize, gather
-from aedrova.agents.managed import ManagedClient, application_origin
+from aedrova.agents.managed import ManagedClient, ai_access_mode, application_ai_origin
 from aedrova.agents.retrieval import retrieval_record, validate_citations
 from aedrova.agents.runtime import BuildCancelled, LocalRunner, instructions
-from aedrova.desktop.controls import ChoiceBox, choose_project
+from aedrova.desktop.controls import AppDialog, ChoiceBox, choose_project
 from aedrova.desktop.dialogs import button, label
 
 
@@ -35,18 +34,34 @@ class Signals(QObject):
 
 
 class ContextJob(QRunnable):
-    def __init__(self, service, workspace, cancelled, generation, managed_origin=""):
+    def __init__(
+        self,
+        service,
+        workspace,
+        cancelled,
+        generation,
+        managed_origin="",
+        query="",
+        preferred_channel="",
+    ):
         super().__init__()
         self.signals = Signals()
         self.service, self.workspace = service, workspace
         self.cancelled, self.generation = cancelled, generation
         self.managed_origin = managed_origin
+        self.query = query
+        self.preferred_channel = preferred_channel
 
     def run(self):
         try:
             result = {
                 "context": gather(
-                    self.service, self.workspace, self.cancelled.is_set, self.signals.progress.emit
+                    self.service,
+                    self.workspace,
+                    self.cancelled.is_set,
+                    self.signals.progress.emit,
+                    query=self.query,
+                    preferred_channel=self.preferred_channel,
                 )
             }
             if self.managed_origin:
@@ -60,7 +75,7 @@ class ContextJob(QRunnable):
             result = {
                 "error": "Could not retrieve workspace context. Check your connection "
                 "and sign in again before retrying. If context decisions are not configured, "
-                "the workspace owner must apply the Milestone 6 SQL migration."
+                "the workspace owner must apply the context scalability SQL migration."
             }
         finally:
             close = getattr(self.service, "close_context", None)
@@ -179,11 +194,12 @@ class BuildJob(QRunnable):
         self.signals.finished.emit(outcome)
 
 
-class BuildDialog(QDialog):
+class BuildDialog(AppDialog):
     def __init__(self, window, task=""):
         super().__init__(window)
         self.window, self.account = window, window.account_dialog
         self.workspace = window.workspace_id
+        self.origin_channel = window.channel_id
         self.user = str(self.account.service.user.id)
         self.context = self.job = self.project = None
         self.approved_plan = ""
@@ -218,6 +234,10 @@ class BuildDialog(QDialog):
             "muted",
             wrap=True,
         )
+        if ai_access_mode() == "local":
+            self.introduction.setText(
+                self.introduction.text() + " This internal build uses your local provider login."
+            )
         layout.addWidget(self.introduction)
         row = QHBoxLayout()
         self.repository = QLineEdit()
@@ -238,11 +258,6 @@ class BuildDialog(QDialog):
         self.request = QPlainTextEdit(task)
         self.request.setAccessibleName("Build request")
         self.request.setObjectName("BuildRequest")
-        self.request.setStyleSheet(
-            "QPlainTextEdit#BuildRequest { border: 1px solid #777777; "
-            "border-radius: 12px; padding: 12px; } "
-            "QPlainTextEdit#BuildRequest:focus { border-color: #0A84FF; }"
-        )
         self.request.setPlaceholderText("What should we build? Include how you’ll know it works.")
         self.request.setMaximumHeight(110)
         layout.addWidget(self.request)
@@ -483,7 +498,7 @@ class BuildDialog(QDialog):
                 factory = getattr(service, "fork_for_context", None)
                 return {
                     "service": factory() if factory else service,
-                    "managed_origin": application_origin(),
+                    "managed_origin": application_ai_origin(),
                 }
             except Exception:
                 return {"error": "Could not connect to your workspace. Sign in again and retry."}
@@ -505,6 +520,8 @@ class BuildDialog(QDialog):
                 cancelled,
                 generation,
                 result.get("managed_origin", ""),
+                query=self.request.toPlainText(),
+                preferred_channel=self.origin_channel,
             )
             self.context_jobs[generation] = job
             self.context_callbacks[generation] = collected

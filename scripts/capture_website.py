@@ -23,6 +23,8 @@ window.show()
 def capture(name, theme, tab=0):
     window.set_theme(theme, persist=False)
     window.select_tab(tab)
+    if app.focusWidget():
+        app.focusWidget().clearFocus()
     QTest.qWait(250)
     # centralWidget is the actual app content, excluding the native menu/title bars.
     if not window.centralWidget().grab().save(str(OUTPUT / name)):

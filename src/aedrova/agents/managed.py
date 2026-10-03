@@ -35,6 +35,31 @@ def application_origin():
     return validate_origin(value) if value else ""
 
 
+def ai_access_mode():
+    """Build authentication is an explicit product mode, independent of meetings.
+
+    Missing modes in older server-connected builds stay included (fail closed).
+    Frozen apps ignore environment overrides so gateway failures never fall back.
+    """
+    path = Path(__file__).parents[1] / "desktop/assets/public-config.json"
+    config = json.loads(path.read_text()) if path.exists() else {}
+    mode = config.get("ai_access_mode", "included" if application_origin() else "local")
+    if not getattr(sys, "frozen", False):
+        mode = os.getenv("AEDROVA_AI_ACCESS_MODE", mode)
+    if mode not in {"included", "local"}:
+        raise ValueError("Invalid AI access mode. Rebuild with local or included access.")
+    return mode
+
+
+def application_ai_origin():
+    if ai_access_mode() == "local":
+        return ""
+    origin = application_origin()
+    if not origin:
+        raise ValueError("Included AI needs the configured Aedrova service. Contact the owner.")
+    return origin
+
+
 @dataclass(frozen=True)
 class BuildAccess:
     id: str

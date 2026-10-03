@@ -56,7 +56,13 @@ try {
    'supabase/migrations/202609280001_communication.sql',
    'supabase/tests/communication.sql',
    'supabase/migrations/202609290001_context_decisions.sql',
-   'supabase/tests/context_decisions.sql']) {
+   'supabase/tests/context_decisions.sql',
+   'supabase/migrations/202610010001_meetings.sql',
+   'supabase/tests/meetings.sql',
+   'supabase/migrations/202610020001_scalability.sql',
+   'supabase/tests/scalability.sql',
+   'supabase/migrations/202610020002_workspace_archive.sql',
+   'supabase/tests/workspace_archive.sql']) {
   await db.exec(fs.readFileSync(file,'utf8'));
   console.log('PASS '+file);
  }

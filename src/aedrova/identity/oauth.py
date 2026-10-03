@@ -15,7 +15,9 @@ REDIRECT_ALLOWLIST = f"http://127.0.0.1:{PORT}/auth/**"
 
 
 class LoopbackServer(HTTPServer):
-    allow_reuse_address = False
+    # Reuse a closed listener after TCP TIME_WAIT, never an active listener.
+    # Each attempt still requires its own random callback path and PKCE verifier.
+    allow_reuse_address = True
 
     def handle_error(self, request, client_address):
         # Ignore incomplete/broken loopback requests without logging callback data.

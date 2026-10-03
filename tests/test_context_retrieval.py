@@ -279,3 +279,79 @@ def test_citation_can_be_resolved_in_source_browser():
     index = ContextIndex(corpus())
     assert index.search("[message:3]")[0].body == "Invoice export must include tax totals"
     index.close()
+
+
+def bounded_service():
+    from types import SimpleNamespace
+
+    from test_builds import snapshot
+
+    def row(identifier, channel="c", parent=None):
+        return {
+            "id": identifier,
+            "channel_id": channel,
+            "body": "Export invoices",
+            "sequence": int(identifier),
+            "parent_id": parent,
+        }
+
+    calls = []
+
+    def search(workspace, query):
+        calls.append(("search", workspace, query))
+        return [row("2", parent="1")]
+
+    def thread(channel, parent):
+        calls.append(("thread", channel, parent))
+        return [row("1"), row("2", parent="1"), row("3", parent="1")]
+
+    def recent(channel):
+        calls.append(("recent", channel))
+        return [row("4" if channel == "c" else "5", channel)]
+
+    source = SimpleNamespace(
+        user=SimpleNamespace(id="u"),
+        snapshot=snapshot,
+        search_context=search,
+        thread_context=thread,
+        recent_context=recent,
+        context_page=lambda *a, **kw: pytest.fail("Must never download full history"),
+        attachments_for=lambda ids: [],
+        context_revision=lambda channel: 1,
+        calls=calls,
+    )
+    return source
+
+
+def test_indexed_context_preserves_query_threads_and_marks_coverage():
+    source = bounded_service()
+    context = gather(source, "w", query="export invoices")
+    records = [json.loads(line) for line in context.text.splitlines()]
+    assert records[0]["coverage"]["mode"] == "indexed search and bounded recent evidence"
+    assert context.count == 5
+    assert ("search", "w", '"export" OR "invoices"') in source.calls
+    assert ("thread", "c", "1") in source.calls
+    assert all("x" not in call for call in source.calls)
+    assert ContextIndex(context).search("invoices")
+
+
+def test_indexed_context_rejects_search_result_from_foreign_channel():
+    source = bounded_service()
+    source.search_context = lambda *a: [{"channel_id": "foreign", "id": "1"}]
+    with pytest.raises(PermissionError):
+        gather(source, "w", query="invoice")
+
+
+def test_indexed_context_rejects_changed_revision():
+    source = bounded_service()
+    revisions = iter([1, 1, 2, 2])
+    source.context_revision = lambda channel: next(revisions)
+    with pytest.raises(ValueError, match="changed"):
+        gather(source, "w", query="invoice")
+
+
+def test_indexed_context_enforces_recent_message_ceiling():
+    source = bounded_service()
+    source.recent_context = lambda channel: [{}] * 21
+    with pytest.raises(PermissionError, match="invalid"):
+        gather(source, "w", query="invoice")

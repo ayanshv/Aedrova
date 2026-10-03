@@ -1,7 +1,6 @@
 from PySide6.QtCore import QEvent, Qt, Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
-    QDialog,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -10,6 +9,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from aedrova.desktop.controls import AppDialog
 from aedrova.desktop.materials import SpringButton, system_font
 
 
@@ -20,7 +20,7 @@ def label(text, role="", *, wrap=False):
     elif role == "title":
         widget.setFont(system_font(20, QFont.Weight.DemiBold, -0.35))
     widget.setTextFormat(Qt.TextFormat.PlainText)
-    widget.setWordWrap(wrap)
+    widget.setWordWrap(wrap or role in ('heading', 'title'))
     if role:
         widget.setProperty("role", role)
     return widget
@@ -35,14 +35,15 @@ def button(text, accessible="", role=""):
     return widget
 
 
-class CreateDialog(QDialog):
+class CreateDialog(AppDialog):
     def __init__(self, parent, *, workspace, create):
         super().__init__(parent)
         self.create = create
         self.result_object = None
         self.setWindowTitle("Create workspace" if workspace else "Create channel")
         self.setModal(True)
-        self.setFixedWidth(480)
+        self.resize(480, 400 if workspace else 480)
+        self.setMinimumWidth(400)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(32, 30, 32, 30)
         layout.setSpacing(14)
@@ -102,7 +103,7 @@ class CreateDialog(QDialog):
         self.accept()
 
 
-class SwitcherDialog(QDialog):
+class SwitcherDialog(AppDialog):
     chosen = Signal(str, str)
 
     def __init__(self, parent, store):

@@ -1,6 +1,7 @@
 """Private, content-free realtime wakeups on a dedicated asyncio thread."""
 
 import asyncio
+import random
 from threading import Event, Lock, Thread
 
 from PySide6.QtCore import QObject, Signal
@@ -63,7 +64,7 @@ class RealtimeWakeups(QObject):
                     await client.close()
                 except Exception:
                     pass
-            for _ in range(delay * 4):
+            for _ in range(max(1, int(random.uniform(0.5, 1.5) * delay * 4))):
                 if self.stop_event.is_set():
                     return
                 await asyncio.sleep(0.25)

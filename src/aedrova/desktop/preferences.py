@@ -6,7 +6,6 @@ from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QCheckBox,
-    QDialog,
     QHBoxLayout,
     QLineEdit,
     QScrollArea,
@@ -14,12 +13,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from aedrova.agents.managed import ManagedClient, application_origin
-from aedrova.desktop.controls import ChoiceBox
+from aedrova.agents.managed import ManagedClient, ai_access_mode, application_origin
+from aedrova.desktop.controls import AppDialog, ChoiceBox
 from aedrova.desktop.dialogs import button, label
 
 
-class SettingsDialog(QDialog):
+class SettingsDialog(AppDialog):
     def __init__(self, window):
         super().__init__(window)
         self.window = window
@@ -31,7 +30,9 @@ class SettingsDialog(QDialog):
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QScrollArea.Shape.NoFrame)
         content = QWidget()
+        content.setObjectName("AccountPage")
         scroll.setWidget(content)
+        scroll.viewport().setAutoFillBackground(False)
         outer.addWidget(scroll)
         layout = QVBoxLayout(content)
         self.resize(600, 760)
@@ -94,6 +95,10 @@ class SettingsDialog(QDialog):
         self.billing_origin = application_origin()
         if self.user:
             layout.addWidget(label("PLAN & INCLUDED AI", "section"))
+            if ai_access_mode() == 'local':
+                layout.addWidget(label('AI builds use your local provider login in this internal '
+                                       'alpha. Included plan access is being prepared.',
+                                       'muted', wrap=True))
             self.billing_status = label(
                 "Checking your workspace’s plan…"
                 if self.billing_origin

@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QLayout,
     QListView,
     QPlainTextEdit,
     QStyle,
@@ -402,6 +403,7 @@ class Composer(QFrame):
         self.setObjectName("Composer")
         self.thread = thread
         layout = QVBoxLayout(self)
+        layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         layout.setContentsMargins(12, 8, 12, 10)
         layout.setSpacing(0)
         self.editor = MessageEditor()

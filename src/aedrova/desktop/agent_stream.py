@@ -1,6 +1,7 @@
 """Compact agent transcript: public messages and expandable tool activity."""
 
 import json
+from math import ceil
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, QTimer
@@ -45,6 +46,7 @@ class ActivityRow(QFrame):
             self.details.setObjectName("AgentCommandOutput")
             self.details.setAccessibleName("Command and output")
             self.details.setMaximumHeight(160)
+            self.details.document().documentLayout().documentSizeChanged.connect(self.resize_output)
             self.details.setPlainText(details[:20000])
             self.details.hide()
             layout.addWidget(self.details)
@@ -56,6 +58,10 @@ class ActivityRow(QFrame):
             self.message.setWordWrap(True)
             self.message.setAccessibleName("Agent update")
             layout.addWidget(self.message)
+
+    def resize_output(self, size):
+        height = ceil(size.height() * self.details.fontMetrics().lineSpacing()) + 16
+        self.details.setFixedHeight(min(160, max(60, height)))
 
     def expand(self, expanded):
         marker = {"running": "◦", "done": "✓", "failed": "!", "stopped": "□"}[self.status]
@@ -105,6 +111,7 @@ class AgentStream(QScrollArea):
         self.scroll_timer.stop()
         for row in self.rows:
             self.layout.removeWidget(row)
+            row.hide()
             row.deleteLater()
         self.rows.clear()
         self.running.clear()
@@ -124,6 +131,7 @@ class AgentStream(QScrollArea):
             old = self.rows.pop(0)
             self.running = {key: value for key, value in self.running.items() if value is not old}
             self.layout.removeWidget(old)
+            old.hide()
             old.deleteLater()
         self.show()
         if follow:

@@ -180,7 +180,8 @@ class IdentityService:
 
     def snapshot(self):
         self._authenticated()
-        workspaces = self.client.table("workspaces").select("id,name").order("name").execute().data
+        workspaces = self.client.rpc("list_my_workspaces", {"p_archived": False}).execute().data
+        archived = self.client.rpc("list_my_workspaces", {"p_archived": True}).execute().data
         memberships = self.client.rpc("list_members", {}).execute().data
         channels = (
             self.client.table("channels")
@@ -204,6 +205,7 @@ class IdentityService:
             .execute()
             .data,
             "workspaces": workspaces,
+            "archived_workspaces": archived,
             "members": memberships,
             "channels": channels,
             "invitations": invitations,
@@ -226,6 +228,7 @@ class IdentityService:
             "set_member_role",
             "remove_member",
             "set_channel_member",
+            "set_workspace_archived",
         }
         if name not in allowed:
             raise ValueError("Unsupported account operation")
@@ -273,6 +276,73 @@ class IdentityService:
             .gt("sequence", after)
             .order("sequence")
             .limit(100)
+            .execute()
+            .data
+        )
+
+    def search_context(self, workspace, query):
+        self._authenticated()
+        return (
+            self.client.rpc(
+                "search_workspace_context",
+                {
+                    "p_workspace": workspace,
+                    "p_query": query[:1000],
+                    "p_limit": 200,
+                },
+            )
+            .execute()
+            .data
+        )
+
+    def recent_context(self, channel):
+        self._authenticated()
+        return (
+            self.client.rpc(
+                "message_page",
+                {
+                    "p_channel": channel,
+                    "p_threads": True,
+                    "p_limit": 20,
+                },
+            )
+            .execute()
+            .data
+        )
+
+    def thread_context(self, channel, parent):
+        self._authenticated()
+        root = (
+            self.client.table("messages")
+            .select("*")
+            .eq("channel_id", channel)
+            .eq("id", parent)
+            .limit(1)
+            .execute()
+            .data
+        )
+        replies = (
+            self.client.rpc(
+                "message_page",
+                {
+                    "p_channel": channel,
+                    "p_parent": parent,
+                    "p_limit": 20,
+                },
+            )
+            .execute()
+            .data
+        )
+        return root + replies
+
+    def recent_decisions(self, channel):
+        self._authenticated()
+        return (
+            self.client.table("context_decisions")
+            .select("*")
+            .eq("channel_id", channel)
+            .order("updated_at", desc=True)
+            .limit(50)
             .execute()
             .data
         )

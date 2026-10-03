@@ -245,3 +245,23 @@ def test_callback_page_is_branded_self_contained_and_has_safe_error_variant():
     assert "Sign-in was not completed." in render_callback(False).decode()
     assert "default-src 'none'" in CSP
     assert "frame-ancestors 'none'" in CSP
+
+
+def test_sequential_signins_reuse_closed_port_but_active_listener_is_exclusive():
+    port = 0
+    for code in ('first', 'second'):
+        service, opened, cancel = FakeService(), Event(), Event()
+        with ThreadPoolExecutor() as pool:
+            future = pool.submit(google_sign_in, service, cancel, port=port,
+                                 opener=lambda _, opened=opened: opened.set() or True, timeout=3)
+            assert opened.wait(2)
+            port = urlsplit(service.redirect).port
+            try:
+                with pytest.raises(OSError):
+                    google_sign_in(FakeService(), port=port, opener=lambda _: True, timeout=.1)
+                with urlopen(service.redirect + '?code=' + code, timeout=2) as response:
+                    response.read()
+                assert future.result(3) == 'signed-in-user'
+            finally:
+                cancel.set()
+        assert service.exchanged == [code]

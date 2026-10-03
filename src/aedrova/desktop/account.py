@@ -8,7 +8,7 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
-    QDialog,
+    QGridLayout,
     QHBoxLayout,
     QLineEdit,
     QListWidget,
@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from aedrova.desktop.brand import BrandMark
-from aedrova.desktop.controls import ChoiceBox
+from aedrova.desktop.controls import AppDialog, ChoiceBox
 from aedrova.desktop.dialogs import button, label
 from aedrova.identity.oauth import google_sign_in
 from aedrova.identity.service import Connection, IdentityService
@@ -50,7 +50,7 @@ class AccountJob(QRunnable):
             self.operation = None
 
 
-class AccountDialog(QDialog):
+class AccountDialog(AppDialog):
     dashboard_requested = Signal()
     session_closed = Signal()
     operation_failed = Signal()
@@ -205,8 +205,8 @@ class AccountDialog(QDialog):
         )
         agent_row.addWidget(self.agent_name)
         agent_row.addWidget(self.agent_provider)
-        agent_row.addWidget(self.save_agent)
         layout.addLayout(agent_row)
+        layout.addWidget(self.save_agent)
         layout.addWidget(
             label(
                 "A shared name for your team. Aedrova is still your workspace.", "muted", wrap=True
@@ -256,20 +256,22 @@ class AccountDialog(QDialog):
         self.members.setAccessibleName("Workspace members")
         self.members.setFixedHeight(100)
         layout.addWidget(self.members)
-        row = QHBoxLayout()
+        row = QGridLayout()
         self.role = ChoiceBox()
         self.role.addItems(["member", "guest", "admin"])
         self.role.setAccessibleName("Member or invitation role")
-        row.addWidget(self.role)
-        for title, operation in [
-            ("Change role", "role"),
-            ("Remove member", "remove"),
-            ("Grant channel", "grant"),
-            ("Revoke channel", "revoke"),
-        ]:
+        row.addWidget(self.role, 0, 0, 1, 2)
+        for index, (title, operation) in enumerate(
+            [
+                ("Change role", "role"),
+                ("Remove member", "remove"),
+                ("Grant channel", "grant"),
+                ("Revoke channel", "revoke"),
+            ]
+        ):
             control = button(title)
             control.clicked.connect(lambda checked=False, op=operation: self.member_action(op))
-            row.addWidget(control)
+            row.addWidget(control, 1 + index // 2, index % 2)
         layout.addLayout(row)
         layout.addWidget(
             label(
@@ -497,6 +499,30 @@ class AccountDialog(QDialog):
         settings = button("Workspace settings")
         settings.clicked.connect(lambda: self.pages.setCurrentIndex(1))
         layout.addWidget(settings)
+        self.archive_workspace = button("Archive for me…")
+        self.archive_workspace.clicked.connect(self.confirm_archive)
+        layout.addWidget(self.archive_workspace)
+        self.archived_section = QWidget()
+        archived_layout = QVBoxLayout(self.archived_section)
+        archived_layout.setContentsMargins(0, 0, 0, 0)
+        archived_layout.setSpacing(12)
+        archived_layout.addWidget(label("ARCHIVED FOR YOU", "section"))
+        self.archived_workspaces = ChoiceBox()
+        self.archived_workspaces.setAccessibleName("Your archived workspaces")
+        archived_layout.addWidget(self.archived_workspaces)
+        self.restore_workspace = button("Restore workspace")
+        self.restore_workspace.clicked.connect(self.restore_archived)
+        archived_layout.addWidget(self.restore_workspace)
+        archived_layout.addWidget(
+            label(
+                "Archiving only hides a workspace for you. "
+                "Your team, files and subscription stay intact.",
+                "muted",
+                wrap=True,
+            )
+        )
+        self.archived_section.hide()
+        layout.addWidget(self.archived_section)
         create = button("Create another workspace")
         create.clicked.connect(self.begin_onboarding)
         layout.addWidget(create)
@@ -509,6 +535,73 @@ class AccountDialog(QDialog):
         )
         layout.addStretch()
         self.add_page(page)
+
+    def confirm_archive(self):
+        workspace = self.workspace_id()
+        if self.busy or not workspace:
+            return
+        if self.archive_blocked():
+            return
+        self.archive_confirmation = AppDialog(self)
+        self.archive_confirmation.setWindowTitle("Aedrova · Archive for me")
+        self.archive_confirmation.setMinimumWidth(420)
+        layout = QVBoxLayout(self.archive_confirmation)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+        layout.addWidget(label("Archive this workspace for you?", "title", wrap=True))
+        layout.addWidget(label(self.workspaces.currentText(), "muted", wrap=True))
+        layout.addWidget(
+            label(
+                "It will leave your dashboard. Teammates keep access and no messages or files are "
+                "deleted. Finish active builds and leave calls before archiving. "
+                "Archiving does not cancel a subscription. "
+                "You can restore it in Account & workspaces.",
+                "muted",
+                wrap=True,
+            )
+        )
+        row = QHBoxLayout()
+        cancel = button("Cancel")
+        cancel.clicked.connect(self.archive_confirmation.reject)
+        archive = button("Archive for me", role="primary")
+
+        def confirmed():
+            if self.archive_blocked():
+                self.archive_confirmation.reject()
+                return
+            self.archive_confirmation.accept()
+            self.mutate(
+                "set_workspace_archived",
+                {
+                    "p_workspace": workspace,
+                    "p_archived": True,
+                },
+            )
+
+        archive.clicked.connect(confirmed)
+        row.addWidget(cancel)
+        row.addWidget(archive)
+        layout.addLayout(row)
+        for control in (cancel, archive):
+            control.setAutoDefault(False)
+        self.archive_confirmation.open()
+
+    def archive_blocked(self):
+        window = self.parent()
+        build = getattr(window, "build_dialog", None)
+        call = getattr(window, "meeting_call", None)
+        if (build and build.pending) or (call and not call.closed):
+            self.status.setText(
+                "Finish active builds and leave calls before archiving a workspace."
+            )
+            return True
+        return False
+
+    def restore_archived(self):
+        workspace = self.archived_workspaces.currentData()
+        if not workspace or self.busy:
+            return
+        self.mutate("set_workspace_archived", {"p_workspace": workspace, "p_archived": False})
 
     def begin_onboarding(self):
         self.pending_intent = None
@@ -651,8 +744,17 @@ class AccountDialog(QDialog):
             self.home_workspaces.addItem(workspace["name"], workspace["id"])
         self.home_workspaces.setCurrentIndex(self.workspaces.currentIndex())
         self.home_workspaces.blockSignals(False)
+        self.archived_workspaces.clear()
+        for workspace in snapshot.get("archived_workspaces", []):
+            self.archived_workspaces.addItem(workspace["name"], workspace["id"])
+        self.archived_section.setVisible(self.archived_workspaces.count() > 0)
+        self.restore_workspace.setEnabled(self.archived_workspaces.count() > 0)
+        self.archive_workspace.setEnabled(bool(snapshot["workspaces"]))
+        self.home_dashboard.setEnabled(bool(snapshot["workspaces"]))
         self.render_workspace()
-        self.pages.setCurrentIndex(4 if snapshot["workspaces"] else 2)
+        self.pages.setCurrentIndex(
+            4 if snapshot["workspaces"] or snapshot.get("archived_workspaces") else 2
+        )
         if not snapshot["workspaces"]:
             self.onboarding_steps.setCurrentIndex(0)
         self.status.setText("Connected · workspace access is enforced by the server.")
@@ -760,7 +862,9 @@ class AccountDialog(QDialog):
                     self.pages.setCurrentIndex(previous_page)
             else:
                 self.clear_connected()
-            if name in ("onboard_workspace", "accept_invitation"):
+            if name in ("onboard_workspace", "accept_invitation") or (
+                name == "set_workspace_archived" and parameters["p_archived"] is False
+            ):
                 index = self.workspaces.findData(value)
                 if index >= 0:
                     self.workspaces.setCurrentIndex(index)
@@ -781,6 +885,13 @@ class AccountDialog(QDialog):
                     self.pages.setCurrentIndex(2)
                     self.onboarding_steps.setCurrentIndex(2)
                     self.status.setText("Workspace created. Invite your team now or do it later.")
+                elif name == "set_workspace_archived":
+                    self.pages.setCurrentIndex(4)
+                    self.status.setText(
+                        "Archived for you. Restore it here anytime."
+                        if parameters["p_archived"]
+                        else "Workspace restored to your dashboard."
+                    )
 
             if snapshot is None:
                 self.status.setText(
@@ -827,6 +938,11 @@ class AccountDialog(QDialog):
         }
         self.workspaces.clear()
         self.home_workspaces.clear()
+        self.archived_workspaces.clear()
+        self.archived_section.hide()
+        self.archive_workspace.setEnabled(False)
+        self.restore_workspace.setEnabled(False)
+        self.home_dashboard.setEnabled(False)
         self.render_workspace()
         self.generated_code.clear()
         self.invite_code.clear()

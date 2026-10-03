@@ -1,11 +1,13 @@
-"""Package the current desktop preview. Ad-hoc signed; not for public distribution."""
+"""Package the current desktop preview. Development previews and gated public distribution."""
 
 import hashlib
 import json
 import os
+import plistlib
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 from aedrova.agents.managed import application_origin
@@ -16,12 +18,24 @@ ROOT = Path(__file__).resolve().parents[1]
 subprocess.run([sys.executable, str(ROOT / "scripts/check_release_secrets.py")], check=True)
 configuration_args = []
 signing_args = []
-identity = os.getenv("AEDROVA_SIGNING_IDENTITY", "")
-if identity:
+release_identity = os.getenv("AEDROVA_SIGNING_IDENTITY", "")
+preview_identity = os.getenv("AEDROVA_PREVIEW_SIGNING_IDENTITY", "")
+if release_identity and preview_identity:
+    raise ValueError("Choose either release or development signing, not both.")
+if preview_identity and not preview_identity.startswith("Apple Development:"):
+    raise ValueError("Development previews require an Apple Development identity.")
+ai_mode = os.getenv("AEDROVA_AI_ACCESS_MODE", "included" if release_identity else "local")
+if ai_mode not in {"local", "included"}:
+    raise ValueError("Choose local or included AI access.")
+if release_identity and ai_mode != "included":
+    raise ValueError("Public paid builds require included AI access; local fallback is forbidden.")
+identity = release_identity or preview_identity
+if release_identity:
     if not identity.startswith("Developer ID Application:"):
         raise ValueError("Public distribution requires a Developer ID Application identity.")
     if not application_origin().startswith("https://"):
         raise ValueError("Public builds require the configured HTTPS managed service origin.")
+if identity:
     signing_args = [
         "--codesign-identity",
         identity,
@@ -77,6 +91,7 @@ if connection:
                 "supabase_url": connection.url,
                 "supabase_publishable_key": connection.public_key,
                 "managed_origin": application_origin(),
+                "ai_access_mode": ai_mode,
             }
         )
     )
@@ -92,15 +107,21 @@ subprocess.run(
         "--noconfirm",
         "--clean",
         "--windowed",
+        "--copy-metadata",
+        "aedrova",
         "--collect-all",
         "claude_agent_sdk",
+        "--collect-all",
+        "livekit.rtc",
+        "--collect-all",
+        "livekit.protocol",
         "--name",
         "Aedrova",
         "--icon",
         str(ROOT / "src/aedrova/desktop/assets/aedrova.icns"),
         *asset_args,
         "--osx-bundle-identifier",
-        "com.aedrova.desktop" if identity else "com.aedrova.desktop.preview",
+        "com.aedrova.desktop" if release_identity else "com.aedrova.desktop.preview",
         *signing_args,
         "--paths",
         str(ROOT / "src"),
@@ -116,3 +137,29 @@ subprocess.run(
     cwd=ROOT,
     check=True,
 )
+
+# Qt's macOS permission API requires usage descriptions in the application bundle.
+# Re-sign the outer bundle after editing; preserve the vendor runtime's own signature.
+bundle = ROOT / "dist/Aedrova.app"
+info_path = bundle / "Contents/Info.plist"
+with info_path.open("rb") as stream:
+    info = plistlib.load(stream)
+info.update({
+    "CFBundleShortVersionString": (
+        tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]
+    ),
+    "CFBundleVersion": tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"],
+    "LSMinimumSystemVersion": "14.0",
+    "NSCameraUsageDescription": "Use your camera when you enable a meeting or local camera check.",
+    "NSMicrophoneUsageDescription": (
+        "Use your microphone when you enable a meeting or local microphone check."
+    ),
+})
+with info_path.open("wb") as stream:
+    plistlib.dump(info, stream)
+resign = ["codesign", "--force", "--sign", identity or "-"]
+if identity:
+    resign.extend(["--options", "runtime", "--entitlements",
+                   str(ROOT / "scripts/release-entitlements.plist")])
+subprocess.run([*resign, str(bundle)], check=True)
+subprocess.run(["codesign", "--verify", "--strict", str(bundle)], check=True)

@@ -3,6 +3,8 @@
 import argparse
 import hashlib
 import json
+import platform
+import plistlib
 import shutil
 import subprocess
 from pathlib import Path
@@ -100,7 +102,17 @@ def main():
         )
     with target.open("rb") as stream:
         checksum = hashlib.file_digest(stream, "sha256").hexdigest()
-    manifest = {"path": str(target), "sha256": checksum, "public_release": not args.preview}
+    with (app / "Contents/Info.plist").open("rb") as stream:
+        info = plistlib.load(stream)
+    manifest = {
+        "path": str(target),
+        "sha256": checksum,
+        "public_release": not args.preview,
+        "version": info.get("CFBundleShortVersionString", "0.1.0"),
+        "architecture": platform.machine(),
+        "minimum_macos": info.get("LSMinimumSystemVersion", "14.0"),
+        "size_bytes": target.stat().st_size,
+    }
     target.with_suffix(".manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(json.dumps(manifest, indent=2))
 

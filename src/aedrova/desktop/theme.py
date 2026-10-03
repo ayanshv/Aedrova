@@ -80,6 +80,9 @@ def palette(theme: Theme):
         (QPalette.ColorRole.ToolTipText, theme.text),
     ):
         result.setColor(role, QColor(color))
+    for role in (QPalette.ColorRole.Text, QPalette.ColorRole.WindowText,
+                 QPalette.ColorRole.ButtonText, QPalette.ColorRole.PlaceholderText):
+        result.setColor(QPalette.ColorGroup.Disabled, role, QColor(theme.muted))
     return result
 
 
@@ -129,7 +132,7 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QLabel[role='heading'] {{ font-size: 32px; font-weight: 600; }}
     QLabel[role='badge'] {{ color: {t.secondary}; background: {capsule};
         border-radius: 11px; padding: 5px 10px; font-size: 10px; font-weight: 500; }}
-    QLabel[role='error'] {{ color: {t.accent_text}; font-size: 12px; }}
+    QLabel[role='error'] {{ color: {'#B4232F' if white else '#FF8A92'}; font-size: 12px; }}
     QFrame#Composer {{ background: {capsule}; border: 1px solid {t.border}; border-radius: 22px; }}
     QFrame#Composer[focused='true'] {{ border: 1px solid {t.accent}; }}
     QFrame#Quiet {{ background: transparent; border-top: 1px solid {t.border}; }}
@@ -145,7 +148,8 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QPushButton:disabled {{ color: {t.muted}; }}
     QPushButton[role='primary'] {{ background: {t.accent}; color: {t.primary_text};
         padding: 9px 18px; border-radius: 16px; font-weight: 600; text-align: center; }}
-    QPushButton[role='primary']:hover {{ background: {t.accent}; }}
+    QPushButton[role='primary']:hover {{ background: {'#0058B0' if white else '#389CFF'}; }}
+    QPushButton[role='primary']:pressed {{ background: {'#004C99' if white else '#0071E3'}; }}
     QPushButton[role='primary']:disabled {{ background: {t.hover}; color: {t.muted}; }}
     QPushButton[role='outline'] {{ border: 1px solid {t.border}; background: {capsule}; }}
     QPushButton[role='icon'] {{ padding: 0px; text-align: center; }}
@@ -171,6 +175,9 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QPlainTextEdit {{ background: transparent; border: 1px solid transparent;
         padding: 8px; selection-background-color: {t.accent_bg}; }}
     QPlainTextEdit#ComposerEditor:focus {{ border: 1px solid transparent; }}
+    QPlainTextEdit#BuildRequest {{ border: 1px solid {t.border};
+        background: {t.surface}; border-radius: 14px; padding: 12px; }}
+    QPlainTextEdit#BuildRequest:focus {{ border-color: {t.accent}; }}
     QLineEdit {{ background: {t.surface}; border: 1px solid {t.border}; border-radius: 14px;
         padding: 12px; selection-background-color: {t.accent_bg}; }}
     QScrollArea {{ border: none; background: transparent; }}
@@ -178,11 +185,36 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QScrollBar::handle:vertical {{ background: {t.border}; min-height: 32px; border-radius: 3px; }}
     QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}
     QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
+    QScrollBar:horizontal {{ background: transparent; height: 7px; margin: 1px 6px; }}
+    QScrollBar::handle:horizontal {{ background: {t.border}; min-width: 32px; border-radius: 3px; }}
+    QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0px; }}
+    QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{ background: transparent; }}
     QMenu {{ background: {t.bg}; border: 1px solid {t.border}; padding: 7px; border-radius: 12px; }}
     QMenu::item {{ padding: 10px 24px 10px 12px; border-radius: 8px; }}
     QMenu::separator {{ height: 1px; background: {t.border}; margin: 6px 8px; }}
     QMenu::item:disabled {{ color: {t.muted}; }}
     QMenu::item:selected {{ background: {t.accent_bg}; }}
+    QMenu::item:selected:enabled {{ color: {t.accent_text}; }}
+    QToolButton:focus {{ border: 1px solid {t.accent}; border-radius: 12px; }}
+    QToolButton:disabled, QComboBox:disabled {{ color: {t.muted}; }}
+    QComboBox:hover:enabled, QLineEdit:hover:enabled {{ border-color: {t.muted}; }}
+    QComboBox:focus, QLineEdit:focus {{ border-color: {t.accent}; }}
+    QCheckBox:disabled {{ color: {t.muted}; }}
+    QCheckBox::indicator:disabled {{ border-color: {t.border}; background: {t.hover}; }}
+    QCheckBox::indicator:focus {{ border-color: {t.accent}; }}
+    QDialogButtonBox QPushButton {{ text-align: center; min-width: 72px; }}
+    QMessageBox {{ min-width: 420px; }}
+    QMessageBox QPushButton {{ min-width: 96px; text-align: center; }}
+    QDialogButtonBox QPushButton:default {{ background: {t.accent}; color: {t.primary_text}; }}
+    QFrame#CallToolbar {{ background: {t.surface}; border: 1px solid {t.border};
+        border-radius: 20px; }}
+    QToolButton#CallControl {{ background: transparent; color: {t.text};
+        border: 1px solid transparent; border-radius: 12px; padding: 6px 10px;
+        font-size: 12px; }}
+    QToolButton#CallControl:hover, QToolButton#CallControl:checked {{ background: {t.hover}; }}
+    QToolButton#CallControl:focus {{ border-color: {t.accent}; }}
+    QToolButton#CallControl:disabled {{ color: {t.muted}; }}
+    QToolButton#CallControl[danger='true'] {{ color: {'#B4232F' if white else '#FF8A92'}; }}
     QScrollArea#AgentStream, QWidget#AgentStreamContent,
     QFrame#AgentMessage {{ background: transparent; border: none; }}
     QFrame#AgentTool {{ background: {t.surface}; border: 1px solid {t.border};

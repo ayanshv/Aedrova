@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -23,6 +24,8 @@ def main():
     parser.add_argument("--width", type=int, default=1440)
     parser.add_argument("--height", type=int, default=940)
     args = parser.parse_args()
+    # Configure before QApplication/QMediaDevices initializes the media integration.
+    os.environ['QT_MEDIA_BACKEND'] = 'ffmpeg'
     app = QApplication.instance() or QApplication(sys.argv[:1])
     app.setApplicationName("Aedrova")
     app.setOrganizationName("Aedrova")

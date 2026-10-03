@@ -80,6 +80,26 @@ def test_expired_session_cannot_invoke_rpc():
     assert service.user is None
 
 
+def test_snapshot_requests_personal_active_and_archived_workspaces(monkeypatch):
+    client = Mock()
+    client.table.return_value.select.return_value.order.return_value.execute.return_value.data = []
+    client.table.return_value.select.return_value.execute.return_value.data = []
+
+    def rpc(name, params):
+        rows = []
+        if name == "list_my_workspaces":
+            rows = [{"id": "hidden" if params["p_archived"] else "active", "name": "Team"}]
+        return SimpleNamespace(execute=lambda: SimpleNamespace(data=rows))
+
+    client.rpc.side_effect = rpc
+    service = IdentityService(Connection(URL, KEY), client=client)
+    monkeypatch.setattr(service, "_authenticated", lambda: None)
+    data = service.snapshot()
+    assert data["workspaces"][0]["id"] == "active"
+    assert data["archived_workspaces"][0]["id"] == "hidden"
+    assert not any(call.args == ("workspaces",) for call in client.table.call_args_list)
+
+
 def test_confirmation_required_signup_does_not_authenticate():
     client = Mock()
     client.auth.sign_up.return_value = SimpleNamespace(

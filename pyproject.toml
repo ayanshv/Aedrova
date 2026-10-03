@@ -12,10 +12,11 @@ dependencies = [
     "pydantic>=2.10,<3",
     "supabase>=2,<3",
     "claude-agent-sdk==0.2.160",
+    "livekit==1.1.20",
 ]
 
 [project.optional-dependencies]
-spikes = ["livekit"]
+spikes = ["livekit==1.1.20", "livekit-api==1.1.0"]
 
 [dependency-groups]
 dev = ["pytest>=8,<10", "pytest-qt>=4.4,<5", "ruff", "pyinstaller>=6,<7"]

@@ -14,6 +14,16 @@ from PySide6.QtWidgets import (
 )
 
 
+class AppDialog(QDialog):
+    """Keep child windows in the app's palette, including subsequent theme changes."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_WindowPropagation, True)
+        if parent is not None:
+            self.setFont(parent.font())
+
+
 class ChoiceBox(QComboBox):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -24,12 +34,14 @@ class ChoiceBox(QComboBox):
         self.setMaxVisibleItems(8)
         self.view().setSpacing(3)
         self.view().setTextElideMode(Qt.TextElideMode.ElideRight)
+        self.setMinimumHeight(44)
 
     def paintEvent(self, event):  # noqa: N802
         super().paintEvent(event)
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setPen(QPen(self.palette().color(QPalette.ColorRole.Text), 1.4))
+        group = QPalette.ColorGroup.Active if self.isEnabled() else QPalette.ColorGroup.Disabled
+        painter.setPen(QPen(self.palette().color(group, QPalette.ColorRole.Text), 1.4))
         x, y = self.width() - 20, self.height() / 2
         path = QPainterPath()
         path.moveTo(x - 3.5, y - 1.5)
@@ -57,12 +69,13 @@ class AppMenu(QMenu):
         self.setObjectName("AppMenu")
         self.setMinimumWidth(220)
         self.setSeparatorsCollapsible(True)
+        self.setAttribute(Qt.WidgetAttribute.WA_WindowPropagation, True)
 
 
 def choose_teammate(parent, names):
     from aedrova.desktop.dialogs import button, label
 
-    dialog = QDialog(parent)
+    dialog = AppDialog(parent)
     dialog.setWindowTitle("Aedrova · Direct message")
     dialog.setMinimumWidth(380)
     layout = QVBoxLayout(dialog)

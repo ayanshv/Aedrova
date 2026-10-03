@@ -8,7 +8,6 @@ from PySide6.QtCore import QProcess, QProcessEnvironment, QThreadPool, QTimer, Q
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
-    QDialog,
     QHBoxLayout,
     QLabel,
     QProgressBar,
@@ -20,11 +19,12 @@ from PySide6.QtWidgets import (
 from aedrova.delivery.github import GitHub, gh_path, github_environment
 from aedrova.delivery.installer import VERSION, install
 from aedrova.desktop.brand import BrandMark
+from aedrova.desktop.controls import AppDialog
 from aedrova.desktop.dialogs import button, label
 from aedrova.desktop.projects import Job
 
 
-class GitHubSetup(QDialog):
+class GitHubSetup(AppDialog):
     progress = Signal(str)
 
     def __init__(self, window):
