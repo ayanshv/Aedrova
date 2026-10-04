@@ -60,17 +60,36 @@ if "TeamIdentifier=2DC432GLL2" not in signature:
     raise ValueError("Use the official OpenAI-signed Codex runtime.")
 with codex_binary.open("rb") as stream:
     runtime_hash = hashlib.file_digest(stream, "sha256").hexdigest()
+code_mode_host = codex_binary.resolve().with_name("codex-code-mode-host")
+if not code_mode_host.is_file():
+    raise ValueError("The Codex runtime requires its matching codex-code-mode-host companion.")
+subprocess.run(["codesign", "--verify", "--strict", str(code_mode_host)], check=True)
+host_signature = subprocess.run(
+    ["codesign", "--display", "--verbose=4", str(code_mode_host)],
+    check=True, capture_output=True, text=True,
+).stderr
+if "TeamIdentifier=2DC432GLL2" not in host_signature:
+    raise ValueError("Use the official OpenAI-signed Codex execution helper.")
+with code_mode_host.open("rb") as stream:
+    host_hash = hashlib.file_digest(stream, "sha256").hexdigest()
 runtime_manifest = ROOT / "work/runtime-manifest.json"
 runtime_manifest.parent.mkdir(parents=True, exist_ok=True)
-runtime_manifest.write_text(json.dumps({"codex_version": "0.155.1", "source_sha256": runtime_hash}))
+runtime_manifest.write_text(json.dumps({
+    "codex_version": "0.155.1", "source_sha256": runtime_hash,
+    "code_mode_host_sha256": host_hash,
+}))
 vendor_binary = ROOT / "work/vendor-codex/codex"
 vendor_binary.parent.mkdir(parents=True, exist_ok=True)
 shutil.copy2(codex_binary, vendor_binary)
+vendor_host = vendor_binary.with_name("codex-code-mode-host")
+shutil.copy2(code_mode_host, vendor_host)
 codex_binary = vendor_binary
 asset_args.extend(
     [
         "--add-binary",
         f"{codex_binary}:aedrova/agents/bin",
+        "--add-binary",
+        f"{vendor_host}:aedrova/agents/bin",
         "--add-data",
         f"{ROOT / 'src/aedrova/desktop/assets/licenses'}:aedrova/desktop/assets/licenses",
         "--add-data",
@@ -92,6 +111,7 @@ if connection:
                 "supabase_publishable_key": connection.public_key,
                 "managed_origin": application_origin(),
                 "ai_access_mode": ai_mode,
+                "meeting_context_enabled": os.getenv("AEDROVA_MEETING_CONTEXT_ENABLED") == "true",
             }
         )
     )

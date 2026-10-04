@@ -74,7 +74,8 @@ assert 'ANTHROPIC_API_KEY' not in os.environ
 assert 'model_provider="aedrova_managed"' in sys.argv
 assert 'model_providers.aedrova_managed.request_max_retries=0' in sys.argv
 assert '--ephemeral' in sys.argv
-assert 'read-only' in sys.argv
+assert 'default_permissions="aedrova"' in sys.argv
+assert any(a.startswith('permissions.aedrova.filesystem=') and '"read"' in a for a in sys.argv)
 print(json.dumps({'type':'item.completed','item':{'type':'agent_message','text':'Done'}}),flush=True)
 print(json.dumps({'type':'turn.completed'}),flush=True)
 """,

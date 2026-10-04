@@ -33,6 +33,12 @@ class Handler(BaseHTTPRequestHandler):
                     i.get("output")
                     for i in body.get("input", [])
                     if isinstance(i, dict) and i.get("type") == "function_call_output"
+                ]
+                + [
+                    block.get("content")
+                    for message in body.get("messages", [])
+                    for block in message.get("content", [])
+                    if isinstance(block, dict) and block.get("type") == "tool_result"
                 ],
                 "authenticated": "local-build-token"
                 in (self.headers.get("Authorization", "") + self.headers.get("x-api-key", "")),
@@ -202,7 +208,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
 
-def main():
+def main(*, verify_claude_edits=True):
     global project_path
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -233,7 +239,7 @@ def main():
                         "Write a synthetic local proof file and confirm.",
                         plan=False,
                     )
-                    if (
+                    if (provider != "claude_code" or verify_claude_edits) and (
                         project_path / ("managed-proof-" + provider + ".txt")
                     ).read_text() != "local tool passed":
                         raise AssertionError("Local tool output missing")

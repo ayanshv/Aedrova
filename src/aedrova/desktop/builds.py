@@ -108,6 +108,7 @@ class BuildJob(QRunnable):
 
     def run(self):
         context_file = None
+        retention_lease = None
         started = time.monotonic()
         try:
             if self.runner.cancelled.is_set():
@@ -117,6 +118,9 @@ class BuildJob(QRunnable):
                 self.project = prepare(
                     self.repository, Path.home() / "Library/Application Support/Aedrova/builds"
                 )
+            from aedrova.agents.retention import protect
+
+            retention_lease = protect(self.project)
             if self.ledger and self.run_id:
                 self.ledger.save_channels(self.run_id, self.context.channel_ids)
                 self.ledger.update(
@@ -130,6 +134,13 @@ class BuildJob(QRunnable):
                 or git(self.project, "status", "--porcelain").strip()
             ):
                 raise ValueError("The build checkout changed after planning. Create a fresh plan.")
+            from aedrova.security.credentials import credential_rules
+
+            if credential_rules((self.task + self.approved).encode()):
+                raise ValueError(
+                    "Build input contains a recognizable credential. "
+                    "Remove it before starting the agent."
+                )
             context_file = self.project.parent / "workspace-context.jsonl"
             context_file.touch(mode=0o600)
             context_file.write_text(
@@ -174,6 +185,14 @@ class BuildJob(QRunnable):
         finally:
             if context_file:
                 context_file.unlink(missing_ok=True)
+            if retention_lease:
+                try:
+                    (self.project.parent / ".last-used").touch(mode=0o600)
+                except OSError:
+                    # Missing/full/unwritable retention metadata must not strand the UI.
+                    pass
+                finally:
+                    retention_lease.close()
             if self.managed_client:
                 try:
                     self.managed_client.close()
@@ -708,6 +727,7 @@ class BuildDialog(AppDialog):
             QTimer.singleShot(0, lambda: self.continue_background(generation))
         else:
             self.background_run = False
+            self.window.finish_agent_response(self.workspace, result["text"])
         self.window.build_activity.configure(
             self.window.theme, self.window.reduced_motion, self.background_transition
         )
@@ -759,6 +779,12 @@ class BuildDialog(AppDialog):
             self.window.agent_activity(
                 self.workspace, "Cancelled · partial files remain for review"
             )
+            if not self.job:
+                self.window.finish_agent_response(
+                    self.workspace,
+                    "Cancelled. No further work will start. "
+                    "Any partial local changes remain available for review.",
+                )
         self.window.update_agent_cancel()
 
     def open_folder(self):
@@ -870,6 +896,7 @@ def _start_background_build(window, task):
     dialog.background_settings = (saved["folder"], saved.get("provider", "codex"), True)
     dialog.background_run = True
     window.agent_clock.reset()
+    window.activity_channel = window.channel_id
     window.agent_feed.clear()
     window.agent_feed.hide()
     window.last_agent_event = ""

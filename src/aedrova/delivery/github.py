@@ -17,11 +17,7 @@ from urllib.parse import quote
 from uuid import uuid4
 
 from aedrova.delivery.files import check_review
-
-SECRET = re.compile(
-    rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|"
-    rb"(?:sk-(?:proj-|ant-)|sb_secret_|GOCSPX-|gh[pousr]_)[A-Za-z0-9_-]{20,}"
-)
+from aedrova.security.credentials import credential_rules
 
 
 def repository_name(value):
@@ -119,7 +115,7 @@ def prepare_publication(client, repo, review, title):
     for change in review.changes:
         if change.path.startswith(".github/workflows/"):
             raise ValueError("Workflow changes need separate manual review and publication.")
-        if change.after and SECRET.search(change.after.data):
+        if change.after and credential_rules(change.after.data):
             raise ValueError(f"Potential credential in {change.path}. Remove it before publishing.")
     connection = client.connection(repo)
     repo, branch = connection["repository"], connection["branch"]

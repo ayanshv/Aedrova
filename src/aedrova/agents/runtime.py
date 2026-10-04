@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import re
 import selectors
 import shutil
 import signal
@@ -16,6 +17,17 @@ from tempfile import TemporaryDirectory
 
 class BuildCancelled(Exception):
     pass
+
+
+def network_command(command):
+    """Early rejection for direct network clients; OS isolation remains the boundary."""
+    return bool(
+        re.search(
+            r"(?:^|[;&|(\s])(?:/[\w/.-]+/)?"
+            r"(?:curl|wget|ssh|scp|sftp|nc|ncat|netcat|socat|telnet|ftp)(?:\s|$)",
+            command,
+        )
+    )
 
 
 def executable(name):
@@ -64,6 +76,37 @@ def environment(*, anthropic=False):
         ]
     )
     return result
+
+
+def codex_permissions(project, *, plan):
+    root = Path(project).resolve()
+    paths = {
+        ":minimal": "read",
+        str(root): "read" if plan else "write",
+        str(root.parent / "workspace-context.jsonl"): "read",
+    }
+    # System tool installations contain build dependencies; personal home stays denied.
+    for path in ("/opt/homebrew", "/usr/local"):
+        if Path(path).is_dir():
+            paths[path] = "read"
+    runtime = Path(executable("codex")).resolve()
+    for binary in (runtime, runtime.resolve(), runtime.resolve().with_name("codex-code-mode-host")):
+        if binary.is_file():
+            paths[str(binary)] = "read"
+            paths[str(binary.parent)] = "read"
+    paths[str(root / ".git")] = "read"
+    for private in (".claude", ".codex", ".agents"):
+        paths[str(root / private)] = "deny"
+    paths[str(root / "**/.env*")] = "deny"
+    table = "{" + ",".join(json.dumps(k) + "=" + json.dumps(v) for k, v in paths.items()) + "}"
+    return [
+        "-c",
+        'default_permissions="aedrova"',
+        "-c",
+        "permissions.aedrova.filesystem=" + table,
+        "-c",
+        "permissions.aedrova.network.enabled=false",
+    ]
 
 
 def instructions(task, context_file, *, plan, approved_plan=""):
@@ -221,7 +264,7 @@ class LocalRunner:
 
     def _codex(self, project, prompt, *, plan, managed_home=None):
         command = [
-            executable("codex"),
+            str(Path(executable("codex")).resolve()),
             "exec",
             "--ignore-user-config",
             "--ignore-rules",
@@ -229,18 +272,24 @@ class LocalRunner:
             "--json",
             "--color",
             "never",
-            "--sandbox",
-            "read-only" if plan else "workspace-write",
             "-c",
             'approval_policy="never"',
             "-c",
             "sandbox_workspace_write.network_access=false",
             "-c",
             'shell_environment_policy.inherit="none"',
+            "-c",
+            "allow_login_shell=false",
+            "-c",
+            'shell_environment_policy.set={PATH="/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin"}',
             "-C",
             str(project),
             "-",
         ]
+        command[2:2] = codex_permissions(project, plan=plan)
+        for feature in ("hooks", "plugins", "multi_agent", "multi_agent_v2", "apps", "browser_use"):
+            command[2:2] = ["-c", "features." + feature + "=false"]
+        command[2:2] = ["-c", 'web_search="disabled"']
         provider_env = environment()
         if self.managed:
             access = self.managed
@@ -397,7 +446,27 @@ class LocalRunner:
             # Defensive fallback: all supported tools pass the PreToolUse gate below.
             return PermissionResultDeny(message="Use the explicit Aedrova tool approval gate.")
 
+        shell_deadline = None
+
+        async def after_tool(event, _tool_id, _context):
+            nonlocal shell_deadline
+            if event.get("tool_name") == "Bash":
+                shell_deadline = None
+            return {}
+
+        async def deny_permission(event, _tool_id, _context):
+            return {
+                "hookSpecificOutput": {
+                    "hookEventName": "PermissionRequest",
+                    "decision": {
+                        "behavior": "deny",
+                        "message": "Network access is disabled. Use the Aedrova tool gate.",
+                    },
+                }
+            }
+
         async def before_tool(event, _tool_id, _context):
+            nonlocal shell_deadline
             tool, data = event["tool_name"], event["tool_input"]
             allowed = False
             if not self.cancelled.is_set():
@@ -415,19 +484,33 @@ class LocalRunner:
                             tool == "Read" and path == root.parent / "workspace-context.jsonl"
                         )
                     elif scoped and not plan:
-                        allowed = await asyncio.to_thread(self.approve, tool, data)
+                        from aedrova.agents.checkout import excluded
+
+                        if excluded(path.relative_to(root)):
+                            scoped = False
+                        allowed = scoped and await asyncio.to_thread(self.approve, tool, data)
                 elif tool == "Bash" and not plan and not data.get("dangerouslyDisableSandbox"):
-                    allowed = await asyncio.to_thread(self.approve, tool, data)
+                    if not network_command(str(data.get("command", ""))):
+                        allowed = await asyncio.to_thread(self.approve, tool, data)
+                    if allowed:
+                        timeout = data.get("timeout", 120000)
+                        timeout = timeout if type(timeout) is int and timeout > 0 else 120000
+                        shell_deadline = time.monotonic() + min(timeout, 300000) / 1000 + 2
             return {
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",
                     "permissionDecision": "allow" if allowed else "deny",
-                    "permissionDecisionReason": "Aedrova local build scope and user approval",
+                    "permissionDecisionReason": "Aedrova local build scope and user approval; "
+                    "external network clients are disabled in the build sandbox",
                 }
             }
 
         clean = {key: "" for key in os.environ}
         clean.update(environment(anthropic=True))
+        # Remove provider credentials from Bash children; the provider process retains auth.
+        clean["CLAUDE_CODE_SUBPROCESS_ENV_SCRUB"] = (
+            "ANTHROPIC_API_KEY,ANTHROPIC_AUTH_TOKEN,AEDROVA_BUILD_TOKEN"
+        )
         managed_options = {}
         if self.managed:
             if self.managed.provider != "claude_code":
@@ -448,15 +531,55 @@ class LocalRunner:
             tools=["Read", "Glob", "Grep"]
             if plan
             else ["Read", "Glob", "Grep", "Edit", "Write", "Bash"],
-            permission_mode="default",
+            # PreToolUse still supplies the explicit Aedrova allow/deny decision.
+            # Other permission requests (including new proxy domains) fail immediately.
+            permission_mode="dontAsk",
             can_use_tool=permission,
-            hooks={"PreToolUse": [HookMatcher(hooks=[before_tool])]},
+            hooks={
+                "PreToolUse": [HookMatcher(hooks=[before_tool])],
+                "PostToolUse": [HookMatcher(hooks=[after_tool])],
+                "PostToolUseFailure": [HookMatcher(hooks=[after_tool])],
+                "PermissionRequest": [HookMatcher(hooks=[deny_permission])],
+            },
             env=clean,
             sandbox={
                 "enabled": True,
+                "failIfUnavailable": True,
                 "autoAllowBashIfSandboxed": False,
                 "allowUnsandboxedCommands": False,
-                "network": {"allowedDomains": []},
+                "network": {
+                    "allowedDomains": [],
+                    "deniedDomains": ["*"],
+                    "allowAllUnixSockets": False,
+                    "allowLocalBinding": False,
+                },
+                "filesystem": {
+                    "denyRead": [
+                        "/Users",
+                        "/home",
+                        "/Volumes",
+                        "/private/tmp",
+                        "/private/var/folders",
+                    ],
+                    "allowRead": [
+                        str(Path(project).resolve()),
+                        str(Path(project).resolve().parent / "workspace-context.jsonl"),
+                    ],
+                    "denyWrite": [
+                        str(Path(project).resolve() / name)
+                        for name in (".git", ".claude", ".codex", ".agents")
+                    ],
+                },
+                "credentials": {
+                    "envVars": [
+                        {"name": name, "mode": "deny"}
+                        for name in (
+                            "ANTHROPIC_API_KEY",
+                            "ANTHROPIC_AUTH_TOKEN",
+                            "AEDROVA_BUILD_TOKEN",
+                        )
+                    ]
+                },
             },
             max_turns=60,
             max_budget_usd=5.0,
@@ -490,6 +613,12 @@ class LocalRunner:
                     raise BuildCancelled()
                 if time.monotonic() - started > self.timeout:
                     raise TimeoutError("Build exceeded its 30-minute time limit.")
+                if shell_deadline is not None and time.monotonic() > shell_deadline:
+                    raise TimeoutError(
+                        "Claude's shell command exceeded its deadline. External networking stays "
+                        "disabled; install dependencies outside the build sandbox and retry. "
+                        "Partial work is retained for review."
+                    )
                 await asyncio.sleep(0.1)
             return await task
         finally:

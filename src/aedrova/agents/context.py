@@ -80,7 +80,14 @@ def gather(
 
     def add(record):
         nonlocal size
+        from aedrova.security.credentials import credential_rules
+
         line = json.dumps(record, ensure_ascii=False)
+        if credential_rules(line.encode("utf-8")):
+            raise ValueError(
+                "A context source contains a recognizable credential. "
+                "Remove it from the selected evidence before building."
+            )
         size += len(line.encode("utf-8")) + 1
         if size > MAX_CONTEXT_BYTES:
             raise ValueError(
@@ -149,6 +156,7 @@ def gather(
             }
         )
 
+    meeting_evidence = {}
     for channel in sorted(snapshot["channels"], key=lambda c: c["id"]):
         if channel["id"] not in channels:
             continue
@@ -165,6 +173,21 @@ def gather(
                 if decision["channel_id"] != channel["id"]:
                     raise PermissionError("Decision scope changed. Refresh context.")
                 add({"decision": decision})
+        if getattr(service, "meeting_context_enabled", False) is True:
+            rows = service.meeting_context(channel["id"])
+            if len(rows) > 50 or any(
+                row.get("channel_id") != channel["id"]
+                or row.get("ai_allowed") is not True
+                or (
+                    row.get("source") not in {"participant_text", "provider_speech"}
+                    or (row.get("source") == "provider_speech" and not row.get("reviewed_at"))
+                )
+                for row in rows
+            ):
+                raise PermissionError("Meeting evidence has invalid consent or channel scope.")
+            meeting_evidence[channel["id"]] = rows
+            for row in rows:
+                add({"meeting_text": row})
         cursor = 0
         while True:
             if cancelled():
@@ -230,6 +253,11 @@ def gather(
             raise TimeoutError("Context retrieval timed out. Retry with a narrower request.")
         if service.context_revision(channel) != revision:
             raise ValueError("Workspace evidence changed during retrieval. Refresh and try again.")
+    for channel, rows in meeting_evidence.items():
+        if cancelled():
+            raise InterruptedError("Cancelled")
+        if service.meeting_context(channel) != rows:
+            raise ValueError("Meeting consent or retention changed. Refresh context and retry.")
     return WorkspaceContext(
         workspace,
         user,

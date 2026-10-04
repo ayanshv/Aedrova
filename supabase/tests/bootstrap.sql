@@ -1,6 +1,8 @@
 -- Test-only Supabase schema facsimile for embedded PostgreSQL. NEVER apply to Supabase.
 create role anon nologin;
+create role service_role nologin;
 create role authenticated nologin;
+create role aedrova_website nologin;
 create schema auth;
 create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz,raw_user_meta_data jsonb default '{}'::jsonb);
 create function auth.uid() returns uuid language sql stable as $$

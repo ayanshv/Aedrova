@@ -63,6 +63,51 @@ class MeetingClient(ManagedClient):
             return str(UUID(existing[0]['id']))
         return str(UUID(self.request('/api/meetings/start/' + channel, {})['meeting']))
 
+    def capabilities(self):
+        try:
+            result = self.request('/api/meetings/capabilities')
+        except RuntimeError:
+            # Older/offline servers cannot opt a call into new text permissions.
+            return {'meeting_text': False, 'audio_transcription': False}
+        return result if isinstance(result, dict) else {'meeting_text': False}
+
+
+    def consent(self, meeting, transcription, ai_context):
+        return self.request('/api/meetings/consent', {
+            'meeting': meeting, 'transcription': transcription, 'ai_context': ai_context,
+        })
+
+    def append_text(self, meeting, *, identifier, permit, body, offset_ms=0):
+        if permit is None or permit.meeting_id != meeting:
+            raise PermissionError('Current unanimous consent is required.')
+        return self.request('/api/meetings/text', {
+            'meeting': meeting, 'identifier': identifier, 'revision': permit.revision,
+            'roster': sorted(permit.participants), 'body': body, 'offset_ms': offset_ms,
+        })
+
+    def transcribe(self, meeting, chunk):
+        if chunk.permit is None or chunk.permit.meeting_id != meeting:
+            raise PermissionError('Current microphone consent is required.')
+        return self.request('/api/meetings/speech', {
+            'meeting': meeting, 'identifier': chunk.identifier,
+            'revision': chunk.permit.revision, 'roster': sorted(chunk.permit.participants),
+            'audio': base64.b64encode(chunk.audio).decode('ascii'), 'offset_ms': chunk.offset_ms,
+        }, timeout=40)
+
+    def transcript(self, meeting, page=0):
+        return self.request('/api/meetings/transcript/' + str(UUID(meeting)) + '?page=' + str(page))
+
+    def history(self, channel):
+        return self.request('/api/meetings/history/' + str(UUID(channel)))
+
+    def review(self, identifier, version, body, decision=False):
+        return self.request('/api/meetings/transcript/review', {
+            'identifier': identifier, 'version': version, 'body': body, 'decision': decision,
+        })
+
+    def withdraw_text(self, meeting, delete=False):
+        return self.request('/api/meetings/text/withdraw', {'meeting': meeting, 'delete': delete})
+
     def pulse(self, meeting):
         return self.request('/api/meetings/pulse', {'meeting': meeting})
 

@@ -16,6 +16,10 @@ class CallWorker(QObject):
     problem = Signal(str)
     media = Signal(str, bool)
     ended = Signal()
+    consent_snapshot = Signal(object)
+    text_capability = Signal(bool)
+    speech_capability = Signal(bool)
+    transcription_state = Signal(str)
 
     def __init__(self, client, *, workspace, channel, user, parent=None):
         super().__init__(parent)
@@ -38,6 +42,14 @@ class CallWorker(QObject):
         self.connected = False
         self.run_task = None
         self.cleaning = False
+        self._speech_state = None
+        self.speech_available = False
+        self.speech_requested = False
+        self.speech_task = None
+        self.local_audio_track = None
+        self.snapshot = None
+        self.snapshot_at = 0
+        self.call_started = time.monotonic()
 
     def start(self):
         if self.thread:
@@ -62,6 +74,11 @@ class CallWorker(QObject):
                 workspace=self.workspace, channel=self.channel, user=self.user)
             if self.stop_requested.is_set():
                 return
+            if hasattr(self.client, 'capabilities'):
+                capabilities = await asyncio.to_thread(self.client.capabilities)
+                self.text_capability.emit(capabilities.get('meeting_text') is True)
+                self.speech_available = capabilities.get('audio_transcription') is True
+                self.speech_capability.emit(self.speech_available)
             phase = 'native media initialization'
             self.room = rtc.Room()
             self._events()
@@ -77,7 +94,9 @@ class CallWorker(QObject):
             last_pulse = 0
             while not self.stop_requested.is_set():
                 if time.monotonic() - last_pulse >= 8:
-                    await asyncio.wait_for(asyncio.to_thread(self.client.pulse, self.meeting), 20)
+                    snapshot = await asyncio.wait_for(
+                        asyncio.to_thread(self.client.pulse, self.meeting), 20)
+                    self.update_consent(snapshot)
                     last_pulse = time.monotonic()
                 self._send_frames()
                 await asyncio.sleep(.03)
@@ -91,6 +110,74 @@ class CallWorker(QObject):
             await self._cleanup()
             self.state.emit(failure or 'Call ended · devices are off')
             self.ended.emit()
+
+    def update_consent(self, snapshot):
+        self.snapshot, self.snapshot_at = snapshot, time.monotonic()
+        self.consent_snapshot.emit(snapshot)
+
+    def speech_permit(self):
+        from aedrova.meetings.consent import capture_permit
+        if (not self.connected or not self.speech_requested or not self.speech_available
+                or not self.microphone or time.monotonic() - self.snapshot_at > 10):
+            return None
+        people = {self.user} | set(self.room.remote_participants)
+        return capture_permit(self.snapshot or {}, people)
+
+    def emit_speech_state(self, state):
+        if state != self._speech_state:
+            self._speech_state = state
+            self.transcription_state.emit(state)
+
+    def pause_speech(self):
+        self.speech_requested = False
+        if self.speech_task:
+            self.speech_task.cancel()
+            self.speech_task = None
+        self.emit_speech_state('Transcription off · review saved text separately')
+
+    def start_speech(self):
+        if self.speech_task or not self.speech_permit() or not self.local_audio_track:
+            return
+        self.speech_task = asyncio.create_task(self._transcribe_microphone())
+        self.tasks.add(self.speech_task)
+        self.speech_task.add_done_callback(self.tasks.discard)
+
+    async def _transcribe_microphone(self):
+        from aedrova.meetings.consent import same_capture
+        from aedrova.meetings.speech import MicrophoneBuffer
+        buffer = MicrophoneBuffer()
+        stream = None
+        try:
+            stream = rtc.AudioStream(self.local_audio_track, capacity=1,
+                                     sample_rate=16000, num_channels=1)
+            async for event in stream:
+                permit = self.speech_permit()
+                self.emit_speech_state('Transcribing your microphone · review required'
+                    if permit else 'Transcription paused · waiting for current consent')
+                chunk = buffer.feed(bytes(event.frame.data), permit,
+                    min(86400000, int((time.monotonic() - self.call_started) * 1000)))
+                if chunk is None:
+                    continue
+                # Skip capture while awaiting the server; bounded capacity discards old frames.
+                # Never queue a stale recording or automatically retry a failed provider call.
+                if same_capture(chunk.permit, self.speech_permit()):
+                    self.emit_speech_state('Processing your speech · capture paused')
+                    await asyncio.to_thread(self.client.transcribe, self.meeting, chunk)
+                buffer.reset()
+                if not self.speech_permit():
+                    self.emit_speech_state('Transcription paused · consent changed')
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            self.speech_requested = False
+            self.emit_speech_state('Transcription stopped · check consent or service; '
+                                           'start again when ready')
+        finally:
+            buffer.reset()
+            if stream:
+                await stream.aclose()
+            if self.speech_task is asyncio.current_task():
+                self.speech_task = None
 
     def _events(self):
         def listen(event, callback):
@@ -124,6 +211,7 @@ class CallWorker(QObject):
 
     def _reconnecting(self, *_):
         self.connected = False
+        self.pause_speech()
         if self.microphone:
             self.microphone.close()
             self.microphone = None
@@ -211,6 +299,8 @@ class CallWorker(QObject):
                 pass  # The worker loop finished between the GUI check and dispatch.
 
     def _schedule(self, kind, enabled):
+        if kind in {"consent", "withdraw_text", "end"} or (kind == "microphone" and not enabled):
+            self.pause_speech()
         if self.cleaning or self.stop_requested.is_set():
             return
         task = asyncio.create_task(self._media(kind, enabled))
@@ -222,6 +312,30 @@ class CallWorker(QObject):
             if self.cleaning or self.stop_requested.is_set():
                 return
             try:
+                if kind == 'transcription':
+                    if not enabled:
+                        self.pause_speech()
+                        return
+                    self.speech_requested = True
+                    if not self.speech_permit():
+                        self.pause_speech()
+                        raise PermissionError('Current unanimous consent and microphone required')
+                    self.start_speech()
+                    return
+                if kind == 'consent':
+                    self.pause_speech()
+                    snapshot = await asyncio.to_thread(
+                        self.client.consent, self.meeting,
+                        enabled['transcription'], enabled['ai_context'])
+                    self.update_consent(snapshot)
+                    return
+                if kind == 'withdraw_text':
+                    self.pause_speech()
+                    await asyncio.to_thread(self.client.withdraw_text, self.meeting,
+                                            enabled['delete'])
+                    snapshot = await asyncio.to_thread(self.client.pulse, self.meeting)
+                    self.update_consent(snapshot)
+                    return
                 if kind == 'end':
                     await asyncio.to_thread(self.client.end, self.meeting)
                     self.stop()
@@ -229,6 +343,8 @@ class CallWorker(QObject):
                 if enabled and not self.connected:
                     raise RuntimeError('Not connected')
                 if kind == 'microphone':
+                    self.pause_speech()
+                    self.local_audio_track = None
                     if self.microphone:
                         self.microphone.close()
                         self.microphone = None
@@ -240,6 +356,7 @@ class CallWorker(QObject):
                             echo_cancellation=True, noise_suppression=True, auto_gain_control=True))
                         track = rtc.LocalAudioTrack.create_audio_track(
                             'Microphone', self.microphone)
+                        self.local_audio_track = track
                         self.mic_publication = await self.room.local_participant.publish_track(
                             track,
                             rtc.TrackPublishOptions(source=rtc.TrackSource.SOURCE_MICROPHONE))
@@ -278,6 +395,7 @@ class CallWorker(QObject):
             self.loop.call_soon_threadsafe(self._cancel_run)
 
     def _cancel_run(self):
+        self.pause_speech()
         if self.microphone:
             self.microphone.close()
             self.microphone = None

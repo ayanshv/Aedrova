@@ -6,6 +6,8 @@ import subprocess
 from pathlib import Path
 from uuid import uuid4
 
+from aedrova.security.credentials import credential_rules
+
 
 def git(root, *args):
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
@@ -46,6 +48,13 @@ EXCLUDED_DIRS = {
     ".pytest_cache",
     ".codex",
     ".claude",
+    ".agents",
+    ".ssh",
+    ".aws",
+    ".azure",
+    ".kube",
+    ".gnupg",
+    ".config",
 }
 
 
@@ -55,13 +64,28 @@ def excluded(path):
         or path.name == ".DS_Store"
         or path.name.startswith(".env")
         or path.suffix.lower() in {".pem", ".key", ".p12", ".pfx"}
-        or path.name in {"id_rsa", "id_ed25519", "credentials.json"}
+        or path.name
+        in {
+            "id_rsa",
+            "id_ed25519",
+            "credentials.json",
+            ".npmrc",
+            ".netrc",
+            ".pypirc",
+            "secrets.json",
+            "secrets.toml",
+            "auth.json",
+        }
     )
 
 
 def prepare(repository, builds):
     """Snapshot current files, including uncommitted work, without changing the source."""
     import json
+
+    from aedrova.agents.retention import maintain
+
+    maintain(builds, protected=(Path(repository).expanduser().resolve().parent,))
 
     root = Path(repository).expanduser().resolve(strict=True)
     if not root.is_dir() or root in {Path.home().resolve(), Path(root.anchor)}:
@@ -116,6 +140,12 @@ def prepare(repository, builds):
         data = source.read_bytes()
         if source.stat().st_mtime_ns != stat.st_mtime_ns or len(data) != stat.st_size:
             raise ValueError("A project file changed while copying. Please create the plan again.")
+        if credential_rules(data):
+            raise ValueError(
+                "Potential hardcoded credential in "
+                + relative.as_posix()
+                + ". Remove it before sending this project to an agent."
+            )
         target.write_bytes(data)
         target.chmod(0o755 if stat.st_mode & 0o111 else 0o644)
         copied += 1

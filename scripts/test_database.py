@@ -62,7 +62,15 @@ try {
    'supabase/migrations/202610020001_scalability.sql',
    'supabase/tests/scalability.sql',
    'supabase/migrations/202610020002_workspace_archive.sql',
-   'supabase/tests/workspace_archive.sql']) {
+   'supabase/tests/workspace_archive.sql',
+   'supabase/migrations/202610030001_meeting_context.sql',
+   'supabase/tests/meeting_context.sql',
+   'supabase/migrations/202610030002_meeting_speech_review.sql',
+   'supabase/tests/meeting_speech_review.sql',
+   'supabase/migrations/202610030003_storage_retention.sql',
+   'supabase/tests/storage_retention.sql',
+   'supabase/migrations/202610030004_meeting_activity.sql',
+   'supabase/tests/meeting_activity.sql']) {
   await db.exec(fs.readFileSync(file,'utf8'));
   console.log('PASS '+file);
  }

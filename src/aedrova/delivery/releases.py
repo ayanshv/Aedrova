@@ -26,11 +26,13 @@ def validate_release(data, machine=None, macos=None):
     version_tuple(data.get("version"))
     if data.get("public_release") is not True:
         raise ValueError("The verified public installer is not ready yet.")
-    if data.get("architecture") not in {"arm64", "x86_64", "universal2"}:
+    if data.get("architecture") not in ("arm64", "x86_64", "universal2"):
         raise ValueError("Release information has an unsupported architecture.")
-    if not re.fullmatch(r"[a-f0-9]{64}", data.get("sha256", "")):
+    digest = data.get("sha256")
+    if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
         raise ValueError("Release information is missing its verification digest.")
-    if not re.fullmatch(r"\d{1,2}\.\d{1,2}", data.get("minimum_macos", "")):
+    minimum = data.get("minimum_macos")
+    if not isinstance(minimum, str) or not re.fullmatch(r"\d{1,2}\.\d{1,2}", minimum):
         raise ValueError("Release information is missing macOS requirements.")
     current = machine or platform.machine()
     if data["architecture"] not in {current, "universal2"}:

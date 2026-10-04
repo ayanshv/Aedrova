@@ -1,6 +1,7 @@
 """Optional, versioned setup and safe, task-based dashboard spotlights."""
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from PySide6.QtCore import QEasingCurve, QEvent, QPoint, QPropertyAnimation, QRect, Qt, QTimer
 from PySide6.QtGui import QColor, QKeySequence, QPainter, QPainterPath, QRegion, QShortcut
@@ -8,7 +9,9 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
     QHBoxLayout,
+    QLineEdit,
     QPushButton,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -148,11 +151,11 @@ STEPS = (
     Step(
         "Meet",
         "A familiar room.",
-        "Open channel call to meet with your team. Inside the call, use microphone and "
+        "Start meeting to meet with your team. Inside the call, use microphone and "
         "camera toggles, screen sharing, participants and leave controls. Shared hosting "
         "is required for calls between Macs. Transcription and AI meeting context are "
         "still being prepared; no silent recording.",
-        "button:Open channel call",
+        "button:Start meeting",
         ("calls", "camera", "microphone", "sharing", "participants", "leave_call"),
         4,
     ),
@@ -212,6 +215,9 @@ class SetupDialog(AppDialog):
         super().__init__(window)
         self.window = window
         self.prefix = account_key(window)
+        self.owner = str(window.current_user().id) if window.current_user() else None
+        self.workspace = window.workspace_id
+        self.build_draft = None
         self.step = 0
         self.setWindowTitle("Aedrova · Make yourself at home")
         self.resize(560, 460)
@@ -228,8 +234,11 @@ class SetupDialog(AppDialog):
         self.content_layout = QVBoxLayout(self.content)
         self.content_layout.setContentsMargins(0, 0, 0, 0)
         self.content_layout.setSpacing(12)
-        layout.addWidget(self.content)
-        layout.addStretch()
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(self.content)
+        layout.addWidget(scroll, 1)
         row = QHBoxLayout()
         skip = button("Set up later", role="outline")
         skip.clicked.connect(self.defer)
@@ -245,10 +254,25 @@ class SetupDialog(AppDialog):
         self.show_step(0)
 
     def show_step(self, step):
+        if self.step == 2 and hasattr(self, "project_folder"):
+            self.build_draft = {
+                "folder": self.project_folder.text(),
+                "provider": self.coding_provider.currentData(),
+                "background_build": self.automatic_builds.isChecked(),
+            }
         self.step = max(0, min(3, step))
         while self.content_layout.count():
             item = self.content_layout.takeAt(0)
-            item.widget().deleteLater()
+            if item.widget():
+                item.widget().hide()
+                item.widget().deleteLater()
+            elif item.layout():
+                nested = item.layout()
+                while nested.count():
+                    child = nested.takeAt(0).widget()
+                    if child:
+                        child.hide()
+                        child.deleteLater()
         content = (
             (
                 "Your team, your space.",
@@ -261,8 +285,8 @@ class SetupDialog(AppDialog):
             ),
             (
                 "Bring your tools.",
-                "Connect only the folder you want your agent to work in. Provider access and "
-                "build permissions are configured in Project settings.",
+                "Choose your project folder and coding provider, then decide how your agent "
+                "plans and builds. You can change these settings later.",
             ),
             (
                 "A little guidance, on your terms.",
@@ -276,7 +300,7 @@ class SetupDialog(AppDialog):
         self.back.setEnabled(self.step > 0)
         self.next.setText("Explore the dashboard" if self.step == 3 else "Continue")
         if self.step == 0:
-            control = button("Workspace & agent settings", role="outline")
+            control = button("Workspace and agent settings", role="outline")
             control.setEnabled(bool(self.window.current_user()))
             control.clicked.connect(lambda: self.window.show_account("manage"))
             self.content_layout.addWidget(control)
@@ -303,6 +327,43 @@ class SetupDialog(AppDialog):
                 control.toggled.connect(callback)
                 self.content_layout.addWidget(control)
         if self.step == 2:
+            from aedrova.desktop.projects import binding
+
+            saved = self.build_draft or binding(self.window, self.workspace)
+            self.project_folder = QLineEdit(saved.get("folder", ""))
+            self.project_folder.setAccessibleName("Onboarding project folder")
+            self.project_folder.setPlaceholderText("Choose the project your agent will build")
+            folder_row = QHBoxLayout()
+            folder_row.addWidget(self.project_folder, 1)
+            choose = button("Choose folder", role="outline")
+            choose.clicked.connect(self.choose_build_folder)
+            folder_row.addWidget(choose)
+            self.content_layout.addLayout(folder_row)
+            self.coding_provider = ChoiceBox()
+            self.coding_provider.setAccessibleName("Onboarding coding provider")
+            self.coding_provider.addItem("Codex", "codex")
+            self.coding_provider.addItem("Claude Code", "claude_code")
+            self.coding_provider.setCurrentIndex(
+                self.coding_provider.findData(saved.get("provider", "codex"))
+            )
+            self.content_layout.addWidget(self.coding_provider)
+            self.automatic_builds = QCheckBox("Let the agent plan and execute automatically")
+            self.automatic_builds.setChecked(saved.get("background_build", False))
+            self.content_layout.addWidget(self.automatic_builds)
+            self.content_layout.addWidget(
+                label(
+                    "When you mention your agent, it shares accessible workspace context with your "
+                    "chosen provider and plans, edits and runs sandboxed tests in a build copy. "
+                    "Provider usage may be billed. Applying changes and publishing still need "
+                    "approval. This is optional and can be changed in Project settings.",
+                    "muted",
+                    wrap=True,
+                )
+            )
+            self.project_status = label(
+                "You can connect now or continue without a project.", "muted", wrap=True
+            )
+            self.content_layout.addWidget(self.project_status)
             editor = ChoiceBox()
             editor.setAccessibleName("Preferred editor")
             editor.addItems(["Visual Studio Code", "Cursor", "Xcode", "Finder"])
@@ -311,16 +372,59 @@ class SetupDialog(AppDialog):
                 lambda value: self.window.settings.setValue("editor", value)
             )
             self.content_layout.addWidget(editor)
-            for text, callback in (
-                ("Connect project & workflow", self.project),
-                ("Set up GitHub", self.github),
-            ):
+            for text, callback in (("Set up GitHub", self.github),):
                 control = button(text, role="outline")
                 control.setEnabled(bool(self.window.current_user()))
                 control.clicked.connect(callback)
                 self.content_layout.addWidget(control)
         self.next.setFocus()
-        fade(self.content, self.window.reduced_motion)
+        # Position animations fight the parent layout and can pin controls at (0, 0).
+        self.content_layout.activate()
+
+    def choose_build_folder(self):
+        from aedrova.desktop.controls import choose_project
+
+        selected = choose_project(self, self.project_folder.text())
+        if selected:
+            self.project_folder.setText(selected)
+
+    def save_build_setup(self):
+        from aedrova.desktop.projects import binding, save_binding
+
+        folder = self.project_folder.text().strip()
+        if not folder:
+            if self.automatic_builds.isChecked():
+                self.project_status.setText("Choose a project before enabling automatic builds.")
+                return False
+            return True
+        try:
+            root = Path(folder).expanduser().resolve(strict=True)
+            if not root.is_dir() or root in {Path.home(), Path(root.anchor)}:
+                raise ValueError("Choose a specific project folder.")
+            if (
+                not self.window.current_user()
+                or str(self.window.current_user().id) != self.owner
+                or self.window.workspace_id != self.workspace
+            ):
+                raise ValueError("Return to your original workspace to save this connection.")
+            saved = binding(self.window, self.workspace)
+            saved.update(
+                folder=str(root),
+                provider=self.coding_provider.currentData(),
+                auto_plan=self.automatic_builds.isChecked(),
+                background_build=self.automatic_builds.isChecked(),
+            )
+            save_binding(self.window, saved, self.workspace)
+            build = getattr(self.window, "build_dialog", None)
+            if build and build.background_run and not build.background_authorized():
+                build.cancel()
+            self.window._render_pages()
+            return True
+        except (ValueError, OSError, PermissionError):
+            self.project_status.setText(
+                "Choose an accessible project folder and sign in to save it."
+            )
+            return False
 
     def project(self):
         from aedrova.desktop.projects import open_project
@@ -333,6 +437,8 @@ class SetupDialog(AppDialog):
         open_github_setup(self.window)
 
     def advance(self):
+        if self.step == 2 and not self.save_build_setup():
+            return
         if self.step < 3:
             self.show_step(self.step + 1)
         else:

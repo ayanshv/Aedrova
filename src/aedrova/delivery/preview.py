@@ -35,12 +35,26 @@ class StaticHandler(http.server.SimpleHTTPRequestHandler):
         self.send_error(404)
         return None
 
-    def do_GET(self):  # noqa: N802
+    def permitted(self):
+        if self.headers.get("Host") != f"127.0.0.1:{self.server.server_port}":
+            self.send_error(403)
+            return False
+        if self.headers.get("Origin") not in {None, f"http://127.0.0.1:{self.server.server_port}"}:
+            self.send_error(403)
+            return False
         path = unquote(urlsplit(self.path).path)
         if any(part.startswith(".") for part in path.split("/") if part):
             self.send_error(404)
-            return
-        super().do_GET()
+            return False
+        return True
+
+    def do_GET(self):  # noqa: N802
+        if self.permitted():
+            super().do_GET()
+
+    def do_HEAD(self):  # noqa: N802
+        if self.permitted():
+            super().do_HEAD()
 
     def end_headers(self):
         self.send_header("X-Content-Type-Options", "nosniff")

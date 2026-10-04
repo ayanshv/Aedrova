@@ -1,5 +1,226 @@
 # Delivery gates
 
+## October 3 — M14A local rehearsal complete; M14B/C remain deferred
+
+Owner authorized resuming M14. The actual signed preview DMG passed integrity/digest,
+mounted signature/version/link checks and isolated installation, replacement and rollback
+launches, retaining synthetic settings/project files. Both themes inspected. Replacement
+uses the same preview version; no real version migration or fresh-Mac acceptance claimed.
+Malformed update-field types now fail with readable validation errors; real loopback HTTP
+checks cover compatible newer metadata, closed/invalid/oversized/preview responses and
+cross-origin redirects. 503 desktop tests, 247 website/backend tests, all 25 desktop SQL
+files, private ledger/meeting schema checks, scoped Ruff, secret scan and rebuilt preview
+checks pass. See [milestone-14-local-rehearsal.md](milestone-14-local-rehearsal.md).
+
+No hosted migration, purchase, public flag, push or deployment changed. **M14 overall is
+not complete:** M14B owner signing/paid hosting/live billing/provider setup and M14C hosted
+two-physical-Mac meeting/context acceptance remain deferred. No owner action is required
+for local rehearsal; reopen the rebuilt preview for the fix. Announcement SQL activation
+remains unconfirmed. Ask permission before M14B/C or independent M15 implementation;
+do not waive the release gates when proceeding with locally available work.
+
+## October 3 — differentiation milestones added; authoritative next sequence
+
+See [differentiation-roadmap.md](differentiation-roadmap.md) for deliverables and acceptance
+criteria. This sequence supersedes earlier forward-looking launch/walkthrough ordering;
+historical implementation and test records below remain intact.
+
+- **M14:** remaining local release rehearsal, deferred M14B owner production setup and
+  **M14C final hosted meeting acceptance**. Meetings finish at M14C only after real provider,
+  consent/context, permissions/recovery and two-physical-Mac checks pass. M10/M12 local
+  implementation is not complete hosted acceptance.
+- **M15:** persistent, editable product memory with approved decisions, source citations,
+  conflict review, freshness and permission-scoped retrieval.
+- **M16:** traceable builds linking agreed requirements to code, actual tests and shared
+  PR review; retain explicit publishing approval.
+- **M17:** continuous team delivery and handoffs, reviewed learning back into memory,
+  visible product differentiation and measured workflow evidence.
+- **M18:** security and production acceptance for the expanded product, then authorized
+  public launch. The waitlist website remains live while product capabilities stay gated.
+- **Entire-codebase walkthrough:** after the entire application is complete and deployed,
+  including M15–M18; historical M13B label does not change that timing.
+
+Only roadmap edits are authorized by this request. Ask before starting a new implementation
+milestone. Owner paid/account/second-Mac actions remain deferred; no secrets or purchases
+are required for this planning task. Announcement SQL activation remains unconfirmed.
+
+## October 3 — meeting actions and announcements implemented; SQL activation pending
+
+Start/Join meeting, shared channel announcement preference, circular participant photos
+and counts are implemented. 493 desktop tests and 25 embedded SQL files pass; signed
+preview, packaged smoke and compact theme visuals pass. See `meeting-announcements.md`.
+Owner must run `202610030004_meeting_activity.sql` in Supabase and reopen the app before
+shared live-account acceptance. Do not claim hosted activation complete; ask before
+validation or resuming the remaining M14 release rehearsal.
+
+## October 3 — workspace mentions and chat scroll boundary complete
+
+Mention suggestions now use the team agent nickname in both composers. Final agent
+results replace progress without leaving stale blank scroll space; repeated wheel
+scrolling, shrinking results and resized layouts are checked. 490 desktop tests, Ruff,
+visual and signed packaged smoke checks pass. See `agent-chat-polish.md`. No owner SQL
+or public deployment changed. Reopen the rebuilt app; ask before resuming local M14.
+
+## October 3 — working-message and build-onboarding follow-up complete
+
+Live status/time/Stop are now in the agent chat message; transient updates disappear
+on completion, leaving the final result. Getting started includes project connection,
+provider/editor and explicit automatic planning/execution. Folder selection uses native
+macOS UI. See `agent-chat-polish.md`; 482 desktop tests and packaged/visual checks pass.
+No SQL or public deployment changed. Owner should reopen the rebuilt app; ask permission
+before resuming the remaining M14 local release rehearsal.
+
+## October 3 — requested agent chat presentation polish complete
+
+Agent responses now appear within the conversation with the team nickname, avatar,
+sent time/date, teammate typography and spacing. Expandable tools and build controls
+remain; originating-channel visibility and realtime/widget lifetime are checked.
+477 desktop tests, Ruff, visual checks and rebuilt-preview validation pass. See
+`agent-chat-polish.md`. No SQL/deployment/paid setup changed. Ask permission before
+resuming the remaining M14 local installation/update rehearsal.
+
+## October 3 — owner setup walkthrough deferred (M14B)
+
+Owner explicitly requested a later guided walkthrough for **Apple Developer ID, Render
+and Stripe**, saved here. Schedule **M14B — guided production account and release setup**
+when the owner has the required account details and payment access. Continue independently
+available local M14 preparation first. Ask permission before starting M14B; do not request
+these details or purchase services during local preparation.
+
+Walk the owner through the actual dashboards and local tools, one step at a time:
+
+- Apple Developer Program enrollment/team access, Developer ID Application certificate
+  and private key via Keychain, notarytool Keychain profile, signing/notarization/stapling,
+  Gatekeeper verification and public installer/update acceptance. Distinguish existing
+  Apple Development preview signing from Developer ID public distribution.
+- Render: existing website/Supabase setup, explicit recurring-cost approval, always-on
+  compute and Blueprint consistency, private server environment, independent meeting
+  guard/maintenance jobs, TLS/domain, health checks, GitHub deployment, rollback and logs.
+  Review actual prices before purchase; no new Render PostgreSQL is assumed.
+- Stripe: truthful business verification/payout setup, live-versus-sandbox separation,
+  approved weekly/monthly prices, Aedrova branding and portal, private keys, signed webhook
+  destination, subscription/allowance integration, failure recovery and launch gates.
+  Use sandbox for payment testing; never request private keys or financial details in chat.
+
+Explain what each action unlocks and verify it before proceeding. Owner-only identity,
+banking/payment and account approval actions stay with the owner. Keep public checkout,
+managed AI, meetings and installer publication gated until their acceptance checks pass.
+This walkthrough precedes the corresponding public release activation; it cannot be
+postponed past publishing a paid/signed app. The separate **entire-codebase walkthrough**
+remains after the entire application is complete and deployed.
+
+## October 3 — M14 local preparation authorized; meeting recovery in progress
+
+Owner approved credential-free local release preparation, keeping Stripe activation, paid
+hosting and public signing deferred. Initial regression: 473 desktop / 243 website tests,
+23 embedded SQL scripts, private ledger schema, SDK handshake and installed-agent boundary
+fixtures pass. Preview packaging passed. Owner then reported meeting failure: the local
+API had stopped and the rehearsal preview incorrectly targeted the public waitlist origin.
+Rebuilt with local port 8090, local AI mode and the existing Apple Development signature;
+restarted local API, verified readiness and synthetic LiveKit media transport. No public
+meeting/checkout/AI/release flags were enabled. Owner signed-in physical call retry remains
+pending. M14 is NOT complete; continue the isolated installation/update rehearsal next.
+
+
+## October 3 — M13A local release hardening complete; stop before M14
+
+The owner approved M13A. Workspace quota accounting, service-only leased orphan cleanup,
+safe local build/context retention and Claude forbidden-network wait handling are implemented.
+473 desktop tests, 231 website/backend tests and all 23 embedded PostgreSQL scripts pass;
+Ruff and installed-agent boundary/normal-edit fixtures pass. Full policy and exact deferred
+owner actions are in `milestone-13a-release-hardening.md`. No hosted SQL, object deletion,
+credential, purchase, push or deployment was performed. UI and live release flags are intact.
+Next: M14 owner setup, staging deployment and hosted acceptance, then release activation.
+Obtain permission before starting. Codebase walkthrough follows the entire app's completion
+and deployment; do not start it now.
+
+## October 3 — next step: M13A release hardening; walkthrough deferred until after deployment
+
+The owner moved the entire-codebase walkthrough to after the entire application is
+complete and deployed. Do not start M13B before that condition is met. The next proposed
+implementation task is **M13A — remaining release hardening**: aggregate workspace storage
+quotas, safe orphan-upload cleanup, explicit local build/context retention and cleanup,
+and handling of Claude forbidden-network waits. Add meaningful regression checks and
+revalidate the agent boundaries. Keep existing UI/features and live release gates intact.
+This task is proposed, not authorized yet; ask permission before implementation. Complete
+independent code preparation before requesting necessary owner SQL/configuration actions.
+M14 remains final hosted acceptance, owner setup and deployment/release activation.
+
+## October 3 — M13 local security audit complete
+
+The owner authorized the final safety/security audit. Verified fixes cover coding runtime
+read boundaries and credential scrubbing, hardcoded/context credential filtering, local
+preview Host/Origin protection, private-input validation, bounded gateway/speech processing
+and a website cryptography dependency update. See `milestone-13-security-audit.md` for scope,
+evidence and remaining risks. 452 desktop tests, 216 website/backend tests, all 21 desktop
+SQL scripts and the private website ledger/meeting PostgreSQL checks pass. Installed-agent
+synthetic boundary tests pass; Claude forbidden-network tools can wait until cancellation.
+These changes are local, not deployed or rebuilt into a new public installer. M14 release
+gates and remaining storage/retention/load engineering are not waived. No owner credentials,
+purchase or migration is required now. Ask permission before M13A; it has not started.
+
+
+## October 3 — M12D local speech and review complete; stop before M13
+
+The owner approved M12D and explicitly required a stop before M13. Native opt-in microphone
+chunks, server-only bounded speech ingestion/reservations, transcript review/corrections,
+confirmed decisions, post-call browsing, privacy withdrawal/deletion and reviewed agent
+citations are implemented locally. See `milestone-12-speech-review.md` for the exact boundaries,
+verification and M14 owner actions. Both server capabilities and the public desktop context
+flag remain disabled. No hosted SQL, provider key, paid resource or deployment was activated.
+438 desktop tests, 213 website/backend tests and all 21 embedded PostgreSQL scripts pass.
+Local fixture acceptance does not replace real provider/physical/hosted acceptance at M14.
+Ask the owner for permission before M13; M13 has not started.
+
+## October 3 — M12C historical delivery; codebase walkthrough added
+
+Owner approved the local meeting consent/storage/context task. Incremental SQL,
+user-token API, gated privacy controls and meeting citations are implemented locally;
+see `milestone-12-meeting-context.md`. Automatic speech capture/provider ingest and a
+transcript review/editor are not yet implemented. No hosted migration, credentials or
+paid setup is required now; those actions remain in M14. Ask permission before the next
+speech/review implementation task and keep unvalidated public capabilities disabled.
+
+**M13B — entire-codebase walkthrough (owner-requested milestone, deferred)** follows
+completion and deployment of the entire application, including M14 acceptance/release.
+Walk through the actual
+final code, not a hypothetical architecture: repository/folder map; Python/Qt app startup,
+onboarding and UI; Supabase auth/schema/RLS/realtime; agent context/planning/execution,
+local files and GitHub delivery; FastAPI website/waitlist; Stripe/managed AI/usage;
+LiveKit/meeting consent/transcripts; tests, configuration, secrets and failure handling;
+CI/deployment, Mac packaging and updates. Explain key files and one complete flow from
+user action to storage/provider and back. Provide practical steps for finding/editing
+features, testing, publishing and debugging; distinguish local code from live validation.
+Use a guided explanation and diagrams, with time for the owner's questions. The request
+adds this milestone; do not start that walkthrough before the agreed implementation work.
+
+
+## Latest owner direction — October 3: M14 deferred meeting activation
+
+The owner requested moving the required actions from the shared meeting staging handoff
+to the latest milestone. **M14 is the final owner setup and hosted meeting acceptance gate**.
+Defer paid Render API/worker approval and creation, shared secret entry, the internal app's
+hosted-origin rebuild/installation and two-Mac physical validation until M14. No hosting
+purchase, new credential request or second-device request is required now. Keep the
+prepared Blueprint and bounded/sanitized guard implementation available.
+
+M12 continues with independently testable feature/integration implementation. M13 remains
+the safety audit and release preparation; those checks cannot substitute for M14's live
+meeting validation. Meeting hosting, recording/transcription and meeting-to-agent context
+must remain unavailable publicly until their relevant live/consent gates pass in M14.
+This deferral does not declare M10/M12 meeting acceptance complete, authorize paid
+resources, or waive signing, billing or any other public release gate. Website waitlist
+stays live. Ask permission before the next implementation task.
+
+
+October 3 — M12B shared meeting deployment preparation approved. The waitlist site is
+live on aedrova.com; certificates, readiness and www redirect passed. Separate Render
+API/guard deployment configuration is in the website repository's
+`deploy/render-meetings.yaml` and `docs/render-meetings.md`. It reuses restricted Supabase
+with bounded pools. Paid service approval and owner secret entry are required before
+live meeting acceptance; no paid services or transcription enabled by this preparation.
+Two-Mac hardware acceptance remains deferred until a second Mac is available.
+
 Domain follow-up, October 2: owner confirms applying workspace archive SQL, bought
 aedrova.com at Cloudflare (registrar email verified) and selected Render. Website-only
 deployment is now requested. Render authorization/hosting/private PostgreSQL/server

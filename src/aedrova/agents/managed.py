@@ -75,9 +75,9 @@ class ManagedClient:
         self._access_token = access_token
         self._run_id = ""
 
-    def request(self, path, body=None):
+    def request(self, path, body=None, *, timeout=20):
         try:
-            with httpx.Client(timeout=20, follow_redirects=False, trust_env=False) as client:
+            with httpx.Client(timeout=timeout, follow_redirects=False, trust_env=False) as client:
                 response = client.request(
                     "GET" if body is None else "POST",
                     self.origin + path,

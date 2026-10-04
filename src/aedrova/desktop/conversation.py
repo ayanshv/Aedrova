@@ -37,6 +37,7 @@ from PySide6.QtWidgets import (
     QStyle,
     QStyledItemDelegate,
     QVBoxLayout,
+    QWidget,
 )
 
 from aedrova.desktop.controls import AppMenu
@@ -125,6 +126,8 @@ class MessageDelegate(QStyledItemDelegate):
     def sizeHint(self, option, index):  # noqa: N802
         message = index.data(MESSAGE_ROLE)
         width = self.view.viewport().width()
+        if message.id == getattr(self.view, "agent_message_id", None):
+            return QSize(width, self.view.agent_feed.content_height(width))
         document = self.document(message, width - 94)
         extra = (58 if message.attachment else 0) + (
             26 if message.replies and self.view.allow_threads else 0
@@ -134,6 +137,8 @@ class MessageDelegate(QStyledItemDelegate):
 
     def paint(self, painter: QPainter, option, index):
         message = index.data(MESSAGE_ROLE)
+        if message.id == getattr(self.view, "agent_message_id", None):
+            return
         t = self.theme
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -245,6 +250,11 @@ class MessageView(QListView):
         self._scroll_timer.setSingleShot(True)
         self._scroll_timer.timeout.connect(self._finish_scroll)
         self.verticalScrollBar().rangeChanged.connect(lambda *_: self._scroll_timer.start(0))
+        self.agent_feed = None
+        self.agent_message_id = None
+        self.agent_visible = False
+        self.agent_anchor = None
+        self.source_messages = []
         self.allow_threads = allow_threads
         self.setObjectName("Messages")
         self.setAccessibleName("Conversation messages")
@@ -266,7 +276,11 @@ class MessageView(QListView):
         self.customContextMenuRequested.connect(self._context_menu)
 
     def _request_thread(self, index):
-        if self.allow_threads and index.isValid():
+        if (
+            self.allow_threads
+            and index.isValid()
+            and index.data(MESSAGE_ROLE).id != self.agent_message_id
+        ):
             self.thread_requested.emit(index.data(MESSAGE_ROLE).id)
 
     def keyPressEvent(self, event):  # noqa: N802
@@ -289,7 +303,7 @@ class MessageView(QListView):
             return
         self.setCurrentIndex(index)
         menu = AppMenu(self)
-        if self.allow_threads:
+        if self.allow_threads and index.data(MESSAGE_ROLE).id != self.agent_message_id:
             menu.addAction("Reply in thread", lambda: self._request_thread(index))
         menu.addAction("Copy message", self.copy_current)
         menu.exec(self.viewport().mapToGlobal(position))
@@ -316,6 +330,11 @@ class MessageView(QListView):
             return
         index = self.model().index(self._scroll_target.row())
         super().scrollTo(index, self._scroll_hint)
+        if (
+            self._scroll_hint == QListView.ScrollHint.PositionAtBottom
+            and self.visualRect(index).height() > self.viewport().height()
+        ):
+            self.verticalScrollBar().setValue(self.verticalScrollBar().maximum())
         if self.viewport().rect().intersects(self.visualRect(index)):
             self._scroll_target = None
 
@@ -327,8 +346,48 @@ class MessageView(QListView):
         self.delegate.theme = theme
         self.viewport().update()
 
-    def show_messages(self, messages):
-        if self.conversation_model.messages == list(messages):
+    def attach_agent_feed(self, feed):
+        self.agent_feed = feed
+        feed.make_inline()
+        feed.changed.connect(self.refresh_agent)
+
+    def set_agent_visible(self, visible):
+        self.agent_visible = visible
+        self.show_messages(self.source_messages)
+
+    def refresh_agent(self):
+        if not self.agent_feed.toPlainText():
+            self.agent_message_id = None
+            self.agent_anchor = None
+            self.agent_visible = False
+        elif not self.agent_message_id:
+            from uuid import uuid4
+
+            self.agent_message_id = "agent-" + str(uuid4())
+            self.agent_anchor = self.source_messages[-1].id if self.source_messages else None
+        self.show_messages(self.source_messages, force=True)
+
+    def show_messages(self, messages, *, force=False):
+        from aedrova.desktop.state import Message
+
+        self.source_messages = list(messages)
+        rows = list(messages)
+        if self.agent_visible and self.agent_message_id and self.agent_feed.toPlainText():
+            position = next(
+                (i + 1 for i, m in enumerate(rows) if m.id == self.agent_anchor),
+                len(rows) if self.agent_anchor else 0,
+            )
+            rows.insert(
+                position,
+                Message(
+                    self.agent_message_id,
+                    self.agent_feed.author_name,
+                    "",
+                    "",
+                    self.agent_feed.toPlainText(),
+                ),
+            )
+        if not force and self.conversation_model.messages == rows:
             return
         bar = self.verticalScrollBar()
         at_bottom = bar.value() >= bar.maximum() - 4
@@ -336,7 +395,27 @@ class MessageView(QListView):
         anchor = index.data(MESSAGE_ROLE).id if index.isValid() else None
         offset = self.visualRect(index).top() if index.isValid() else 0
         self._scroll_target = None
-        self.conversation_model.replace(messages)
+        if self.agent_feed:
+            # Qt owns index widgets and deletes them on model reset. Detach the live
+            # transcript first so ordinary realtime refreshes cannot destroy it.
+            self.agent_feed.hide()
+            self.agent_feed.setParent(self)
+        if self.agent_feed and self.agent_visible:
+            self.agent_feed.content_height(self.viewport().width())
+        self.conversation_model.replace(rows)
+        if self.agent_visible and self.agent_message_id:
+            for row, message in enumerate(rows):
+                if message.id == self.agent_message_id:
+                    holder = QWidget()
+                    layout = QVBoxLayout(holder)
+                    layout.setContentsMargins(0, 0, 0, 0)
+                    layout.addWidget(self.agent_feed)
+                    self.setIndexWidget(self.model().index(row), holder)
+                    self.agent_feed.show()
+                    break
+        # Inline agent height may change drastically at completion. Recalculate
+        # the list range after attaching its widget, before restoring scrolling.
+        self.doItemsLayout()
         if at_bottom:
             self.scrollToBottom()
         elif anchor:
@@ -402,6 +481,7 @@ class Composer(QFrame):
         super().__init__(parent)
         self.setObjectName("Composer")
         self.thread = thread
+        self.agent_name = "Aedrova"
         layout = QVBoxLayout(self)
         layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         layout.setContentsMargins(12, 8, 12, 10)
@@ -460,6 +540,15 @@ class Composer(QFrame):
         if self.editor.height() != height:
             self.editor.setFixedHeight(height)
 
+    def set_agent_name(self, name):
+        self.agent_name = (name or "").strip() or "Aedrova"
+        mention = "@" + self.agent_name
+        self.suggestion.setText(f"{mention}    ·    Tab or ↵")
+        self.suggestion.setAccessibleName(f"Complete mention {mention}. Tab or Return.")
+        self.mention.setAccessibleName("Mention " + self.agent_name)
+        self.mention.setToolTip(f"Insert {mention} · ask your agent to build")
+        self.update_suggestion()
+
     def mention_start(self):
         cursor = self.editor.textCursor()
         if cursor.hasSelection():
@@ -469,8 +558,8 @@ class Composer(QFrame):
             .encode("utf-16-le")[: cursor.position() * 2]
             .decode("utf-16-le")
         )
-        match = re.search(r"(?<!\S)@([A-Za-z]*)$", prefix)
-        if match and "aedrova".startswith(match[1].lower()):
+        match = re.search(r"(?<!\S)@([^@\n]*)$", prefix)
+        if match and self.agent_name.casefold().startswith(match[1].casefold()):
             return len(prefix[: match.start()].encode("utf-16-le")) // 2
         return None
 
@@ -498,7 +587,7 @@ class Composer(QFrame):
             return
         cursor = self.editor.textCursor()
         cursor.setPosition(start, QTextCursor.MoveMode.KeepAnchor)
-        cursor.insertText("@Aedrova ")
+        cursor.insertText("@" + self.agent_name + " ")
         self.editor.setTextCursor(cursor)
         self.editor.setFocus()
         self.suggestion.hide()
@@ -508,7 +597,7 @@ class Composer(QFrame):
         before = self.editor.toPlainText().encode("utf-16-le")[: cursor.selectionStart() * 2]
         prefix = before.decode("utf-16-le")
         separator = " " if prefix and not prefix[-1].isspace() else ""
-        cursor.insertText(separator + "@Aedrova ")
+        cursor.insertText(separator + "@" + self.agent_name + " ")
         self.editor.setTextCursor(cursor)
         self.editor.setFocus()
 

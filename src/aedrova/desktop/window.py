@@ -302,6 +302,11 @@ class AedrovaWindow(QMainWindow):
         date.setAlignment(Qt.AlignmentFlag.AlignCenter)
         date.setContentsMargins(0, 20, 0, 10)
         chat.addWidget(date)
+        self.meeting_announcements = QWidget()
+        self.meeting_announcements_layout = QVBoxLayout(self.meeting_announcements)
+        self.meeting_announcements_layout.setContentsMargins(28, 0, 28, 10)
+        self.meeting_announcements.hide()
+        chat.addWidget(self.meeting_announcements)
         self.message_stack = QStackedWidget()
         self.messages = MessageView()
         self.messages.thread_requested.connect(self.open_thread)
@@ -336,6 +341,7 @@ class AedrovaWindow(QMainWindow):
         self.build_activity.hide()
         self.build_activity.clicked.connect(self.open_agent_activity)
         activity_row = QHBoxLayout()
+        activity_row.setContentsMargins(0, 0, 0, 0)
         activity_row.addWidget(self.build_activity, 1)
         self.agent_clock = AgentClock()
         activity_row.addWidget(self.agent_clock)
@@ -351,11 +357,13 @@ class AedrovaWindow(QMainWindow):
             execution_queue(self).show_history()
 
         self.build_history.clicked.connect(show_builds)
-        activity_row.addWidget(self.build_history)
-        composition.addLayout(activity_row)
+        composition.addWidget(self.build_history)
         self.agent_feed = AgentStream()
+        status_controls = QWidget()
+        status_controls.setLayout(activity_row)
+        self.agent_feed.install_status_controls(status_controls)
         self.last_agent_event = ""
-        composition.addWidget(self.agent_feed)
+        self.messages.attach_agent_feed(self.agent_feed)
         composition.addWidget(self.composer)
         footer = label("Aedrova stays quiet until you mention it.", "muted")
         composition.addWidget(footer)
@@ -533,6 +541,14 @@ class AedrovaWindow(QMainWindow):
             self.connected.refresh()
 
     def _load_channel(self):
+        account = getattr(self, "account_dialog", None)
+        preferences = account.snapshot.get("agent_preferences", []) if account else []
+        nickname = next(
+            (p["nickname"] for p in preferences if p["workspace_id"] == self.workspace_id),
+            "Aedrova",
+        )
+        for composer in (self.composer, self.thread_composer):
+            composer.set_agent_name(nickname)
         if self.connected and self.current_user():
             from aedrova.desktop.execution import execution_queue
 
@@ -540,8 +556,9 @@ class AedrovaWindow(QMainWindow):
         if hasattr(self, "stop_agent"):
             self.update_agent_cancel()
         if hasattr(self, "agent_feed"):
-            self.agent_feed.setVisible(
+            self.messages.set_agent_visible(
                 getattr(self, "activity_workspace", None) == self.workspace_id
+                and getattr(self, "activity_channel", None) == self.channel_id
                 and bool(self.agent_feed.toPlainText())
             )
         if hasattr(self, "build_activity"):
@@ -558,10 +575,7 @@ class AedrovaWindow(QMainWindow):
             else "Local conversation"
         )
         self.messages.show_messages(channel.messages)
-        has_activity = getattr(self, "activity_workspace", None) == self.workspace_id and bool(
-            self.agent_feed.toPlainText()
-        )
-        self.message_stack.setCurrentIndex(0 if channel.messages or has_activity else 1)
+        self.message_stack.setCurrentIndex(0 if self.messages.model().rowCount() else 1)
         self.pinned.setVisible(any(m.decision for m in channel.messages))
         self.composer.editor.setPlaceholderText(
             f"Message {' ' if channel.direct else '#'}{channel.name}…"
@@ -574,9 +588,11 @@ class AedrovaWindow(QMainWindow):
             self.connection_badge.setText("Connected")
             self.conversation_date.setText("Shared conversation")
             self.members_label.setText("Your team")
-            for composer in (self.composer, self.thread_composer):
-                composer.mention.setToolTip("Mention @Aedrova to ask your coding agent")
             self.composer.setEnabled(bool(self.channel_id))
+        if hasattr(self, "account_dialog"):
+            from aedrova.desktop.meeting_activity import update_meeting_ui
+
+            update_meeting_ui(self)
 
     def open_pinned(self):
         for message in self.channel.messages:
@@ -651,7 +667,7 @@ class AedrovaWindow(QMainWindow):
             self.agent_feed.finish_pending()
         self.build_activity.configure(self.theme, self.reduced_motion, active)
 
-    def agent_event(self, workspace, text):
+    def agent_event(self, workspace, text, *, update_activity=True):
         if workspace != self.workspace_id:
             return
         if text == self.last_agent_event:
@@ -671,11 +687,17 @@ class AedrovaWindow(QMainWindow):
         else:
             summary = text[:1400]
         self.activity_workspace = workspace
+        self.activity_channel = getattr(self, "activity_channel", self.channel_id)
+        account = getattr(self, "account_dialog", None)
+        preferences = account.snapshot.get("agent_preferences", []) if account else []
+        self.agent_feed.author_name = next(
+            (p["nickname"] for p in preferences if p["workspace_id"] == workspace), "Aedrova"
+        )
         self.agent_feed.add_event(text)
-        self.agent_feed.show()
+        self.messages.set_agent_visible(self.activity_channel == self.channel_id)
         if self.messages.model().rowCount() == 0:
             self.message_stack.setCurrentIndex(0)
-        if getattr(self, "build_dialog", None) and self.build_dialog.job:
+        if update_activity and getattr(self, "build_dialog", None) and self.build_dialog.job:
             phase = "Working · latest update below"
             if text.startswith("Running:"):
                 phase = "Running command · " + text.removeprefix("Running:").strip()[:100]
@@ -695,7 +717,17 @@ class AedrovaWindow(QMainWindow):
         nickname = next(
             (p["nickname"] for p in preferences if p["workspace_id"] == workspace), "Aedrova"
         )
-        self.build_activity.setText(nickname + " · " + text[:105])
+        self.build_activity.setText(text[:105])
+        if workspace == self.workspace_id:
+            self.activity_channel = getattr(self, "activity_channel", self.channel_id)
+            build = getattr(self, "build_dialog", None)
+            if build and not (build.pending or build.background_transition):
+                self.agent_feed.author_name = nickname
+                self.agent_feed.finish_with_result(text)
+            else:
+                self.agent_feed.set_status(nickname, text)
+            self.messages.set_agent_visible(self.activity_channel == self.channel_id)
+            self.message_stack.setCurrentIndex(0)
         self.build_activity.setToolTip(text + "\nPrivate build activity. Click for details.")
         self.build_activity.setVisible(workspace == self.workspace_id)
         self.update_agent_cancel()
@@ -709,6 +741,13 @@ class AedrovaWindow(QMainWindow):
                 and (build.pending or build.background_transition)
             ),
         )
+
+    def finish_agent_response(self, workspace, text):
+        if workspace != self.workspace_id:
+            return
+        self.agent_feed.finish_with_result(text)
+        self.build_activity.hide()
+        self.messages.set_agent_visible(getattr(self, "activity_channel", None) == self.channel_id)
 
     def start_agent_request(self, text):
         from aedrova.agents.context import build_command
@@ -1109,6 +1148,7 @@ class AedrovaWindow(QMainWindow):
         return page
 
     def _meetings_page(self):
+        self.meeting_destination = None
         from aedrova.desktop.meeting_setup import open_meeting_setup
 
         page, layout = self._page(
@@ -1125,15 +1165,66 @@ class AedrovaWindow(QMainWindow):
                 lambda: open_meeting_setup(self),
             )
         )
+        from aedrova.desktop.meeting_activity import MeetingAction, current_meetings
         from aedrova.desktop.meeting_call import open_channel_call
 
-        call = button("Open channel call", role="primary")
-        call.clicked.connect(lambda: open_channel_call(self))
-        layout.addWidget(call)
+        active = next((m for m in current_meetings(self)
+                       if m["channel_id"] == self.channel_id), None)
+        self.meeting_action_layout = QVBoxLayout()
+        self.meeting_action_layout.addWidget(MeetingAction(
+            self.theme, active, lambda: open_channel_call(self)))
+        layout.addLayout(self.meeting_action_layout)
+        if self.connected and self.connected.active:
+            from aedrova.desktop.controls import ChoiceBox
+
+            layout.addWidget(label("Meeting announcements", "section"))
+            destinations = ChoiceBox()
+            self.meeting_destination = destinations
+            destinations.setAccessibleName("Meeting announcement channel")
+            public = [c for c in self.account_dialog.snapshot.get("channels", [])
+                      if c["workspace_id"] == self.workspace_id and not c.get("private")
+                      and c.get("kind", "channel") == "channel"]
+            for channel in public:
+                destinations.addItem("#" + channel["name"], channel["id"])
+            preferences = self.account_dialog.snapshot.get("meeting_activity", {}).get(
+                "preferences", [])
+            selected = next((p["announcement_channel"] for p in preferences
+                             if p["workspace_id"] == self.workspace_id), None)
+            selected = selected or next((c["id"] for c in public if c["name"] == "general"), None)
+            destinations.setCurrentIndex(max(0, destinations.findData(selected)))
+            admin = any(m["workspace_id"] == self.workspace_id
+                        and m["user_id"] == str(self.current_user().id)
+                        and m["role"] in ("owner", "admin")
+                        for m in self.account_dialog.snapshot.get("members", []))
+            destinations.setEnabled(admin and not self.account_dialog.snapshot.get(
+                "meeting_activity", {}).get("setup_required"))
+            workspace = self.workspace_id
+            def save_destination(_):
+                channel = destinations.currentData()
+                self.connected.enqueue(
+                    ("meeting-channel", workspace),
+                    lambda: self.account_dialog.service.rpc("set_meeting_announcement_channel",
+                        {"p_workspace": workspace, "p_channel": channel}),
+                    lambda _: self.connected.refresh())
+
+            destinations.activated.connect(save_destination)
+            layout.addWidget(destinations)
+            layout.addWidget(label("Public meetings appear here and in their own channel. "
+                                   "Private meetings stay in their private channel.", "muted",
+                                   wrap=True))
+        service = getattr(getattr(self, "account_dialog", None), "service", None)
+        if getattr(service, "meeting_context_enabled", False):
+            from aedrova.desktop.meeting_transcript import open_transcript_history
+
+            history = button("Review meeting transcripts", role="outline")
+            history.clicked.connect(lambda: open_transcript_history(self))
+            layout.addWidget(history)
+
         layout.addWidget(
             label(
                 "Your devices stay off until you enable a check. No checks are recorded.",
-                "muted", wrap=True
+                "muted",
+                wrap=True,
             )
         )
         layout.addStretch()

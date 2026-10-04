@@ -101,7 +101,10 @@ def test_agent_stream_never_overlaps_composer_when_resized(qtbot, tmp_path):
         window.set_theme(theme, persist=False)
         for width, height in ((900, 650), (1440, 940)):
             window.resize(width, height)
-            qtbot.waitUntil(
-                lambda: window.agent_feed.geometry().bottom() < window.composer.geometry().top()
-            )
-            assert 70 <= window.agent_feed.height() <= 230
+            qtbot.wait(30)
+            assert window.messages.isAncestorOf(window.agent_feed)
+            viewport_bottom = window.messages.mapToGlobal(window.messages.rect().bottomLeft()).y()
+            composer_top = window.composer.mapToGlobal(window.composer.rect().topLeft()).y()
+            assert viewport_bottom < composer_top
+            assert window.agent_feed.inline
+            assert not window.agent_feed.verticalScrollBar().isVisible()

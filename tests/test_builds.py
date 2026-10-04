@@ -168,7 +168,8 @@ def test_codex_real_subprocess_stream_and_flags(tmp_path, monkeypatch):
         monkeypatch,
         """
 assert '--ignore-user-config' in sys.argv
-assert sys.argv[sys.argv.index('--sandbox')+1] == 'workspace-write'
+assert 'default_permissions="aedrova"' in sys.argv
+assert any(a.startswith('permissions.aedrova.filesystem=') for a in sys.argv)
 assert 'approval_policy="never"' in sys.argv
 print(json.dumps({'type':'item.completed','item':{'type':'command_execution','command':'test',
 'aggregated_output':'passed','exit_code':0}}),flush=True)
@@ -296,6 +297,8 @@ def test_claude_approval_hooks_and_outside_paths(tmp_path, monkeypatch, planning
             self.options = options
             assert options.setting_sources == []
             assert options.sandbox["allowUnsandboxedCommands"] is False
+            assert options.sandbox["failIfUnavailable"] is True
+            assert options.permission_mode == "dontAsk"
             assert options.sandbox["network"]["allowedDomains"] == []
 
         async def __aenter__(self):
@@ -313,6 +316,7 @@ def test_claude_approval_hooks_and_outside_paths(tmp_path, monkeypatch, planning
                 ("Write", {"file_path": str(tmp_path / "new.py")}, "deny" if planning else "allow"),
                 ("Bash", {"command": "python3 -m unittest"}, "deny" if planning else "allow"),
                 ("Bash", {"command": "id", "dangerouslyDisableSandbox": True}, "deny"),
+                ("Bash", {"command": "curl https://example.com"}, "deny"),
             ]:
                 result = await hook({"tool_name": name, "tool_input": data}, None, None)
                 assert result["hookSpecificOutput"]["permissionDecision"] == expected
@@ -332,7 +336,7 @@ def test_claude_approval_hooks_and_outside_paths(tmp_path, monkeypatch, planning
     monkeypatch.setattr(sdk, "ClaudeSDKClient", Client)
     runner = LocalRunner(lambda _: None, lambda tool, data: approved.append(tool) or True)
     assert runner.run("claude_code", tmp_path, "task", plan=planning) == "Complete"
-    assert len(checks) == 6
+    assert len(checks) == 7
     assert approved == ([] if planning else ["Write", "Bash"])
 
 

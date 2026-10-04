@@ -22,6 +22,9 @@ class Source:
     confirmed_by: str
     fingerprint: str
     attachment: str = ""
+    meeting: str = ""
+    speaker: str = ""
+    offset_ms: int = 0
 
     def record(self):
         return vars(self)
@@ -65,6 +68,28 @@ class ContextIndex:
                     hashlib.sha256(body.encode()).hexdigest(),
                 )
             )
+        for record in records:
+            meeting = record.get("meeting_text")
+            if meeting is None:
+                continue
+            if (meeting.get("channel_id") not in context.channel_ids
+                    or meeting.get("ai_allowed") is not True
+                    or meeting.get("source") not in {"participant_text", "provider_speech"}
+                    or (meeting.get("source") == "provider_speech"
+                        and not meeting.get("reviewed_at"))):
+                raise PermissionError("Meeting text lacks authorized scope and consent.")
+            self._add(Source(
+                "meeting:" + meeting["id"], "meeting:" + meeting["id"],
+                channels.get(meeting["channel_id"], "channel"), meeting["body"],
+                None, meeting["created_at"],
+                ("confirmed_meeting_decision" if meeting.get("confirmed_decision") else
+                 "reviewed_speech" if meeting["source"] == "provider_speech"
+                 else "participant_text"),
+                meeting.get("reviewed_by") or "",
+                hashlib.sha256(meeting["body"].encode()).hexdigest(),
+                meeting=meeting["meeting_id"], speaker=meeting["speaker_id"],
+                offset_ms=meeting["offset_ms"],
+            ))
         for record in records:
             if "attachment" not in record:
                 continue
@@ -151,7 +176,7 @@ def validate_citations(context, plan):
     index = ContextIndex(context)
     try:
         available = {s.citation for s in index.sources}
-        cited = set(re.findall(r"(?:message|attachment):[A-Za-z0-9_-]+", plan))
+        cited = set(re.findall(r"(?:message|attachment|meeting):[A-Za-z0-9_-]+", plan))
         unknown = cited - available
         if unknown:
             raise ValueError(

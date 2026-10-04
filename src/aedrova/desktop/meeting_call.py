@@ -89,7 +89,7 @@ class MeetingCall(AppDialog):
         summary = QHBoxLayout()
         self.status = label('Ready when you are. Join with your devices off.', 'muted', wrap=True)
         summary.addWidget(self.status, 1)
-        self.join = button('Join channel call', role='primary')
+        self.join = button('Join meeting', role='primary')
         self.join.clicked.connect(self.join_call)
         summary.addWidget(self.join)
         layout.addLayout(summary)
@@ -180,13 +180,37 @@ class MeetingCall(AppDialog):
         self.arrange_toolbar()
         layout.addWidget(self.toolbar)
         footer = QHBoxLayout()
-        footer.addWidget(label('No recording · No transcription · No AI meeting access',
-                              'muted', wrap=True), 1)
+        self.privacy_status = label('No recording · No transcription · No AI meeting access',
+                                    'muted', wrap=True)
+        layout.addWidget(self.privacy_status)
+        self.last_consent_snapshot = None
+        self.meeting_text_enabled = False
+        self.audio_transcription_enabled = False
+        self.privacy_button = button('Meeting privacy', role='outline')
+        self.privacy_button.hide()
+        self.privacy_button.clicked.connect(self.show_privacy)
+        footer.addWidget(self.privacy_button)
+        self.speech_button = button('Start transcription', role='outline')
+        self.speech_button.setCheckable(True)
+        self.speech_button.hide()
+        self.speech_button.toggled.connect(
+            lambda checked: self.worker.command('transcription', checked))
+        footer.addWidget(self.speech_button)
+        self.transcript_button = button('Review transcript', role='outline')
+        self.transcript_button.hide()
+        self.transcript_button.clicked.connect(self.show_transcript)
+        footer.addWidget(self.transcript_button)
+        if hasattr(worker, 'speech_capability'):
+            worker.speech_capability.connect(self.speech_capability)
+            worker.transcription_state.connect(self.speech_state)
+        if hasattr(worker, 'text_capability'):
+            worker.text_capability.connect(self.text_capability)
+            worker.consent_snapshot.connect(self.consent_changed)
         self.end = button('End for everyone · host/admin', role='outline')
         self.end.setEnabled(False)
         self.end.clicked.connect(lambda: self.worker.command('end', True))
-        footer.addWidget(self.end)
         layout.addLayout(footer)
+        layout.addWidget(self.end, alignment=Qt.AlignmentFlag.AlignRight)
         for control in self.findChildren(type(self.join)):
             control.setAutoDefault(False)
         self.refresh_icons()
@@ -218,11 +242,59 @@ class MeetingCall(AppDialog):
         self.status.setText(state)
         self.connected = state.startswith(('Connected', 'Reconnected'))
         self.end.setEnabled(self.connected)
+        self.privacy_button.setEnabled(self.connected)
         for kind, control in self.controls.items():
             control.setEnabled(self.connected)
             if not self.connected:
                 self.disable(kind)
         self.join.setVisible(not self.connected)
+        if self.meeting_text_enabled:
+            self.consent_changed(self.last_consent_snapshot or {})
+
+    def text_capability(self, enabled):
+        self.meeting_text_enabled = enabled
+        self.privacy_button.setVisible(enabled)
+        self.transcript_button.setVisible(enabled)
+        self.privacy_button.setEnabled(self.connected)
+        if enabled:
+            self.consent_changed(self.last_consent_snapshot)
+
+    def speech_capability(self, enabled):
+        self.audio_transcription_enabled = enabled
+        self.speech_button.setVisible(enabled)
+        self.speech_button.setEnabled(False)
+
+    def speech_state(self, state):
+        self.privacy_status.setText(state)
+        if state.startswith(('Transcription off', 'Transcription stopped')):
+            self.speech_button.blockSignals(True)
+            self.speech_button.setChecked(False)
+            self.speech_button.blockSignals(False)
+        self.speech_button.setText('Stop transcription' if self.speech_button.isChecked()
+                                   else 'Start transcription')
+
+    def show_transcript(self):
+        if self.worker.meeting and self.meeting_text_enabled:
+            from aedrova.desktop.meeting_transcript import TranscriptReview
+            TranscriptReview(self, self.worker.client, meeting=self.worker.meeting).exec()
+
+    def consent_changed(self, snapshot):
+        self.last_consent_snapshot = snapshot
+        if not self.meeting_text_enabled:
+            return
+        from aedrova.meetings.consent import capture_permit
+        permit = capture_permit(snapshot or {}, self.people)
+        state = ('Waiting for everyone’s text consent' if permit is None else
+                 'Meeting text allowed · AI context ' + ('allowed' if permit.ai_allowed else 'off'))
+        if not self.speech_button.isChecked():
+            self.privacy_status.setText('No audio recording · ' + state)
+        self.speech_button.setEnabled(self.audio_transcription_enabled and self.connected
+                                      and permit is not None and self.states['microphone'])
+
+    def show_privacy(self):
+        if self.connected and self.meeting_text_enabled:
+            from aedrova.desktop.meeting_privacy import MeetingPrivacy
+            MeetingPrivacy(self, self.worker, self.last_consent_snapshot).exec()
 
     def toggle(self, kind):
         if not self.connected or self.closed:
@@ -305,6 +377,7 @@ class MeetingCall(AppDialog):
         if kind not in self.states:
             return
         self.states[kind] = enabled
+        self.consent_changed(self.last_consent_snapshot)
         if not enabled:
             self.disable(kind, notify_worker=False)
         else:
@@ -359,6 +432,8 @@ class MeetingCall(AppDialog):
             return
         ids = {person['id'] for person in people}
         self.people = ids
+        if hasattr(self, 'last_consent_snapshot'):
+            self.consent_changed(self.last_consent_snapshot)
         self.names = {person['id']: str(person['name'])[:80] for person in people}
         while self.participant_body.count():
             item = self.participant_body.takeAt(0)
@@ -474,6 +549,8 @@ class MeetingCall(AppDialog):
         self.end.setEnabled(False)
         self.join.setVisible(False)
         self.timer.stop()
+        self.speech_button.setEnabled(False)
+        self.privacy_button.setEnabled(False)
         self.last_images.clear()
         self.stage.clear()
         for _, preview in self.tiles.values():

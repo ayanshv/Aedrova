@@ -171,7 +171,9 @@ class ContextBrowser(AppDialog):
         source = (
             self.sources[row] if hasattr(self, "sources") and 0 <= row < len(self.sources) else None
         )
-        self.confirm.setEnabled(bool(source and not source.attachment and not self.busy))
+        self.confirm.setEnabled(
+            bool(source and not source.attachment and not source.meeting and not self.busy)
+        )
         self.retire.setEnabled(
             bool(source and source.decision in {"confirmed", "stale"} and not self.busy)
         )
@@ -185,11 +187,17 @@ class ContextBrowser(AppDialog):
                 if source.confirmed_by == self.studio.user
                 else names.get(source.confirmed_by, source.confirmed_by or "—")
             )
+            if source.meeting:
+                recorder = names.get(source.speaker, source.speaker)
             self.detail.setToolTip(f"Source fingerprint: {source.fingerprint}")
+            location = (
+                f"Meeting: {source.meeting} · Offset: {source.offset_ms} ms"
+                if source.meeting else f"Thread: {source.parent_id or source.message_id}"
+            )
             self.detail.setPlainText(
                 f"[{source.citation}]\n#{source.channel} · {source.created_at}\n"
                 f"Status: {source.decision}\nRecorded by: {recorder}\n"
-                f"Thread: {source.parent_id or source.message_id}\n\n{source.body}"
+                f"{location}\n\n{source.body}"
             )
         else:
             self.detail.clear()
@@ -199,7 +207,7 @@ class ContextBrowser(AppDialog):
         if self.closed or self.busy or row < 0:
             return
         source = self.sources[row]
-        if source.attachment:
+        if source.attachment or source.meeting:
             return
         self.busy = True
         self.selected()

@@ -317,6 +317,8 @@ class ConnectedDashboard(QObject):
 
         def operation():
             snapshot = service.snapshot()
+            if hasattr(service, "meeting_activity"):
+                snapshot["meeting_activity"] = service.meeting_activity()
             allowed = {c["id"] for c in snapshot["channels"]}
             incoming = []
             if channel_id in allowed:
@@ -508,7 +510,7 @@ class ConnectedDashboard(QObject):
             rows, str(self.account.service.user.id), directory=names, attachments=self.files
         )
         w.messages.show_messages(w.channel.messages)
-        w.message_stack.setCurrentIndex(0 if w.channel.messages else 1)
+        w.message_stack.setCurrentIndex(0 if w.messages.model().rowCount() else 1)
         if w.thread_id:
             parent = next((m for m in w.channel.messages if m.id == w.thread_id), None)
             if parent:

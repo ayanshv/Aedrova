@@ -71,8 +71,13 @@ class Connection:
 
 
 class IdentityService:
-    def __init__(self, connection, *, client=None):
+    def __init__(self, connection, *, client=None, meeting_context_enabled=None):
         self.connection = connection
+        if meeting_context_enabled is None:
+            path = Path(__file__).parents[1] / "desktop/assets/public-config.json"
+            configuration = json.loads(path.read_text()) if path.exists() else {}
+            meeting_context_enabled = configuration.get("meeting_context_enabled", False)
+        self.meeting_context_enabled = meeting_context_enabled is True
         self._transport = (
             httpx.Client(timeout=15, follow_redirects=False) if client is None else None
         )
@@ -93,7 +98,9 @@ class IdentityService:
         """Called in the serialized transport worker; never expose tokens to UI/logs."""
         self._authenticated()
         session = self.client.auth.get_session()
-        fork = IdentityService(self.connection)
+        fork = IdentityService(
+            self.connection, meeting_context_enabled=self.meeting_context_enabled
+        )
         fork.is_context_clone = True
         try:
             result = fork.client.auth.set_session(session.access_token, session.refresh_token)
@@ -211,9 +218,19 @@ class IdentityService:
             "invitations": invitations,
         }
 
+    def meeting_activity(self):
+        self._authenticated()
+        try:
+            return self.client.rpc("meeting_activity", {}).execute().data
+        except Exception as error:
+            if getattr(error, "code", None) == "PGRST202":
+                return {"meetings": [], "preferences": [], "setup_required": True}
+            raise
+
     def rpc(self, name, parameters):
         allowed = {
             "start_direct_message",
+            "set_meeting_announcement_channel",
             "mark_channel_read",
             "reserve_attachment",
             "finish_attachment",
@@ -346,6 +363,15 @@ class IdentityService:
             .execute()
             .data
         )
+
+    def meeting_context(self, channel):
+        self._authenticated()
+        if not self.meeting_context_enabled:
+            return []
+        rows = self.client.rpc(
+            "meeting_text_context", {"p_channel": channel, "p_limit": 50}
+        ).execute().data
+        return [{**row, "body": row.get("review_body") or row["body"]} for row in rows]
 
     def context_revision(self, channel):
         self._authenticated()

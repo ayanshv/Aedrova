@@ -55,7 +55,7 @@ def choose_project(parent, initial=""):
         parent,
         "Choose your project folder",
         initial,
-        QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontUseNativeDialog,
+        QFileDialog.Option.ShowDirsOnly,
     )
 
 
