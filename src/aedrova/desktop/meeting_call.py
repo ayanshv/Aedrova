@@ -1,5 +1,7 @@
 """Native channel-call controls. Device access is always an explicit action."""
 
+import time
+
 from PySide6.QtCore import QEvent, QSize, Qt, QTimer
 from PySide6.QtGui import QImage, QPainter, QPalette
 from PySide6.QtWidgets import (
@@ -30,10 +32,12 @@ def encode_image(image, *, fill=False):
     """Bounded RGBA: camera fills without distortion; screens retain every edge."""
     result = QImage(640, 360, QImage.Format.Format_RGBA8888)
     result.fill(Qt.GlobalColor.black)
-    mode = (Qt.AspectRatioMode.KeepAspectRatioByExpanding if fill else
-            Qt.AspectRatioMode.KeepAspectRatio)
-    fit = image.scaled(640, 360, mode,
-                       Qt.TransformationMode.SmoothTransformation)
+    mode = (
+        Qt.AspectRatioMode.KeepAspectRatioByExpanding
+        if fill
+        else Qt.AspectRatioMode.KeepAspectRatio
+    )
+    fit = image.scaled(640, 360, mode, Qt.TransformationMode.SmoothTransformation)
     painter = QPainter(result)
     painter.drawImage((640 - fit.width()) // 2, (360 - fit.height()) // 2, fit)
     painter.end()
@@ -50,28 +54,32 @@ def toolbar_control(text):
     control.setCursor(Qt.CursorShape.PointingHandCursor)
     control.setMinimumHeight(66)
     control.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-    control.setObjectName('CallControl')
+    control.setObjectName("CallControl")
     return control
 
 
 class MeetingCall(AppDialog):
-    def __init__(self, parent, worker, *, devices=None, channel_name='Team channel'):
+    def __init__(
+        self, parent, worker, *, devices=None, channel_name="Team channel", initial_mode=None
+    ):
         super().__init__(parent)
-        if parent is not None and hasattr(parent, 'theme'):
+        if parent is not None and hasattr(parent, "theme"):
             self.setPalette(palette(parent.theme))
         self.worker = worker
+        self.initial_mode = initial_mode
+        self.initial_media_applied = False
         self.devices = devices or DeviceCheck(self)
         self.connected = False
         self.closed = False
-        self.states = {kind: False for kind in ('microphone', 'camera', 'screen')}
+        self.states = {kind: False for kind in ("microphone", "camera", "screen")}
         self.mic_epoch = 0
         self.starting_device = None
         self.tiles = {}
         self.people = {worker.user}
-        self.focused = worker.user + '/camera'
-        self.names = {worker.user: 'You'}
+        self.focused = worker.user + "/camera"
+        self.names = {worker.user: "You"}
         self.last_images = {}
-        self.setWindowTitle('Aedrova · ' + channel_name + ' call')
+        self.setWindowTitle("Aedrova · " + channel_name + " call")
         self.resize(1120, 760)
         self.setMinimumSize(640, 560)
         layout = QVBoxLayout(self)
@@ -79,22 +87,30 @@ class MeetingCall(AppDialog):
         layout.setSpacing(14)
         heading = QHBoxLayout()
         heading.addWidget(BrandMark(32))
-        heading.addWidget(label(channel_name, 'title', wrap=True), 1)
+        heading.addWidget(label(channel_name, "title", wrap=True), 1)
         self.view_choice = ChoiceBox(self)
-        self.view_choice.addItems(['Gallery view', 'Speaker view'])
-        self.view_choice.setAccessibleName('Meeting view')
+        self.view_choice.addItems(["Gallery view", "Speaker view"])
+        self.view_choice.setAccessibleName("Meeting view")
         self.view_choice.currentIndexChanged.connect(self.arrange)
         heading.addWidget(self.view_choice)
         layout.addLayout(heading)
         summary = QHBoxLayout()
-        self.status = label('Ready when you are. Join with your devices off.', 'muted', wrap=True)
+        self.status = label(
+            "Connecting audio call · camera stays off."
+            if initial_mode == "audio"
+            else "Connecting video call · device permission may be requested."
+            if initial_mode == "video"
+            else "Ready when you are. Join with your devices off.",
+            "muted",
+            wrap=True,
+        )
         summary.addWidget(self.status, 1)
-        self.join = button('Join meeting', role='primary')
+        self.join = button("Join meeting", role="primary")
         self.join.clicked.connect(self.join_call)
         summary.addWidget(self.join)
         layout.addLayout(summary)
         self.stage_row = QHBoxLayout()
-        self.stage = FramePreview('Waiting for the speaker’s video')
+        self.stage = FramePreview("Waiting for the speaker’s video")
         self.stage.setMinimumHeight(220)
         self.stage.setVisible(False)
         self.stage_row.addWidget(self.stage, 3)
@@ -112,7 +128,7 @@ class MeetingCall(AppDialog):
         self.participant_panel = QFrame()
         panel = QVBoxLayout(self.participant_panel)
         panel.setContentsMargins(16, 12, 16, 12)
-        panel.addWidget(label('Participants', 'title'))
+        panel.addWidget(label("Participants", "title"))
         roster_scroll = QScrollArea()
         roster_scroll.setWidgetResizable(True)
         roster_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
@@ -128,87 +144,97 @@ class MeetingCall(AppDialog):
         self.participant_panel.hide()
         self.stage_row.addWidget(self.participant_panel)
         layout.addLayout(self.stage_row, 1)
-        self.render_roster([{'id': worker.user, 'name': 'You'}])
+        self.render_roster([{"id": worker.user, "name": "You"}])
         self.device_panel = QFrame()
         device_layout = QVBoxLayout(self.device_panel)
         device_layout.setContentsMargins(12, 8, 12, 8)
         choices = QHBoxLayout()
         self.camera_choice, self.screen_choice = ChoiceBox(self), ChoiceBox(self)
-        for kind, choice in [('camera', self.camera_choice), ('screen', self.screen_choice)]:
+        for kind, choice in [("camera", self.camera_choice), ("screen", self.screen_choice)]:
             for device in self.devices.backend.list(kind):
-                name = device.name() if kind == 'screen' else device.description()
+                name = device.name() if kind == "screen" else device.description()
                 choice.addItem(name, device)
             if not choice.count():
-                choice.addItem('No ' + kind + ' available', None)
-            choice.setAccessibleName('Call ' + kind + ' device')
+                choice.addItem("No " + kind + " available", None)
+            choice.setAccessibleName("Call " + kind + " device")
             choice.currentIndexChanged.connect(lambda _, kind=kind: self.disable(kind))
             choices.addWidget(choice)
         device_layout.addLayout(choices)
-        device_layout.addWidget(label('Microphone and speakers use your system default. '
-                                     'Screen sharing includes the entire selected screen.',
-                                     'muted', wrap=True))
+        device_layout.addWidget(
+            label(
+                "Microphone and speakers use your system default. "
+                "Screen sharing includes the entire selected screen.",
+                "muted",
+                wrap=True,
+            )
+        )
         self.device_panel.hide()
         layout.addWidget(self.device_panel)
         self.toolbar = QFrame()
-        self.toolbar.setObjectName('CallToolbar')
+        self.toolbar.setObjectName("CallToolbar")
         controls = QGridLayout(self.toolbar)
         controls.setContentsMargins(8, 4, 8, 4)
         controls.setSpacing(8)
         self.toolbar_layout = controls
         self.toolbar_buttons = []
         self.controls = {}
-        for kind, text in [('microphone', 'Muted'), ('camera', 'Camera off'),
-                           ('screen', 'Share screen')]:
+        for kind, text in [
+            ("microphone", "Muted"),
+            ("camera", "Camera off"),
+            ("screen", "Share screen"),
+        ]:
             control = toolbar_control(text)
             control.setEnabled(False)
             control.clicked.connect(lambda checked=False, kind=kind: self.toggle(kind))
             self.controls[kind] = control
             self.toolbar_buttons.append(control)
-        self.participants_button = toolbar_control('Participants (1)')
+        self.participants_button = toolbar_control("Participants (1)")
         self.participants_button.setCheckable(True)
         self.participants_button.toggled.connect(self.participant_panel.setVisible)
         self.toolbar_buttons.append(self.participants_button)
-        self.settings_button = toolbar_control('Devices')
+        self.settings_button = toolbar_control("Devices")
         self.settings_button.setCheckable(True)
         self.settings_button.toggled.connect(self.device_panel.setVisible)
         self.toolbar_buttons.append(self.settings_button)
-        leave = toolbar_control('Leave')
-        leave.setProperty('danger', True)
+        leave = toolbar_control("Leave")
+        leave.setProperty("danger", True)
         leave.clicked.connect(self.reject)
         self.leave_button = leave
         self.toolbar_buttons.append(leave)
         self.arrange_toolbar()
         layout.addWidget(self.toolbar)
         footer = QHBoxLayout()
-        self.privacy_status = label('No recording · No transcription · No AI meeting access',
-                                    'muted', wrap=True)
+        self.privacy_status = label(
+            "No recording · No transcription · No AI meeting access", "muted", wrap=True
+        )
         layout.addWidget(self.privacy_status)
         self.last_consent_snapshot = None
         self.meeting_text_enabled = False
         self.audio_transcription_enabled = False
-        self.privacy_button = button('Meeting privacy', role='outline')
+        self.privacy_button = button("Meeting privacy", role="outline")
         self.privacy_button.hide()
         self.privacy_button.clicked.connect(self.show_privacy)
         footer.addWidget(self.privacy_button)
-        self.speech_button = button('Start transcription', role='outline')
+        self.speech_button = button("Start transcription", role="outline")
         self.speech_button.setCheckable(True)
         self.speech_button.hide()
         self.speech_button.toggled.connect(
-            lambda checked: self.worker.command('transcription', checked))
+            lambda checked: self.worker.command("transcription", checked)
+        )
         footer.addWidget(self.speech_button)
-        self.transcript_button = button('Review transcript', role='outline')
+        self.transcript_button = button("Review transcript", role="outline")
         self.transcript_button.hide()
         self.transcript_button.clicked.connect(self.show_transcript)
         footer.addWidget(self.transcript_button)
-        if hasattr(worker, 'speech_capability'):
+        if hasattr(worker, "speech_capability"):
             worker.speech_capability.connect(self.speech_capability)
             worker.transcription_state.connect(self.speech_state)
-        if hasattr(worker, 'text_capability'):
+        if hasattr(worker, "text_capability"):
             worker.text_capability.connect(self.text_capability)
             worker.consent_snapshot.connect(self.consent_changed)
-        self.end = button('End for everyone · host/admin', role='outline')
+        self.end = button("End for everyone · host/admin", role="outline")
         self.end.setEnabled(False)
-        self.end.clicked.connect(lambda: self.worker.command('end', True))
+        self.end.clicked.connect(lambda: self.worker.command("end", True))
         layout.addLayout(footer)
         layout.addWidget(self.end, alignment=Qt.AlignmentFlag.AlignRight)
         for control in self.findChildren(type(self.join)):
@@ -223,7 +249,7 @@ class MeetingCall(AppDialog):
         worker.problem.connect(self.status.setText)
         worker.media.connect(self.media_state)
         worker.ended.connect(self.call_ended)
-        if hasattr(worker, 'speaker'):
+        if hasattr(worker, "speaker"):
             worker.speaker.connect(self.speaker_changed)
         self.timer = QTimer(self)
         self.timer.setInterval(50)
@@ -233,6 +259,8 @@ class MeetingCall(AppDialog):
         QApplication.instance().aboutToQuit.connect(self.shutdown)
 
     def join_call(self):
+        if self.closed or self.connected:
+            return
         self.join.setEnabled(False)
         self.worker.start()
 
@@ -240,7 +268,7 @@ class MeetingCall(AppDialog):
         if self.closed:
             return
         self.status.setText(state)
-        self.connected = state.startswith(('Connected', 'Reconnected'))
+        self.connected = state.startswith(("Connected", "Reconnected"))
         self.end.setEnabled(self.connected)
         self.privacy_button.setEnabled(self.connected)
         for kind, control in self.controls.items():
@@ -248,6 +276,11 @@ class MeetingCall(AppDialog):
             if not self.connected:
                 self.disable(kind)
         self.join.setVisible(not self.connected)
+        if self.connected and self.initial_mode and not self.initial_media_applied:
+            self.initial_media_applied = True
+            self.toggle("microphone")
+            if self.initial_mode == "video":
+                self.toggle("camera")
         if self.meeting_text_enabled:
             self.consent_changed(self.last_consent_snapshot or {})
 
@@ -266,16 +299,18 @@ class MeetingCall(AppDialog):
 
     def speech_state(self, state):
         self.privacy_status.setText(state)
-        if state.startswith(('Transcription off', 'Transcription stopped')):
+        if state.startswith(("Transcription off", "Transcription stopped")):
             self.speech_button.blockSignals(True)
             self.speech_button.setChecked(False)
             self.speech_button.blockSignals(False)
-        self.speech_button.setText('Stop transcription' if self.speech_button.isChecked()
-                                   else 'Start transcription')
+        self.speech_button.setText(
+            "Stop transcription" if self.speech_button.isChecked() else "Start transcription"
+        )
 
     def show_transcript(self):
         if self.worker.meeting and self.meeting_text_enabled:
             from aedrova.desktop.meeting_transcript import TranscriptReview
+
             TranscriptReview(self, self.worker.client, meeting=self.worker.meeting).exec()
 
     def consent_changed(self, snapshot):
@@ -283,17 +318,26 @@ class MeetingCall(AppDialog):
         if not self.meeting_text_enabled:
             return
         from aedrova.meetings.consent import capture_permit
+
         permit = capture_permit(snapshot or {}, self.people)
-        state = ('Waiting for everyone’s text consent' if permit is None else
-                 'Meeting text allowed · AI context ' + ('allowed' if permit.ai_allowed else 'off'))
+        state = (
+            "Waiting for everyone’s text consent"
+            if permit is None
+            else "Meeting text allowed · AI context " + ("allowed" if permit.ai_allowed else "off")
+        )
         if not self.speech_button.isChecked():
-            self.privacy_status.setText('No audio recording · ' + state)
-        self.speech_button.setEnabled(self.audio_transcription_enabled and self.connected
-                                      and permit is not None and self.states['microphone'])
+            self.privacy_status.setText("No audio recording · " + state)
+        self.speech_button.setEnabled(
+            self.audio_transcription_enabled
+            and self.connected
+            and permit is not None
+            and self.states["microphone"]
+        )
 
     def show_privacy(self):
         if self.connected and self.meeting_text_enabled:
             from aedrova.desktop.meeting_privacy import MeetingPrivacy
+
             MeetingPrivacy(self, self.worker, self.last_consent_snapshot).exec()
 
     def toggle(self, kind):
@@ -303,8 +347,8 @@ class MeetingCall(AppDialog):
             self.disable(kind)
             return
         self.states[kind] = True  # Includes permission/publish pending, cancellable.
-        self.controls[kind].setText('Cancel ' + kind)
-        if kind == 'microphone':
+        self.controls[kind].setText("Cancel " + kind)
+        if kind == "microphone":
             self.mic_epoch += 1
             epoch = self.mic_epoch
 
@@ -315,18 +359,21 @@ class MeetingCall(AppDialog):
                     self.worker.command(kind, True)
                 else:
                     self.disable(kind)
-                    self.status.setText('Microphone permission is needed. Check '
-                                        'System Settings → Privacy & Security → Microphone.')
+                    self.status.setText(
+                        "Microphone permission is needed. Check "
+                        "System Settings → Privacy & Security → Microphone."
+                    )
+
             try:
                 self.devices.backend.permission(kind, permission)
             except Exception:
                 permission(False)
         else:
-            choice = self.camera_choice if kind == 'camera' else self.screen_choice
+            choice = self.camera_choice if kind == "camera" else self.screen_choice
             device = choice.currentData()
             if device is None:
                 self.disable(kind)
-                self.status.setText('No device is available for this control.')
+                self.status.setText("No device is available for this control.")
             else:
                 self.starting_device = kind
                 try:
@@ -336,37 +383,37 @@ class MeetingCall(AppDialog):
 
     def disable(self, kind, *, notify_worker=True):
         self.states[kind] = False
-        if kind == 'microphone':
+        if kind == "microphone":
             self.mic_epoch += 1
         else:
             self.devices.stop(kind)
         self.worker.clear_frame(kind)
         if notify_worker:
             self.worker.command(kind, False)
-        names = {'microphone': 'Muted', 'camera': 'Camera off', 'screen': 'Share screen'}
+        names = {"microphone": "Muted", "camera": "Camera off", "screen": "Share screen"}
         self.controls[kind].setText(names[kind])
         self.refresh_icons()
-        key = self.worker.user + ('/screen' if kind == 'screen' else '/camera')
-        if kind != 'microphone' and key in self.tiles:
+        key = self.worker.user + ("/screen" if kind == "screen" else "/camera")
+        if kind != "microphone" and key in self.tiles:
             self.tiles[key][1].clear()
-        if kind != 'microphone':
+        if kind != "microphone":
             self.last_images.pop(key, None)
             if key == self.focused:
                 self.stage.clear()
             self.arrange()
 
     def device_state(self, kind, state):
-        if kind not in {'camera', 'screen'}:
+        if kind not in {"camera", "screen"}:
             return
-        if state == 'active' and self.states[kind] and not self.closed:
+        if state == "active" and self.states[kind] and not self.closed:
             self.worker.command(kind, True)
-        elif state == 'off' and self.states[kind] and self.starting_device != kind:
+        elif state == "off" and self.states[kind] and self.starting_device != kind:
             self.disable(kind)
 
     def media_state(self, kind, enabled):
         if self.closed:
             return
-        if '/' in kind:
+        if "/" in kind:
             if kind in self.tiles:
                 self.tiles[kind][1].clear()
             self.last_images.pop(kind, None)
@@ -381,24 +428,24 @@ class MeetingCall(AppDialog):
         if not enabled:
             self.disable(kind, notify_worker=False)
         else:
-            names = {'microphone': 'Unmuted', 'camera': 'Camera on', 'screen': 'Sharing screen'}
+            names = {"microphone": "Unmuted", "camera": "Camera on", "screen": "Sharing screen"}
             self.controls[kind].setText(names[kind])
             self.refresh_icons()
 
     def device_problem(self, message):
-        for kind in ('camera', 'screen'):
+        for kind in ("camera", "screen"):
             if self.states[kind] and kind not in self.devices.handles:
                 self.disable(kind)
         self.status.setText(message)
 
     def local_frame(self, kind, image):
         if self.connected and not self.closed and self.states.get(kind):
-            frame = encode_image(image, fill=kind == 'camera')
+            frame = encode_image(image, fill=kind == "camera")
             self.worker.frame(kind, frame)
-            key = self.worker.user + ('/screen' if kind == 'screen' else '/camera')
-            self.tile(key, 'Your screen' if kind == 'screen' else 'You')[1].display(frame)
+            key = self.worker.user + ("/screen" if kind == "screen" else "/camera")
+            self.tile(key, "Your screen" if kind == "screen" else "You")[1].display(frame)
             self.last_images[key] = frame
-            if kind == 'screen':
+            if kind == "screen":
                 self.focused = key
                 self.arrange()
             if key == self.focused:
@@ -408,20 +455,23 @@ class MeetingCall(AppDialog):
         if key not in self.tiles:
             box = QFrame()
             box.setPalette(self.palette())
-            box.setStyleSheet('QFrame {background: transparent; border: none;}')
+            box.setStyleSheet("QFrame {background: transparent; border: none;}")
             layout = QGridLayout(box)
             layout.setContentsMargins(0, 0, 0, 0)
             layout.setSpacing(0)
-            preview = FramePreview('Video is off', fill=key.endswith('/camera'))
+            preview = FramePreview("Video is off", fill=key.endswith("/camera"))
             preview.setPalette(self.palette())
-            preview.setStyleSheet('background: transparent;')
+            preview.setStyleSheet("background: transparent;")
             layout.addWidget(preview, 0, 0)
-            caption = label(name, 'muted', wrap=True)
-            caption.setStyleSheet('QLabel {color: #FFFFFF; background: rgba(0,0,0,145); '
-                                 'border-radius: 8px; padding: 5px 9px; margin: 10px;}')
+            caption = label(name, "muted", wrap=True)
+            caption.setStyleSheet(
+                "QLabel {color: #FFFFFF; background: rgba(0,0,0,145); "
+                "border-radius: 8px; padding: 5px 9px; margin: 10px;}"
+            )
             caption.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-            layout.addWidget(caption, 0, 0, Qt.AlignmentFlag.AlignLeft |
-                             Qt.AlignmentFlag.AlignBottom)
+            layout.addWidget(
+                caption, 0, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom
+            )
             index = len(self.tiles)
             self.grid.addWidget(box, index // 2, index % 2)
             self.tiles[key] = box, preview
@@ -430,59 +480,59 @@ class MeetingCall(AppDialog):
     def render_roster(self, people):
         if self.closed:
             return
-        ids = {person['id'] for person in people}
+        ids = {person["id"] for person in people}
         self.people = ids
-        if hasattr(self, 'last_consent_snapshot'):
+        if hasattr(self, "last_consent_snapshot"):
             self.consent_changed(self.last_consent_snapshot)
-        self.names = {person['id']: str(person['name'])[:80] for person in people}
+        self.names = {person["id"]: str(person["name"])[:80] for person in people}
         while self.participant_body.count():
             item = self.participant_body.takeAt(0)
             if item.widget():
                 item.widget().hide()
                 item.widget().deleteLater()
         for person in people[:16]:
-            name = str(person['name'])[:80]
-            status = 'Microphone on' if person.get('microphone_on') else 'Muted'
+            name = str(person["name"])[:80]
+            status = "Microphone on" if person.get("microphone_on") else "Muted"
             self.participant_body.addWidget(label(name, wrap=True))
-            self.participant_body.addWidget(label(status, 'muted'))
-        if hasattr(self, 'participants_button'):
-            self.participants_button.setText(f'Participants ({len(people)})')
+            self.participant_body.addWidget(label(status, "muted"))
+        if hasattr(self, "participants_button"):
+            self.participants_button.setText(f"Participants ({len(people)})")
         for key in list(self.tiles):
-            if key.split('/')[0] not in ids:
+            if key.split("/")[0] not in ids:
                 box, _ = self.tiles.pop(key)
                 self.grid.removeWidget(box)
                 box.deleteLater()
                 self.last_images.pop(key, None)
         for person in people[:16]:
-            self.tile(person['id'] + '/camera', str(person['name'])[:80])
+            self.tile(person["id"] + "/camera", str(person["name"])[:80])
         self.arrange()
 
     def remote_frames(self):
         if self.closed:
             return
         for key, image in self.worker.take_remote_frames().items():
-            if key.split('/')[0] not in self.people:
+            if key.split("/")[0] not in self.people:
                 continue
             if len(self.tiles) < 32 or key in self.tiles:
-                name = 'Shared screen' if key.endswith('/screen') else 'Teammate'
+                name = "Shared screen" if key.endswith("/screen") else "Teammate"
                 self.tile(key, name)[1].display(image)
                 self.last_images[key] = image
-                if key.endswith('/screen'):
+                if key.endswith("/screen"):
                     self.focused = key
                     self.arrange()
                 if key == self.focused:
                     self.stage.display(image)
 
     def arrange(self, *_):
-        if not hasattr(self, 'gallery'):
+        if not hasattr(self, "gallery"):
             return
-        screen = next((key for key in self.last_images if key.endswith('/screen')), None)
+        screen = next((key for key in self.last_images if key.endswith("/screen")), None)
         spotlight = self.view_choice.currentIndex() == 1 or screen is not None
         if screen:
             self.focused = screen
-        if self.focused.split('/')[0] not in self.people:
-            self.focused = self.worker.user + '/camera'
-        self.stage.fill = self.focused.endswith('/camera')
+        if self.focused.split("/")[0] not in self.people:
+            self.focused = self.worker.user + "/camera"
+        self.stage.fill = self.focused.endswith("/camera")
         self.stage.setVisible(spotlight)
         self.gallery.setMaximumWidth(280 if spotlight else 16777215)
         columns = 1 if spotlight else 2
@@ -496,30 +546,35 @@ class MeetingCall(AppDialog):
                 self.stage.clear()
 
     def speaker_changed(self, user):
-        if user in self.people and not any(key.endswith('/screen') for key in self.last_images):
-            self.focused = user + '/camera'
+        if user in self.people and not any(key.endswith("/screen") for key in self.last_images):
+            self.focused = user + "/camera"
             self.arrange()
 
     def refresh_icons(self):
-        if not hasattr(self, 'controls'):
+        if not hasattr(self, "controls"):
             return
         color = self.palette().color(QPalette.ColorRole.Text)
         for kind, control in self.controls.items():
-            off = kind in {'microphone', 'camera'} and not self.states[kind]
+            off = kind in {"microphone", "camera"} and not self.states[kind]
             control.setIcon(meeting_icon(kind, color, off=off))
-            actions = {'microphone': ('Unmute microphone', 'Mute microphone'),
-                       'camera': ('Turn camera on', 'Turn camera off'),
-                       'screen': ('Start sharing screen', 'Stop sharing screen')}
+            actions = {
+                "microphone": ("Unmute microphone", "Mute microphone"),
+                "camera": ("Turn camera on", "Turn camera off"),
+                "screen": ("Start sharing screen", "Stop sharing screen"),
+            }
             control.setAccessibleName(control.text())
             control.setToolTip(actions[kind][int(self.states[kind])])
             control.setIconSize(QSize(20, 20))
-        for control, kind in ((self.participants_button, 'participants'),
-                              (self.settings_button, 'settings'), (self.leave_button, 'leave')):
+        for control, kind in (
+            (self.participants_button, "participants"),
+            (self.settings_button, "settings"),
+            (self.leave_button, "leave"),
+        ):
             control.setIcon(meeting_icon(kind, color))
             control.setIconSize(QSize(20, 20))
 
     def arrange_toolbar(self):
-        if not hasattr(self, 'toolbar_buttons'):
+        if not hasattr(self, "toolbar_buttons"):
             return
         columns = 3 if self.width() < 850 else 6
         for index, control in enumerate(self.toolbar_buttons):
@@ -538,7 +593,7 @@ class MeetingCall(AppDialog):
     def devices_changed(self):
         for kind in self.states:
             self.disable(kind)
-        self.status.setText('Devices changed. Leave and rejoin to refresh device choices.')
+        self.status.setText("Devices changed. Leave and rejoin to refresh device choices.")
 
     def call_ended(self):
         self.connected = False
@@ -575,32 +630,185 @@ class MeetingCall(AppDialog):
         super().hideEvent(event)
 
 
-def open_channel_call(window):
-    existing = getattr(window, 'meeting_call', None)
+class AudioCall(MeetingCall):
+    """Phone presentation sharing the same authenticated, consent-aware transport."""
+
+    def __init__(
+        self, parent, worker, *, devices=None, channel_name="Team channel", initial_mode="audio"
+    ):
+        self.audio_started = None
+        self.audio_cards = {}
+        super().__init__(
+            parent, worker, devices=devices, channel_name=channel_name, initial_mode="audio"
+        )
+        self.setWindowTitle("Aedrova · " + channel_name + " audio call")
+        self.resize(760, 660)
+        self.setMinimumSize(580, 540)
+        self.view_choice.hide()
+        self.stage.hide()
+        self.gallery.hide()
+        self.controls["camera"].hide()
+        self.controls["screen"].hide()
+        self.camera_choice.hide()
+        self.screen_choice.hide()
+        self.controls["microphone"].setText("Muted")
+        self.leave_button.setText("Hang up")
+        self.leave_button.setToolTip("Leave this audio call")
+        self.leave_button.setIcon(
+            meeting_icon("phone", self.palette().color(QPalette.ColorRole.Text))
+        )
+        self.toolbar_buttons = [
+            self.controls["microphone"],
+            self.participants_button,
+            self.settings_button,
+            self.leave_button,
+        ]
+        self.arrange_toolbar()
+        self.audio_surface = QFrame()
+        self.audio_surface.setObjectName("AudioCallStage")
+        audio = QVBoxLayout(self.audio_surface)
+        audio.setContentsMargins(24, 28, 24, 28)
+        audio.setSpacing(20)
+        audio.addWidget(label("VOICE CALL", "section"), alignment=Qt.AlignmentFlag.AlignCenter)
+        self.duration = label("Connecting…", "title")
+        self.duration.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.duration.setAccessibleName("Audio call duration")
+        audio.addWidget(self.duration)
+        self.audio_grid = QGridLayout()
+        self.audio_grid.setSpacing(16)
+        audio.addLayout(self.audio_grid, 1)
+        self.layout().insertWidget(2, self.audio_surface, 2)
+        self.duration_timer = QTimer(self)
+        self.duration_timer.setInterval(1000)
+        self.duration_timer.timeout.connect(self.update_duration)
+        self.finished.connect(self.duration_timer.stop)
+        self.render_roster([{"id": worker.user, "name": "You"}])
+
+    def refresh_icons(self):
+        super().refresh_icons()
+        if hasattr(self, "leave_button"):
+            self.leave_button.setIcon(
+                meeting_icon("phone", self.palette().color(QPalette.ColorRole.Text))
+            )
+
+    def arrange_toolbar(self):
+        if not hasattr(self, "toolbar_buttons"):
+            return
+        for index, control in enumerate(self.toolbar_buttons):
+            control.setMinimumWidth(control.fontMetrics().horizontalAdvance(control.text()) + 16)
+            self.toolbar_layout.addWidget(control, 0, index)
+
+    def shutdown(self, *_):
+        if hasattr(self, "duration_timer"):
+            self.duration_timer.stop()
+        super().shutdown()
+
+    def render_roster(self, people):
+        super().render_roster(people)
+        if not hasattr(self, "audio_grid"):
+            return
+        from aedrova.desktop.profile import Avatar
+
+        while self.audio_grid.count():
+            item = self.audio_grid.takeAt(0)
+            if item.widget():
+                item.widget().hide()
+                item.widget().deleteLater()
+        self.audio_cards.clear()
+        for index, person in enumerate(people[:16]):
+            card = QFrame()
+            card.setObjectName("AudioParticipant")
+            card.setProperty("speaking", False)
+            column = QVBoxLayout(card)
+            column.setContentsMargins(20, 24, 20, 24)
+            column.setSpacing(12)
+            avatar = Avatar(72)
+            avatar.initials = "".join(p[0] for p in str(person["name"]).split()[:2]).upper() or "?"
+            column.addWidget(avatar, alignment=Qt.AlignmentFlag.AlignCenter)
+            name = label(str(person["name"])[:80], "title", wrap=True)
+            name.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            column.addWidget(name)
+            status = label("Microphone on" if person.get("microphone_on") else "Muted", "muted")
+            status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            column.addWidget(status)
+            self.audio_grid.addWidget(card, index // 3, index % 3)
+            self.audio_cards[person["id"]] = card
+
+    def arrange(self, *_):
+        if hasattr(self, "gallery"):
+            self.gallery.hide()
+            self.stage.hide()
+
+    def remote_frames(self):
+        # Voice calls never display video, even if another participant has video on.
+        if not self.closed:
+            self.worker.take_remote_frames()
+
+    def speaker_changed(self, user):
+        for identifier, card in self.audio_cards.items():
+            card.setProperty("speaking", identifier == user)
+            card.style().unpolish(card)
+            card.style().polish(card)
+            card.update()
+
+    def call_state(self, state):
+        super().call_state(state)
+        if self.connected and hasattr(self, "duration_timer"):
+            if self.audio_started is None:
+                self.audio_started = time.monotonic()
+            self.duration_timer.start()
+            self.update_duration()
+
+    def update_duration(self):
+        if self.audio_started is not None:
+            elapsed = int(time.monotonic() - self.audio_started)
+            self.duration.setText(f"{elapsed // 60:02d}:{elapsed % 60:02d}")
+
+    def call_ended(self):
+        super().call_ended()
+        if hasattr(self, "duration_timer"):
+            self.duration_timer.stop()
+            self.duration.setText("Call ended")
+
+
+def open_channel_call(window, *, mode=None):
+    existing = getattr(window, "meeting_call", None)
     if existing and existing.isVisible():
         existing.raise_()
         existing.activateWindow()
         return
     if existing and existing.worker.thread and existing.worker.thread.is_alive():
-        window.notify('Your previous call is leaving. Please try again shortly.')
+        window.notify("Your previous call is leaving. Please try again shortly.")
         return
     if not window.connected or not window.connected.active:
-        window.notify('Sign in and open a workspace to join a channel call.')
+        window.notify("Sign in and open a workspace to join a channel call.")
         return
     origin = application_origin()
     if not origin:
-        window.notify('The Aedrova meeting service is not configured yet.')
+        window.notify("The Aedrova meeting service is not configured yet.")
         return
     service = window.account_dialog.service
     token = service.client.auth.get_session().access_token
-    worker = CallWorker(MeetingClient(origin, token), workspace=window.workspace_id,
-                        channel=window.channel_id, user=str(service.user.id), parent=window)
-    dialog = MeetingCall(window, worker,
-                         channel_name=window.workspace.name + ' / ' + window.channel.name)
+    worker = CallWorker(
+        MeetingClient(origin, token),
+        workspace=window.workspace_id,
+        channel=window.channel_id,
+        user=str(service.user.id),
+        parent=window,
+    )
+    call_type = AudioCall if mode == "audio" else MeetingCall
+    dialog = call_type(
+        window,
+        worker,
+        channel_name=window.workspace.name + " / " + window.channel.name,
+        initial_mode=mode,
+    )
     window.meeting_call = dialog
     window.account_dialog.session_closed.connect(dialog.reject)
     # A local setup preview cannot compete with call capture for the same device.
-    setup = getattr(window, 'meeting_setup', None)
+    setup = getattr(window, "meeting_setup", None)
     if setup and setup.isVisible():
         setup.reject()
     dialog.show()
+    if mode in {"audio", "video"}:
+        QTimer.singleShot(0, dialog.join_call)

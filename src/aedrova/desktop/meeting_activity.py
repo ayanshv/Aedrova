@@ -25,18 +25,25 @@ class ParticipantAvatar(QWidget):
         url = person.get("avatar_url") or ""
         parsed = urlparse(url)
         host = parsed.hostname or ""
-        if (parsed.scheme != "https" or not host.startswith("lh")
-                or not host.removeprefix("lh").removesuffix(".googleusercontent.com").isdigit()
-                or not host.endswith(".googleusercontent.com") or parsed.username
-                or parsed.password or parsed.port not in (None, 443)):
+        if (
+            parsed.scheme != "https"
+            or not host.startswith("lh")
+            or not host.removeprefix("lh").removesuffix(".googleusercontent.com").isdigit()
+            or not host.endswith(".googleusercontent.com")
+            or parsed.username
+            or parsed.password
+            or parsed.port not in (None, 443)
+        ):
             return
         if url in _IMAGES:
             self.image = _IMAGES[url]
             return
         self.network = QNetworkAccessManager(self)
         request = QNetworkRequest(QUrl(url))
-        request.setAttribute(QNetworkRequest.Attribute.RedirectPolicyAttribute,
-                             QNetworkRequest.RedirectPolicy.ManualRedirectPolicy)
+        request.setAttribute(
+            QNetworkRequest.Attribute.RedirectPolicyAttribute,
+            QNetworkRequest.RedirectPolicy.ManualRedirectPolicy,
+        )
         self.reply = self.network.get(request)
         self.reply.readyRead.connect(self.limit_image)
         self.reply.finished.connect(lambda: self.loaded(url))
@@ -52,8 +59,12 @@ class ParticipantAvatar(QWidget):
             if len(data) <= 256 * 1024:
                 image = QPixmap()
                 if image.loadFromData(data) and image.width() <= 4096 and image.height() <= 4096:
-                    self.image = image.scaled(60, 60, Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-                                              Qt.TransformationMode.SmoothTransformation)
+                    self.image = image.scaled(
+                        60,
+                        60,
+                        Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
                     if len(_IMAGES) >= 128:
                         _IMAGES.pop(next(iter(_IMAGES)))
                     _IMAGES[url] = self.image
@@ -97,8 +108,13 @@ class MeetingAction(QFrame):
             copy = QVBoxLayout()
             copy.setSpacing(4)
             copy.addWidget(label("Meeting in progress", "section"))
-            copy.addWidget(label("#" + channel_name + " · " + meeting.get("title", "Team meeting"),
-                                 "muted", wrap=True))
+            copy.addWidget(
+                label(
+                    "#" + channel_name + " · " + meeting.get("title", "Team meeting"),
+                    "muted",
+                    wrap=True,
+                )
+            )
             outer.addLayout(copy)
             outer.addLayout(layout)
         self.action = button("Join meeting" if meeting else "Start meeting", role="primary")
@@ -119,43 +135,75 @@ def current_meetings(window):
         return []
     activity = window.account_dialog.snapshot.get("meeting_activity", {})
     allowed = {channel.id for channel in window.workspace.channels}
-    return [meeting for meeting in activity.get("meetings", [])
-            if meeting.get("workspace_id") == window.workspace_id
-            and meeting.get("channel_id") in allowed]
+    return [
+        meeting
+        for meeting in activity.get("meetings", [])
+        if meeting.get("workspace_id") == window.workspace_id
+        and meeting.get("channel_id") in allowed
+    ]
 
 
 def update_meeting_ui(window):
     from aedrova.desktop.meeting_call import open_channel_call
 
+    hub = getattr(window, "meeting_hub", None)
+    if (
+        hub
+        and hub.isVisible()
+        and getattr(window, "meeting_hub_scope", None) != (window.workspace_id, window.channel_id)
+    ):
+        hub.reject()
     meetings = current_meetings(window)
     selected = next((m for m in meetings if m["channel_id"] == window.channel_id), None)
+    window.refresh_call_bar(selected)
     if hasattr(window, "meeting_action_layout"):
         replace_widgets(window.meeting_action_layout)
-        window.meeting_action_layout.addWidget(MeetingAction(
-            window.theme, selected, lambda: open_channel_call(window)))
+        window.meeting_action_layout.addWidget(
+            MeetingAction(window.theme, selected, lambda: open_channel_call(window))
+        )
     if getattr(window, "meeting_destination", None) is not None:
         destination_choice = window.meeting_destination
         preferences = window.account_dialog.snapshot.get("meeting_activity", {}).get(
-            "preferences", [])
-        selected_channel = next((p["announcement_channel"] for p in preferences
-                                 if p["workspace_id"] == window.workspace_id), None)
+            "preferences", []
+        )
+        selected_channel = next(
+            (
+                p["announcement_channel"]
+                for p in preferences
+                if p["workspace_id"] == window.workspace_id
+            ),
+            None,
+        )
         if selected_channel and destination_choice.findData(selected_channel) >= 0:
             destination_choice.setCurrentIndex(destination_choice.findData(selected_channel))
     replace_widgets(window.meeting_announcements_layout)
     preferences = window.account_dialog.snapshot.get("meeting_activity", {}).get("preferences", [])
-    destination = next((p["announcement_channel"] for p in preferences
-                        if p["workspace_id"] == window.workspace_id), None)
-    destination = destination or next((c.id for c in window.workspace.channels
-                                      if c.name == "general" and not c.direct), window.channel_id)
+    destination = next(
+        (
+            p["announcement_channel"]
+            for p in preferences
+            if p["workspace_id"] == window.workspace_id
+        ),
+        None,
+    )
+    destination = destination or next(
+        (c.id for c in window.workspace.channels if c.name == "general" and not c.direct),
+        window.channel_id,
+    )
     for meeting in meetings:
         target = meeting["channel_id"] if meeting.get("private") else destination
         if window.channel_id not in {target, meeting["channel_id"]}:
             continue
         channel = next(c for c in window.workspace.channels if c.id == meeting["channel_id"])
-        window.meeting_announcements_layout.addWidget(MeetingAction(
-            window.theme, meeting,
-            lambda checked=False, channel=channel.id: join_channel(window, channel),
-            announcement=True, channel_name=channel.name))
+        window.meeting_announcements_layout.addWidget(
+            MeetingAction(
+                window.theme,
+                meeting,
+                lambda checked=False, channel=channel.id: join_channel(window, channel),
+                announcement=True,
+                channel_name=channel.name,
+            )
+        )
     window.meeting_announcements.setVisible(window.meeting_announcements_layout.count() > 0)
 
 

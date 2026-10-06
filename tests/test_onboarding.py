@@ -4,9 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 from PySide6.QtCore import QSettings, Qt
-from PySide6.QtWidgets import QWidget
 
-from aedrova.desktop.onboarding import FEATURES, STEPS, SetupDialog, account_key
+from aedrova.desktop.onboarding import FEATURES, STEPS, account_key
 from aedrova.desktop.window import AedrovaWindow
 
 
@@ -76,7 +75,9 @@ def test_implemented_function_coverage():
         "help",
         "updates",
     }
-    assert FEATURES == expected
+    assert expected <= FEATURES
+    assert {"reactions", "editing", "deletion", "pins", "bookmarks", "activity"} <= FEATURES
+    assert all(len(step.text.split()) <= 40 for step in STEPS)
     assert len({step.title for step in STEPS}) == len(STEPS)
 
 
@@ -139,25 +140,6 @@ def test_hidden_target_does_not_get_spotlight(window, qtbot):
     window.tour.finish("paused")
 
 
-def test_setup_back_skip_and_preferences(window, qtbot):
-    setup = SetupDialog(window)
-    qtbot.addWidget(setup)
-    setup.show()
-    assert not setup.back.isEnabled()
-    setup.advance()
-    from aedrova.desktop.controls import ChoiceBox
-
-    appearance = setup.content.findChild(ChoiceBox)
-    appearance.setCurrentIndex(appearance.findData("dark"))
-    assert window.theme_mode == "dark"
-    setup.advance()
-    setup.back.click()
-    assert setup.step == 1
-    setup.defer()
-    assert window.settings.value(account_key(window) + "/deferred", False, type=bool)
-    assert not window.settings.value(account_key(window) + "/setup", False, type=bool)
-
-
 def test_completed_tour_can_be_replayed_from_start(window):
     window.show_tour()
     window.tour.show_step(len(STEPS) - 1)
@@ -165,23 +147,3 @@ def test_completed_tour_can_be_replayed_from_start(window):
     window.show_tour()
     assert window.tour.index == 0
     window.tour.finish("skipped")
-
-
-@pytest.mark.parametrize("theme", ["light", "dark"])
-def test_setup_controls_stay_below_description_with_motion(window, qtbot, theme):
-    window.set_theme(theme)
-    window.set_reduced_motion(False)
-    setup = SetupDialog(window)
-    qtbot.addWidget(setup)
-    setup.show()
-    for step in (0, 1, 2, 3, 2, 1, 0):
-        setup.show_step(step)
-        qtbot.wait(230)
-        assert setup.content.mapToGlobal(setup.content.rect().topLeft()).y() >= (
-            setup.description.mapToGlobal(setup.description.rect().bottomLeft()).y()
-        )
-        assert setup.rect().contains(setup.content.geometry())
-        for child in setup.content.findChildren(QWidget):
-            if child.isVisible() and child.parentWidget() is setup.content:
-                assert setup.content.rect().contains(child.geometry())
-    setup.reject()

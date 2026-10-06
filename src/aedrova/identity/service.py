@@ -82,6 +82,9 @@ class IdentityService:
             httpx.Client(timeout=15, follow_redirects=False) if client is None else None
         )
         self.is_context_clone = False
+        self.interactions_available = None
+        self.collaboration_available = None
+        self.profiles_available = None
         self.client = client or create_client(
             connection.url,
             connection.public_key,
@@ -159,6 +162,8 @@ class IdentityService:
         if not 1 <= len(name) <= 80:
             raise ValueError("Display name must be 1–80 characters.")
         self.user = self.client.auth.update_user({"data": {"full_name": name}}).user
+        if self.profiles_available is True:
+            self.rpc("save_chat_profile", {"p_data": {"display_name": name}})
 
     def sign_out(self):
         try:
@@ -205,6 +210,7 @@ class IdentityService:
             .data
         )
         return {
+            "user_profile": self.my_profile(),
             "directory": self.client.rpc("team_directory", {}).execute().data,
             "unread": self.client.rpc("unread_counts", {}).execute().data,
             "agent_preferences": self.client.table("workspace_agent_preferences")
@@ -229,12 +235,16 @@ class IdentityService:
 
     def rpc(self, name, parameters):
         allowed = {
+            "save_chat_profile",
+            "chat_action",
             "start_direct_message",
             "set_meeting_announcement_channel",
             "mark_channel_read",
             "reserve_attachment",
             "finish_attachment",
             "send_message",
+            "unsend_message",
+            "set_message_reaction",
             "create_workspace",
             "onboard_workspace",
             "set_agent_preferences",
@@ -251,6 +261,104 @@ class IdentityService:
             raise ValueError("Unsupported account operation")
         self._authenticated()
         return self.client.rpc(name, parameters).execute().data
+
+    def message_interactions(self, identifiers):
+        self._authenticated()
+        if self.interactions_available is False or not identifiers:
+            return []
+        from postgrest.exceptions import APIError
+
+        try:
+            result = self.client.rpc("message_interactions", {"p_ids": identifiers}).execute().data
+        except APIError as exc:
+            if exc.code != "PGRST202":
+                raise
+            # Keep established chat working until the owner applies the new migration.
+            self.interactions_available = False
+            return []
+        self.interactions_available = True
+        return result or []
+
+    def my_profile(self):
+        self._authenticated()
+        if self.profiles_available is False:
+            return {"setup_required": True}
+        from postgrest.exceptions import APIError
+
+        try:
+            result = self.client.rpc("my_chat_profile", {}).execute().data
+        except APIError as exc:
+            if exc.code != "PGRST202":
+                raise
+            self.profiles_available = False
+            return {"setup_required": True}
+        self.profiles_available = True
+        return result or {}
+
+    def save_full_profile(self, data, avatar=None):
+        from uuid import uuid4
+
+        self._authenticated()
+        path = None
+        if avatar is not None:
+            if not avatar.startswith(b"\x89PNG\r\n\x1a\n") or not 1 <= len(avatar) <= 2097152:
+                raise ValueError("Choose a PNG avatar under 2 MB.")
+            path = str(self.user.id) + "/" + str(uuid4()) + ".png"
+            self.client.storage.from_("aedrova-avatars").upload(
+                path, avatar, {"content-type": "image/png", "upsert": "false"}
+            )
+            data = {**data, "avatar_path": path}
+        # A timeout may occur after the profile was saved. Never delete a potentially
+        # published avatar on an uncertain outcome.
+        return self.rpc("save_chat_profile", {"p_data": data})
+
+    def avatar_bytes(self, path):
+        self._authenticated()
+        if not re.fullmatch(r"[a-f0-9-]{36}/[a-f0-9-]{36}\.png", path):
+            raise ValueError("Invalid avatar path.")
+        token = self.client.auth.get_session().access_token
+        headers = {"apikey": self.connection.public_key, "Authorization": "Bearer " + token}
+        content = bytearray()
+        with httpx.Client(timeout=10, follow_redirects=False) as client:
+            with client.stream(
+                "GET",
+                self.connection.url + "/storage/v1/object/authenticated/aedrova-avatars/" + path,
+                headers=headers,
+            ) as response:
+                response.raise_for_status()
+                for chunk in response.iter_bytes():
+                    if len(content) + len(chunk) > 2097152:
+                        raise ValueError("Avatar exceeded size limit.")
+                    content.extend(chunk)
+        return bytes(content)
+
+    def chat_inventory(self, workspace, query="", section="search", channel=None):
+        self._authenticated()
+        if self.collaboration_available is False:
+            return {"setup_required": True}
+        from postgrest.exceptions import APIError
+
+        try:
+            result = (
+                self.client.rpc(
+                    "chat_inventory",
+                    {
+                        "p_workspace": workspace,
+                        "p_query": query,
+                        "p_section": section,
+                        "p_channel": channel,
+                    },
+                )
+                .execute()
+                .data
+            )
+        except APIError as exc:
+            if exc.code != "PGRST202":
+                raise
+            self.collaboration_available = False
+            return {"setup_required": True}
+        self.collaboration_available = True
+        return result
 
     def messages(self, channel_id):
         self._authenticated()
@@ -368,9 +476,11 @@ class IdentityService:
         self._authenticated()
         if not self.meeting_context_enabled:
             return []
-        rows = self.client.rpc(
-            "meeting_text_context", {"p_channel": channel, "p_limit": 50}
-        ).execute().data
+        rows = (
+            self.client.rpc("meeting_text_context", {"p_channel": channel, "p_limit": 50})
+            .execute()
+            .data
+        )
         return [{**row, "body": row.get("review_body") or row["body"]} for row in rows]
 
     def context_revision(self, channel):

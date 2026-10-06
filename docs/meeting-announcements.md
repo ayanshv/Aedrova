@@ -1,6 +1,6 @@
 # Shared meeting announcements
 
-The Meetings tab says Start meeting until an open channel meeting exists, then Join
+The chat header’s call bar offers Start audio/video call until a channel meeting exists, then Join
 meeting with up to four circular participant photos and an exact presence count. Photos
 use the participant Google profile where available; initials are the accessible fallback.
 Joining still opens the existing prejoin call controls with devices off.
@@ -31,3 +31,8 @@ Ruff, whitespace, light/dark 450/900-pixel visual inspection, Apple Development 
 signature, package secret scanner and packaged smoke passed. Real shared-account
 acceptance is pending the owner applying the SQL. No hosted data changed or deployment
 was performed. Ask permission before the next task or resuming M14.
+
+Meeting devices, announcement settings and transcript history are available from the
+call bar’s ⋯ menu. The former Meetings tab has been removed. Audio starts without
+camera capture; video requests camera and microphone permissions after connection.
+No new SQL or service configuration is required for this navigation change.

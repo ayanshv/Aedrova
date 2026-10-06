@@ -6,7 +6,7 @@ import os
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QSettings, QTimer
+from PySide6.QtCore import QEvent, QObject, QSettings, QTimer
 from PySide6.QtWidgets import QApplication
 
 from aedrova.desktop.brand import app_icon
@@ -20,12 +20,13 @@ def main():
     parser.add_argument("--settings-file", type=Path)
     parser.add_argument("--thread", action="store_true")
     parser.add_argument("--demo", action="store_true", help="Open the local sample chat preview")
+    parser.add_argument("--onboarding", action="store_true", help="Open the guided introduction")
     parser.add_argument("--account", action="store_true", help="Open account and workspace setup")
     parser.add_argument("--width", type=int, default=1440)
     parser.add_argument("--height", type=int, default=940)
     args = parser.parse_args()
     # Configure before QApplication/QMediaDevices initializes the media integration.
-    os.environ['QT_MEDIA_BACKEND'] = 'ffmpeg'
+    os.environ["QT_MEDIA_BACKEND"] = "ffmpeg"
     app = QApplication.instance() or QApplication(sys.argv[:1])
     app.setApplicationName("Aedrova")
     app.setOrganizationName("Aedrova")
@@ -37,12 +38,26 @@ def main():
         else None
     )
     window = AedrovaWindow(settings=settings)
+
+    class Links(QObject):
+        def eventFilter(self, watched, event):
+            if event.type() == QEvent.Type.FileOpen:
+                window.collaboration.open_link(event.url().toString())
+                return True
+            return False
+
+    links = Links(app)
+    app.installEventFilter(links)
     if args.theme:
         window.set_theme(args.theme, persist=False)
     window.resize(args.width, args.height)
-    account_first = args.account or (not args.demo and not args.smoke_report)
+    account_first = args.account or (
+        not args.demo and not args.smoke_report and not args.onboarding
+    )
     if not account_first:
         window.show()
+    if args.onboarding:
+        QTimer.singleShot(0, window.show_setup)
     if args.thread:
         window.open_pinned()
     if account_first:

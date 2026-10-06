@@ -188,7 +188,7 @@ def test_theme_changes_preserve_work_and_saved_preference(window, qtbot):
 
 
 def test_tabs_open_real_pages_and_sample_documents(window, qtbot):
-    for index in range(5):
+    for index in range(4):
         qtbot.mouseClick(window.tab_buttons[index], Qt.MouseButton.LeftButton)
         assert window.pages.currentIndex() == index
         assert sum(tab.isChecked() for tab in window.tab_buttons) == 1
@@ -247,7 +247,8 @@ def test_input_limit_and_plain_text_are_preserved(window, qtbot):
     window.composer.editor.setPlainText(text)
     qtbot.mouseClick(window.composer.send, Qt.MouseButton.LeftButton)
     doc = window.messages.delegate.document(window.channel.messages[-1], 500)
-    assert doc.toPlainText() == text
+    assert window.channel.messages[-1].body == text
+    assert doc.toPlainText() == '<script>alert("hello")</script> & literal text'
 
 
 def test_variable_height_history_model_and_rendering(qtbot):

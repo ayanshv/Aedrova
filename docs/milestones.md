@@ -1,5 +1,46 @@
 # Delivery gates
 
+## October 5 — M14D Windows desktop distribution added
+
+Owner requested a Windows build. Add **M14D — Windows compatibility, installer and
+release acceptance** after M14C; finish before M18 public cross-platform launch. This
+plans the work only; it does not claim Windows support or authorize starting implementation.
+
+Deliverables:
+- Audit platform-specific paths, keychain/session storage, keyboard shortcuts, file/folder
+  selection, IDE launching, GitHub CLI and Codex/Claude integration on Windows.
+- Adapt camera, microphone, audio calls, video calls and screen sharing to Windows,
+  preserving explicit permissions and the existing workspace/context security boundaries.
+- Build on a Windows CI runner and produce a versioned downloadable installer (.exe),
+  with uninstall support and release digests; never treat a macOS bundle as a Windows build.
+- Sign Windows release artifacts and implement verified Windows update installation,
+  rollback/recovery and clear failure messages using the existing release trust model.
+- Add website platform-aware download choices when an approved Windows release is ready;
+  preserve the waitlist/public-release gates until acceptance passes.
+
+Acceptance: clean install, launch, Google callback/onboarding, chat/reactions/files,
+local agent build/review, GitHub authorization, meetings and screen sharing, light/dark
+and display scaling, upgrade/recovery, uninstall and security regression checks on an
+actual supported Windows environment. Publish supported Windows versions/architectures
+only after verification. Include Windows CI and release code in the final codebase walkthrough.
+
+Owner actions: **none required now**. At M14D, walk through Windows code-signing
+setup and arrange a Windows test device or VM; explain available signing options/costs
+before requesting a purchase. Never request certificate secrets in chat. M14B's current
+Apple Developer enrollment requirement remains the next owner setup step.
+
+
+## October 5 — requested core chat collaboration expansion
+
+Owner confirmed the reaction SQL was applied. Existing workspaces, channels/private access,
+DMs, threads, uploads, unread counts, invitations and roles reviewed. Missing chat actions,
+group DMs, rich text, mentions, search/activity/files/saved/pinned tools, channel topics/posting,
+typing, presence, profiles and notifications implemented locally. See `docs/chat-collaboration.md`.
+New `202610040002_chat_collaboration.sql` must be run once by the owner, followed by an app
+restart; hosted two-account acceptance remains pending. No public push/deploy or M14 purchase
+occurred. Return to M14 requirement 1: confirm Apple enrollment purchase and active/pending status.
+
+
 ## October 3 — M14A local rehearsal complete; M14B/C remain deferred
 
 Owner authorized resuming M14. The actual signed preview DMG passed integrity/digest,
@@ -28,7 +69,8 @@ historical implementation and test records below remain intact.
 - **M14:** remaining local release rehearsal, deferred M14B owner production setup and
   **M14C final hosted meeting acceptance**. Meetings finish at M14C only after real provider,
   consent/context, permissions/recovery and two-physical-Mac checks pass. M10/M12 local
-  implementation is not complete hosted acceptance.
+  implementation is not complete hosted acceptance. **M14D** adds Windows compatibility,
+  installer/signing, verified updates and Windows acceptance (see October 5 entry above).
 - **M15:** persistent, editable product memory with approved decisions, source citations,
   conflict review, freshness and permission-scoped retrieval.
 - **M16:** traceable builds linking agreed requirements to code, actual tests and shared
@@ -607,3 +649,45 @@ echo, true network reconnect and hosted two-account acceptance remain open. Keep
 meetings disabled pending owner device preflight; continue this approved task's live
 validation when ready. Do not start transcription/AI meeting context without asking
 after call validation. A separate supervised lease guard is required for production.
+
+### Profile customization (before M14)
+- Added three-step personal profile onboarding and account/settings editing: avatar,
+  display name, username, bio, job title, custom status/emoji and availability.
+- Shared names, profile cards, username mentions and private chat avatars integrated.
+- Owner must apply `202610050001_user_profiles.sql` after chat collaboration SQL,
+  then restart and validate a real avatar/profile update. Local tests do not assert
+  hosted completion. Exact Shotbase onboarding replication awaits an optional recording.
+- M14 remains gated by release requirements; Apple Developer enrollment is the active
+  owner step. No website deployment or GitHub push is part of this profile change.
+
+### Call bar navigation refinement (before M14)
+- Replaced Meetings tab with a compact phone/video/options bar in the chat header.
+- Audio/video entry points join the existing channel meeting transport and request
+  only the corresponding devices; mute choices survive reconnects.
+- Active calls show Join labels and participant counts. Announcement join cards,
+  device checks, announcement settings and transcript history remain accessible.
+- No new migration or owner configuration required for this change. Existing meeting
+  service and macOS permissions still apply. M14 enrollment gate remains unchanged.
+
+### Reaction latency fix (before M14)
+- Added immediate shared reaction feedback, coalesced rapid toggles, targeted server
+  confirmation and priority over background work.
+- Slow polling preserves pending intent; failed saves roll back without clearing chat.
+- Covered delayed requests, rapid toggles, failure recovery, counts, priority and logout.
+- No new migration or owner setup required; M14 release enrollment gate stays unchanged.
+
+
+### October 5 — simulated introduction replacement
+
+The five-stage Zen introduction replaces the guided setup. Permission/device/project
+configuration is deferred to feature settings; completion does not grant authority.
+See `docs/zen-onboarding.md` for integration and animation limits. No SQL or new
+owner credentials are required. M14 enrollment/release work remains a separate gate.
+
+
+### October 5 — white onboarding with guided configuration
+
+Expanded the introduction into 12 screens and real optional profile, appearance,
+project/workflow, GitHub and meeting-device setup. Saved grants remain explicit,
+scoped to the account/workspace, and do not start work. See `docs/zen-onboarding.md`.
+No new SQL is required. M14 Apple enrollment/release setup remains separate.

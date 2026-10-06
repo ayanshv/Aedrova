@@ -1,25 +1,30 @@
 """Optional, versioned setup and safe, task-based dashboard spotlights."""
 
 from dataclasses import dataclass
-from pathlib import Path
 
-from PySide6.QtCore import QEasingCurve, QEvent, QPoint, QPropertyAnimation, QRect, Qt, QTimer
-from PySide6.QtGui import QColor, QKeySequence, QPainter, QPainterPath, QRegion, QShortcut
+from PySide6.QtCore import (
+    QEasingCurve,
+    QEvent,
+    QPoint,
+    QPropertyAnimation,
+    QRect,
+    Qt,
+    QTimer,
+    QVariantAnimation,
+)
+from PySide6.QtGui import QColor, QKeySequence, QPainter, QPainterPath, QPen, QRegion, QShortcut
 from PySide6.QtWidgets import (
-    QCheckBox,
     QFrame,
     QHBoxLayout,
-    QLineEdit,
     QPushButton,
-    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
 
-from aedrova.desktop.controls import AppDialog, ChoiceBox
+from aedrova.desktop.controls import ChoiceBox
 from aedrova.desktop.dialogs import button, label
 
-VERSION = 1
+VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -36,67 +41,98 @@ STEPS = (
     Step(
         "Your team",
         "A place for every team.",
-        "Switch workspaces here. Each workspace has its own people, conversations and "
-        "projects. Use + on the left to create another.",
+        "Switch teams here. Each workspace keeps its people, conversations and projects "
+        "separate. Use + to create another.",
         "workspace_title",
         ("workspaces",),
+        0,
     ),
     Step(
         "Your team",
         "Bring your people together.",
-        "Invite teammates with a workspace invitation. Owners and admins manage "
-        "invitations, membership and the agent nickname in Workspace settings.",
+        "Invite teammates here. Workspace settings manages members, owner/admin roles and "
+        "your agent’s nickname.",
         "invite_teammates_button",
         ("invitations", "roles", "nickname"),
+        0,
     ),
     Step(
         "Your team",
         "Give conversations a home.",
-        "Channels organize your work. Use + to create a channel; select a channel to see "
-        "its conversation and unread activity.",
+        "Pick a channel or use + to create one. Public and private channels have topics, "
+        "members and unread activity.",
         "channel_list",
         ("channels", "unread"),
+        0,
     ),
     Step(
         "Your team",
         "A quieter conversation.",
-        "Direct messages stay separate from channels. Use the Direct messages list or ⌘⇧M"
-        " to choose a teammate.",
+        "Start a private conversation with one teammate or a group. "
+        "Presence and typing indicators show who’s available and replying.",
         "dm_list",
         ("direct_messages",),
+        0,
     ),
     Step(
         "Conversation",
         "Pick up the thread.",
-        "Select a message's reply control to open its thread. Replies keep the main "
-        "conversation clear; Escape closes the thread. Scroll up for older messages, or "
-        "use ⌘⇧H.",
+        "Open a message’s replies to keep discussion in a thread. Scroll up for history; "
+        "Escape closes the thread.",
         "messages",
         ("messages", "threads", "history"),
+        0,
     ),
     Step(
         "Conversation",
         "Find the signal.",
-        "⌘K jumps to conversations. Search and context tools help you review accessible "
-        "messages, decisions and sources before building. Private context follows "
-        "membership permissions.",
+        "Find messages, people, channels and files. ⌘K jumps to a conversation; context "
+        "search finds decisions and sources.",
         "search_button",
         ("search", "decisions", "sources"),
+        0,
     ),
     Step(
         "Conversation",
         "Keep the work close.",
-        "Use ⌘⇧U to attach a file and ⌘⇧S to save the selected attachment. The Files tab "
-        "explains file access; attachments in chat are the current shared-file workflow.",
+        "Format text or code, add emoji, and attach or drag files here. "
+        "Files keeps shared uploads together. ⌘⇧S saves a selected file.",
         "composer",
-        ("attachments", "save_files"),
+        ("attachments", "save_files", "rich_text", "drag_uploads"),
+        0,
+    ),
+    Step(
+        "Conversation",
+        "Make messages work for you.",
+        "Hover or right-click a message to react, reply, quote, edit or unsend. The + "
+        "reaction button opens all emojis.",
+        "messages",
+        ("reactions", "emojis", "editing", "deletion", "quotes"),
+        0,
+    ),
+    Step(
+        "Conversation",
+        "Keep the important things.",
+        "Message actions pin, save, forward, share or copy a message link. Links show "
+        "previews when available.",
+        "messages",
+        ("pins", "bookmarks", "forwarding", "message_links", "sharing_messages", "link_previews"),
+        0,
+    ),
+    Step(
+        "Conversation",
+        "Stay in the loop.",
+        "Activity collects mentions, direct messages and replies. Channel settings control "
+        "notifications; unread badges show where to catch up.",
+        "button:Activity",
+        ("notifications", "activity", "read_state", "typing", "presence"),
+        0,
     ),
     Step(
         "Build",
         "Your project, connected.",
-        "Connect a local folder in Project settings. Choose Codex or Claude and configure"
-        " planning, execution permissions and your repository. Changes to these "
-        "permissions always stay in your hands.",
+        "Connect a local project and choose Codex or Claude Code. Your settings control "
+        "planning and execution.",
         "button:Project settings|Connect a project",
         ("project", "provider", "workflow", "permissions"),
         1,
@@ -104,9 +140,8 @@ STEPS = (
     Step(
         "Build",
         "Your editor stays yours.",
-        "Open a connected project in your preferred IDE from this page. Select VS Code, "
-        "Cursor, Xcode or Finder in Settings. GitHub is optional until you want to "
-        "publish.",
+        "Open the connected project in your preferred editor. Choose VS Code, Cursor, Xcode "
+        "or Finder in Settings.",
         "button:Open project in IDE",
         ("ide", "repository"),
         1,
@@ -114,78 +149,74 @@ STEPS = (
     Step(
         "Build",
         "From a decision to a build.",
-        "Type @ to select your named agent, then ask it to build. It gathers context from"
-        " conversations you can access and works in the background using your project "
-        "permissions. Provider login or included access must be ready first.",
+        "Type @ to choose your agent or a teammate. Your agent builds from accessible team "
+        "context after your request.",
         "composer",
         ("mentions", "builds", "context"),
+        0,
     ),
     Step(
         "Build",
         "Follow the work.",
-        "Builds opens the queue, progress, recovery and usage. During a run, the activity"
-        " stream shows tools and results; Stop cancels work. Review requested approvals "
-        "before granting them.",
+        "Follow build progress, tools, results and usage here. Stop cancels a run; failed "
+        "runs can be recovered.",
         "build_history",
         ("progress", "queue", "recovery", "usage", "cancel", "approvals"),
+        0,
     ),
     Step(
         "Build",
         "Review before publishing.",
-        "Open a completed run to inspect changes and test results, apply the reviewed "
-        "work, open the IDE or preview, and publish to the connected GitHub repository. "
-        "Publication requires your explicit approval.",
+        "Inspect changes and tests before applying them. Publishing to GitHub always asks "
+        "for your approval.",
         "build_history",
         ("review", "apply", "preview", "github"),
+        0,
     ),
     Step(
         "Meet",
         "Arrive ready.",
-        "Check meeting devices previews your camera, microphone, speaker and screen "
-        "locally. Enable macOS camera, microphone and screen-recording permissions when "
-        "prompted. Checks are never recorded.",
-        "button:Check meeting devices",
+        "Use meeting options to check your microphone, camera, speaker and screen. Checks "
+        "stay local and never start a call.",
+        "call_bar",
         ("devices", "screen_preview"),
-        4,
+        0,
     ),
     Step(
         "Meet",
         "A familiar room.",
-        "Start meeting to meet with your team. Inside the call, use microphone and "
-        "camera toggles, screen sharing, participants and leave controls. Shared hosting "
-        "is required for calls between Macs. Transcription and AI meeting context are "
-        "still being prepared; no silent recording.",
-        "button:Start meeting",
+        "The phone starts audio; the camera starts video. In a call, control microphone, "
+        "camera, sharing, participants and leaving.",
+        "call_bar",
         ("calls", "camera", "microphone", "sharing", "participants", "leave_call"),
-        4,
+        0,
     ),
     Step(
         "Make it yours",
         "Comfort comes first.",
-        "Account → Settings lets you choose light, dark or system appearance, reduce "
-        "motion and transparency, set your editor and update your display name. These "
-        "preferences are saved on this Mac.",
+        "Your account menu opens profile and settings. Change appearance, accessibility, "
+        "editor preferences and status here.",
         "profile_button",
         ("account", "settings", "appearance", "accessibility", "profile"),
+        0,
     ),
     Step(
         "Make it yours",
         "Know your allowance.",
-        "Settings shows your workspace's included AI usage and opens Plan & billing on "
-        "the website. Local alpha builds use provider access; purchasing a sandbox plan "
-        "never enables paid AI.",
+        "Settings shows included AI usage. Plan & billing opens subscription details and "
+        "usage allowances on the website.",
         "profile_button",
         ("billing", "allowance"),
+        0,
     ),
     Step(
         "Make it yours",
         "You can always come back.",
-        "Log out from the account menu. Check for updates or replay Getting started "
-        "and Explore Aedrova from "
-        "Help whenever you like. Pause this tour to resume later; skip without changing "
-        "any workspace data.",
+        "Log out from Account. Help offers updates and these guides again. You can pause or "
+        "skip this tour anytime.",
         "profile_button",
         ("logout", "help", "updates"),
+        0,
     ),
 )
 FEATURES = frozenset(feature for step in STEPS for feature in step.features)
@@ -210,245 +241,8 @@ def account_key(window):
     return f"onboarding/v{VERSION}/" + (str(user.id) if user else "local-preview")
 
 
-class SetupDialog(AppDialog):
-    def __init__(self, window):
-        super().__init__(window)
-        self.window = window
-        self.prefix = account_key(window)
-        self.owner = str(window.current_user().id) if window.current_user() else None
-        self.workspace = window.workspace_id
-        self.build_draft = None
-        self.step = 0
-        self.setWindowTitle("Aedrova · Make yourself at home")
-        self.resize(560, 460)
-        self.setMinimumWidth(460)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(32, 32, 32, 32)
-        layout.setSpacing(18)
-        self.progress = label("", "section")
-        self.heading = label("", "heading", wrap=True)
-        self.description = label("", "muted", wrap=True)
-        for widget in (self.progress, self.heading, self.description):
-            layout.addWidget(widget)
-        self.content = QWidget()
-        self.content_layout = QVBoxLayout(self.content)
-        self.content_layout.setContentsMargins(0, 0, 0, 0)
-        self.content_layout.setSpacing(12)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setWidget(self.content)
-        layout.addWidget(scroll, 1)
-        row = QHBoxLayout()
-        skip = button("Set up later", role="outline")
-        skip.clicked.connect(self.defer)
-        self.back = button("Back", role="outline")
-        self.back.clicked.connect(lambda: self.show_step(self.step - 1))
-        self.next = button("Continue", role="primary")
-        self.next.clicked.connect(self.advance)
-        row.addWidget(skip)
-        row.addStretch()
-        row.addWidget(self.back)
-        row.addWidget(self.next)
-        layout.addLayout(row)
-        self.show_step(0)
-
-    def show_step(self, step):
-        if self.step == 2 and hasattr(self, "project_folder"):
-            self.build_draft = {
-                "folder": self.project_folder.text(),
-                "provider": self.coding_provider.currentData(),
-                "background_build": self.automatic_builds.isChecked(),
-            }
-        self.step = max(0, min(3, step))
-        while self.content_layout.count():
-            item = self.content_layout.takeAt(0)
-            if item.widget():
-                item.widget().hide()
-                item.widget().deleteLater()
-            elif item.layout():
-                nested = item.layout()
-                while nested.count():
-                    child = nested.takeAt(0).widget()
-                    if child:
-                        child.hide()
-                        child.deleteLater()
-        content = (
-            (
-                "Your team, your space.",
-                "Your workspace and agent name stay with your team. You can revisit invitations "
-                "and workspace settings at any time.",
-            ),
-            (
-                "Make it comfortable.",
-                "Choose how Aedrova feels on this Mac. You can change these preferences later.",
-            ),
-            (
-                "Bring your tools.",
-                "Choose your project folder and coding provider, then decide how your agent "
-                "plans and builds. You can change these settings later.",
-            ),
-            (
-                "A little guidance, on your terms.",
-                "Explore the dashboard in short chapters. You can skip, pause, go back or replay "
-                "the tour from Help. No build or purchase starts during the tour.",
-            ),
-        )[self.step]
-        self.progress.setText(f"MAKE YOURSELF AT HOME · {self.step + 1} OF 4")
-        self.heading.setText(content[0])
-        self.description.setText(content[1])
-        self.back.setEnabled(self.step > 0)
-        self.next.setText("Explore the dashboard" if self.step == 3 else "Continue")
-        if self.step == 0:
-            control = button("Workspace and agent settings", role="outline")
-            control.setEnabled(bool(self.window.current_user()))
-            control.clicked.connect(lambda: self.window.show_account("manage"))
-            self.content_layout.addWidget(control)
-        if self.step == 1:
-            appearance = ChoiceBox()
-            appearance.setAccessibleName("Appearance")
-            for mode in ("system", "light", "dark"):
-                appearance.addItem(mode.title(), mode)
-            appearance.setCurrentIndex(appearance.findData(self.window.theme_mode))
-            appearance.currentIndexChanged.connect(
-                lambda: self.window.set_theme(appearance.currentData())
-            )
-            self.content_layout.addWidget(appearance)
-            for text, value, callback in (
-                ("Reduce motion", self.window.reduced_motion, self.window.set_reduced_motion),
-                (
-                    "Reduce transparency",
-                    self.window.reduced_transparency,
-                    self.window.set_reduced_transparency,
-                ),
-            ):
-                control = QCheckBox(text)
-                control.setChecked(value)
-                control.toggled.connect(callback)
-                self.content_layout.addWidget(control)
-        if self.step == 2:
-            from aedrova.desktop.projects import binding
-
-            saved = self.build_draft or binding(self.window, self.workspace)
-            self.project_folder = QLineEdit(saved.get("folder", ""))
-            self.project_folder.setAccessibleName("Onboarding project folder")
-            self.project_folder.setPlaceholderText("Choose the project your agent will build")
-            folder_row = QHBoxLayout()
-            folder_row.addWidget(self.project_folder, 1)
-            choose = button("Choose folder", role="outline")
-            choose.clicked.connect(self.choose_build_folder)
-            folder_row.addWidget(choose)
-            self.content_layout.addLayout(folder_row)
-            self.coding_provider = ChoiceBox()
-            self.coding_provider.setAccessibleName("Onboarding coding provider")
-            self.coding_provider.addItem("Codex", "codex")
-            self.coding_provider.addItem("Claude Code", "claude_code")
-            self.coding_provider.setCurrentIndex(
-                self.coding_provider.findData(saved.get("provider", "codex"))
-            )
-            self.content_layout.addWidget(self.coding_provider)
-            self.automatic_builds = QCheckBox("Let the agent plan and execute automatically")
-            self.automatic_builds.setChecked(saved.get("background_build", False))
-            self.content_layout.addWidget(self.automatic_builds)
-            self.content_layout.addWidget(
-                label(
-                    "When you mention your agent, it shares accessible workspace context with your "
-                    "chosen provider and plans, edits and runs sandboxed tests in a build copy. "
-                    "Provider usage may be billed. Applying changes and publishing still need "
-                    "approval. This is optional and can be changed in Project settings.",
-                    "muted",
-                    wrap=True,
-                )
-            )
-            self.project_status = label(
-                "You can connect now or continue without a project.", "muted", wrap=True
-            )
-            self.content_layout.addWidget(self.project_status)
-            editor = ChoiceBox()
-            editor.setAccessibleName("Preferred editor")
-            editor.addItems(["Visual Studio Code", "Cursor", "Xcode", "Finder"])
-            editor.setCurrentText(self.window.settings.value("editor", "Visual Studio Code"))
-            editor.currentTextChanged.connect(
-                lambda value: self.window.settings.setValue("editor", value)
-            )
-            self.content_layout.addWidget(editor)
-            for text, callback in (("Set up GitHub", self.github),):
-                control = button(text, role="outline")
-                control.setEnabled(bool(self.window.current_user()))
-                control.clicked.connect(callback)
-                self.content_layout.addWidget(control)
-        self.next.setFocus()
-        # Position animations fight the parent layout and can pin controls at (0, 0).
-        self.content_layout.activate()
-
-    def choose_build_folder(self):
-        from aedrova.desktop.controls import choose_project
-
-        selected = choose_project(self, self.project_folder.text())
-        if selected:
-            self.project_folder.setText(selected)
-
-    def save_build_setup(self):
-        from aedrova.desktop.projects import binding, save_binding
-
-        folder = self.project_folder.text().strip()
-        if not folder:
-            if self.automatic_builds.isChecked():
-                self.project_status.setText("Choose a project before enabling automatic builds.")
-                return False
-            return True
-        try:
-            root = Path(folder).expanduser().resolve(strict=True)
-            if not root.is_dir() or root in {Path.home(), Path(root.anchor)}:
-                raise ValueError("Choose a specific project folder.")
-            if (
-                not self.window.current_user()
-                or str(self.window.current_user().id) != self.owner
-                or self.window.workspace_id != self.workspace
-            ):
-                raise ValueError("Return to your original workspace to save this connection.")
-            saved = binding(self.window, self.workspace)
-            saved.update(
-                folder=str(root),
-                provider=self.coding_provider.currentData(),
-                auto_plan=self.automatic_builds.isChecked(),
-                background_build=self.automatic_builds.isChecked(),
-            )
-            save_binding(self.window, saved, self.workspace)
-            build = getattr(self.window, "build_dialog", None)
-            if build and build.background_run and not build.background_authorized():
-                build.cancel()
-            self.window._render_pages()
-            return True
-        except (ValueError, OSError, PermissionError):
-            self.project_status.setText(
-                "Choose an accessible project folder and sign in to save it."
-            )
-            return False
-
-    def project(self):
-        from aedrova.desktop.projects import open_project
-
-        open_project(self.window)
-
-    def github(self):
-        from aedrova.desktop.github_setup import open_github_setup
-
-        open_github_setup(self.window)
-
-    def advance(self):
-        if self.step == 2 and not self.save_build_setup():
-            return
-        if self.step < 3:
-            self.show_step(self.step + 1)
-        else:
-            self.window.settings.setValue(self.prefix + "/setup", True)
-            self.accept()
-            self.window.show_tour()
-
-    def defer(self):
-        self.window.settings.setValue(self.prefix + "/deferred", True)
-        self.reject()
+# Public import retained for existing Help/first-run integration.
+from aedrova.desktop.zen_onboarding import ZenOnboarding as SetupDialog  # noqa: E402, F401
 
 
 class SpotlightTour(QWidget):
@@ -462,6 +256,11 @@ class SpotlightTour(QWidget):
         self.index = max(0, min(len(STEPS) - 1, self.index))
         if window.settings.value(self.prefix + "/status") in {"completed", "skipped"}:
             self.index = 0
+        self.reveal = 1.0
+        self.highlight_animation = QVariantAnimation(self)
+        self.highlight_animation.setDuration(240)
+        self.highlight_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self.highlight_animation.valueChanged.connect(self.animate_highlight)
         self.target_rect = QRect()
         self.saved_tab = window.pages.currentIndex()
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -531,7 +330,18 @@ class SpotlightTour(QWidget):
         self.next.setFocus()
         self.reposition()
         fade(self.card, self.window.reduced_motion)
+        self.highlight_animation.stop()
+        if self.window.reduced_motion:
+            self.reveal = 1.0
+        else:
+            self.highlight_animation.setStartValue(0.0)
+            self.highlight_animation.setEndValue(1.0)
+            self.highlight_animation.start()
         QTimer.singleShot(0, self.reposition)
+
+    def animate_highlight(self, value):
+        self.reveal = float(value)
+        self.update()
 
     def advance(self):
         if self.index == len(STEPS) - 1:
@@ -596,9 +406,19 @@ class SpotlightTour(QWidget):
             cutout = QPainterPath()
             cutout.addRoundedRect(self.target_rect, 16, 16)
             path = path.subtracted(cutout)
-        painter.fillPath(path, QColor(0, 0, 0, 175 if self.window.reduced_transparency else 140))
+        painter.fillPath(
+            path,
+            QColor(0, 0, 0, int((175 if self.window.reduced_transparency else 140) * self.reveal)),
+        )
+        if not self.target_rect.isEmpty():
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            accent = QColor(self.window.theme.accent)
+            accent.setAlpha(int(210 * self.reveal))
+            painter.setPen(QPen(accent, 2))
+            painter.drawRoundedRect(self.target_rect, 16, 16)
 
     def finish(self, status):
+        self.highlight_animation.stop()
         self.window.settings.setValue(self.prefix + "/status", status)
         self.window.settings.sync()
         self.window.select_tab(self.saved_tab)
@@ -606,3 +426,4 @@ class SpotlightTour(QWidget):
         self.hide()
         self.deleteLater()
         self.window.tour = None
+        self.window.composer.editor.setFocus()

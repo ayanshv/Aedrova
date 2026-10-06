@@ -149,13 +149,14 @@ def test_signed_in_meetings_opens_device_setup_and_signout_closes_it(qtbot, tmp_
     from PySide6.QtWidgets import QPushButton
 
     window, _ = setup(qtbot, tmp_path)
-    window.pages.setCurrentIndex(4)
-    # Rebuilding the connected dashboard must preserve both tab and device action.
+    window.select_tab(0)
+    window.open_meeting_hub()
+    # Rebuilding chat keeps the call bar and the device action available.
     window._render_pages()
-    assert window.pages.currentIndex() == 4
-    page = window.pages.widget(4)
-    actions = [b for b in page.findChildren(QPushButton)
-               if b.text() == "Check meeting devices"]
+    assert window.pages.currentIndex() == 0
+    assert window.call_buttons["camera"].accessibleName() == "Start video call"
+    page = window.meeting_hub
+    actions = [b for b in page.findChildren(QPushButton) if b.text() == "Check meeting devices"]
     assert len(actions) == 1
     qtbot.mouseClick(actions[0], Qt.MouseButton.LeftButton)
     assert window.meeting_setup.isVisible()

@@ -4,8 +4,6 @@ from PySide6.QtWidgets import QFileDialog
 from test_connected import setup
 
 from aedrova.desktop.controls import choose_project
-from aedrova.desktop.onboarding import SetupDialog
-from aedrova.desktop.projects import binding
 
 
 def test_working_status_is_in_chat_and_final_result_replaces_transients(qtbot, tmp_path):
@@ -34,50 +32,6 @@ def test_working_status_is_in_chat_and_final_result_replaces_transients(qtbot, t
     window.finish_agent_response("w", "Cancelled. Partial changes are available for review.")
     assert "Starting" not in window.agent_feed.toPlainText()
     window.build_dialog = None
-
-
-def test_onboarding_saves_explicit_project_authority_without_running_build(
-    qtbot, tmp_path, monkeypatch
-):
-    window, _ = setup(qtbot, tmp_path)
-    monkeypatch.setattr(
-        window,
-        "start_agent_request",
-        lambda *_: (_ for _ in ()).throw(AssertionError("Onboarding must not start builds")),
-    )
-    project = tmp_path / "project"
-    project.mkdir()
-    dialog = SetupDialog(window)
-    qtbot.addWidget(dialog)
-    dialog.show_step(2)
-    assert not dialog.automatic_builds.isChecked()
-    dialog.project_folder.setText(str(project))
-    dialog.automatic_builds.setChecked(True)
-    dialog.coding_provider.setCurrentIndex(dialog.coding_provider.findData("claude_code"))
-    dialog.show_step(1)
-    dialog.show_step(2)
-    assert dialog.project_folder.text() == str(project)
-    assert dialog.automatic_builds.isChecked()
-    dialog.advance()
-    assert dialog.step == 3
-    saved = binding(window)
-    assert saved["folder"] == str(project.resolve())
-    assert saved["provider"] == "claude_code"
-    assert saved["auto_plan"] and saved["background_build"]
-
-
-def test_onboarding_rejects_missing_folder_and_changed_account(qtbot, tmp_path):
-    window, _ = setup(qtbot, tmp_path)
-    dialog = SetupDialog(window)
-    qtbot.addWidget(dialog)
-    dialog.show_step(2)
-    dialog.automatic_builds.setChecked(True)
-    dialog.advance()
-    assert dialog.step == 2 and not binding(window)
-    dialog.project_folder.setText(str(tmp_path))
-    window.current_user = lambda: SimpleNamespace(id="different-user")
-    dialog.advance()
-    assert dialog.step == 2 and not binding(window)
 
 
 def test_project_picker_requests_native_folder_dialog(monkeypatch):

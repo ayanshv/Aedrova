@@ -3,8 +3,17 @@
 from pathlib import Path
 from threading import Event
 
-from PySide6.QtCore import QObject, QRunnable, QSettings, QSize, Qt, QThreadPool, Signal, Slot
-from PySide6.QtGui import QIcon
+from PySide6.QtCore import (
+    QObject,
+    QRunnable,
+    QSettings,
+    QSize,
+    Qt,
+    QThreadPool,
+    Signal,
+    Slot,
+)
+from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -55,6 +64,7 @@ class AccountDialog(AppDialog):
     session_closed = Signal()
     operation_failed = Signal()
     snapshot_loaded = Signal()
+    sign_in_ready = Signal()
     operation_finished = Signal()
 
     def __init__(self, parent=None, *, settings=None, factory=IdentityService):
@@ -65,6 +75,7 @@ class AccountDialog(AppDialog):
         self.busy = False
         self.pending_intent = None
         self.oauth_cancel = None
+        self.awaiting_sign_in_snapshot = False
         QApplication.instance().aboutToQuit.connect(self.cancel_google)
         self.snapshot = {
             "workspaces": [],
@@ -127,8 +138,28 @@ class AccountDialog(AppDialog):
         layout = QVBoxLayout(page)
         layout.setSpacing(18)
         layout.addStretch()
-        layout.addWidget(label("Welcome to Aedrova", "heading"))
-        layout.addWidget(label("Pick up where your next idea begins.", "muted", wrap=True))
+        preview = label("")
+        preview.setAccessibleName("Aedrova workspace preview")
+        preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        photo = QPixmap(str(Path(__file__).parent / "assets/onboarding/light.png"))
+        if not photo.isNull():
+            preview.setPixmap(
+                photo.scaled(
+                    540,
+                    250,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+            )
+            layout.addWidget(preview)
+        heading = label("Your team. Your next idea.", "heading")
+        heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(heading)
+        subtitle = label(
+            "One Google account. Your workspace, ready when you are.", "muted", wrap=True
+        )
+        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(subtitle)
         self.google_button = button("Continue with Google", role="primary")
         self.google_button.setIcon(QIcon(str(Path(__file__).parent / "assets/google-g.png")))
         self.google_button.setIconSize(QSize(20, 20))
@@ -715,6 +746,7 @@ class AccountDialog(AppDialog):
         if user is None:
             self.status.setText("Sign-in did not finish. Please try again.")
             return
+        self.awaiting_sign_in_snapshot = True
         self.show()
         self.raise_()
         self.activateWindow()
@@ -760,6 +792,11 @@ class AccountDialog(AppDialog):
         self.status.setText("Connected · workspace access is enforced by the server.")
         self.apply_intent()
         self.snapshot_loaded.emit()
+        if self.awaiting_sign_in_snapshot and self.service and self.service.user:
+            self.awaiting_sign_in_snapshot = False
+            self.sign_in_ready.emit()
+        # Profile customization remains in Account → Edit profile; the intro is a
+        # permission-free product playground, with no competing setup dialogs.
 
     def apply_intent(self):
         intent, self.pending_intent = self.pending_intent, None
@@ -951,6 +988,7 @@ class AccountDialog(AppDialog):
         self.setup_email.clear()
 
     def sign_out(self):
+        self.awaiting_sign_in_snapshot = False
         self.session_closed.emit()
         self.clear_connected()
         self.onboarding_workspace.clear()

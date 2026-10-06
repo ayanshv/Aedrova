@@ -150,7 +150,7 @@ bundle plist re-signs the outer app without re-signing the embedded vendor runti
 Light/dark screenshots were checked locally using fake device inventory. These UI
 and lifecycle tests do not establish physical-device or echo-cancellation acceptance.
 
-Owner action now: open the rebuilt dist/Aedrova.app, enter Meetings → Check meeting
+Owner action now: open the rebuilt dist/Aedrova.app, enter chat header → ⋯ → Check meeting
 devices, and explicitly run camera, microphone, speaker, and screen checks. Approve
 macOS prompts only for the checks you choose. If screen preview is denied, enable
 Aedrova in System Settings → Privacy & Security → Screen & System Audio Recording
@@ -220,7 +220,7 @@ rejoin. Report `work/meeting-call-check.json`; no hardware is accessed, audio AD
 stubbed, and hosted Supabase authorization is NOT tested by this probe. Prior real
 synthetic audio and forced TURN probes remain separate evidence.
 
-Owner action: sign in to the rebuilt app, open Meetings → Check meeting devices,
+Owner action: sign in to the rebuilt app, open chat header → ⋯ → Check meeting devices,
 explicitly test each device, approve macOS prompts, and report which checks work.
 The developer prepared a stable private `.env.meeting-server` in Aedrova_site; no new
 keys or SQL are required from the owner now. Keep meetings disabled until device
@@ -357,3 +357,18 @@ Supabase migration/RLS suite passed, and embedded PostgreSQL validated the priva
 ledger/meeting schemas plus conditional lease SQL (duplicate, grace, authorized rejoin).
 These checks do not prove networked PostgreSQL concurrency, a built Docker image,
 deployed TLS/monitor processes or physical two-Mac acceptance.
+
+
+### October 5 call recovery and phone interface
+
+The desktop's local meeting origin was correct, but its API process was absent.
+A user LaunchAgent (`com.aedrova.local-meetings`) now starts that service at login
+and restarts it after process exits. Local meeting health is ready and the real
+LiveKit two-peer synthetic audio/video/screen transport probe passed. This is not
+a signed-in hardware or second-Mac acceptance test. No new SQL is required.
+
+The phone entry now opens a separate voice-call presentation with participant
+avatars, speaking highlights, elapsed time, microphone controls and Hang up.
+Video calls retain their video presentation. Meeting API failures now show safe,
+useful connection/access messages without exposing response bodies or credentials.
+Quit and reopen the rebuilt desktop, then retry a signed-in channel call.

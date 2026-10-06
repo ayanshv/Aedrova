@@ -94,7 +94,7 @@ class GitHubSetup(AppDialog):
         self.code.setAccessibleName("GitHub one-time code")
         self.code.hide()
         layout.addWidget(self.code)
-        self.browser_button = button("Copy code & open GitHub", role="outline")
+        self.browser_button = button("Copy code → Open Github", role="outline")
         self.browser_button.clicked.connect(self.open_browser)
         self.browser_button.hide()
         layout.addWidget(self.browser_button)

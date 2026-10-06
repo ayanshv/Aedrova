@@ -54,11 +54,17 @@ class SettingsDialog(AppDialog):
             )
             row = QHBoxLayout()
             self.name = QLineEdit(
-                (getattr(self.user, "user_metadata", None) or {}).get("full_name", "")
+                account.snapshot.get("user_profile", {}).get("display_name")
+                or (getattr(self.user, "user_metadata", None) or {}).get("full_name", "")
             )
             self.name.setPlaceholderText("Your display name")
             self.name.setAccessibleName("Display name")
             self.name.setMaxLength(80)
+            from aedrova.desktop.profile import open_profile_editor
+
+            full_profile = button("Edit full profile…", role="outline")
+            full_profile.clicked.connect(lambda: open_profile_editor(window))
+            layout.addWidget(full_profile)
             self.save = button("Save name", role="outline")
             self.save.clicked.connect(self.save_name)
             row.addWidget(self.name, 1)
@@ -95,10 +101,15 @@ class SettingsDialog(AppDialog):
         self.billing_origin = application_origin()
         if self.user:
             layout.addWidget(label("PLAN & INCLUDED AI", "section"))
-            if ai_access_mode() == 'local':
-                layout.addWidget(label('AI builds use your local provider login in this internal '
-                                       'alpha. Included plan access is being prepared.',
-                                       'muted', wrap=True))
+            if ai_access_mode() == "local":
+                layout.addWidget(
+                    label(
+                        "AI builds use your local provider login in this internal "
+                        "alpha. Included plan access is being prepared.",
+                        "muted",
+                        wrap=True,
+                    )
+                )
             self.billing_status = label(
                 "Checking your workspace’s plan…"
                 if self.billing_origin

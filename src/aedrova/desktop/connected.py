@@ -19,6 +19,21 @@ from aedrova.identity.transfers import save_download
 PAGE_SIZE = 100
 
 
+def with_reaction(row, emoji, present):
+    """Apply our desired membership without mutating authoritative counts."""
+    row = {**row, "reactions": [dict(r) for r in row.get("reactions", [])]}
+    if row.get("unsent_at"):
+        return row
+    reaction = next((r for r in row["reactions"] if r["emoji"] == emoji), None)
+    if reaction is None and present:
+        row["reactions"].append({"emoji": emoji, "count": 1, "mine": True})
+    elif reaction is not None and bool(reaction.get("mine")) != present:
+        reaction["count"] += 1 if present else -1
+        reaction["mine"] = present
+    row["reactions"] = [r for r in row["reactions"] if r["count"] > 0]
+    return row
+
+
 def workspaces_from_snapshot(snapshot, user_id=None):
     names = {
         (x["workspace_id"], x["user_id"]): x["display_name"] for x in snapshot.get("directory", [])
@@ -29,17 +44,28 @@ def workspaces_from_snapshot(snapshot, user_id=None):
         for c in snapshot["channels"]:
             if c["workspace_id"] != row["id"]:
                 continue
-            direct = c.get("kind") == "dm"
+            direct = c.get("kind") in ("dm", "group_dm")
             other = c.get("dm_high") if c.get("dm_low") == user_id else c.get("dm_low")
-            name = names.get((row["id"], other), "Direct conversation") if direct else c["name"]
+            name = (
+                names.get((row["id"], other), "Direct conversation")
+                if c.get("kind") == "dm"
+                else c["name"]
+            )
+            if c.get("kind") == "group_dm":
+                name = c.get("display_name") or "Group conversation"
             channels.append(
                 Channel(
                     c["id"],
                     name,
-                    "Private conversation"
+                    c.get("topic") or "Private conversation"
                     if direct
-                    else ("Private channel" if c["private"] else "Team channel"),
+                    else (
+                        c.get("topic") or ("Private channel" if c["private"] else "Team channel")
+                    ),
                     direct=direct,
+                    private=c.get("private", False),
+                    description=c.get("description", ""),
+                    posting=c.get("posting", "members"),
                 )
             )
         if not channels:
@@ -68,6 +94,13 @@ def message_tree(rows, user_id, *, directory=None, attachments=None):
             attachment_id=file.get("id", ""),
             sequence=row.get("sequence", 0),
             delivery=row.get("delivery", ""),
+            mine=mine,
+            unsent=bool(row.get("unsent_at")),
+            reactions=row.get("reactions", []),
+            edited=bool(row.get("edited_at")),
+            saved=bool(row.get("saved")),
+            pinned=bool(row.get("pinned")),
+            sender_id=row["sender_id"],
         )
     roots = []
     for row in sorted(rows, key=lambda r: (bool(r.get("local")), r.get("sequence", 0))):
@@ -85,6 +118,8 @@ class ConnectedDashboard(QObject):
         self.active = False
         self.pending = {}
         self.outbox = {}
+        self.reaction_edits = {}
+        self.reaction_jobs = set()
         self.queue = deque()
         self.current_action = None
         self.last_view = None
@@ -189,6 +224,8 @@ class ConnectedDashboard(QObject):
         self.stop_realtime()
         self.pending.clear()
         self.outbox.clear()
+        self.reaction_edits.clear()
+        self.reaction_jobs.clear()
         self.queue.clear()
         self.current_action = None
         self.cache.clear()
@@ -209,6 +246,8 @@ class ConnectedDashboard(QObject):
         self.window.agent_feed.clear()
         self.window.agent_feed.hide()
         self.window.last_agent_event = ""
+        if hasattr(self.window, "collaboration"):
+            self.window.collaboration.reset()
         self.window.hide()
 
     def failed(self):
@@ -334,17 +373,28 @@ class ConnectedDashboard(QObject):
                     [r["id"] for r in incoming] + (list(cached) if reload_metadata else [])
                 )
             )
+            interactions = []
+            if channel_id in allowed and hasattr(service, "message_interactions"):
+                all_ids = list(dict.fromkeys(list(cached) + [r["id"] for r in incoming]))
+                for start in range(0, len(all_ids), 100):
+                    interactions.extend(service.message_interactions(all_ids[start : start + 100]))
             files = []
             if channel_id in allowed:
                 for start in range(0, len(ids), 100):
                     files.extend(service.attachments_for(ids[start : start + 100]))
+            if hasattr(service, "chat_inventory") and workspace_id:
+                snapshot["chat"] = service.chat_inventory(workspace_id, section="recent")
+                channel_details = {c["id"]: c for c in snapshot["chat"].get("channels", [])}
+                snapshot["channels"] = [
+                    {**c, **channel_details.get(c["id"], {})} for c in snapshot["channels"]
+                ]
             credentials = service.realtime_credentials()
-            return snapshot, incoming, files, credentials
+            return snapshot, incoming, files, credentials, interactions
 
         def loaded(result):
             if not self.active:
                 return
-            snapshot, incoming, files, credentials = result
+            snapshot, incoming, files, credentials, interactions = result
             self.failures = 0
             self.retry_at = 0
             allowed = {c["id"] for c in snapshot["channels"]}
@@ -353,6 +403,15 @@ class ConnectedDashboard(QObject):
             if channel_id in allowed:
                 self.cache.setdefault(channel_id, {}).update({r["id"]: r for r in incoming})
                 self.files.update({f["message_id"]: f for f in files})
+                for item in interactions:
+                    message_id = item["id"]
+                    if message_id in self.cache[channel_id]:
+                        self.cache[channel_id][message_id] = {
+                            **self.cache[channel_id][message_id],
+                            **item,
+                        }
+                        if item.get("unsent_at"):
+                            self.files.pop(message_id, None)
             if self.realtime and credentials:
                 self.realtime.configure(credentials)
             if (workspace_id, channel_id) != (w.workspace_id, w.channel_id):
@@ -363,7 +422,8 @@ class ConnectedDashboard(QObject):
             )
             # A cursor only advances through records actually fetched while this chat is visible.
             if (
-                w.isActiveWindow()
+                channel_id not in getattr(w.collaboration, "manual_unread", set())
+                and w.isActiveWindow()
                 and w.pages.currentIndex() == 0
                 and channel_id in allowed
                 and w.messages.verticalScrollBar().value()
@@ -424,7 +484,14 @@ class ConnectedDashboard(QObject):
         for identifier in server_ids:
             self.outbox.pop(identifier, None)
         rows = rows + [dict(r) for r in self.outbox.values() if r["channel_id"] == channel_id]
+        allowed_channels = {c["id"] for c in snapshot["channels"]}
+        self.reaction_edits = {
+            k: v for k, v in self.reaction_edits.items() if k[0] in allowed_channels
+        }
+        rows = self.reaction_overlay(rows, channel_id)
         self.account.snapshot = snapshot
+        if hasattr(w, "collaboration"):
+            w.collaboration.sync(snapshot)
         view = (snapshot, rows, workspace_id, channel_id, dict(self.files))
         if view == self.last_view:
             return
@@ -484,11 +551,11 @@ class ConnectedDashboard(QObject):
             else:
                 w.close_thread()
         w.composer.setEnabled(bool(w.channel_id))
-        w.notice_timer.stop()
-        w.notice.setText(
-            "Shared chat · ⌘⇧M direct message · ⌘⇧U attach file · "
-            "⌘⇧S save selected file · ⌘⇧H older messages"
-        )
+        if not w.notice_timer.isActive():
+            w.notice.setText(
+                "Shared chat · ⌘⇧M direct message · ⌘⇧U attach file · "
+                "⌘⇧S save selected file · ⌘⇧H older messages"
+            )
 
     def render_local_messages(self):
         w = self.window
@@ -501,6 +568,7 @@ class ConnectedDashboard(QObject):
             for r in self.outbox.values()
             if r["channel_id"] == w.channel_id and r["id"] not in ids
         ]
+        rows = self.reaction_overlay(rows, w.channel_id)
         names = {
             r["user_id"]: r["display_name"]
             for r in self.account.snapshot.get("directory", [])
@@ -573,6 +641,110 @@ class ConnectedDashboard(QObject):
         self.render_local_messages()
         (w.thread_messages if parent_id else w.messages).scrollToBottom()
 
+    def reaction_overlay(self, rows, channel):
+        edits = [(key, value) for key, value in self.reaction_edits.items() if key[0] == channel]
+        result = []
+        for row in rows:
+            for (_, message_id, emoji), edit in edits:
+                if row["id"] == message_id:
+                    row = with_reaction(row, emoji, edit["present"])
+            result.append(row)
+        return result
+
+    def submit_reaction(self, key):
+        if key in self.reaction_jobs or key not in self.reaction_edits:
+            return
+        channel, message_id, emoji = key
+        service = self.account.service
+        user = str(service.user.id)
+        self.reaction_jobs.add(key)
+
+        def operation():
+            edit = dict(self.reaction_edits.get(key, {}))
+            if not edit:
+                return {"cancelled": True}
+            try:
+                service.rpc(
+                    "set_message_reaction",
+                    {"p_message": message_id, "p_emoji": emoji, "p_present": edit["present"]},
+                )
+                items = (
+                    service.message_interactions([message_id])
+                    if hasattr(service, "message_interactions")
+                    else []
+                )
+                return {"edit": edit, "items": items}
+            except Exception:
+                return {"edit": edit, "error": True}
+
+        def done(result):
+            if (
+                not self.active
+                or self.account.service is not service
+                or str(service.user.id) != user
+            ):
+                return
+            self.reaction_jobs.discard(key)
+            current = self.reaction_edits.get(key)
+            row = self.cache.get(channel, {}).get(message_id)
+            if not current or not row or result.get("cancelled"):
+                self.reaction_edits.pop(key, None)
+                return
+            acknowledged = result["edit"]
+            if not result.get("error"):
+                item = next((r for r in result["items"] if r["id"] == message_id), None)
+                self.cache[channel][message_id] = (
+                    {**row, **item} if item else with_reaction(row, emoji, acknowledged["present"])
+                )
+            if current["version"] != acknowledged["version"]:
+                self.submit_reaction(key)
+            else:
+                self.reaction_edits.pop(key, None)
+                if result.get("error"):
+                    self.window.notify(
+                        "Reaction could not be confirmed. Check connection or access."
+                    )
+            self.last_view = None
+            if self.window.channel_id == channel:
+                self.render_local_messages()
+
+        if not self.enqueue(("reaction", *key), operation, done, priority=True):
+            self.reaction_jobs.discard(key)
+            self.reaction_edits.pop(key, None)
+            self.render_local_messages()
+            self.window.notify("Reaction not saved. Wait for pending actions, then try again.")
+
+    def interact(self, message_id, emoji=None, present=True):
+        channel = self.window.channel_id
+        service = self.account.service
+        row = self.cache.get(channel, {}).get(message_id)
+        if not row or row.get("unsent_at") or message_id in self.outbox:
+            self.window.notify("Wait for this message to finish sending.")
+            return
+        if emoji is None and row["sender_id"] != str(service.user.id):
+            self.window.notify("Only the sender can unsend a message.")
+            return
+        if emoji is not None:
+            key = (channel, message_id, emoji)
+            previous = self.reaction_edits.get(key, {})
+            self.reaction_edits[key] = {
+                "present": bool(present),
+                "version": previous.get("version", 0) + 1,
+            }
+            self.render_local_messages()
+            self.submit_reaction(key)
+            return
+        name = "unsend_message" if emoji is None else "set_message_reaction"
+        params = {"p_message": message_id}
+        if emoji is not None:
+            params.update(p_emoji=emoji, p_present=present)
+
+        def done(_):
+            self.last_view = None
+            self.window.notify("Message unsent." if emoji is None else "Reaction updated.")
+
+        self.enqueue((name, message_id, emoji, present), lambda: service.rpc(name, params), done)
+
     def start_dm(self):
         if not self.active:
             return
@@ -608,15 +780,18 @@ class ConnectedDashboard(QObject):
 
         self.enqueue(("directory", workspace), service.snapshot, choose)
 
-    def upload(self):
+    def upload(self, path=None, *, parent=None):
         if not self.active or not self.window.channel_id:
             return
-        path, _ = QFileDialog.getOpenFileName(self.window, "Attach a file · up to 10 MB")
+        if not path or isinstance(path, bool):
+            parent = parent or (
+                self.window.thread_id if self.window.thread_composer.editor.hasFocus() else None
+            )
+            path, _ = QFileDialog.getOpenFileName(self.window, "Attach a file · up to 10 MB")
         if not path:
             return
         # Capture context before the dialog/worker runs; changing channels never redirects uploads.
         channel = self.window.channel_id
-        parent = self.window.thread_id if self.window.thread_composer.editor.hasFocus() else None
         service = self.account.service
         key = ("upload", channel, parent, str(Path(path).resolve()))
         identifier = self.pending.setdefault(key, str(uuid4()))

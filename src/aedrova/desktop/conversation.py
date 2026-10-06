@@ -2,13 +2,16 @@
 
 import re
 from collections import OrderedDict
+from html import escape
 from math import ceil
+from urllib.parse import urlsplit
 
 from PySide6.QtCore import (
     QAbstractListModel,
     QEvent,
     QPersistentModelIndex,
     QPoint,
+    QPointF,
     QRectF,
     QSize,
     Qt,
@@ -22,7 +25,9 @@ from PySide6.QtGui import (
     QFontMetrics,
     QKeySequence,
     QPainter,
+    QPainterPath,
     QPalette,
+    QTextBlockFormat,
     QTextCursor,
     QTextDocument,
 )
@@ -41,6 +46,7 @@ from PySide6.QtWidgets import (
 )
 
 from aedrova.desktop.controls import AppMenu
+from aedrova.desktop.emojis import QUICK_EMOJI, pick_emoji
 from aedrova.desktop.materials import SpringButton, system_font
 from aedrova.desktop.theme import LIGHT, Theme
 
@@ -101,6 +107,29 @@ class ConversationModel(QAbstractListModel):
                 break
 
 
+def reaction_chips(message, width, top):
+    x, y = 74, top
+    result = []
+    for reaction in message.reactions:
+        text = f"{reaction['emoji']} {reaction['count']}"
+        size = max(52, QFontMetrics(font(12)).horizontalAdvance(text) + 22)
+        if x + size > width - 20 and x > 74:
+            x, y = 74, y + 34
+        result.append((QRectF(x, y, size, 28), reaction, text))
+        x += size + 6
+    return result
+
+
+def message_urls(body):
+    return list(dict.fromkeys(re.findall(r"https?://[^\s<>\)]+", body)))[:3]
+
+
+class SafeDocument(QTextDocument):
+    def loadResource(self, resource_type, url):
+        # Markdown must never fetch external images or read local files.
+        return None
+
+
 class MessageDelegate(QStyledItemDelegate):
     def __init__(self, view):
         super().__init__(view)
@@ -110,12 +139,58 @@ class MessageDelegate(QStyledItemDelegate):
 
     def document(self, message, width):
         width = max(80, width)
-        key = (message.id, message.body, width)
+        key = (message.id, message.body, width, self.theme.name)
         if key not in self.documents:
-            document = QTextDocument()
+            document = SafeDocument()
             document.setDefaultFont(font(14))
+            document.setDefaultStyleSheet(
+                "a { color: " + self.theme.accent + "; } pre { white-space: pre-wrap; }"
+            )
             document.setDocumentMargin(0)
-            document.setPlainText(message.body)
+            text = re.sub(r"<@([a-f0-9-]{36})\|([^>\n]{1,80})>", lambda m: "@" + m[2], message.body)
+            document.setMarkdown(escape(text, quote=False))
+            previews = ""
+            for url in message_urls(message.body):
+                parsed = urlsplit(url)
+                if parsed.hostname:
+                    title = parsed.hostname + (parsed.path[:70] if parsed.path != "/" else "")
+                    previews += (
+                        '<p style="margin-top:12px;">↗ <a href="'
+                        + escape(url, quote=True)
+                        + '">'
+                        + escape(title)
+                        + "</a><br><small>Link preview</small></p>"
+                    )
+            if previews:
+                preview_cursor = QTextCursor(document)
+                preview_cursor.movePosition(QTextCursor.MoveOperation.End)
+                preview_cursor.insertHtml(previews)
+            block = document.begin()
+            anchor_ranges = []
+            while block.isValid():
+                cursor = QTextCursor(block)
+                block_format = block.blockFormat()
+                block_format.setLineHeight(
+                    135, QTextBlockFormat.LineHeightTypes.ProportionalHeight.value
+                )
+                block_format.setTopMargin(3)
+                block_format.setBottomMargin(4)
+                block_format.setNonBreakableLines(False)
+                cursor.setBlockFormat(block_format)
+                fragments = block.begin()
+                while not fragments.atEnd():
+                    fragment = fragments.fragment()
+                    if fragment.isValid() and fragment.charFormat().isAnchor():
+                        anchor_ranges.append((fragment.position(), fragment.length()))
+                    fragments += 1
+                block = block.next()
+            for start, length in anchor_ranges:
+                cursor = QTextCursor(document)
+                cursor.setPosition(start)
+                cursor.setPosition(start + length, QTextCursor.MoveMode.KeepAnchor)
+                style = cursor.charFormat()
+                style.setForeground(QColor(self.theme.accent))
+                cursor.mergeCharFormat(style)
             document.setTextWidth(width)
             self.documents[key] = document
             if len(self.documents) > 512:
@@ -133,7 +208,11 @@ class MessageDelegate(QStyledItemDelegate):
             26 if message.replies and self.view.allow_threads else 0
         )
         header = QFontMetrics(font(14, True)).height() + 6
-        return QSize(width, 18 + header + ceil(document.size().height()) + extra + 22)
+        chips = reaction_chips(message, width, 0)
+        reaction_height = int(chips[-1][0].bottom()) + 8 if chips else 0
+        return QSize(
+            width, 18 + header + ceil(document.size().height()) + extra + 22 + reaction_height
+        )
 
     def paint(self, painter: QPainter, option, index):
         message = index.data(MESSAGE_ROLE)
@@ -158,11 +237,26 @@ class MessageDelegate(QStyledItemDelegate):
         painter.setPen(QColor(t.text))
         painter.setFont(font(11, True))
         painter.drawText(QRectF(x, y, 34, 34), Qt.AlignmentFlag.AlignCenter, message.initials)
+        photo = getattr(self.view, "avatar_images", {}).get(
+            getattr(self.view, "avatar_paths", {}).get(message.sender_id)
+        )
+        if photo is not None and not photo.isNull():
+            painter.save()
+            clip = QPainterPath()
+            clip.addRoundedRect(QRectF(x, y, 34, 34), 12, 12)
+            painter.setClipPath(clip)
+            painter.drawPixmap(int(x), int(y), 34, 34, photo)
+            painter.restore()
         x += 46
         header_height = QFontMetrics(font(14, True)).height() + 6
         available = max(0, rect.width() - 94)
         badge_width = 76 if message.decision else 0
-        timestamp = message.delivery or message.time
+        timestamp = message.delivery or (
+            message.time
+            + (" · edited" if message.edited else "")
+            + (" · pinned" if message.pinned else "")
+            + (" · saved" if message.saved else "")
+        )
         time_metrics = QFontMetrics(font(11))
         time_width = min(
             time_metrics.horizontalAdvance(timestamp) + 2,
@@ -236,11 +330,26 @@ class MessageDelegate(QStyledItemDelegate):
                 QRectF(x, bottom + 7, rect.width() - 94, 20),
                 f"{count} {'reply' if count == 1 else 'replies'}  →  Open thread",
             )
+        if message.reactions:
+            chip_top = bottom + (30 if message.replies and self.view.allow_threads else 8)
+            for box, reaction, text in reaction_chips(message, rect.width(), chip_top):
+                box.translate(rect.x(), 0)
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QColor(t.accent_bg if reaction.get("mine") else t.surface))
+                painter.drawRoundedRect(box, 12, 12)
+                painter.setPen(QColor(t.accent_text if reaction.get("mine") else t.secondary))
+                painter.setFont(font(12))
+                painter.drawText(box, Qt.AlignmentFlag.AlignCenter, text)
         painter.restore()
 
 
 class MessageView(QListView):
     thread_requested = Signal(str)
+    reaction_requested = Signal(str, str, bool)
+    unsend_requested = Signal(str)
+    action_requested = Signal(str, str)
+    files_dropped = Signal(list)
+    link_requested = Signal(str)
 
     def __init__(self, parent=None, *, allow_threads=True):
         super().__init__(parent)
@@ -262,6 +371,8 @@ class MessageView(QListView):
             "Use arrow keys to select a message and Return to open its thread."
         )
         self.setMouseTracking(True)
+        self.setAcceptDrops(True)
+        self.setDragDropMode(QListView.DragDropMode.DropOnly)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollMode(QListView.ScrollMode.ScrollPerPixel)
         self.setResizeMode(QListView.ResizeMode.Adjust)
@@ -271,9 +382,115 @@ class MessageView(QListView):
         self.setModel(self.conversation_model)
         self.delegate = MessageDelegate(self)
         self.setItemDelegate(self.delegate)
-        self.clicked.connect(self._request_thread)
+        self.clicked.connect(self._clicked_message)
+        self.reaction_bar = QFrame(self.viewport())
+        self.reaction_bar.setObjectName("ReactionBar")
+        bar = QHBoxLayout(self.reaction_bar)
+        bar.setContentsMargins(6, 4, 6, 4)
+        bar.setSpacing(2)
+        self.hover_message = None
+        for emoji in QUICK_EMOJI:
+            control = SpringButton(emoji)
+            control.setFixedSize(32, 30)
+            control.setAccessibleName("React " + emoji)
+            control.clicked.connect(
+                lambda checked=False, e=emoji: self.react(self.hover_message, e)
+            )
+            bar.addWidget(control)
+        more = SpringButton("+")
+        more.setFixedSize(32, 30)
+        more.setAccessibleName("React with any emoji")
+        more.setToolTip("Choose any emoji")
+        more.clicked.connect(self.pick_reaction)
+        bar.addWidget(more)
+        self.reaction_bar.hide()
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._context_menu)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls() and all(u.isLocalFile() for u in event.mimeData().urls()):
+            event.acceptProposedAction()
+
+    def dragMoveEvent(self, event):
+        self.dragEnterEvent(event)
+
+    def dropEvent(self, event):
+        if event.mimeData().hasUrls():
+            paths = [u.toLocalFile() for u in event.mimeData().urls() if u.isLocalFile()]
+            if paths:
+                self.files_dropped.emit(paths)
+                event.acceptProposedAction()
+
+    def mouseReleaseEvent(self, event):  # noqa: N802
+        self._click_position = event.position().toPoint()
+        super().mouseReleaseEvent(event)
+
+    def _clicked_message(self, index):
+        if not index.isValid():
+            return
+        message = index.data(MESSAGE_ROLE)
+        rect = self.visualRect(index)
+        document = self.delegate.document(message, rect.width() - 94)
+        top = rect.top() + 18 + QFontMetrics(font(14, True)).height() + 6
+        top += document.size().height() + (58 if message.attachment else 0)
+        top += 30 if message.replies and self.allow_threads else 8
+        point = getattr(self, "_click_position", QPoint(-1, -1))
+        for box, reaction, _ in reaction_chips(message, rect.width(), top):
+            if box.contains(point):
+                self.react(message.id, reaction["emoji"])
+                return
+        body_top = rect.top() + 18 + QFontMetrics(font(14, True)).height() + 6
+        link = document.documentLayout().anchorAt(QPointF(point.x() - 74, point.y() - body_top))
+        if link and urlsplit(link).scheme in ("https", "http"):
+            self.link_requested.emit(link)
+            return
+        if (
+            message.attachment_id
+            and body_top + document.size().height()
+            <= point.y()
+            <= body_top + document.size().height() + 58
+        ):
+            self.action_requested.emit("attachment", message.id)
+            return
+        self._request_thread(index)
+
+    def react(self, identifier, emoji):
+        message = next((m for m in self.model().messages if m.id == identifier), None)
+        if not message or message.unsent or message.delivery or identifier == self.agent_message_id:
+            return
+        mine = next((r.get("mine", False) for r in message.reactions if r["emoji"] == emoji), False)
+        self.reaction_requested.emit(identifier, emoji, not mine)
+
+    def pick_reaction(self):
+        identifier = self.hover_message
+        self.reaction_bar.hide()
+        emoji = pick_emoji(self)
+        if emoji:
+            self.react(identifier, emoji)
+
+    def mouseMoveEvent(self, event):  # noqa: N802
+        super().mouseMoveEvent(event)
+        index = self.indexAt(event.position().toPoint())
+        if not index.isValid():
+            self.reaction_bar.hide()
+            return
+        message = index.data(MESSAGE_ROLE)
+        if message.unsent or message.delivery or message.id == self.agent_message_id:
+            self.reaction_bar.hide()
+            return
+        self.hover_message = message.id
+        self.reaction_bar.adjustSize()
+        self.reaction_bar.move(
+            max(0, self.viewport().width() - self.reaction_bar.width() - 16),
+            max(0, self.visualRect(index).top() + 4),
+        )
+        self.reaction_bar.show()
+        self.reaction_bar.raise_()
+
+    def leaveEvent(self, event):  # noqa: N802
+        if not self.reaction_bar.underMouse():
+            self.reaction_bar.hide()
+        super().leaveEvent(event)
 
     def _request_thread(self, index):
         if (
@@ -305,8 +522,49 @@ class MessageView(QListView):
         menu = AppMenu(self)
         if self.allow_threads and index.data(MESSAGE_ROLE).id != self.agent_message_id:
             menu.addAction("Reply in thread", lambda: self._request_thread(index))
+        message = index.data(MESSAGE_ROLE)
+        if not message.unsent and not message.delivery and message.id != self.agent_message_id:
+            reactions = AppMenu(menu)
+            reactions.setTitle("React")
+            for emoji in QUICK_EMOJI:
+                reactions.addAction(emoji, lambda checked=False, e=emoji: self.react(message.id, e))
+            reactions.addAction("+ Any emoji…", lambda: self._choose_for(message.id))
+            menu.addMenu(reactions)
+            if message_urls(message.body):
+                menu.addAction(
+                    "Preview link…", lambda: self.link_requested.emit(message_urls(message.body)[0])
+                )
+            menu.addSeparator()
+            for action, title in [
+                ("quote", "Quote message"),
+                ("saved", "Remove from saved" if message.saved else "Save for later"),
+                ("pinned", "Unpin message" if message.pinned else "Pin message"),
+                ("forward", "Forward / share…"),
+                ("link", "Copy link to message"),
+                ("unread", "Mark unread"),
+                ("profile", "View profile"),
+            ]:
+                menu.addAction(
+                    title, lambda checked=False, a=action: self.action_requested.emit(a, message.id)
+                )
+            if message.attachment_id:
+                menu.addAction(
+                    "Open attachment…", lambda: self.action_requested.emit("attachment", message.id)
+                )
+            if message.mine:
+                menu.addAction(
+                    "Edit message…", lambda: self.action_requested.emit("edit", message.id)
+                )
+                menu.addAction(
+                    "Delete / unsend message", lambda: self.unsend_requested.emit(message.id)
+                )
         menu.addAction("Copy message", self.copy_current)
         menu.exec(self.viewport().mapToGlobal(position))
+
+    def _choose_for(self, identifier):
+        emoji = pick_emoji(self)
+        if emoji:
+            self.react(identifier, emoji)
 
     def scrollTo(self, index, hint=QListView.ScrollHint.EnsureVisible):  # noqa: N802
         # Batched layout may not have reached this row yet. Retry when its range grows.
@@ -370,6 +628,7 @@ class MessageView(QListView):
     def show_messages(self, messages, *, force=False):
         from aedrova.desktop.state import Message
 
+        self.reaction_bar.hide()
         self.source_messages = list(messages)
         rows = list(messages)
         if self.agent_visible and self.agent_message_id and self.agent_feed.toPlainText():
@@ -432,6 +691,24 @@ class MessageView(QListView):
 
 
 class MessageEditor(QPlainTextEdit):
+    files_dropped = Signal(list)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls() and all(u.isLocalFile() for u in event.mimeData().urls()):
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event):
+        self.dragEnterEvent(event)
+
+    def dropEvent(self, event):
+        if event.mimeData().hasUrls() and all(u.isLocalFile() for u in event.mimeData().urls()):
+            self.files_dropped.emit([u.toLocalFile() for u in event.mimeData().urls()])
+            event.acceptProposedAction()
+        else:
+            super().dropEvent(event)
+
     submitted = Signal()
     focus_changed = Signal(bool)
     completion = None
@@ -482,6 +759,9 @@ class Composer(QFrame):
         self.setObjectName("Composer")
         self.thread = thread
         self.agent_name = "Aedrova"
+        self.people = []
+        self.mention_tokens = {}
+        self.mention_choice = None
         layout = QVBoxLayout(self)
         layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
         layout.setContentsMargins(12, 8, 12, 10)
@@ -511,6 +791,13 @@ class Composer(QFrame):
         self.mention.setToolTip("Insert @Aedrova · ask your agent to build")
         self.mention.clicked.connect(self.insert_mention)
         bottom.addWidget(self.mention)
+        self.emoji = SpringButton("☺")
+        self.emoji.setProperty("role", "icon")
+        self.emoji.setFixedSize(30, 29)
+        self.emoji.setAccessibleName("Insert emoji")
+        self.emoji.setToolTip("Choose an emoji")
+        self.emoji.clicked.connect(self.insert_emoji)
+        bottom.addWidget(self.emoji)
         self.hint = QLabel("Shift ↵ for a new line")
         self.hint.setProperty("role", "muted")
         bottom.addWidget(self.hint)
@@ -525,6 +812,12 @@ class Composer(QFrame):
         self.editor.textChanged.connect(self._changed)
         bottom.addWidget(self.send)
         layout.addLayout(bottom)
+
+    def insert_emoji(self):
+        emoji = pick_emoji(self)
+        if emoji:
+            self.editor.textCursor().insertText(emoji)
+            self.editor.setFocus()
 
     def _focus_changed(self, focused):
         self.setProperty("focused", focused)
@@ -559,12 +852,39 @@ class Composer(QFrame):
             .decode("utf-16-le")
         )
         match = re.search(r"(?<!\S)@([^@\n]*)$", prefix)
-        if match and self.agent_name.casefold().startswith(match[1].casefold()):
+        self.mention_choice = None
+        if match:
+            choices = (
+                [
+                    (self.agent_name, "@" + self.agent_name),
+                    ("channel", "@channel"),
+                    ("everyone", "@everyone"),
+                ]
+                + [
+                    (p["display_name"], "<@" + p["user_id"] + "|" + p["display_name"] + ">")
+                    for p in self.people
+                ]
+                + [
+                    (p["username"], "<@" + p["user_id"] + "|" + p["username"] + ">")
+                    for p in self.people
+                    if p.get("username")
+                ]
+            )
+            hits = [
+                (name, token)
+                for name, token in choices
+                if name.casefold().startswith(match[1].casefold())
+            ]
+            if hits:
+                self.mention_choice = hits[0]
+        if match and self.mention_choice:
             return len(prefix[: match.start()].encode("utf-16-le")) // 2
         return None
 
     def update_suggestion(self):
         self.suggestion.setVisible(self.mention_start() is not None)
+        if self.mention_choice:
+            self.suggestion.setText("@" + self.mention_choice[0] + "    ·    Tab or ↵")
 
     def completion_key(self, event):
         if self.suggestion.isHidden():
@@ -587,7 +907,10 @@ class Composer(QFrame):
             return
         cursor = self.editor.textCursor()
         cursor.setPosition(start, QTextCursor.MoveMode.KeepAnchor)
-        cursor.insertText("@" + self.agent_name + " ")
+        name, token = self.mention_choice
+        if token.startswith("<@"):
+            self.mention_tokens[name] = token
+        cursor.insertText("@" + name + " ")
         self.editor.setTextCursor(cursor)
         self.editor.setFocus()
         self.suggestion.hide()
@@ -613,6 +936,10 @@ class Composer(QFrame):
     def _submit(self):
         text = self.editor.toPlainText().strip()
         if text and len(text) <= 10_000:
+            for name, token in self.mention_tokens.items():
+                text = re.sub(
+                    r"(?<!\S)@" + re.escape(name) + r"(?=$|[\s.,!?])", lambda _, t=token: t, text
+                )
             self.submitted.emit(text)
 
     def clear(self):

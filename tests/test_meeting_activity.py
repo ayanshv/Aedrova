@@ -6,19 +6,28 @@ from aedrova.desktop.meeting_activity import MeetingAction, ParticipantAvatar, u
 
 
 def active(window, *, private=False, channel="c", workspace="w"):
-    return {"id": "meeting", "channel_id": channel, "workspace_id": workspace,
-            "title": "Team meeting", "private": private,
-            "participants": [{"user_id": "u", "display_name": "Alex"},
-                             {"user_id": "peer", "display_name": "Robin"}]}
+    return {
+        "id": "meeting",
+        "channel_id": channel,
+        "workspace_id": workspace,
+        "title": "Team meeting",
+        "private": private,
+        "participants": [
+            {"user_id": "u", "display_name": "Alex"},
+            {"user_id": "peer", "display_name": "Robin"},
+        ],
+    }
 
 
 def test_start_join_roster_and_ended_state(qtbot, tmp_path):
     window, _ = setup(qtbot, tmp_path)
-    window._render_pages()
+    window.open_meeting_hub()
     action = window.meeting_action_layout.itemAt(0).widget()
     assert action.action.text() == "Start meeting"
     window.account_dialog.snapshot["meeting_activity"] = {
-        "meetings": [active(window)], "preferences": []}
+        "meetings": [active(window)],
+        "preferences": [],
+    }
     update_meeting_ui(window)
     action = window.meeting_action_layout.itemAt(0).widget()
     assert action.action.text() == "Join meeting"
@@ -64,8 +73,9 @@ def test_card_click_is_explicit_and_avatars_are_accessible(qtbot):
     from aedrova.desktop.theme import LIGHT
 
     calls = []
-    card = MeetingAction(LIGHT, {"participants": [{"display_name": "A teammate"}]},
-                         lambda: calls.append(True))
+    card = MeetingAction(
+        LIGHT, {"participants": [{"display_name": "A teammate"}]}, lambda: calls.append(True)
+    )
     qtbot.addWidget(card)
     assert not calls
     assert card.findChildren(ParticipantAvatar)[0].accessibleName().endswith("A teammate")

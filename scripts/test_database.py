@@ -70,7 +70,13 @@ try {
    'supabase/migrations/202610030003_storage_retention.sql',
    'supabase/tests/storage_retention.sql',
    'supabase/migrations/202610030004_meeting_activity.sql',
-   'supabase/tests/meeting_activity.sql']) {
+   'supabase/tests/meeting_activity.sql',
+   'supabase/migrations/202610040001_message_interactions.sql',
+   'supabase/tests/message_interactions.sql',
+   'supabase/migrations/202610040002_chat_collaboration.sql',
+   'supabase/tests/chat_collaboration.sql',
+   'supabase/migrations/202610050001_user_profiles.sql',
+   'supabase/tests/user_profiles.sql']) {
   await db.exec(fs.readFileSync(file,'utf8'));
   console.log('PASS '+file);
  }

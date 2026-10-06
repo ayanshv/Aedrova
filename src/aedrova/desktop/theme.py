@@ -80,8 +80,12 @@ def palette(theme: Theme):
         (QPalette.ColorRole.ToolTipText, theme.text),
     ):
         result.setColor(role, QColor(color))
-    for role in (QPalette.ColorRole.Text, QPalette.ColorRole.WindowText,
-                 QPalette.ColorRole.ButtonText, QPalette.ColorRole.PlaceholderText):
+    for role in (
+        QPalette.ColorRole.Text,
+        QPalette.ColorRole.WindowText,
+        QPalette.ColorRole.ButtonText,
+        QPalette.ColorRole.PlaceholderText,
+    ):
         result.setColor(QPalette.ColorGroup.Disabled, role, QColor(theme.muted))
     return result
 
@@ -96,15 +100,18 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     return f"""
     QWidget {{ color: {t.text}; font-size: 14px; }}
     QMainWindow, QDialog, QStackedWidget#AccountPages, QWidget#AccountPage {{ background: {t.bg}; }}
-    QComboBox {{ background: {t.surface}; border: 1px solid {t.border};
+    QComboBox {{ background: {t.bg}; border: 1px solid transparent;
         border-radius: 12px; padding: 10px; min-width: 75px; }}
     QComboBox::drop-down {{ border: none; width: 30px; background: transparent; }}
     QComboBox:focus {{ border-color: {t.accent}; }}
     QComboBox::down-arrow {{ image: none; border: none; width: 0px; height: 0px; }}
-    QComboBox QAbstractItemView {{ background: {t.surface}; color: {t.text};
-        border: 1px solid {t.border}; border-radius: 12px; padding: 6px;
+    QComboBox QAbstractItemView {{ background: {t.bg}; color: {t.text};
+        border: none; border-radius: 12px; padding: 6px;
         selection-background-color: {t.accent_bg}; selection-color: {t.accent_text};
         outline: none; }}
+    QFrame#ChoicePopup {{ background: {t.bg}; border: none;
+        border-radius: 16px; padding: 0; }}
+    QListView#ChoiceList, QListView#ChoiceList:focus {{ border: none; outline: none; }}
     QComboBox QAbstractItemView::item {{ min-height: 30px; padding: 5px 12px;
         border-radius: 8px; }}
     QCheckBox {{ spacing: 9px; padding: 4px 0; }}
@@ -132,10 +139,17 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QLabel[role='heading'] {{ font-size: 32px; font-weight: 600; }}
     QLabel[role='badge'] {{ color: {t.secondary}; background: {capsule};
         border-radius: 11px; padding: 5px 10px; font-size: 10px; font-weight: 500; }}
-    QLabel[role='error'] {{ color: {'#B4232F' if white else '#FF8A92'}; font-size: 12px; }}
+    QLabel[role='error'] {{ color: {"#B4232F" if white else "#FF8A92"}; font-size: 12px; }}
     QFrame#Composer {{ background: {capsule}; border: 1px solid {t.border}; border-radius: 22px; }}
     QFrame#Composer[focused='true'] {{ border: 1px solid {t.accent}; }}
     QFrame#Quiet {{ background: transparent; border-top: 1px solid {t.border}; }}
+    QFrame#AudioCallStage {{ background: {t.surface}; border: 1px solid {t.border};
+        border-radius: 24px; }}
+    QFrame#AudioParticipant {{ background: {t.bg}; border: 1px solid {t.border};
+        border-radius: 20px; }}
+    QFrame#AudioParticipant[speaking="true"] {{ border: 1px solid {t.accent}; }}
+    QFrame#CallBar {{ background: {t.surface}; border: 1px solid {t.border};
+        border-radius: 18px; }}
     QWidget#Segments {{ background: {t.surface}; border: 1px solid {t.border};
         border-radius: 17px; }}
     QPushButton {{ background: transparent; border: 1px solid transparent;
@@ -148,8 +162,8 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QPushButton:disabled {{ color: {t.muted}; }}
     QPushButton[role='primary'] {{ background: {t.accent}; color: {t.primary_text};
         padding: 9px 18px; border-radius: 16px; font-weight: 600; text-align: center; }}
-    QPushButton[role='primary']:hover {{ background: {'#0058B0' if white else '#389CFF'}; }}
-    QPushButton[role='primary']:pressed {{ background: {'#004C99' if white else '#0071E3'}; }}
+    QPushButton[role='primary']:hover {{ background: {"#0058B0" if white else "#389CFF"}; }}
+    QPushButton[role='primary']:pressed {{ background: {"#004C99" if white else "#0071E3"}; }}
     QPushButton[role='primary']:disabled {{ background: {t.hover}; color: {t.muted}; }}
     QPushButton[role='outline'] {{ border: 1px solid {t.border}; background: {capsule}; }}
     QPushButton[role='icon'] {{ padding: 0px; text-align: center; }}
@@ -178,6 +192,9 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QPlainTextEdit#BuildRequest {{ border: 1px solid {t.border};
         background: {t.surface}; border-radius: 14px; padding: 12px; }}
     QPlainTextEdit#BuildRequest:focus {{ border-color: {t.accent}; }}
+    QPlainTextEdit#ProfileBio {{ background: {t.surface}; border: 1px solid {t.border};
+        border-radius: 14px; padding: 12px; color: {t.text}; }}
+    QPlainTextEdit#ProfileBio:focus {{ border-color: {t.accent}; }}
     QLineEdit {{ background: {t.surface}; border: 1px solid {t.border}; border-radius: 14px;
         padding: 12px; selection-background-color: {t.accent_bg}; }}
     QScrollArea {{ border: none; background: transparent; }}
@@ -189,7 +206,23 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QScrollBar::handle:horizontal {{ background: {t.border}; min-width: 32px; border-radius: 3px; }}
     QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0px; }}
     QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{ background: transparent; }}
-    QMenu {{ background: {t.bg}; border: 1px solid {t.border}; padding: 7px; border-radius: 12px; }}
+    QListWidget#ChatResults {{ background: {t.bg}; border: 1px solid {t.border};
+        border-radius: 18px; padding: 10px; outline: none; }}
+    QListWidget#ChatResults::item {{ padding: 14px 12px; border: none;
+        border-radius: 12px; color: {t.text}; }}
+    QListWidget#ChatResults::item:hover {{ background: {t.hover}; }}
+    QListWidget#ChatResults::item:selected {{ background: {t.accent_bg}; color: {t.text}; }}
+    QListWidget#EmojiGrid {{ background: {t.bg}; border: none; border-radius: 14px;
+        outline: none; font-size: 20px; }}
+    QListWidget#EmojiGrid::item {{ padding: 0; margin: 2px; border-radius: 8px; }}
+    QListWidget#EmojiGrid::item:hover {{ background: {t.hover}; }}
+    QListWidget#EmojiGrid::item:selected {{ background: {t.accent_bg}; }}
+    QFrame#ReactionBar {{ background: {t.bg}; border: 1px solid {t.border};
+        border-radius: 14px; }}
+    QFrame#ReactionBar QPushButton {{ border: none; border-radius: 9px;
+        background: transparent; padding: 0; }}
+    QFrame#ReactionBar QPushButton:hover {{ background: {t.hover}; }}
+    QMenu {{ background: {t.bg}; border: none; padding: 8px; border-radius: 16px; }}
     QMenu::item {{ padding: 10px 24px 10px 12px; border-radius: 8px; }}
     QMenu::separator {{ height: 1px; background: {t.border}; margin: 6px 8px; }}
     QMenu::item:disabled {{ color: {t.muted}; }}
@@ -197,7 +230,8 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QMenu::item:selected:enabled {{ color: {t.accent_text}; }}
     QToolButton:focus {{ border: 1px solid {t.accent}; border-radius: 12px; }}
     QToolButton:disabled, QComboBox:disabled {{ color: {t.muted}; }}
-    QComboBox:hover:enabled, QLineEdit:hover:enabled {{ border-color: {t.muted}; }}
+    QComboBox:hover:enabled {{ background: {t.hover}; border-color: transparent; }}
+    QLineEdit:hover:enabled {{ border-color: {t.muted}; }}
     QComboBox:focus, QLineEdit:focus {{ border-color: {t.accent}; }}
     QCheckBox:disabled {{ color: {t.muted}; }}
     QCheckBox::indicator:disabled {{ border-color: {t.border}; background: {t.hover}; }}
@@ -214,7 +248,7 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QToolButton#CallControl:hover, QToolButton#CallControl:checked {{ background: {t.hover}; }}
     QToolButton#CallControl:focus {{ border-color: {t.accent}; }}
     QToolButton#CallControl:disabled {{ color: {t.muted}; }}
-    QToolButton#CallControl[danger='true'] {{ color: {'#B4232F' if white else '#FF8A92'}; }}
+    QToolButton#CallControl[danger='true'] {{ color: {"#B4232F" if white else "#FF8A92"}; }}
     QScrollArea#AgentStream, QWidget#AgentStreamContent,
     QFrame#AgentMessage {{ background: transparent; border: none; }}
     QFrame#AgentTool {{ background: {t.surface}; border: 1px solid {t.border};

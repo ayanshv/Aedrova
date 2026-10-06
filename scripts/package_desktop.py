@@ -66,7 +66,9 @@ if not code_mode_host.is_file():
 subprocess.run(["codesign", "--verify", "--strict", str(code_mode_host)], check=True)
 host_signature = subprocess.run(
     ["codesign", "--display", "--verbose=4", str(code_mode_host)],
-    check=True, capture_output=True, text=True,
+    check=True,
+    capture_output=True,
+    text=True,
 ).stderr
 if "TeamIdentifier=2DC432GLL2" not in host_signature:
     raise ValueError("Use the official OpenAI-signed Codex execution helper.")
@@ -74,10 +76,15 @@ with code_mode_host.open("rb") as stream:
     host_hash = hashlib.file_digest(stream, "sha256").hexdigest()
 runtime_manifest = ROOT / "work/runtime-manifest.json"
 runtime_manifest.parent.mkdir(parents=True, exist_ok=True)
-runtime_manifest.write_text(json.dumps({
-    "codex_version": "0.155.1", "source_sha256": runtime_hash,
-    "code_mode_host_sha256": host_hash,
-}))
+runtime_manifest.write_text(
+    json.dumps(
+        {
+            "codex_version": "0.155.1",
+            "source_sha256": runtime_hash,
+            "code_mode_host_sha256": host_hash,
+        }
+    )
+)
 vendor_binary = ROOT / "work/vendor-codex/codex"
 vendor_binary.parent.mkdir(parents=True, exist_ok=True)
 shutil.copy2(codex_binary, vendor_binary)
@@ -96,10 +103,16 @@ asset_args.extend(
         f"{runtime_manifest}:aedrova/desktop/assets",
     ]
 )
-for asset in ("aedrova.png", "aedrova.icns", "google-g.png"):
+for asset in ("aedrova.png", "aedrova.icns", "google-g.png", "emoji.json"):
     asset_args.extend(
         ["--add-data", f"{ROOT / 'src/aedrova/desktop/assets' / asset}:aedrova/desktop/assets"]
     )
+asset_args.extend(
+    [
+        "--add-data",
+        f"{ROOT / 'src/aedrova/desktop/assets/onboarding'}:aedrova/desktop/assets/onboarding",
+    ]
+)
 connection = Connection.from_environment() or Connection.from_bundle()
 if connection:
     config_path = ROOT / "work" / "public-config.json"
@@ -164,22 +177,32 @@ bundle = ROOT / "dist/Aedrova.app"
 info_path = bundle / "Contents/Info.plist"
 with info_path.open("rb") as stream:
     info = plistlib.load(stream)
-info.update({
-    "CFBundleShortVersionString": (
-        tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]
-    ),
-    "CFBundleVersion": tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"],
-    "LSMinimumSystemVersion": "14.0",
-    "NSCameraUsageDescription": "Use your camera when you enable a meeting or local camera check.",
-    "NSMicrophoneUsageDescription": (
-        "Use your microphone when you enable a meeting or local microphone check."
-    ),
-})
+info.update(
+    {
+        "CFBundleShortVersionString": (
+            tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]
+        ),
+        "CFBundleVersion": tomllib.loads((ROOT / "pyproject.toml").read_text())["project"][
+            "version"
+        ],
+        "LSMinimumSystemVersion": "14.0",
+        "NSCameraUsageDescription": (
+            "Use your camera when you enable a meeting or local camera check."
+        ),
+        "CFBundleURLTypes": [
+            {"CFBundleURLName": "com.aedrova.chat", "CFBundleURLSchemes": ["aedrova"]}
+        ],
+        "NSMicrophoneUsageDescription": (
+            "Use your microphone when you enable a meeting or local microphone check."
+        ),
+    }
+)
 with info_path.open("wb") as stream:
     plistlib.dump(info, stream)
 resign = ["codesign", "--force", "--sign", identity or "-"]
 if identity:
-    resign.extend(["--options", "runtime", "--entitlements",
-                   str(ROOT / "scripts/release-entitlements.plist")])
+    resign.extend(
+        ["--options", "runtime", "--entitlements", str(ROOT / "scripts/release-entitlements.plist")]
+    )
 subprocess.run([*resign, str(bundle)], check=True)
 subprocess.run(["codesign", "--verify", "--strict", str(bundle)], check=True)

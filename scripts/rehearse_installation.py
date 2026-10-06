@@ -89,7 +89,7 @@ def main():
                 (REPORTS / f"{stage}.log").write_text(result.stdout + result.stderr)
                 smoke = json.loads(report.read_text())
                 assert smoke["packaged"] and smoke["screenshot_saved"]
-                assert smoke["theme"] == theme and smoke["tabs"] >= 5
+                assert smoke["theme"] == theme and smoke["tabs"] >= 4
                 assert smoke["messages"] > 0
                 preserved = QSettings(str(preferences), QSettings.Format.IniFormat)
                 assert preserved.value("appearance") == "light"
