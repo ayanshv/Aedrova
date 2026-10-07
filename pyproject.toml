@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "A Python-first workspace where teams and AI build together"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "keyring>=25,<26",
     "PySide6>=6.8,<7",
     "pydantic>=2.10,<3",
     "supabase>=2,<3",

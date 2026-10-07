@@ -121,7 +121,12 @@ def instructions(task, context_file, *, plan, approved_plan=""):
         "The first record provides retrieval leads and human-recorded decisions. "
         "Inspect cited sources and search the supplied evidence when leads are insufficient. "
         "Ask the team for missing evidence; never claim to have read omitted history. "
-        "Cite exact message:<id> or attachment:<id> references alongside each requirement. "
+        "Cite exact message:<id>, attachment:<id>, meeting:<id> or memory:<id> references "
+        "alongside each requirement. Product memory includes a pinned revision "
+        "and source citations. "
+        "Only fresh approved memory is current. Proposals, conflicts, "
+        "retired or superseded entries "
+        "and open questions are not approved requirements. Resolve conflicts with the team. "
         "Separate confirmed decisions from proposals; stale or retired decisions are not current. "
         "A member confirmation is not proof of unanimous agreement. Ask about conflicting or "
         "underspecified requirements rather than silently choosing the newest message. "
@@ -230,6 +235,7 @@ class LocalRunner:
         self.cancelled = threading.Event()
         self.process = None
         self.usage = {}
+        self.command_results = []
         self.lease_fd = None
         self.managed = None
 
@@ -245,7 +251,20 @@ class LocalRunner:
                 if process.poll() is None:
                     process.terminate()
 
+    def observe_command(self, command, output, exit_code):
+        from aedrova.delivery.evidence import MAX_COMMANDS, command_result, project_fingerprint
+
+        # Keep a visible coverage flag rather than unbounded provider logs.
+        if len(self.command_results) <= MAX_COMMANDS:
+            record = command_result(command, output, exit_code)
+            try:
+                record["project_fingerprint"] = project_fingerprint(self.evidence_project)
+            except (OSError, ValueError, AttributeError):
+                record["project_fingerprint"] = None
+            self.command_results.append(record)
+
     def run(self, provider, project, prompt, *, plan):
+        self.evidence_project = project
         if self.cancelled.is_set():
             raise BuildCancelled()
         if provider == "codex":
@@ -370,6 +389,11 @@ class LocalRunner:
                                     final = item.get("text", "")
                                     self.emit(final)
                                 elif item.get("type") == "command_execution":
+                                    self.observe_command(
+                                        item.get("command", ""),
+                                        item.get("aggregated_output", ""),
+                                        item.get("exit_code"),
+                                    )
                                     self.emit(
                                         f"$ {item.get('command', '')}\n"
                                         f"{item.get('aggregated_output', '')[-20000:]}\n"
@@ -452,6 +476,13 @@ class LocalRunner:
             nonlocal shell_deadline
             if event.get("tool_name") == "Bash":
                 shell_deadline = None
+                response = event.get("tool_response", {})
+                response = response if isinstance(response, dict) else {}
+                self.observe_command(
+                    event.get("tool_input", {}).get("command", ""),
+                    str(response.get("stdout", "")) + str(response.get("stderr", "")),
+                    response.get("exit_code", response.get("exitCode")),
+                )
             return {}
 
         async def deny_permission(event, _tool_id, _context):

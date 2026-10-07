@@ -190,6 +190,35 @@ class IdentityService:
             self.user = None
             raise
 
+    def ai_teammates(self, workspace=None):
+        self._authenticated()
+        try:
+            query = (
+                self.client.table("ai_teammates")
+                .select("*")
+                .order("updated_at", desc=True)
+                .limit(200)
+            )
+            if workspace:
+                query = query.eq("workspace_id", workspace)
+            return {"items": query.execute().data, "setup_required": False}
+        except Exception as error:
+            if getattr(error, "code", None) == "PGRST205":
+                return {"items": [], "setup_required": True}
+            raise
+
+    def save_ai_teammate(self, parameters):
+        self._authenticated()
+        return self.client.rpc("save_ai_teammate", parameters).execute().data
+
+    def remove_ai_teammate(self, identifier, version):
+        self._authenticated()
+        return (
+            self.client.rpc("remove_ai_teammate", {"p_id": identifier, "p_version": version})
+            .execute()
+            .data
+        )
+
     def snapshot(self):
         self._authenticated()
         workspaces = self.client.rpc("list_my_workspaces", {"p_archived": False}).execute().data
@@ -210,6 +239,7 @@ class IdentityService:
             .data
         )
         return {
+            "ai_teammates": self.ai_teammates()["items"],
             "user_profile": self.my_profile(),
             "directory": self.client.rpc("team_directory", {}).execute().data,
             "unread": self.client.rpc("unread_counts", {}).execute().data,
@@ -482,6 +512,125 @@ class IdentityService:
             .data
         )
         return [{**row, "body": row.get("review_body") or row["body"]} for row in rows]
+
+    def memory_context(self, workspace):
+        return self.memory_list(workspace, active=True)
+
+    def memory_list(self, workspace, query="", *, active=False):
+        self._authenticated()
+        try:
+            return (
+                self.client.rpc(
+                    "memory_list",
+                    {
+                        "p_workspace": workspace,
+                        "p_query": query[:1000],
+                        "p_limit": 200,
+                        "p_active": active,
+                    },
+                )
+                .execute()
+                .data
+            )
+        except Exception as error:
+            if getattr(error, "code", None) == "PGRST202":
+                return {"items": [], "total": 0, "setup_required": True}
+            raise
+
+    def memory_source(self, kind, identifier):
+        self._authenticated()
+        return (
+            self.client.rpc(
+                "memory_source",
+                {
+                    "p_kind": kind,
+                    "p_id": identifier,
+                },
+            )
+            .execute()
+            .data
+        )
+
+    def save_memory(self, parameters):
+        self._authenticated()
+        return self.client.rpc("save_product_memory", parameters).execute().data
+
+    def memory_history(self, identifier):
+        self._authenticated()
+        return (
+            self.client.table("product_memory_history")
+            .select("*")
+            .eq("memory_id", identifier)
+            .order("version", desc=True)
+            .limit(100)
+            .execute()
+            .data
+        )
+
+    def build_reviews(self, workspace):
+        self._authenticated()
+        try:
+            rows = (
+                self.client.table("build_reviews")
+                .select("*")
+                .eq("workspace_id", workspace)
+                .order("updated_at", desc=True)
+                .limit(50)
+                .execute()
+                .data
+            )
+            receipts = (
+                (
+                    self.client.table("build_delivery_receipts")
+                    .select("*")
+                    .in_("build_id", [r["id"] for r in rows])
+                    .order("created_at", desc=True)
+                    .limit(100)
+                    .execute()
+                    .data
+                )
+                if rows
+                else []
+            )
+            memory = {r["id"]: r for r in self.memory_context(workspace)["items"]}
+            for row in rows:
+                row["receipts"] = [r for r in receipts if r["build_id"] == row["id"]]
+                row["current"] = all(
+                    r["id"] in memory
+                    and memory[r["id"]]["version"] == r["version"]
+                    and memory[r["id"]]["state"] == "approved"
+                    and memory[r["id"]]["fresh"]
+                    for r in row["evidence"]["requirements"]
+                )
+            return {"items": rows, "setup_required": False}
+        except Exception as error:
+            if getattr(error, "code", None) == "PGRST205":
+                return {"items": [], "setup_required": True}
+            raise
+
+    def save_build_review(self, parameters):
+        self._authenticated()
+        return self.client.rpc("save_build_review", parameters).execute().data
+
+    def build_review_decisions(self, identifier):
+        self._authenticated()
+        return (
+            self.client.table("build_review_decisions")
+            .select("*")
+            .eq("build_id", identifier)
+            .order("created_at", desc=True)
+            .limit(100)
+            .execute()
+            .data
+        )
+
+    def decide_build_review(self, parameters):
+        self._authenticated()
+        return self.client.rpc("decide_build_review", parameters).execute().data
+
+    def record_build_delivery(self, parameters):
+        self._authenticated()
+        return self.client.rpc("record_build_delivery", parameters).execute().data
 
     def context_revision(self, channel):
         self._authenticated()

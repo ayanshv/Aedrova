@@ -122,4 +122,11 @@ revoke all on function public.append_meeting_text(uuid,uuid,bigint,uuid[],text,i
 grant execute on function public.append_meeting_text(uuid,uuid,bigint,uuid[],text,integer),
  public.withdraw_meeting_text(uuid,boolean),public.meeting_text_context(uuid,integer)
  to authenticated;
+-- Support installing optional meeting context after Product Memory.
+do $$ begin
+ if to_regprocedure('aedrova_private.purge_source_memory()') is not null then
+ execute 'create trigger memory_meeting_withdrawal after delete or update of ai_allowed
+ on public.meeting_transcript_segments for each row execute function aedrova_private.purge_source_memory()';
+ end if;
+end $$;
 commit;

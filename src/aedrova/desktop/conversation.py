@@ -759,6 +759,7 @@ class Composer(QFrame):
         self.setObjectName("Composer")
         self.thread = thread
         self.agent_name = "Aedrova"
+        self.ai_teammates = []
         self.people = []
         self.mention_tokens = {}
         self.mention_choice = None
@@ -861,6 +862,11 @@ class Composer(QFrame):
                     ("everyone", "@everyone"),
                 ]
                 + [
+                    (r["config"]["name"], "<@ai:" + r["id"] + "|" + r["config"]["name"] + ">")
+                    for r in self.ai_teammates
+                    if not r["paused"]
+                ]
+                + [
                     (p["display_name"], "<@" + p["user_id"] + "|" + p["display_name"] + ">")
                     for p in self.people
                 ]
@@ -884,7 +890,8 @@ class Composer(QFrame):
     def update_suggestion(self):
         self.suggestion.setVisible(self.mention_start() is not None)
         if self.mention_choice:
-            self.suggestion.setText("@" + self.mention_choice[0] + "    ·    Tab or ↵")
+            suffix = " · AI teammate" if self.mention_choice[1].startswith("<@ai:") else ""
+            self.suggestion.setText("@" + self.mention_choice[0] + suffix + "    ·    Tab or ↵")
 
     def completion_key(self, event):
         if self.suggestion.isHidden():

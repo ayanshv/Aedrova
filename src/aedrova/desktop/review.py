@@ -1,6 +1,7 @@
 """Concrete file review, local application and separately approved GitHub delivery."""
 
 import threading
+from uuid import uuid4
 
 from PySide6.QtCore import QThreadPool, QUrl, Slot
 from PySide6.QtGui import QDesktopServices
@@ -72,6 +73,11 @@ class ReviewDialog(AppDialog):
         remote.addWidget(self.prepare_button)
         remote.addWidget(self.publish_button)
         layout.addLayout(remote)
+        self.evidence_button = button("Requirements & shared evidence…", role="outline")
+        self.evidence_button.clicked.connect(self.open_evidence)
+        layout.addWidget(self.evidence_button)
+        self.evidence_dialog = None
+
         self.files.currentRowChanged.connect(self.selected)
         self.refresh_button.clicked.connect(self.refresh)
         self.ide.clicked.connect(self.open_ide)
@@ -193,6 +199,17 @@ class ReviewDialog(AppDialog):
         self.apply_button.setEnabled(bool(review.changes))
         self.prepare_button.setEnabled(bool(review.changes))
 
+    def open_evidence(self):
+        if not self.review or self.job or self.cancelled.is_set():
+            return
+        from aedrova.desktop.build_evidence import SharedBuilds
+
+        try:
+            self.evidence_dialog = SharedBuilds(self.window, studio=self.studio, review=self.review)
+            self.evidence_dialog.show()
+        except (ValueError, OSError) as error:
+            self.status.setText(str(error))
+
     def selected(self, row):
         if self.review and 0 <= row < len(self.review.changes):
             self.diff.setPlainText(self.review.changes[row].diff())
@@ -241,6 +258,7 @@ class ReviewDialog(AppDialog):
     def applied(self, receipt):
         self.status.setText("Applied. Recovery copy: " + str(receipt))
         self.apply_button.setEnabled(False)
+        self.record_delivery("local_apply", "Reviewed changes applied locally")
         self.studio.repository.setText(str(self.review.source))
 
     def prepare(self):
@@ -296,10 +314,42 @@ class ReviewDialog(AppDialog):
     def published(self, result):
         self.status.setText(result["message"] + "\n" + result["url"])
         self.scope.setText(result["url"])
+        self.record_delivery("draft_pr" if "/pull/" in result["url"] else "branch", result["url"])
         self.publish_button.setEnabled(False)
+
+    def record_delivery(self, kind, reference):
+        identifier = getattr(self.studio, "evidence_id", None)
+        if not identifier:
+            return
+        parameters = {
+            "p_id": str(uuid4()),
+            "p_build": identifier,
+            "p_digest": self.review.digest,
+            "p_kind": kind,
+            "p_reference": reference,
+        }
+
+        def write():
+            try:
+                self.studio.account.service.record_build_delivery(parameters)
+                return True
+            except Exception:
+                return False
+
+        def synced(ok):
+            if not ok:
+                self.window.notify(
+                    "Delivery succeeded, but its shared receipt could not sync. "
+                    "The actual result remains in this review."
+                )
+
+        if not self.window.connected.enqueue(("delivery-receipt", identifier, kind), write, synced):
+            synced(False)
 
     def revoke(self):
         self.cancelled.set()
+        if self.evidence_dialog:
+            self.evidence_dialog.reject()
         if self.preview:
             self.preview.close()
             self.preview = None

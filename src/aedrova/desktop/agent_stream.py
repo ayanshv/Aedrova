@@ -23,7 +23,16 @@ from aedrova.desktop.materials import system_font
 
 
 class ActivityRow(QFrame):
-    def __init__(self, summary, details="", *, tool=False, pending=False, author="Aedrova"):
+    def __init__(
+        self,
+        summary,
+        details="",
+        *,
+        tool=False,
+        pending=False,
+        author="Aedrova",
+        character_config=None,
+    ):
         super().__init__()
         self.sent_at = datetime.now().astimezone()
         self.summary = summary
@@ -71,7 +80,13 @@ class ActivityRow(QFrame):
             layout.setSpacing(6)
             body = QHBoxLayout()
             body.setSpacing(12)
-            avatar = BrandMark(34)
+            if character_config:
+                from aedrova.desktop.ai_teammates import Character
+
+                avatar = Character(character_config, reduced_motion=True)
+                avatar.setFixedSize(34, 32)
+            else:
+                avatar = BrandMark(34)
             body.addWidget(avatar, 0, Qt.AlignmentFlag.AlignTop)
             column = QVBoxLayout()
             self.column = column
@@ -142,6 +157,7 @@ class AgentStream(QScrollArea):
         self.status_row = None
         self.status_controls = None
         self.author_name = "Aedrova"
+        self.character_config = None
         self.inline = False
         self.rows = []
         self.running = {}
@@ -174,7 +190,11 @@ class AgentStream(QScrollArea):
         return "\n".join(row.summary for row in self.rows)
 
     def appendPlainText(self, text):  # noqa: N802
-        self.add_row(ActivityRow(text[:50000], author=self.author_name))
+        self.add_row(
+            ActivityRow(
+                text[:50000], author=self.author_name, character_config=self.character_config
+            )
+        )
 
     def add_row(self, row):
         bar = self.verticalScrollBar()
@@ -272,7 +292,9 @@ class AgentStream(QScrollArea):
     def set_status(self, author, text):
         self.author_name = author
         if self.status_row is None:
-            self.status_row = ActivityRow(text, author=author)
+            self.status_row = ActivityRow(
+                text, author=author, character_config=self.character_config
+            )
             self.status_row.message.hide()
             self.status_row.column.addWidget(self.status_controls)
             self.status_controls.show()

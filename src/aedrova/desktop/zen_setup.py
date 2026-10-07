@@ -24,34 +24,34 @@ from aedrova.desktop.projects import binding, save_binding
 from aedrova.desktop.zen_visuals import ProjectPicker, SetupVisual, ThemePhoto
 
 SETUP_STEPS = (
-    ("Your space. Your pace.", "A few comforts before the big ideas.", "Keep this look"),
+    ("Choose your style", "Make the workspace feel like yours.", "Continue"),
     (
-        "Put a face to the ideas.",
+        "Your account",
         "Your teammates should know who is behind the good ones.",
         "Continue",
     ),
     (
-        "Give the work a home.",
+        "Connect your workspace",
         "Connect a specific folder. Your original files stay under your control.",
         "Continue",
     ),
     (
-        "Less ceremony. More making.",
+        "Choose your agent’s workflow",
         "Choose how much your agent may do after an explicit mention.",
         "Continue",
     ),
     (
-        "A bridge to your repository.",
+        "Connect with GitHub",
         "Connect GitHub when you are ready to publish reviewed work.",
         "Continue",
     ),
     (
-        "Good meetings start here.",
+        "Meet face to face",
         "Check devices deliberately. Nothing records in the background.",
         "Continue",
     ),
     (
-        "One last look. Then you are in.",
+        "You’re good to go",
         "Real settings. Clear permissions. No surprise builds.",
         "Save & enter workspace",
     ),
@@ -82,7 +82,7 @@ class SetupPages(QScrollArea):
         self.setWidget(self.body)
         self.column = QVBoxLayout(self.body)
         self.column.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
-        self.column.setContentsMargins(24, 20, 24, 20)
+        self.column.setContentsMargins(20, 18, 20, 18)
         self.column.setSpacing(16)
         self.page = None
         self.status = None

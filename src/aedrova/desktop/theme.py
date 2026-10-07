@@ -100,6 +100,8 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     return f"""
     QWidget {{ color: {t.text}; font-size: 14px; }}
     QMainWindow, QDialog, QStackedWidget#AccountPages, QWidget#AccountPage {{ background: {t.bg}; }}
+    QWidget#AccountLoginCard {{ background: {t.bg}; border: 1px solid {t.border};
+        border-radius: 10px; }}
     QComboBox {{ background: {t.bg}; border: 1px solid transparent;
         border-radius: 12px; padding: 10px; min-width: 75px; }}
     QComboBox::drop-down {{ border: none; width: 30px; background: transparent; }}
@@ -140,7 +142,7 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QLabel[role='badge'] {{ color: {t.secondary}; background: {capsule};
         border-radius: 11px; padding: 5px 10px; font-size: 10px; font-weight: 500; }}
     QLabel[role='error'] {{ color: {"#B4232F" if white else "#FF8A92"}; font-size: 12px; }}
-    QFrame#Composer {{ background: {capsule}; border: 1px solid {t.border}; border-radius: 22px; }}
+    QFrame#Composer {{ background: {capsule}; border: 1px solid {t.border}; border-radius: 12px; }}
     QFrame#Composer[focused='true'] {{ border: 1px solid {t.accent}; }}
     QFrame#Quiet {{ background: transparent; border-top: 1px solid {t.border}; }}
     QFrame#AudioCallStage {{ background: {t.surface}; border: 1px solid {t.border};
@@ -148,6 +150,15 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QFrame#AudioParticipant {{ background: {t.bg}; border: 1px solid {t.border};
         border-radius: 20px; }}
     QFrame#AudioParticipant[speaking="true"] {{ border: 1px solid {t.accent}; }}
+    QFrame#TeamSection {{ background: {t.surface}; border: 1px solid {t.border};
+        border-radius: 10px; }}
+    QSlider::groove:horizontal {{ height: 6px; background: {t.border}; border-radius: 3px; }}
+    QSlider::sub-page:horizontal {{ background: {t.accent}; border-radius: 3px; }}
+    QSlider::handle:horizontal {{ background: {t.bg}; border: 2px solid {t.accent}; width: 16px;
+        margin: -6px 0; border-radius: 9px; }}
+    QSlider::handle:horizontal:hover {{ background: {t.accent_bg}; }}
+    QSlider::handle:horizontal:focus {{ border: 3px solid {t.accent}; }}
+    QSlider::handle:horizontal:disabled {{ border-color: {t.muted}; }}
     QFrame#CallBar {{ background: {t.surface}; border: 1px solid {t.border};
         border-radius: 18px; }}
     QWidget#Segments {{ background: {t.surface}; border: 1px solid {t.border};
@@ -161,7 +172,7 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QPushButton:checked {{ background: {t.accent_bg}; color: {t.accent_text}; }}
     QPushButton:disabled {{ color: {t.muted}; }}
     QPushButton[role='primary'] {{ background: {t.accent}; color: {t.primary_text};
-        padding: 9px 18px; border-radius: 16px; font-weight: 600; text-align: center; }}
+        padding: 9px 18px; border-radius: 8px; font-weight: 600; text-align: center; }}
     QPushButton[role='primary']:hover {{ background: {"#0058B0" if white else "#389CFF"}; }}
     QPushButton[role='primary']:pressed {{ background: {"#004C99" if white else "#0071E3"}; }}
     QPushButton[role='primary']:disabled {{ background: {t.hover}; color: {t.muted}; }}
@@ -195,8 +206,8 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QPlainTextEdit#ProfileBio {{ background: {t.surface}; border: 1px solid {t.border};
         border-radius: 14px; padding: 12px; color: {t.text}; }}
     QPlainTextEdit#ProfileBio:focus {{ border-color: {t.accent}; }}
-    QLineEdit {{ background: {t.surface}; border: 1px solid {t.border}; border-radius: 14px;
-        padding: 12px; selection-background-color: {t.accent_bg}; }}
+    QLineEdit {{ background: {t.surface}; border: 1px solid {t.border}; border-radius: 8px;
+        padding: 10px; selection-background-color: {t.accent_bg}; }}
     QScrollArea {{ border: none; background: transparent; }}
     QScrollBar:vertical {{ background: transparent; width: 7px; margin: 6px 1px; }}
     QScrollBar::handle:vertical {{ background: {t.border}; min-height: 32px; border-radius: 3px; }}

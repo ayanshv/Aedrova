@@ -13,7 +13,7 @@ from PySide6.QtCore import (
     Signal,
     Slot,
 )
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
 from aedrova.desktop.brand import BrandMark
 from aedrova.desktop.controls import AppDialog, ChoiceBox
 from aedrova.desktop.dialogs import button, label
+from aedrova.desktop.welcome_surface import WelcomeSurface
 from aedrova.identity.oauth import google_sign_in
 from aedrova.identity.service import Connection, IdentityService
 
@@ -90,8 +91,8 @@ class AccountDialog(AppDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(28, 24, 28, 24)
         top = QHBoxLayout()
-        top.addWidget(BrandMark(54))
-        top.addWidget(label("Your space to build.", "heading"))
+        top.addWidget(BrandMark(36))
+        top.addWidget(label("Aedrova", "title"))
         top.addStretch()
         layout.addLayout(top)
         self.status = label(
@@ -134,46 +135,41 @@ class AccountDialog(AppDialog):
         return result
 
     def _login_page(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setSpacing(18)
-        layout.addStretch()
-        preview = label("")
-        preview.setAccessibleName("Aedrova workspace preview")
-        preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        photo = QPixmap(str(Path(__file__).parent / "assets/onboarding/light.png"))
-        if not photo.isNull():
-            preview.setPixmap(
-                photo.scaled(
-                    540,
-                    250,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
-                )
-            )
-            layout.addWidget(preview)
-        heading = label("Your team. Your next idea.", "heading")
+        page = WelcomeSurface()
+        outer = QVBoxLayout(page)
+        outer.addStretch()
+        row = QHBoxLayout()
+        row.addStretch()
+        card = QWidget()
+        card.setObjectName("AccountLoginCard")
+        card.setFixedWidth(340)
+        column = QVBoxLayout(card)
+        column.setContentsMargins(24, 28, 24, 28)
+        column.setSpacing(16)
+        column.addWidget(BrandMark(40), alignment=Qt.AlignmentFlag.AlignHCenter)
+        heading = label("Get started with Aedrova", "title")
         heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(heading)
-        subtitle = label(
-            "One Google account. Your workspace, ready when you are.", "muted", wrap=True
-        )
+        column.addWidget(heading)
+        subtitle = label("Your team’s context. Put to work.", "muted", wrap=True)
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(subtitle)
+        column.addWidget(subtitle)
         self.google_button = button("Continue with Google", role="primary")
         self.google_button.setIcon(QIcon(str(Path(__file__).parent / "assets/google-g.png")))
-        self.google_button.setIconSize(QSize(20, 20))
-        self.google_button.setStyleSheet(
-            "QPushButton { background: white; color: #1f1f1f; border: 1px solid #dadce0;"
-            " border-radius: 24px; padding: 12px 24px; }"
-            "QPushButton:hover { background: #f5f5f7; }"
-            "QPushButton:disabled { color: #808080; }"
-        )
-        self.google_button.setMinimumHeight(48)
+        self.google_button.setIconSize(QSize(18, 18))
+        self.google_button.setMinimumHeight(40)
         self.google_button.clicked.connect(self.start_google)
-        layout.addWidget(self.google_button)
-        layout.addWidget(label("Sign in securely in your browser, then return here.", "muted"))
-        layout.addStretch()
+        column.addWidget(self.google_button)
+        note = label(
+            "Sign in securely in your browser.\nWe’ll bring you straight back to setup.",
+            "muted",
+            wrap=True,
+        )
+        note.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        column.addWidget(note)
+        row.addWidget(card)
+        row.addStretch()
+        outer.addLayout(row)
+        outer.addStretch()
         self.add_page(page)
 
     def start_google(self):
@@ -375,19 +371,22 @@ class AccountDialog(AppDialog):
         return choice
 
     def _onboarding_page(self):
-        page = QWidget()
+        page = WelcomeSurface()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(24, 24, 24, 24)
         self.onboarding_steps = QStackedWidget()
-        layout.addWidget(self.onboarding_steps)
+        self.onboarding_steps.setMaximumWidth(440)
+        layout.addWidget(self.onboarding_steps, alignment=Qt.AlignmentFlag.AlignHCenter)
 
         def step(kicker, title, subtitle):
             panel = QWidget()
             column = QVBoxLayout(panel)
-            column.setSpacing(20)
+            column.setSpacing(14)
             column.addStretch()
             column.addWidget(label(kicker, "section"))
-            column.addWidget(label(title, "heading", wrap=True))
+            heading = label(title, "title", wrap=True)
+            heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            column.addWidget(heading)
             column.addWidget(label(subtitle, "muted", wrap=True))
             self.onboarding_steps.addWidget(panel)
             return column

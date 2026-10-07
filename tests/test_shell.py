@@ -450,7 +450,7 @@ def test_brand_artwork_icon_and_reduced_motion(window, qtbot):
     assert artwork.width() < 450  # Transparent source margins do not shrink the mark.
     assert not app_icon().pixmap(128, 128).isNull()
     marks = window.findChildren(BrandMark)
-    assert len(marks) == 3
+    assert len(marks) == 2  # Header and chat; the old branding footer became the AI team shelf.
     mark = marks[0]
     mark.animate(1.0)
     qtbot.waitUntil(lambda: mark.get_lift() > 0.5)

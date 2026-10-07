@@ -55,7 +55,7 @@ class ExecutionQueue(QObject):
         user = self.window.current_user()
         return str(user.id) if user else ""
 
-    def submit(self, task):
+    def submit(self, task, *, teammate=None):
         if not self.lease:
             self.window.notify(
                 "Another Aedrova instance owns the build queue. Close it and reopen this app."
@@ -69,6 +69,14 @@ class ExecutionQueue(QObject):
                 self.window.workspace_id, "Enable background builds in Project settings"
             )
             return False
+        if teammate:
+            from aedrova.teammates.model import validate
+
+            validate(teammate["config"])
+            if teammate["workspace_id"] != self.window.workspace_id or teammate["paused"]:
+                self.window.notify("Teammate is unavailable. Refresh the workspace.")
+                return False
+            saved["ai_teammate"] = teammate
         try:
             run_id, fresh = self.ledger.enqueue(user, self.window.workspace_id, task, saved)
         except ValueError as exc:
@@ -129,7 +137,22 @@ class ExecutionQueue(QObject):
         except PermissionError:
             self.ledger.update(row["id"], "paused")
             return
-        if json.loads(row["settings"]) != scope(binding(self.window)):
+        pinned = json.loads(row["settings"])
+        teammate = pinned.pop("ai_teammate", None)
+        if teammate:
+            live = next(
+                (
+                    r
+                    for r in self.window.account_dialog.snapshot.get("ai_teammates", [])
+                    if r["id"] == teammate["id"] and r["workspace_id"] == row["workspace"]
+                ),
+                None,
+            )
+            if not live or live["paused"] or live["version"] != teammate["version"]:
+                self.ledger.update(row["id"], "paused")
+                self.window.notify("Teammate settings changed. Send a fresh assignment.")
+                return
+        if pinned != scope(binding(self.window)):
             self.ledger.update(row["id"], "paused")
             self.window.notify(
                 "A queued build paused because project permissions changed. Review it in Builds."
@@ -140,7 +163,11 @@ class ExecutionQueue(QObject):
         from aedrova.desktop.builds import _start_background_build
 
         try:
-            started = _start_background_build(self.window, row["task"])
+            started = (
+                _start_background_build(self.window, row["task"], teammate=teammate)
+                if teammate
+                else _start_background_build(self.window, row["task"])
+            )
         except Exception:
             self.ledger.update(row["id"], "failed")
             self.window.notify("Could not start the queued build. Review it in Builds.")
@@ -182,6 +209,9 @@ class RunHistory(AppDialog):
                 wrap=True,
             )
         )
+        shared = button("Shared build reviews…", role="outline")
+        shared.clicked.connect(self.open_shared)
+        layout.addWidget(shared)
         self.list = QListWidget()
         self.list.setProperty("accountList", True)
         layout.addWidget(self.list, 1)
@@ -207,6 +237,13 @@ class RunHistory(AppDialog):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.refresh)
         self.timer.start(1000)
+
+    def open_shared(self):
+        if self.valid():
+            from aedrova.desktop.build_evidence import SharedBuilds
+
+            self.shared_dialog = SharedBuilds(self.queue.window)
+            self.shared_dialog.show()
 
     def valid(self):
         try:
@@ -265,7 +302,21 @@ class RunHistory(AppDialog):
         row = self.selected()
         if not row or row["state"] not in {"paused", "failed", "interrupted", "cancelled"}:
             return
-        if json.loads(row["settings"]) != scope(binding(self.queue.window)):
+        saved = json.loads(row["settings"])
+        teammate = saved.pop("ai_teammate", None)
+        if teammate:
+            live = next(
+                (
+                    r
+                    for r in self.queue.window.account_dialog.snapshot.get("ai_teammates", [])
+                    if r["id"] == teammate["id"] and r["workspace_id"] == self.workspace
+                ),
+                None,
+            )
+            if not live or live["paused"] or live["version"] != teammate["version"]:
+                self.queue.window.notify("Teammate settings changed. Send a fresh assignment.")
+                return
+        if saved != scope(binding(self.queue.window)):
             self.queue.window.notify(
                 "Project settings changed. Send a new mention using the current settings."
             )
@@ -308,7 +359,26 @@ class RunHistory(AppDialog):
                 "Wait for the current build or delivery action before opening a saved review."
             )
             return
-        if json.loads(row["settings"]) != scope(binding(window)):
+        saved = json.loads(row["settings"])
+        teammate = saved.pop("ai_teammate", None)
+        if teammate:
+            live = next(
+                (
+                    r
+                    for r in window.account_dialog.snapshot.get("ai_teammates", [])
+                    if r["id"] == teammate["id"] and r["workspace_id"] == self.workspace
+                ),
+                None,
+            )
+            if not live or live["paused"] or live["version"] != teammate["version"]:
+                window.notify("Teammate settings changed. Send a fresh assignment.")
+                return
+            if teammate["config"]["role"] != "engineering":
+                window.notify(
+                    "This teammate completed an analysis, with no code changes to review."
+                )
+                return
+        if saved != scope(binding(window)):
             window.notify("Reconnect this build's original project settings before reviewing it.")
             return
         allowed = authorize(window.account_dialog.snapshot, self.workspace, self.user)
@@ -322,10 +392,17 @@ class RunHistory(AppDialog):
         from aedrova.desktop.builds import BuildDialog
 
         studio = BuildDialog(window, row["task"])
+        studio.teammate = teammate
         window.build_dialog = studio
         studio.project = Path(row["project"])
         studio.baseline = row["baseline"]
         studio.context = SimpleNamespace(channel_ids=channels)
+        try:
+            studio.command_results = json.loads(
+                (studio.project.parent / "observed-checks.json").read_text()
+            )
+        except (OSError, ValueError):
+            studio.command_results = []
         studio.successful_build = True
         studio.open_review()
 

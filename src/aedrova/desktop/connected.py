@@ -210,10 +210,16 @@ class ConnectedDashboard(QObject):
             self.apply(self.account.snapshot, [], self.window.workspace_id, self.window.channel_id)
 
     def disconnect(self):
+        teammate_dialog = getattr(self.window, "teammates_dialog", None)
+        if teammate_dialog and not teammate_dialog.closed:
+            teammate_dialog.reject()
         if self.window.tour:
             self.window.tour.finish("paused")
         if getattr(self.window, "setup_dialog", None):
             self.window.setup_dialog.close()
+        shared = getattr(self.window, "shared_build_dialog", None)
+        if shared and not shared.closed:
+            shared.reject()
         build = getattr(self.window, "build_dialog", None)
         if build:
             build.invalidate()
@@ -471,6 +477,26 @@ class ConnectedDashboard(QObject):
         self.enqueue(("older", channel, parent, before), operation, loaded)
 
     def apply(self, snapshot, rows, workspace_id, channel_id):
+        teammate_dialog = getattr(self.window, "teammates_dialog", None)
+        if teammate_dialog and not teammate_dialog.closed:
+            if not teammate_dialog.valid() or not any(
+                m["workspace_id"] == teammate_dialog.workspace
+                and m["user_id"] == teammate_dialog.user
+                for m in snapshot["members"]
+            ):
+                teammate_dialog.reject()
+            elif not teammate_dialog.busy and teammate_dialog.rows != [
+                r
+                for r in snapshot.get("ai_teammates", [])
+                if r["workspace_id"] == teammate_dialog.workspace
+            ]:
+                teammate_dialog.refresh()
+        memory = getattr(self.window, "memory_dialog", None)
+        if memory and not memory.closed:
+            memory.check_access(snapshot)
+        shared = getattr(self.window, "shared_build_dialog", None)
+        if shared and not shared.closed:
+            shared.check_access(snapshot)
         build = getattr(self.window, "build_dialog", None)
         if build:
             build.verify_access(snapshot)

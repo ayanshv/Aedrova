@@ -16,9 +16,20 @@ gated functionality from public availability. Website updates are a completion c
 for each applicable milestone. No website changes are requested by this reminder; follow
 the existing push/deployment authorization gates when delivering those future updates.
 
-## M14 — production prerequisites and meeting completion
+## Current delivery order — owner revision October 5
 
-Finish the already authorized local installation/update rehearsal first. M14B remains
+Build M15 → M16 → M17 → migration M17A–M17E → AI Teammates M17F first.
+Then complete remaining M14 (owner production setup, hosted meeting acceptance,
+Windows support/distribution and updated release rehearsals), followed by M18 acceptance
+and authorized launch. The codebase walkthrough follows the completed deployment.
+Earlier instructions to finish M14 before feature implementation are superseded.
+External acceptance that cannot yet run must be recorded, not claimed complete; finish
+it before launch. Ask permission to start M15, then again between subsequent milestones.
+
+## M14 — deferred production prerequisites and meeting completion
+
+The completed M14A local rehearsal remains recorded. Repeat release checks with the final
+feature set after implementation. M14B remains
 the deferred guided owner setup for Apple Developer ID, Render and live Stripe. Prepare
 independent implementation while owner account/payment actions are unavailable; do not
 activate paid checkout, public installers or unvalidated capabilities.
@@ -111,6 +122,20 @@ partial/offline/provider failure recovery preserves history; workspace permissio
 to every record and notification. Measure time to accepted PR, repeated clarification
 and correction cycles on matched tasks; report observed results rather than promise
 superiority over Slack plus integrations without evidence.
+
+## M17A–M17E — migration from Slack and Microsoft Teams
+
+Complete the [migration roadmap](migration-roadmap.md): preview and durable import jobs,
+Slack exports, Teams Graph import/Microsoft identity linking, pilot/catch-up/rollback and
+permission-scoped context continuity. Validate authorized real imports before advertising
+availability. These additions precede M18 and are included in final launch/security checks.
+
+## M17F — AI Teammates
+
+Deliver the [AI Teammates roadmap](ai-teammates-roadmap.md) as a headline pillar beside
+the central builder: persistent configurable specialists with native chat, scoped tools
+and meeting-aware context using existing execution/usage infrastructure. Include its
+acceptance and marketing deliverables before M18; no passive model spending or gamification.
 
 ## M18 — expanded release acceptance and launch
 

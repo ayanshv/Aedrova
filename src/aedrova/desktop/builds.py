@@ -1,6 +1,7 @@
 """Private local build studio using real provider runtimes."""
 
 import json
+import os
 import threading
 import time
 from pathlib import Path
@@ -43,6 +44,7 @@ class ContextJob(QRunnable):
         managed_origin="",
         query="",
         preferred_channel="",
+        teammate=None,
     ):
         super().__init__()
         self.signals = Signals()
@@ -51,6 +53,7 @@ class ContextJob(QRunnable):
         self.managed_origin = managed_origin
         self.query = query
         self.preferred_channel = preferred_channel
+        self.teammate = teammate
 
     def run(self):
         try:
@@ -64,6 +67,17 @@ class ContextJob(QRunnable):
                     preferred_channel=self.preferred_channel,
                 )
             }
+            if self.teammate:
+                live = next(
+                    (
+                        r
+                        for r in self.service.ai_teammates(self.workspace)["items"]
+                        if r["id"] == self.teammate["id"]
+                    ),
+                    None,
+                )
+                if not live or live["paused"] or live["version"] != self.teammate["version"]:
+                    raise PermissionError("Teammate settings changed. Send a fresh assignment.")
             if self.managed_origin:
                 _, _, access, user = self.service.realtime_credentials()
                 if user != str(self.service.user.id):
@@ -93,6 +107,7 @@ class BuildJob(QRunnable):
         self.baseline = baseline
         self.context, self.repository, self.task = context, repository, task
         self.provider, self.plan, self.project, self.approved = provider, plan, project, approved
+        self.teammate = None
         self.ledger = None
         self.managed_client = None
         self.run_id = None
@@ -150,6 +165,12 @@ class BuildJob(QRunnable):
             prompt = instructions(
                 self.task, context_file, plan=self.plan, approved_plan=self.approved
             )
+            if self.teammate:
+                from aedrova.teammates.model import EFFORT
+                from aedrova.teammates.model import prompt as teammate_prompt
+
+                prompt += "\n\n" + teammate_prompt(self.teammate["config"])
+                self.runner.timeout = EFFORT[self.teammate["config"]["effort"]]
             if self.managed_client:
                 self.signals.progress.emit("Checking your workspace’s included AI access…")
                 self.runner.managed = self.managed_client.begin(
@@ -165,6 +186,7 @@ class BuildJob(QRunnable):
                 "text": result,
                 "project": self.project,
                 "changes": changes(self.project),
+                "commands": self.runner.command_results,
                 "baseline": git(self.project, "rev-parse", "HEAD").strip(),
             }
         except BuildCancelled:
@@ -210,6 +232,18 @@ class BuildJob(QRunnable):
                 time.monotonic() - started,
                 self.runner.usage,
             )
+        outcome["commands"] = self.runner.command_results
+        if not self.plan and self.project:
+            try:
+                path = self.project.parent / "observed-checks.json"
+                fd = os.open(path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+                with os.fdopen(fd, "w") as stream:
+                    json.dump(self.runner.command_results, stream)
+            except OSError:
+                self.signals.progress.emit(
+                    "Observed checks could not be saved locally; "
+                    "they remain available until this review closes."
+                )
         self.signals.finished.emit(outcome)
 
 
@@ -541,6 +575,7 @@ class BuildDialog(AppDialog):
                 result.get("managed_origin", ""),
                 query=self.request.toPlainText(),
                 preferred_channel=self.origin_channel,
+                teammate=getattr(self, "teammate", None),
             )
             self.context_jobs[generation] = job
             self.context_callbacks[generation] = collected
@@ -586,6 +621,16 @@ class BuildDialog(AppDialog):
                 self.set_busy(False)
                 return
             self.context = context
+            memory = next(
+                (
+                    json.loads(line)["product_memory_snapshot"]
+                    for line in context.text.splitlines()
+                    if "product_memory_snapshot" in json.loads(line)
+                ),
+                {},
+            )
+            self.memory_revision = memory.get("revision", "")
+            self.status.setToolTip("Product memory revision: " + self.memory_revision)
             self.status.setText(
                 f"{'Planning' if plan else 'Building'} · {context.count} messages "
                 f"across {len(context.channel_ids)} accessible channels"
@@ -601,6 +646,7 @@ class BuildDialog(AppDialog):
                 self.approved_plan,
                 self.baseline,
             )
+            self.job.teammate = getattr(self, "teammate", None)
             self.job.managed_client = result.get("managed")
             if self.execution_queue and self.run_id:
                 self.job.ledger = self.execution_queue.ledger
@@ -642,7 +688,14 @@ class BuildDialog(AppDialog):
         if not self.invalidated:
             if not self.output.toPlainText().endswith(text[-50000:]):
                 self.output.appendPlainText(text[-50000:])
-                self.window.agent_event(self.workspace, text)
+                teammate = getattr(self, "teammate", None)
+                reporting = teammate["config"]["reporting"] if teammate else "detailed"
+                now = time.monotonic()
+                if reporting != "quiet" and (
+                    reporting == "detailed" or now - getattr(self, "last_teammate_update", 0) > 2
+                ):
+                    self.window.agent_event(self.workspace, text)
+                    self.last_teammate_update = now
 
     @Slot(object)
     def permission(self, request):
@@ -688,6 +741,8 @@ class BuildDialog(AppDialog):
         if self.job and self.job.runner.cancelled.is_set():
             result = {**result, "ok": False, "text": "Cancelled. Review any partial local changes."}
         self.job = None
+        if not plan:
+            self.command_results = result.get("commands", [])
         self.project = result.get("project")
         self.baseline = result.get("baseline", "")
         if self.invalidated:
@@ -720,7 +775,18 @@ class BuildDialog(AppDialog):
             self.status.setText("Run stopped. See the details below.")
             self.window.agent_activity(self.workspace, "Needs attention · open to continue")
         self.set_busy(False)
-        if plan and result["ok"] and self.background_run:
+        analysis = bool(
+            getattr(self, "teammate", None) and self.teammate["config"]["role"] != "engineering"
+        )
+        if analysis and plan and result["ok"]:
+            self.successful_build = True
+            self.approved_plan = ""
+            self.status.setText(
+                "Analysis complete. Sources are cited in the result; no files were edited."
+            )
+            self.review_button.setEnabled(False)
+            self.build_button.setEnabled(False)
+        if plan and result["ok"] and self.background_run and not analysis:
             self.background_transition = True
             self.window.agent_activity(self.workspace, "Plan ready · starting background build…")
             generation = self.generation
@@ -733,7 +799,77 @@ class BuildDialog(AppDialog):
         )
         self.window.update_agent_cancel()
 
+    def verify_memory(self, force=False):
+        if self.invalidated or not self.context or getattr(self, "memory_check_pending", False):
+            return
+        records = [
+            json.loads(line) for line in getattr(self.context, "text", "").splitlines() if line
+        ]
+        pinned = next((r for r in records if "product_memory_snapshot" in r), None)
+        if pinned is None or not hasattr(self.account.service, "memory_list"):
+            return
+        if not force and time.monotonic() - getattr(self, "memory_check_at", 0) < 15:
+            return
+        self.memory_check_pending = True
+        self.memory_check_at = time.monotonic()
+        original_context = self.context
+
+        def checked(payload):
+            self.memory_check_pending = False
+            if self.invalidated or self.context is not original_context:
+                return
+            from aedrova.memory.model import snapshot_record
+
+            try:
+                if "error" in payload:
+                    raise ValueError("Memory verification unavailable")
+                current = snapshot_record(payload, self.workspace, self.context.channel_ids)
+                changed = current != pinned
+            except (PermissionError, ValueError, KeyError):
+                changed = True
+            if changed:
+                self.invalidated = True
+                self.cancel()
+                self.approved_plan = ""
+                self.successful_build = False
+                if self.review_dialog:
+                    self.review_dialog.revoke()
+                self.status.setText(
+                    "Product memory changed or could not be verified. "
+                    "Start a fresh build before applying changes."
+                )
+                self.window.agent_activity(self.workspace, self.status.text())
+
+        def operation():
+            try:
+                return getattr(
+                    self.account.service, "memory_context", self.account.service.memory_list
+                )(self.workspace)
+            except Exception:
+                return {"error": "Memory verification unavailable"}
+
+        if not self.window.connected.enqueue(
+            ("build-memory", id(self)),
+            operation,
+            checked,
+        ):
+            self.memory_check_pending = False
+
     def verify_access(self, snapshot):
+        teammate = getattr(self, "teammate", None)
+        if teammate:
+            live = next(
+                (
+                    r
+                    for r in snapshot.get("ai_teammates", [])
+                    if r["id"] == teammate["id"] and r["workspace_id"] == self.workspace
+                ),
+                None,
+            )
+            if not live or live["paused"] or live["version"] != teammate["version"]:
+                self.invalidate()
+                return
+        self.verify_memory()
         if self.background_run and not self.background_authorized():
             self.cancel()
         if self.invalidated:
@@ -818,7 +954,9 @@ def open_build(window, task=""):
         return
     existing = getattr(window, "build_dialog", None)
     if existing and not existing.invalidated:
-        if existing.workspace == window.workspace_id or existing.pending:
+        if existing.pending or (
+            existing.workspace == window.workspace_id and not getattr(existing, "teammate", None)
+        ):
             if task and not existing.pending:
                 existing.request.setPlainText(task)
             existing.show()
@@ -836,6 +974,7 @@ def open_build(window, task=""):
         if not existing.job:
             existing.deleteLater()
     dialog = BuildDialog(window, task)
+    window.agent_feed.character_config = None
     window.build_dialog = dialog
     dialog.show()
     from aedrova.desktop.projects import binding
@@ -847,7 +986,7 @@ def start_background_build(window, task):
     return execution_queue(window).submit(task)
 
 
-def _start_background_build(window, task):
+def _start_background_build(window, task, *, teammate=None):
     """A chat mention never opens a dialog or starts a second overlapping run."""
     from aedrova.desktop.projects import binding
 
@@ -871,7 +1010,11 @@ def _start_background_build(window, task):
     if existing and (existing.invalidated or existing.workspace != window.workspace_id):
         existing.invalidate()
         existing = None
+    if existing and getattr(existing, "teammate", None) != teammate:
+        existing.invalidate()
+        existing = None
     dialog = existing or BuildDialog(window, task)
+    dialog.teammate = teammate
     window.build_dialog = dialog
     window.agent_setup_needed = False
     dialog.request.setPlainText(task)
@@ -897,6 +1040,7 @@ def _start_background_build(window, task):
     dialog.background_run = True
     window.agent_clock.reset()
     window.activity_channel = window.channel_id
+    window.agent_feed.character_config = teammate["config"] if teammate else None
     window.agent_feed.clear()
     window.agent_feed.hide()
     window.last_agent_event = ""

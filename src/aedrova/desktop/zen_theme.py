@@ -61,24 +61,23 @@ def tone(theme, color):
 
 
 def onboarding_styles(theme):
-    surface = tone(theme, "#F0F7FF")
-    hover = "#E7F2FF" if theme.name == "light" else "#243D58"
-    pressed = "#D6E9FF" if theme.name == "light" else "#2D4C6D"
     return (
         stylesheet(theme)
         + f"""
         QDialog {{background:{theme.bg};}}
         QScrollArea#ZenSettings {{background:transparent;border:0;}}
-        QFrame#ZenSettingsBody {{background:{theme.bg};border:1px solid {tone(theme, "#E2EBF5")};
-            border-radius:24px;}}
-        QFrame#ZenSettingsBody QLabel[role="muted"] {{font-size:15px;}}
-        QPushButton {{background:{surface};color:{tone(theme, "#23558A")};
-            text-align:center;border:1px solid {tone(theme, "#C9DEF4")};
-            border-radius:18px;padding:14px 24px;}}
-        QPushButton:hover {{background:{hover};}}
-        QPushButton:pressed {{background:{pressed};}}
-        QPushButton:focus {{border:2px solid {tone(theme, "#4092E7")};}}
-        QPushButton:disabled {{color:{theme.muted};background:{theme.surface};}}
+        QFrame#ZenSettingsBody {{background:{theme.bg};border:1px solid {theme.border};
+            border-radius:10px;}}
+        QFrame#ZenSettingsBody QLabel[role="muted"] {{font-size:12px;}}
+        QFrame#ZenSettingsBody QLabel[role="title"] {{font-size:15px;font-weight:600;}}
+        QPushButton {{border-radius:6px;padding:9px 16px;}}
+        QPushButton#OnboardingContinue {{background:{theme.accent};color:{theme.primary_text};
+            border-radius:6px;text-align:center;font-weight:600;padding:8px 16px;}}
+        QPushButton#OnboardingContinue:hover {{background:{theme.accent_text};}}
+        QPushButton#OnboardingContinue:disabled {{background:{theme.surface};color:{theme.muted};}}
         QPushButton#ZenSkip {{border:0;background:transparent;color:{theme.muted};padding:8px;}}
+        QLineEdit {{background:{theme.bg};border:1px solid {theme.border};border-radius:6px;
+            padding:9px;}}
+        QLineEdit:focus {{border-color:{theme.accent};}}
     """
     )

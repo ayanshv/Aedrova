@@ -156,6 +156,20 @@ def gather(
             }
         )
 
+    memory_snapshot = None
+    if hasattr(service, "memory_list"):
+        from aedrova.memory.model import snapshot_record
+
+        progress("Reading source-backed product memory…")
+        read_memory = getattr(service, "memory_context", service.memory_list)
+        memory_snapshot = snapshot_record(read_memory(workspace), workspace, channels)
+        if memory_snapshot["product_memory_snapshot"]["truncated"]:
+            raise ValueError(
+                "Product memory exceeds 200 entries. Retire obsolete entries "
+                "or narrow the inventory before building; no partial memory used."
+            )
+        add(memory_snapshot)
+
     meeting_evidence = {}
     for channel in sorted(snapshot["channels"], key=lambda c: c["id"]):
         if channel["id"] not in channels:
@@ -258,6 +272,10 @@ def gather(
             raise InterruptedError("Cancelled")
         if service.meeting_context(channel) != rows:
             raise ValueError("Meeting consent or retention changed. Refresh context and retry.")
+    if memory_snapshot is not None:
+        fresh_memory = snapshot_record(read_memory(workspace), workspace, current)
+        if fresh_memory != memory_snapshot:
+            raise ValueError("Product memory changed during retrieval. Refresh and retry.")
     return WorkspaceContext(
         workspace,
         user,

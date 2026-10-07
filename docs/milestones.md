@@ -1,5 +1,154 @@
 # Delivery gates
 
+## October 6 — onboarding, custom-role sliders and living teammate UI refinement
+
+Owner approved a reference-led App onboarding/chatspace redesign and animated teammate shelf.
+Implemented Dub/Linear-style centered forms with Aedrova blue, preserved setup/profile/auth
+flow and controls tour, free-text roles with real explicit provider tool suggestions,
+styled sliders and a persistent-identity marble shelf. Reduced motion/hidden timers never
+run a model. See [onboarding-teammate-refinement.md](onboarding-teammate-refinement.md).
+No new SQL or owner credentials required; suggestions use existing local provider login
+and allowance. Tool recommendations are advisory; unavailable connectors remain labelled.
+M17F.2 shared results/team management has not started and still needs approval.
+
+## October 6 — M17F.1 first useful slice and hosted profiles complete
+
+Native customizable characters/profiles, `@name` assignments, named chat progress/results
+and bounded specialist execution are implemented. Engineering reuses coding/delivery;
+Product/Research run read-only analysis. Real Codex Research passed on synthetic evidence.
+Owner SQL applied. Normal personal/school OAuth checks passed profile persistence, retries,
+owner/admin writes, member reads, outsider isolation, unique actor names, pause/stale edits,
+rename/stable mentions, revocation with existing profiles and deletion. Test member removed.
+See [milestone-17f1-ai-teammates.md](milestone-17f1-ai-teammates.md).
+
+Validation: 597 desktop tests, final 36 focused tests, 32 website page checks; actual
+PostgreSQL/RLS suites, scoped lint, packaged signature and smoke passed. Hosted report:
+`work/m17f1/hosted-teammate-check.json`. **Owner action now: none for this slice.**
+
+M17F.2 shared results/team management requires fresh permission. Per-teammate tool/resource
+grants, connectors, custom roles/colors and stronger server-side effort/priority controls
+remain planned in subsequent slices. Current effort is a timeout; importance is a tone
+preference. Results remain private to the initiating user. Paid Claude/final release gates
+stay M14/M18. Local website previews are labelled; nothing pushed/deployed.
+
+## October 6 — AI Teammates moved ahead of M17
+
+Owner requested the mini/cute AI Teammates next, ahead of continuous delivery and migration.
+M17F.1 implementation was approved; its current acceptance gate is documented above. Revised remaining feature order:
+M17F → M17 → M17A–M17E → remaining M14 → M18 → deployed-codebase walkthrough.
+M15 memory and M16 evidence are available foundations. Reuse existing agent/build task
+infrastructure; do not assume the not-yet-built M17 shared work-item model exists.
+
+The first implementation slice must demonstrate useful work, not just character CRUD:
+persistent customizable identities, native mentions/results and a real bounded specialist
+task through an available existing provider. Connectors expand capabilities in subsequent
+slices with explicit grants and owner setup. No connectors/provider subscriptions are
+activated by this planning change. Obtain approval before implementation and between slices.
+
+
+## October 6 — M16 implementation and hosted shared-review checks complete
+
+M16 now links approved memory/citations to actual diffs and observed command receipts,
+acceptance criteria and versioned peer reviews. Passing checks must match the final local
+file fingerprint. Scope checks, withdrawal cleanup, safe retries and explicit publication
+approval remain enforced. See [milestone-16-build-reviews.md](milestone-16-build-reviews.md).
+
+The owner applied `202610060003_build_reviews.sql`. The live personal/school-account
+probe passed real local diff/check persistence, idempotent retries, exact-version peer
+approval, outsider/private-channel isolation, direct-write denial, source staleness,
+withdrawal cleanup and member revocation while evidence still existed.
+Report: `work/m16/hosted-build-review-check.json` (no credentials).
+
+**Owner action now: none for the implemented shared-review workflow.** M17 has not started
+and requires approval. The real owner-approved GitHub test PR and paid Claude/provider
+activation remain explicitly deferred external acceptance at M14/M18.
+
+Validation: full desktop suite 587 passed; final focused review/connection checks 22 passed;
+website suite 247 passed; actual PostgreSQL/RLS suites, scoped Ruff, packaged signature
+and smoke passed. Light/dark/compact review captures inspected.
+
+Live Codex planning/edit/test probe passed. Paid Claude, an owner-approved real GitHub test
+PR and final provider/release acceptance are not claimed complete; unavailable external
+activation remains deferred to M14/M18. Local website preview copy/captures are prepared,
+with pending rollout labels; nothing pushed/deployed. AI Teammates connector requirements
+remain recorded for M17F. M17 is continuous team delivery and requires fresh approval.
+
+
+## October 6 — M15 implementation and hosted memory acceptance complete
+
+Source-backed Product memory UI, revision/history and approval/conflict lifecycle, RLS/RPC
+storage, permission/freshness checks and pinned build memory are implemented. Both SQL
+migrations were applied by the owner. Live personal/school-account acceptance passed for
+persistence, lifecycle, stale edits, private isolation, withdrawal and member revocation.
+See [milestone-15-product-memory.md](milestone-15-product-memory.md).
+
+Validation: prior complete desktop suite 572 passed; latest focused suite 105 passed;
+actual PostgreSQL/RLS suites passed (including missing/late meeting schema and the
+conflict-function upgrade); rebuilt signature/smoke and scoped lint passed. Public-page
+suite previously 32 passed. No successful live paid-provider build or hosted meeting-source
+acceptance is claimed; those external acceptance gates remain required at M14/M18.
+
+**Owner action now: none for M15. M16 was approved and is in progress; see the latest entry above.** Local website screenshots/copy are prepared; nothing pushed or
+publicly enabled. M14 setup remains deferred until feature implementation is complete.
+AI Teammates M17F now explicitly includes scoped external app connectors for Marketing,
+Generation/Design, Finance and Builder roles. No connector accounts are required now.
+
+
+## October 5 — authoritative order: build features before remaining M14
+
+Owner explicitly deferred remaining M14 until all planned feature implementation is built.
+This ordering supersedes prior entries that call Apple enrollment the current gate or
+place M14 before M15. Completed M14A work remains complete; pending acceptance is not waived.
+
+1. **M15:** persistent product memory, approved decisions, citations and scoped retrieval.
+2. **M16:** traceable builds and shared review with real test/diff evidence.
+3. **M17:** continuous team delivery and handoffs.
+4. **M17A–M17E:** guided Slack/Teams migration and context continuity.
+5. **M17F.1–M17F.4:** persistent customizable AI Teammates and scoped external app
+   connectors for marketing, generation/design, finance and builder workflows, using
+   existing infrastructure.
+6. **Remaining M14:** production owner setup/signing/live Stripe/hosting/provider activation,
+   hosted meeting/hardware acceptance, Windows compatibility/build/distribution and final
+   installer/update rehearsals for the completed feature set.
+7. **M18:** final expanded security/production acceptance and explicitly authorized launch.
+8. **Entire-codebase walkthrough:** after everything is complete and deployed.
+
+Do independently available feature work first. Defer Apple enrollment, paid hosting,
+live Stripe activation, signing and release purchases to remaining M14. Still disclose
+feature-specific SQL, test-tenant/export/provider or access requirements when actually
+needed; staging/local checks do not establish live acceptance. Record any unavailable
+external tests and finish them at M14/M18 before advertising public availability. No
+public product release, migration of real customer data or payment activation is authorized
+by this reordering. The existing waitlist website remains live.
+
+**Next task: M15 implementation**, subject to explicit owner approval. This request
+changes the plan only. Do not continue asking about Apple enrollment during feature work;
+resume that one-requirement-at-a-time walkthrough when remaining M14 begins.
+
+
+## October 5 — M17F AI Teammates added as a major differentiator
+
+Add **M17F.1–M17F.4** before M18: persistent specialist identities/character customization,
+quick creation/native chat, permission-scoped execution and meeting context, then live
+acceptance/UI polish and website advertising alongside the main builder. Shape, color,
+name, personality, reporting cadence, effort and importance are explicit controls. Reuse
+existing agent/task/context/usage infrastructure; passive presence consumes no model credits.
+See [ai-teammates-roadmap.md](ai-teammates-roadmap.md). Planning only; attached implementation
+commands are requirements for that future milestone, not permission to start now.
+No owner action required for this addition. M14 Apple enrollment remains the current gate.
+
+
+## October 5 — Slack and Teams migration milestones added
+
+Add **M17A–M17E**, after M17 and before M18, for migration foundation/preview, Slack
+imports, Teams imports plus Microsoft account linking, staged cutover/rollback, and
+permission-scoped context continuity with real pilot acceptance. See
+[migration-roadmap.md](migration-roadmap.md) for deliverables, platform limits and checks.
+Planning only: no implementation, website availability claims or deployment authorized.
+No owner action required now; real exports and tenant/admin permissions come at delivery.
+The final codebase walkthrough remains after the entire app is complete and deployed.
+
+
 ## October 5 — M14D Windows desktop distribution added
 
 Owner requested a Windows build. Add **M14D — Windows compatibility, installer and
@@ -77,6 +226,10 @@ historical implementation and test records below remain intact.
   PR review; retain explicit publishing approval.
 - **M17:** continuous team delivery and handoffs, reviewed learning back into memory,
   visible product differentiation and measured workflow evidence.
+- **M17A–M17E:** guided Slack/Teams migration, identity/permission mapping, safe
+  catch-up/rollback and cited historical context; see [migration-roadmap.md](migration-roadmap.md).
+- **M17F:** persistent, customizable AI Teammates as a major product pillar; see
+  [ai-teammates-roadmap.md](ai-teammates-roadmap.md).
 - **M18:** security and production acceptance for the expanded product, then authorized
   public launch. The waitlist website remains live while product capabilities stay gated.
 - **Entire-codebase walkthrough:** after the entire application is complete and deployed,

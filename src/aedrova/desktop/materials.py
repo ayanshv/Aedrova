@@ -76,8 +76,8 @@ class Backdrop(QWidget):
             painter = QPainter(source)
             painter.setPen(Qt.PenStyle.NoPen)
             for x, y, radius, alpha, tint in (
-                (width * 0.04, height * 0.90, width * 0.28, 25, "#75C9BC"),
-                (width * 0.94, height * 0.06, width * 0.25, 24, "#9990EB"),
+                (width * 0.04, height * 0.90, width * 0.28, 25, "#83B7F5"),
+                (width * 0.94, height * 0.06, width * 0.25, 24, "#88B0EF"),
                 (width * 0.52, height * 0.98, width * 0.23, 16, "#80AEED"),
             ):
                 glow = QRadialGradient(x, y, radius)
@@ -116,7 +116,7 @@ class Backdrop(QWidget):
             if panel.layer not in ("main", "sidebar") or not panel.isVisible():
                 continue
             rect = QRectF(panel.mapTo(self, QPoint()), panel.size())
-            for spread in range(18, 0, -3):
+            for spread in range(9, 0, -3):
                 painter.setBrush(QColor(0, 0, 0, 2 if self.theme.name == "light" else 3))
                 painter.drawRoundedRect(
                     rect.adjusted(-spread, 5 - spread, spread, spread + 5), 24 + spread, 24 + spread
@@ -124,7 +124,7 @@ class Backdrop(QWidget):
 
 
 class GlassFrame(QFrame):
-    def __init__(self, *, layer="surface", radius=24):
+    def __init__(self, *, layer="surface", radius=12):
         super().__init__()
         self.layer = layer
         self.radius = radius

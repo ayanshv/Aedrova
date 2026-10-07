@@ -45,7 +45,7 @@ def main():
     runner = directory / "run.mjs"
     runner.write_text("""import {PGlite} from './package/dist/index.js';
 import fs from 'node:fs';
-const db = new PGlite();
+let db = new PGlite();
 try {
  for(const file of ['supabase/tests/bootstrap.sql',
    'supabase/migrations/202609260001_identity.sql',
@@ -76,9 +76,43 @@ try {
    'supabase/migrations/202610040002_chat_collaboration.sql',
    'supabase/tests/chat_collaboration.sql',
    'supabase/migrations/202610050001_user_profiles.sql',
-   'supabase/tests/user_profiles.sql']) {
-  await db.exec(fs.readFileSync(file,'utf8'));
+   'supabase/tests/user_profiles.sql',
+   'supabase/migrations/202610060001_product_memory.sql',
+   'supabase/migrations/202610060002_memory_conflict_response.sql',
+   'supabase/tests/product_memory.sql',
+   'supabase/migrations/202610060003_build_reviews.sql',
+   'supabase/tests/build_reviews.sql',
+   'supabase/migrations/202610060004_ai_teammates.sql',
+   'supabase/tests/ai_teammates.sql']) {
+  let sql = fs.readFileSync(file,'utf8');
+  // Reproduce the already-activated original function, then verify its additive
+  // conflict-response upgrade before running the lifecycle tests.
+  if(file === 'supabase/migrations/202610060001_product_memory.sql') {
+   sql = sql.replaceAll("errcode='PT409'", "errcode='40001'");
+  }
+  await db.exec(sql);
   console.log('PASS '+file);
+ }
+ await db.close();
+ db = new PGlite();
+ // Hosted projects may have deferred meeting context. Test that installation
+ // order separately rather than hiding the dependency behind the full schema.
+ for(const file of ['supabase/tests/bootstrap.sql',
+   'supabase/migrations/202609260001_identity.sql',
+   'supabase/migrations/202609270001_agent_onboarding.sql',
+   'supabase/migrations/202609270002_messages.sql',
+   'supabase/migrations/202609280001_communication.sql',
+   'supabase/migrations/202609290001_context_decisions.sql',
+   'supabase/migrations/202610010001_meetings.sql',
+   'supabase/migrations/202610020001_scalability.sql',
+   'supabase/migrations/202610040001_message_interactions.sql',
+   'supabase/migrations/202610060001_product_memory.sql',
+   'supabase/migrations/202610060002_memory_conflict_response.sql',
+   'supabase/tests/product_memory_without_meetings.sql',
+   'supabase/migrations/202610030001_meeting_context.sql',
+   'supabase/tests/product_memory_late_meetings.sql']) {
+  await db.exec(fs.readFileSync(file,'utf8'));
+  console.log('PASS optional-meetings '+file);
  }
 } catch(e) {console.error(e.message); process.exitCode=1;} finally {await db.close();}
 """)

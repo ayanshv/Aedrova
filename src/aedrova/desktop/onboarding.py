@@ -58,6 +58,15 @@ STEPS = (
     ),
     Step(
         "Your team",
+        "Meet your AI teammates.",
+        "Use + to create a teammate. Describe their role and review suggested tools. "
+        "Click a character to mention them, then send an assignment.",
+        "ai_team_section",
+        ("ai_teammates", "custom_roles", "tool_suggestions"),
+        0,
+    ),
+    Step(
+        "Your team",
         "Give conversations a home.",
         "Pick a channel or use + to create one. Public and private channels have topics, "
         "members and unread activity.",
@@ -90,6 +99,16 @@ STEPS = (
         "search finds decisions and sources.",
         "search_button",
         ("search", "decisions", "sources"),
+        0,
+    ),
+    Step(
+        "Conversation",
+        "Keep decisions current.",
+        "Product memory links goals and requirements to their sources. Review proposals, "
+        "approve agreed decisions and replace outdated ones. Source changes are flagged "
+        "before your agent relies on them.",
+        "memory_button",
+        ("product_memory", "revisions", "source_freshness"),
         0,
     ),
     Step(

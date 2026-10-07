@@ -304,7 +304,7 @@ def test_onboarding_theme_previews_all_scenes_without_saving(flow, qtbot):
             sum(
                 screenshot.pixelColor(x, y).lightness() > 180
                 for x in range(32, screenshot.width() - 32, 3)
-                for y in range(90, 180, 3)
+                for y in range(146, 240, 3)
             )
             > 100
         )

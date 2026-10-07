@@ -1196,6 +1196,11 @@ class Collaboration(QObject):
                 ("everyone", "@everyone"),
             ]
             + [
+                (r["config"]["name"], "<@ai:" + r["id"] + "|" + r["config"]["name"] + ">")
+                for r in composer.ai_teammates
+                if not r["paused"]
+            ]
+            + [
                 (p["display_name"], "<@" + p["user_id"] + "|" + p["display_name"] + ">")
                 for p in composer.people
             ]
@@ -1207,7 +1212,7 @@ class Collaboration(QObject):
         )
         for name, token in choices:
             menu.addAction(
-                "@" + name,
+                "@" + name + (" · AI teammate" if token.startswith("<@ai:") else ""),
                 lambda checked=False, t=token, n=name: self.insert_person(composer, n, t),
             )
         menu.exec(composer.mention.mapToGlobal(composer.mention.rect().topLeft()))

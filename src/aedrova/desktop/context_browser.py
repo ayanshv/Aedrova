@@ -61,8 +61,10 @@ class ContextBrowser(AppDialog):
         self.refresh_button = button("Refresh", role="outline")
         self.confirm = button("Confirm decision", role="primary")
         self.retire = button("Retire decision", role="outline")
+        self.memory = button("Add to product memory", role="outline")
+        self.memory.clicked.connect(self.add_memory)
         self.done = button("Done", role="outline")
-        for control in (self.refresh_button, self.confirm, self.retire, self.done):
+        for control in (self.refresh_button, self.confirm, self.retire, self.memory, self.done):
             actions.addWidget(control)
         layout.addLayout(actions)
         self.query.textChanged.connect(self.search)
@@ -171,8 +173,10 @@ class ContextBrowser(AppDialog):
         source = (
             self.sources[row] if hasattr(self, "sources") and 0 <= row < len(self.sources) else None
         )
+        self.memory.setEnabled(bool(source and not source.memory_id and not self.busy))
         self.confirm.setEnabled(
-            bool(source and not source.attachment and not source.meeting and not self.busy)
+            bool(source and not source.attachment and not source.meeting
+                 and not source.memory_id and not self.busy)
         )
         self.retire.setEnabled(
             bool(source and source.decision in {"confirmed", "stale"} and not self.busy)
@@ -202,12 +206,24 @@ class ContextBrowser(AppDialog):
         else:
             self.detail.clear()
 
+    def add_memory(self):
+        row = self.results.currentRow()
+        if row < 0 or self.busy:
+            return
+        source = self.sources[row]
+        if source.memory_id:
+            return
+        from aedrova.desktop.product_memory import open_memory
+
+        kind, identifier = source.citation.split(":", 1)
+        open_memory(self.studio.window, {"kind": kind, "id": identifier})
+
     def record(self, confirmed):
         row = self.results.currentRow()
         if self.closed or self.busy or row < 0:
             return
         source = self.sources[row]
-        if source.attachment or source.meeting:
+        if source.attachment or source.meeting or source.memory_id:
             return
         self.busy = True
         self.selected()

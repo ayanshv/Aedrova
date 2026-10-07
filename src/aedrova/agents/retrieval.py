@@ -25,6 +25,7 @@ class Source:
     meeting: str = ""
     speaker: str = ""
     offset_ms: int = 0
+    memory_id: str = ""
 
     def record(self):
         return vars(self)
@@ -43,6 +44,27 @@ class ContextIndex:
             r["message"]["id"]: r["message"] for r in records if isinstance(r.get("message"), dict)
         }
         decisions = {r["decision"]["message_id"]: r["decision"] for r in records if "decision" in r}
+        self.memory_snapshot = next(
+            (r["product_memory_snapshot"] for r in records if "product_memory_snapshot" in r), {}
+        )
+        for item in self.memory_snapshot.get("items", []):
+            if item["channel_id"] not in context.channel_ids:
+                raise PermissionError("Memory is outside this context scope.")
+            state = item["state"] if item["fresh"] else "stale"
+            self._add(
+                Source(
+                    "memory:" + item["id"],
+                    item["id"],
+                    channels.get(item["channel_id"], "channel"),
+                    item["title"] + "\n" + item["body"],
+                    None,
+                    item["updated_at"],
+                    "memory_" + state,
+                    item["updated_by"],
+                    str(item["version"]),
+                    memory_id=item["id"],
+                )
+            )
         for identifier, message in messages.items():
             if message["channel_id"] not in context.channel_ids:
                 raise PermissionError("Evidence contains a channel outside this snapshot.")
@@ -72,24 +94,35 @@ class ContextIndex:
             meeting = record.get("meeting_text")
             if meeting is None:
                 continue
-            if (meeting.get("channel_id") not in context.channel_ids
-                    or meeting.get("ai_allowed") is not True
-                    or meeting.get("source") not in {"participant_text", "provider_speech"}
-                    or (meeting.get("source") == "provider_speech"
-                        and not meeting.get("reviewed_at"))):
+            if (
+                meeting.get("channel_id") not in context.channel_ids
+                or meeting.get("ai_allowed") is not True
+                or meeting.get("source") not in {"participant_text", "provider_speech"}
+                or (meeting.get("source") == "provider_speech" and not meeting.get("reviewed_at"))
+            ):
                 raise PermissionError("Meeting text lacks authorized scope and consent.")
-            self._add(Source(
-                "meeting:" + meeting["id"], "meeting:" + meeting["id"],
-                channels.get(meeting["channel_id"], "channel"), meeting["body"],
-                None, meeting["created_at"],
-                ("confirmed_meeting_decision" if meeting.get("confirmed_decision") else
-                 "reviewed_speech" if meeting["source"] == "provider_speech"
-                 else "participant_text"),
-                meeting.get("reviewed_by") or "",
-                hashlib.sha256(meeting["body"].encode()).hexdigest(),
-                meeting=meeting["meeting_id"], speaker=meeting["speaker_id"],
-                offset_ms=meeting["offset_ms"],
-            ))
+            self._add(
+                Source(
+                    "meeting:" + meeting["id"],
+                    "meeting:" + meeting["id"],
+                    channels.get(meeting["channel_id"], "channel"),
+                    meeting["body"],
+                    None,
+                    meeting["created_at"],
+                    (
+                        "confirmed_meeting_decision"
+                        if meeting.get("confirmed_decision")
+                        else "reviewed_speech"
+                        if meeting["source"] == "provider_speech"
+                        else "participant_text"
+                    ),
+                    meeting.get("reviewed_by") or "",
+                    hashlib.sha256(meeting["body"].encode()).hexdigest(),
+                    meeting=meeting["meeting_id"],
+                    speaker=meeting["speaker_id"],
+                    offset_ms=meeting["offset_ms"],
+                )
+            )
         for record in records:
             if "attachment" not in record:
                 continue
@@ -153,6 +186,7 @@ class ContextIndex:
                 "total_sources": len(self.sources),
                 "sources": [s.record() for s in selected.values()],
                 "decision_inventory": [s.record() for s in decisions],
+                "product_memory": self.memory_snapshot,
                 "notice": "Ranked leads, not exhaustive requirements. Full evidence follows. "
                 "Confirmed means a member recorded this message, not unanimous agreement. "
                 "Stale/retired decisions are not current. Resolve conflicts with the user.",
@@ -176,7 +210,7 @@ def validate_citations(context, plan):
     index = ContextIndex(context)
     try:
         available = {s.citation for s in index.sources}
-        cited = set(re.findall(r"(?:message|attachment|meeting):[A-Za-z0-9_-]+", plan))
+        cited = set(re.findall(r"(?:message|attachment|meeting|memory):[A-Za-z0-9_-]+", plan))
         unknown = cited - available
         if unknown:
             raise ValueError(

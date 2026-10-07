@@ -183,7 +183,11 @@ class AedrovaWindow(QMainWindow):
         self.invite_teammates_button = button("Invite teammates…", "Invite teammates")
         self.invite_teammates_button.clicked.connect(lambda: self.show_account("invite"))
         side.addWidget(self.invite_teammates_button)
-        side.addSpacing(30)
+        from aedrova.desktop.teammate_habitat import TeamSection
+
+        self.ai_team_section = TeamSection(self)
+        side.addWidget(self.ai_team_section)
+        side.addSpacing(16)
         channels_header = QHBoxLayout()
         channels_header.addWidget(label("CHANNELS", "section"))
         channels_header.addStretch()
@@ -219,9 +223,9 @@ class AedrovaWindow(QMainWindow):
         quiet_layout.addLayout(presence)
         quiet_layout.addWidget(label("Quiet until you need it.", "muted"))
         quiet_layout.addWidget(label("From a thought to a thing.", "muted"))
-        side.addWidget(quiet)
+        quiet.hide()
         side.addSpacing(8)
-        side.addWidget(label("Preview · changes stay on this Mac", "muted", wrap=True))
+
         body.addWidget(self.sidebar)
         main = GlassFrame(layer="main")
         self.main_surface = main
@@ -230,12 +234,13 @@ class AedrovaWindow(QMainWindow):
         main_layout.setSpacing(0)
         self.header = QFrame()
         self.header.setObjectName("ChannelHeader")
-        self.header.setFixedHeight(112)
+        self.header.setFixedHeight(92)
         header_layout = QHBoxLayout(self.header)
-        header_layout.setContentsMargins(32, 22, 32, 16)
+        header_layout.setContentsMargins(26, 18, 26, 14)
         heading = QVBoxLayout()
         heading.setSpacing(5)
         self.channel_title = label("Product", "display")
+        self.channel_title.setStyleSheet("font-size:26px;font-weight:600;")
         self.channel_title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.channel_topic = label("", "muted")
         self.channel_topic.setWordWrap(True)
@@ -290,6 +295,9 @@ class AedrovaWindow(QMainWindow):
             tabs_layout.addWidget(tab)
         tab_area_layout.addWidget(tabs)
         tab_area_layout.addStretch()
+        self.memory_button = button("Product memory", "Open product memory", "outline")
+        self.memory_button.clicked.connect(self.open_product_memory)
+        tab_area_layout.addWidget(self.memory_button)
         main_layout.addWidget(tab_area)
         self.pages = QStackedWidget()
         main_layout.addWidget(self.pages, 1)
@@ -540,6 +548,15 @@ class AedrovaWindow(QMainWindow):
         if workspace_id == self.workspace_id:
             self.workspace_buttons[workspace_id].setChecked(True)
             return
+        teammate_dialog = getattr(self, "teammates_dialog", None)
+        if teammate_dialog and not teammate_dialog.closed:
+            teammate_dialog.reject()
+        memory = getattr(self, "memory_dialog", None)
+        if memory and not memory.closed:
+            memory.reject()
+        shared = getattr(self, "shared_build_dialog", None)
+        if shared:
+            shared.reject()
         self._save_drafts()
         self.last_channels[self.workspace_id] = self.channel_id
         self.workspace_id = workspace_id
@@ -581,7 +598,27 @@ class AedrovaWindow(QMainWindow):
             (p["nickname"] for p in preferences if p["workspace_id"] == self.workspace_id),
             "Aedrova",
         )
+        if hasattr(self, "ai_team_section"):
+            team = (
+                [
+                    r
+                    for r in account.snapshot.get("ai_teammates", [])
+                    if r["workspace_id"] == self.workspace_id
+                ]
+                if account
+                else []
+            )
+            self.ai_team_section.sync(team, self.workspace_id)
         for composer in (self.composer, self.thread_composer):
+            composer.ai_teammates = (
+                [
+                    r
+                    for r in self.account_dialog.snapshot.get("ai_teammates", [])
+                    if r["workspace_id"] == self.workspace_id
+                ]
+                if hasattr(self, "account_dialog")
+                else []
+            )
             composer.set_agent_name(nickname)
         if self.connected and self.current_user():
             from aedrova.desktop.execution import execution_queue
@@ -741,6 +778,9 @@ class AedrovaWindow(QMainWindow):
         self.agent_feed.author_name = next(
             (p["nickname"] for p in preferences if p["workspace_id"] == workspace), "Aedrova"
         )
+        active = getattr(self, "build_dialog", None)
+        if active and getattr(active, "teammate", None) and active.workspace == workspace:
+            self.agent_feed.author_name = active.teammate["config"]["name"]
         self.agent_feed.add_event(text)
         self.messages.set_agent_visible(self.activity_channel == self.channel_id)
         if self.messages.model().rowCount() == 0:
@@ -765,6 +805,9 @@ class AedrovaWindow(QMainWindow):
         nickname = next(
             (p["nickname"] for p in preferences if p["workspace_id"] == workspace), "Aedrova"
         )
+        active = getattr(self, "build_dialog", None)
+        if active and getattr(active, "teammate", None) and active.workspace == workspace:
+            nickname = active.teammate["config"]["name"]
         self.build_activity.setText(text[:105])
         if workspace == self.workspace_id:
             self.activity_channel = getattr(self, "activity_channel", self.channel_id)
@@ -806,6 +849,34 @@ class AedrovaWindow(QMainWindow):
             (p["nickname"] for p in preferences if p["workspace_id"] == self.workspace_id),
             "Aedrova",
         )
+        from aedrova.teammates.model import resolve
+
+        rows = [
+            r
+            for r in self.account_dialog.snapshot.get("ai_teammates", [])
+            if r["workspace_id"] == self.workspace_id
+        ]
+        specialist = resolve(text, rows)
+        if specialist:
+            teammate, assignment = specialist
+            if teammate["paused"]:
+                self.notify(teammate["config"]["name"] + " is paused. Resume them in AI teammates.")
+            elif not assignment:
+                self.notify("Add an assignment after the teammate's name.")
+            else:
+                from aedrova.desktop.execution import execution_queue
+
+                if execution_queue(self).submit(assignment, teammate=teammate):
+                    for composer in (self.composer, self.thread_composer):
+                        visible = resolve(composer.editor.toPlainText(), rows)
+                        if composer.editor.toPlainText().strip() == text.strip() or (
+                            visible
+                            and visible[0]["id"] == teammate["id"]
+                            and visible[1] == assignment
+                        ):
+                            composer.clear()
+                    self._save_drafts()
+            return True
         task = build_command(text, nickname)
         if task is None:
             return False
@@ -910,6 +981,11 @@ class AedrovaWindow(QMainWindow):
         self.store.drafts[(self.workspace_id, self.channel_id, self.thread_id)] = ""
         QTimer.singleShot(0, self.thread_messages.scrollToBottom)
         self.notify("Reply added to this local preview.")
+
+    def open_product_memory(self):
+        from aedrova.desktop.product_memory import open_memory
+
+        open_memory(self)
 
     def select_tab(self, index):
         if not 0 <= index < len(self.tab_buttons):
