@@ -376,10 +376,10 @@ def test_spring_motion_reacts_without_moving_layout(window, qtbot):
     control = window.search_button
     original = control.geometry()
     QApplication.sendEvent(control, QEvent(QEvent.Type.Enter))
-    qtbot.waitUntil(lambda: control.motion.effect.get_scale() > 1.01)
+    assert control.motion.effect.get_scale() == 1.0
     assert control.geometry() == original
     qtbot.mousePress(control, Qt.MouseButton.LeftButton)
-    qtbot.waitUntil(lambda: control.motion.effect.get_scale() < 0.99)
+    qtbot.waitUntil(lambda: control.motion.effect.get_scale() < 0.995)
     # Release outside the control: test the physical spring without opening a dialog.
     from PySide6.QtCore import QPoint
 

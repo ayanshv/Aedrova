@@ -138,7 +138,7 @@ class MessageDelegate(QStyledItemDelegate):
         self.documents = OrderedDict()
 
     def document(self, message, width):
-        width = max(80, width)
+        width = max(80, min(880, width))
         key = (message.id, message.body, width, self.theme.name)
         if key not in self.documents:
             document = SafeDocument()
@@ -803,7 +803,7 @@ class Composer(QFrame):
         self.hint.setProperty("role", "muted")
         bottom.addWidget(self.hint)
         bottom.addStretch()
-        self.send = SpringButton("Reply ↑" if thread else "Send ↑")
+        self.send = SpringButton("Reply" if thread else "Send")
         self.send.setProperty("role", "primary")
         self.send.setAccessibleName("Send thread reply" if thread else "Send message")
         self.send.setToolTip("Send reply · Return" if thread else "Send message · Return")
@@ -813,6 +813,12 @@ class Composer(QFrame):
         self.editor.textChanged.connect(self._changed)
         bottom.addWidget(self.send)
         layout.addLayout(bottom)
+        from aedrova.desktop.icons import assign
+
+        for control, name in ((self.mention, "mention"), (self.emoji, "smile")):
+            assign(control, name)
+            control.setText("")
+        assign(self.send, "send")
 
     def insert_emoji(self):
         emoji = pick_emoji(self)

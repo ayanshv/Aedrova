@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QSizePolicy,
     QVBoxLayout,
 )
 
@@ -14,24 +15,36 @@ from aedrova.desktop.materials import SpringButton, system_font
 
 
 def label(text, role="", *, wrap=False):
+    from aedrova.desktop.design_system import TYPE
+
     widget = QLabel(text)
     if role in ("display", "heading"):
-        widget.setFont(system_font(34 if role == "display" else 32, QFont.Weight.DemiBold, -0.9))
+        widget.setFont(system_font(TYPE[role], QFont.Weight.DemiBold, -0.6))
     elif role == "title":
-        widget.setFont(system_font(20, QFont.Weight.DemiBold, -0.35))
+        widget.setFont(system_font(TYPE[role], QFont.Weight.DemiBold, -0.25))
     widget.setTextFormat(Qt.TextFormat.PlainText)
-    widget.setWordWrap(wrap or role in ('heading', 'title'))
+    widget.setWordWrap(wrap or role in ("heading", "title"))
+    if widget.wordWrap() and role not in ("heading", "title"):
+        widget.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
     if role:
         widget.setProperty("role", role)
     return widget
 
 
 def button(text, accessible="", role=""):
-    widget = SpringButton(text)
-    widget.setAccessibleName(accessible or text)
+    import re
+
+    visible = re.sub(r"(?<!&)&(?!&)", "&&", text)
+    widget = SpringButton(visible)
+    widget.setAccessibleName(accessible or text.replace("&&", "&"))
     widget.setCursor(Qt.CursorShape.PointingHandCursor)
     if role:
         widget.setProperty("role", role)
+    from aedrova.desktop.icons import SYMBOLS, assign
+
+    if text in SYMBOLS:
+        assign(widget, SYMBOLS[text])
+        widget.setText("")
     return widget
 
 

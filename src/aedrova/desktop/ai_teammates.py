@@ -7,17 +7,19 @@ from PySide6.QtCore import QObject, QRectF, QRunnable, Qt, QThreadPool, QTimer, 
 from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import (
     QFormLayout,
-    QHBoxLayout,
     QLineEdit,
     QListWidget,
     QPlainTextEdit,
     QScrollArea,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from aedrova.desktop.choice_slider import ChoiceSlider
+from aedrova.desktop.connector_panel import ConnectorPanel
 from aedrova.desktop.controls import AppDialog
+from aedrova.desktop.design_system import FlowActions, MasterDetail
 from aedrova.desktop.dialogs import button, label
 from aedrova.teammates.model import (
     COLORS,
@@ -105,6 +107,11 @@ class TeammatesDialog(AppDialog):
         self.workspace, self.user = window.workspace_id, str(window.current_user().id)
         self.rows, self.selected, self.busy, self.closed = [], None, False, False
         self.role_job = None
+        self.last_advised_role = ""
+        self.role_timer = QTimer(self)
+        self.role_timer.setSingleShot(True)
+        self.role_timer.setInterval(1600)
+        self.role_timer.timeout.connect(self.automatic_suggestions)
         self.suggested_tools = []
         self.draft_id = str(uuid4())
         self.setWindowTitle("Aedrova · AI teammates")
@@ -126,7 +133,6 @@ class TeammatesDialog(AppDialog):
         self.list.setAccessibleName("Workspace AI teammates")
         self.list.setProperty("accountList", True)
         self.list.setMaximumHeight(76)
-        layout.addWidget(self.list)
         area = QScrollArea()
         area.setWidgetResizable(True)
         area.setFrameShape(area.Shape.NoFrame)
@@ -134,8 +140,18 @@ class TeammatesDialog(AppDialog):
         content = QVBoxLayout(body)
         self.character = Character(reduced_motion=window.reduced_motion)
         content.addWidget(self.character, alignment=Qt.AlignmentFlag.AlignHCenter)
-        form = QFormLayout()
+        tabs = QTabWidget()
+        purpose = QWidget()
+        personality = QWidget()
+        form = QFormLayout(purpose)
+        style_form = QFormLayout(personality)
+        style_form.setSpacing(16)
+        tabs.addTab(purpose, "Purpose and tools")
+        tabs.addTab(personality, "Personality")
         form.setSpacing(12)
+        for fields in (form, style_form):
+            fields.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
+            fields.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         self.name = QLineEdit("Pixel")
         self.name.setMaxLength(24)
         self.name.setAccessibleName("Teammate name")
@@ -151,13 +167,15 @@ class TeammatesDialog(AppDialog):
         self.suggest.clicked.connect(self.suggest_role)
         form.addRow("", self.suggest)
         self.advice = label(
-            "Describe their role, then ask your provider for suggestions. "
-            "Uses provider login and allowance.",
+            "Suggestions appear automatically after you describe their role. "
+            "AI refinement uses your provider login and allowance; it never connects tools.",
             "muted",
             wrap=True,
         )
         self.advice.setTextFormat(Qt.TextFormat.PlainText)
         form.addRow("", self.advice)
+        self.connectors = ConnectorPanel(self)
+        form.addRow("", self.connectors)
         self.fields = {}
         for key, title, choices in (
             (
@@ -188,7 +206,7 @@ class TeammatesDialog(AppDialog):
                 field.addItem(text, value)
             field.setAccessibleName("Teammate " + title)
             self.fields[key] = field
-            form.addRow(title, field)
+            (form if key == "role" else style_form).addRow(title, field)
             field.currentIndexChanged.connect(self.preview)
         self.responsibilities = QPlainTextEdit(
             "Help with focused assignments and cite accessible evidence."
@@ -198,21 +216,23 @@ class TeammatesDialog(AppDialog):
         self.fields["role"].currentIndexChanged.connect(self.role_template)
         form.addRow("Responsibilities", self.responsibilities)
         self.fields["effort"].setCurrentIndex(1)
-        content.addLayout(form)
+        content.addWidget(tabs)
         content.addWidget(
             label(
                 "Context: your accessible workspace evidence and approved Product memory. "
                 "Engineering uses saved project permissions; Product and Research are read-only. "
                 "The work window caps runtime, not provider charges. Importance never changes "
                 "permissions or bypasses the queue. "
-                "External app connectors arrive in the next stages.",
+                "Connected external resources are read-only and bounded. Publishing still "
+                "requires the existing delivery approval workflow.",
                 "muted",
                 wrap=True,
             )
         )
         area.setWidget(body)
-        layout.addWidget(area, 1)
-        actions = QHBoxLayout()
+        self.master_detail = MasterDetail(self.list, area)
+        layout.addWidget(self.master_detail, 1)
+        actions = FlowActions()
         self.new = button("New", role="outline")
         self.save = button("Save teammate", role="primary")
         self.pause = button("Pause", role="outline")
@@ -228,6 +248,7 @@ class TeammatesDialog(AppDialog):
         done.clicked.connect(self.reject)
         self.list.currentRowChanged.connect(self.select)
         self.name.textChanged.connect(self.preview)
+        self.role_input.textEdited.connect(self.role_changed)
         window.account_dialog.session_closed.connect(self.reject)
         self.refresh()
 
@@ -240,10 +261,12 @@ class TeammatesDialog(AppDialog):
         )
 
     def valid(self):
+        current = self.window.current_user()
         return (
             not self.closed
+            and current is not None
             and self.window.workspace_id == self.workspace
-            and str(self.window.current_user().id) == self.user
+            and str(current.id) == self.user
         )
 
     def run(self, name, action, completed):
@@ -256,6 +279,10 @@ class TeammatesDialog(AppDialog):
             try:
                 return {"value": action(self.window.account_dialog.service)}
             except Exception as error:
+                from aedrova.connectors.service import ConnectorError
+
+                if isinstance(error, ConnectorError):
+                    return {"error": "connector", "message": str(error)}
                 return {"error": getattr(error, "code", "")}
 
         def finish(result):
@@ -266,9 +293,12 @@ class TeammatesDialog(AppDialog):
             self.controls()
             if "error" in result:
                 self.status.setText(
-                    "Settings could not save. Refresh before retrying; names must be unique "
-                    "and your owner/admin access must still be active."
+                    result.get("message")
+                    or "Settings could not save. Refresh before retrying; "
+                    "names must be unique and your owner/admin access must still be active."
                 )
+                if name in {"connect", "disconnect"}:
+                    self.connectors.status.setText(self.status.text())
             else:
                 completed(result["value"])
 
@@ -312,6 +342,7 @@ class TeammatesDialog(AppDialog):
             "role_label": self.role_input.text().strip()
             or ROLES[self.fields["role"].currentData()],
             "suggested_tools": list(self.suggested_tools),
+            "connections": [dict(r) for r in self.connectors.rows],
             **{k: f.currentData() for k, f in self.fields.items()},
         }
 
@@ -347,17 +378,20 @@ class TeammatesDialog(AppDialog):
         ):
             w.setEnabled(allowed)
         self.suggest.setEnabled(allowed and self.role_job is None)
+        self.connectors.permissions(self.busy, allowed)
         self.pause.setEnabled(allowed and self.selected is not None)
         self.remove.setEnabled(allowed and self.selected is not None)
 
     def create(self):
         self.selected = None
+        self.last_advised_role = ""
         self.draft_id = str(uuid4())
         self.list.setCurrentRow(-1)
         self.name.setText("Pixel")
         self.role_input.clear()
         self.fields["role"].setCurrentIndex(0)
         self.suggested_tools = []
+        self.connectors.load([])
         self.advice.setText("Describe the role to get suggested tools.")
         self.controls()
 
@@ -368,8 +402,14 @@ class TeammatesDialog(AppDialog):
         config = self.selected["config"]
         self.name.setText(config["name"])
         self.role_input.setText(config.get("role_label", ROLES[config["role"]]))
-        self.suggested_tools = config.get("suggested_tools", [])
-        self.show_suggestions()
+        from aedrova.teammates.advisor import suggest_locally
+
+        self.suggested_tools = config.get("suggested_tools") or suggest_locally(
+            self.role_input.text()
+        )
+        self.connectors.load(config.get("connections", []))
+        self.select_suggested_connector()
+        self.show_suggestions("Suggested tools for this role.")
         self.responsibilities.setPlainText(config["responsibilities"])
         for k, field in self.fields.items():
             at = field.findData(config[k])
@@ -389,6 +429,9 @@ class TeammatesDialog(AppDialog):
         config = self.config()
         try:
             validate(config)
+            from aedrova.connectors.service import validate_connections
+
+            validate_connections(config["connections"])
         except ValueError as error:
             self.status.setText(str(error))
             return
@@ -414,10 +457,30 @@ class TeammatesDialog(AppDialog):
             self.window.connected.refresh()
             self.refresh()
 
-        self.run("save", lambda service: service.save_ai_teammate(parameters), saved)
+        def verified_save(service):
+            from aedrova.connectors.service import evidence
+
+            evidence(self.user, self.workspace, {"id": record["id"], "config": config})
+            return service.save_ai_teammate(parameters)
+
+        self.run("save", verified_save, saved)
+
+    def role_changed(self):
+        from aedrova.teammates.advisor import suggest_locally
+
+        self.suggested_tools = suggest_locally(self.role_input.text())
+        self.select_suggested_connector()
+        self.show_suggestions("Suggested from your role · AI refinement follows automatically.")
+        self.role_timer.start()
+
+    def automatic_suggestions(self):
+        role = self.role_input.text().strip()
+        if len(role) >= 8 and role != self.last_advised_role and not self.role_job:
+            self.last_advised_role = role
+            self.suggest_role()
 
     def suggest_role(self):
-        if not self.editable() or self.role_job:
+        if not self.editable() or self.role_job or self.busy or not self.valid():
             return
         from aedrova.desktop.projects import binding
         from aedrova.teammates.advisor import role_prompt
@@ -441,15 +504,27 @@ class TeammatesDialog(AppDialog):
         self.suggest.setEnabled(self.editable())
         if role != self.role_input.text().strip():
             self.advice.setText("Your role changed. Ask for fresh suggestions.")
+            self.role_timer.start()
             return
         if value.get("error"):
             self.advice.setText(
-                "Your provider couldn't suggest tools. Check its login or allowance. "
-                "You can still save the role and choose an execution mode yourself."
+                "AI refinement unavailable. Role-based suggestions remain available below. "
+                "Check provider login or allowance, or connect a tool directly."
             )
+            self.show_suggestions(self.advice.text())
             return
         self.suggested_tools = value["advice"]["tools"]
+        self.select_suggested_connector()
         self.show_suggestions(value["advice"]["summary"])
+
+    def select_suggested_connector(self):
+        if self.connectors.resource.text().strip() or self.connectors.token.text():
+            return  # Never overwrite a connection the user is already configuring.
+        for tool in self.suggested_tools:
+            at = self.connectors.kind.findData(tool)
+            if at >= 0:
+                self.connectors.kind.setCurrentIndex(at)
+                break
 
     def show_suggestions(self, summary=""):
         from aedrova.teammates.advisor import TOOLS
@@ -460,7 +535,7 @@ class TeammatesDialog(AppDialog):
                 title, availability = TOOLS[key]
                 lines.append(title + " · " + availability)
         lines.append(
-            "Suggestions only. No tool is connected or permission granted here. "
+            "Connect a suggested tool below to grant access. Suggestions grant no permissions. "
             "Uses your provider login; provider usage may be billed."
         )
         self.advice.setText("\n".join(lines))
@@ -480,6 +555,7 @@ class TeammatesDialog(AppDialog):
 
     def reject(self):
         self.closed = True
+        self.role_timer.stop()
         if self.role_job:
             self.role_job.runner.cancel()
         self.rows = []

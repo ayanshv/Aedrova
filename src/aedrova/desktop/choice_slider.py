@@ -14,6 +14,7 @@ class ChoiceSlider(QWidget):
         column.setContentsMargins(0, 0, 0, 0)
         column.setSpacing(5)
         self.caption = QLabel()
+        self.caption.setWordWrap(True)
         self.caption.setProperty("role", "muted")
         column.addWidget(self.caption)
         self.slider = QSlider(Qt.Orientation.Horizontal)

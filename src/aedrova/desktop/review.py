@@ -18,6 +18,7 @@ from aedrova.delivery.files import apply_review, make_review
 from aedrova.delivery.github import GitHub, prepare_publication, publish
 from aedrova.delivery.preview import StaticPreview
 from aedrova.desktop.controls import AppDialog
+from aedrova.desktop.design_system import FlowActions
 from aedrova.desktop.dialogs import button, label
 from aedrova.desktop.projects import Job, binding, open_editor
 
@@ -58,7 +59,7 @@ class ReviewDialog(AppDialog):
         layout.addLayout(content, 1)
         self.scope = label("", "muted", wrap=True)
         layout.addWidget(self.scope)
-        local = QHBoxLayout()
+        local = FlowActions()
         self.refresh_button = button("Refresh review", role="outline")
         self.ide = button("Open build in IDE", role="outline")
         self.preview_button = button("Preview site", role="outline")
@@ -66,7 +67,7 @@ class ReviewDialog(AppDialog):
         for control in (self.refresh_button, self.ide, self.preview_button, self.apply_button):
             local.addWidget(control)
         layout.addLayout(local)
-        remote = QHBoxLayout()
+        remote = FlowActions()
         self.prepare_button = button("Prepare GitHub review", role="outline")
         self.publish_button = button("Publish branch & draft PR…", role="primary")
         self.publish_button.setEnabled(False)

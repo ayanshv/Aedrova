@@ -50,13 +50,13 @@ class FramePreview(QWidget):
         painter.fillRect(self.rect(), canvas)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(background)
-        painter.drawRoundedRect(self.rect(), 18, 18)
+        painter.drawRoundedRect(self.rect(), 10, 10)
         if self.image.isNull():
             painter.setPen(self.palette().color(QPalette.ColorRole.PlaceholderText))
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self.text)
             return
         clip = QPainterPath()
-        clip.addRoundedRect(self.rect(), 18, 18)
+        clip.addRoundedRect(self.rect(), 10, 10)
         painter.setClipPath(clip)
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         mode = Qt.AspectRatioMode.KeepAspectRatioByExpanding if self.fill else (

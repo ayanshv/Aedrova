@@ -145,6 +145,8 @@ subprocess.run(
         "--collect-all",
         "claude_agent_sdk",
         "--collect-all",
+        "keyring",
+        "--collect-all",
         "livekit.rtc",
         "--collect-all",
         "livekit.protocol",

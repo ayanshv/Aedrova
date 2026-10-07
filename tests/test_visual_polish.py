@@ -1,7 +1,7 @@
 """Visual regressions that previously hid controls or content in narrow/dark layouts."""
 
 from PySide6.QtCore import QSettings, Qt
-from PySide6.QtGui import QPalette, QTextCursor
+from PySide6.QtGui import QColor, QPalette, QTextCursor
 from PySide6.QtWidgets import QLabel, QMessageBox, QScrollArea
 from test_connected import setup
 from test_meeting_calls import Backend, Worker
@@ -25,7 +25,9 @@ def test_dark_scroll_panels_and_live_theme_change(qtbot, tmp_path):
         scroll = dialog.findChild(QScrollArea)
         # Sample an unoccupied corner of the scroll content, not just its palette.
         image = scroll.widget().grab().toImage()
-        assert image.pixelColor(2, 2).name().upper() == DARK.bg
+        actual, expected = image.pixelColor(2, 2), QColor(DARK.bg)
+        # Native color conversion can round a channel by one on macOS.
+        assert max(abs(a - b) for a, b in zip(actual.getRgb(), expected.getRgb(), strict=True)) <= 1
         assert dialog.palette().color(QPalette.ColorRole.Window).name().upper() == DARK.bg
     window.set_theme("light", persist=False)
     for dialog in dialogs:

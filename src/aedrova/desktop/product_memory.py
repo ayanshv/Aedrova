@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from aedrova.desktop.controls import AppDialog, ChoiceBox
+from aedrova.desktop.design_system import FlowActions, MasterDetail
 from aedrova.desktop.dialogs import button, label
 from aedrova.memory.model import KINDS, STATES, snapshot_record
 
@@ -68,7 +69,6 @@ class ProductMemory(AppDialog):
         self.list.setAccessibleName("Product memory entries")
         self.list.setMaximumHeight(110)
         self.list.currentRowChanged.connect(self.select_entry)
-        layout.addWidget(self.list)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QScrollArea.Shape.NoFrame)
@@ -78,7 +78,8 @@ class ProductMemory(AppDialog):
         editor.setContentsMargins(0, 8, 0, 8)
         editor.setSpacing(12)
         scroll.setWidget(form)
-        layout.addWidget(scroll, 1)
+        self.master_detail = MasterDetail(self.list, scroll)
+        layout.addWidget(self.master_detail, 1)
         selectors = QHBoxLayout()
         self.kind = ChoiceBox()
         self.kind.addItems(list(KINDS))
@@ -122,7 +123,7 @@ class ProductMemory(AppDialog):
         self.evidence.setAccessibleName("Memory source citations and freshness")
         self.evidence.setMinimumHeight(110)
         editor.addWidget(self.evidence)
-        source_actions = QHBoxLayout()
+        source_actions = FlowActions()
         self.review = button("Review current sources", role="outline")
         self.review.clicked.connect(self.review_sources)
         self.open_source = button("Open citation", role="outline")
@@ -141,7 +142,7 @@ class ProductMemory(AppDialog):
         self.history.setMinimumHeight(100)
         editor.addWidget(self.history)
         self.history.hide()
-        actions = QHBoxLayout()
+        actions = FlowActions()
         self.replace_button = button("Supersede with new entry", role="outline")
         self.replace_button.clicked.connect(self.supersede)
         history = button("Revision history", role="outline")

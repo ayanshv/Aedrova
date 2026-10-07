@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 
 from aedrova.delivery.github import GitHub, repository_name
 from aedrova.desktop.controls import AppDialog, ChoiceBox, choose_project
+from aedrova.desktop.design_system import FlowActions
 from aedrova.desktop.dialogs import button, label
 
 
@@ -189,7 +190,7 @@ class ProjectDialog(AppDialog):
             "Connect once, then start your next build from chat.", "muted", wrap=True
         )
         layout.addWidget(self.status)
-        actions = QHBoxLayout()
+        actions = FlowActions()
         disconnect = button("Disconnect project", role="outline")
         disconnect.clicked.connect(self.disconnect)
         save = button("Save connection", role="primary")

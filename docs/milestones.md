@@ -1,5 +1,24 @@
 # Delivery gates
 
+## October 6 — Workroom product redesign
+
+Owner authorized a structural frontend redesign through the attached design brief.
+Implemented compact workspace navigation, responsive context/review/editor layouts,
+shared neutral/blue typography and controls, grouped settings, refreshed onboarding and
+matching local website styles/screenshots. No schema or permission changes.
+See [design-audit.md](design-audit.md) for scope, captures, test results and limitations.
+No new owner configuration is required; website publication and M17F.2 remain approval-gated.
+
+## October 6 — real teammate connectors brought forward
+
+Owner authorized scoped GitHub, Figma and Notion read-only tool connections, automatic
+role-based/real-provider suggestions and a mandatory verified connection for saving/running
+a teammate. macOS Keychain credentials are isolated per user/workspace/actor/resource;
+config contains no tokens. Every work phase rechecks access. GitHub live API and native
+Keychain acceptance passed; Figma/Notion live checks require owner-granted resources.
+No SQL migration needed. See [teammate-connectors.md](teammate-connectors.md) for exact
+in-app setup, bounded coverage, limitations and validation. M17F.2 remains approval-gated.
+
 ## October 6 — onboarding, custom-role sliders and living teammate UI refinement
 
 Owner approved a reference-led App onboarding/chatspace redesign and animated teammate shelf.

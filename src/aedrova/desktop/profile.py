@@ -106,7 +106,7 @@ class Avatar(QWidget):
                 (self.width() - pixmap.width()) // 2, (self.height() - pixmap.height()) // 2, pixmap
             )
         else:
-            painter.fillRect(self.rect(), QColor("#8A83CE"))
+            painter.fillRect(self.rect(), QColor("#246BFD"))
             painter.setPen(QColor("white"))
             painter.setFont(system_font(26))
             painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self.initials)

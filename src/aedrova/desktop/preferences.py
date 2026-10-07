@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 
 from aedrova.agents.managed import ManagedClient, ai_access_mode, application_origin
 from aedrova.desktop.controls import AppDialog, ChoiceBox
+from aedrova.desktop.design_system import FlowActions, section
 from aedrova.desktop.dialogs import button, label
 
 
@@ -38,12 +39,13 @@ class SettingsDialog(AppDialog):
         self.resize(600, 760)
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(16)
-        layout.addWidget(label("Make yourself at home.", "heading"))
+        layout.addWidget(label("Settings", "heading"))
+        root_layout = layout
         account = getattr(window, "account_dialog", None)
         self.user = account.service.user if account and account.service else None
         self.account = account
         if self.user:
-            layout.addWidget(label("ACCOUNT", "section"))
+            layout = section(root_layout, "Account", "Your identity across the workspace.")
             layout.addWidget(label(getattr(self.user, "email", None) or "Google account"))
             layout.addWidget(
                 label(
@@ -70,7 +72,7 @@ class SettingsDialog(AppDialog):
             row.addWidget(self.name, 1)
             row.addWidget(self.save)
             layout.addLayout(row)
-        layout.addWidget(label("APPEARANCE", "section"))
+        layout = section(root_layout, "Appearance", "Choose a comfortable way to work.")
         self.appearance = ChoiceBox()
         self.appearance.setAccessibleName("Appearance")
         for text, value in (("Match macOS", "system"), ("Light", "light"), ("Dark", "dark")):
@@ -88,7 +90,7 @@ class SettingsDialog(AppDialog):
         self.transparency.setChecked(window.reduced_transparency)
         self.transparency.toggled.connect(window.reduce_transparency_action.setChecked)
         layout.addWidget(self.transparency)
-        layout.addWidget(label("EDITOR", "section"))
+        layout = section(root_layout, "Workflow", "Open project files in your preferred editor.")
         self.editor = ChoiceBox()
         self.editor.setAccessibleName("Preferred editor")
         for name in ("Visual Studio Code", "Cursor", "Xcode", "Finder"):
@@ -100,7 +102,7 @@ class SettingsDialog(AppDialog):
         layout.addWidget(self.editor)
         self.billing_origin = application_origin()
         if self.user:
-            layout.addWidget(label("PLAN & INCLUDED AI", "section"))
+            layout = section(root_layout, "Plan & AI access")
             if ai_access_mode() == "local":
                 layout.addWidget(
                     label(
@@ -139,9 +141,10 @@ class SettingsDialog(AppDialog):
                 row.addWidget(refresh)
                 layout.addLayout(row)
                 self.load_balance()
+        layout = root_layout
         self.status = label("Preferences are saved on this Mac.", "muted", wrap=True)
         layout.addWidget(self.status)
-        actions = QHBoxLayout()
+        actions = FlowActions()
         if self.user:
             workspace = button("Workspace settings", role="outline")
             workspace.clicked.connect(self.workspace_settings)

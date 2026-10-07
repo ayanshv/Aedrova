@@ -4,7 +4,7 @@ import math
 import time
 
 from PySide6.QtCore import QEvent, QRectF, Qt, QTimer
-from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap, QRadialGradient
+from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QApplication, QPushButton, QWidget
 
 from aedrova.desktop.brand import brand_image
@@ -41,16 +41,6 @@ class ZenCanvas(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.fillRect(self.rect(), QColor(t.bg))
-        for cx, cy, color, alpha in (
-            (w * 0.32, h * 0.12, "#70B5F6", 32),
-            (w * 0.76, h * 0.1, "#92B6FA", 42),
-        ):
-            glow = QRadialGradient(cx, cy, w * 0.48)
-            c = QColor(color)
-            c.setAlpha(alpha if t.name == "light" else alpha // 2)
-            glow.setColorAt(0, c)
-            glow.setColorAt(1, QColor(0, 0, 0, 0))
-            p.fillRect(self.rect(), glow)
         elapsed = f.now() - f.entered
         lift = 0 if f.reduced else 10 * (1 - settled_spring(elapsed))
         p.translate(0, lift)

@@ -1,8 +1,9 @@
 """Explicit per-participant meeting-text consent. No audio capture is started here."""
 
-from PySide6.QtWidgets import QCheckBox, QHBoxLayout, QVBoxLayout
+from PySide6.QtWidgets import QCheckBox, QVBoxLayout
 
 from aedrova.desktop.controls import AppDialog
+from aedrova.desktop.design_system import FlowActions
 from aedrova.desktop.dialogs import button, label
 
 
@@ -62,7 +63,7 @@ class MeetingPrivacy(AppDialog):
         delete = button("Delete saved meeting text for everyone", role="outline")
         delete.clicked.connect(lambda: self.confirm_delete(worker))
         layout.addWidget(delete)
-        actions = QHBoxLayout()
+        actions = FlowActions()
         cancel = button("Cancel", role="outline")
         cancel.clicked.connect(self.reject)
         save = button("Save my choices", role="primary")

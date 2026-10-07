@@ -4,6 +4,7 @@ from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, Signal
 from PySide6.QtWidgets import QCheckBox, QHBoxLayout, QListWidget, QPlainTextEdit, QVBoxLayout
 
 from aedrova.desktop.controls import AppDialog, ChoiceBox
+from aedrova.desktop.design_system import FlowActions
 from aedrova.desktop.dialogs import button, label
 
 
@@ -76,7 +77,7 @@ class TranscriptReview(AppDialog):
         privacy.addWidget(self.delete)
         privacy.addStretch()
         layout.addLayout(privacy)
-        actions = QHBoxLayout()
+        actions = FlowActions()
         self.previous = button('Previous', role='outline')
         self.next = button('Next', role='outline')
         self.refresh = button('Refresh', role='outline')

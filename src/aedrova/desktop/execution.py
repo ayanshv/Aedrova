@@ -6,11 +6,12 @@ from types import SimpleNamespace
 
 from PySide6.QtCore import QObject, QSettings, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QHBoxLayout, QListWidget, QPlainTextEdit, QVBoxLayout
+from PySide6.QtWidgets import QListWidget, QPlainTextEdit, QVBoxLayout
 
 from aedrova.agents.context import authorize
 from aedrova.agents.ledger import RunLedger
 from aedrova.desktop.controls import AppDialog
+from aedrova.desktop.design_system import FlowActions
 from aedrova.desktop.dialogs import button, label
 from aedrova.desktop.projects import binding
 
@@ -219,7 +220,7 @@ class RunHistory(AppDialog):
         self.details.setReadOnly(True)
         self.details.setMaximumHeight(160)
         layout.addWidget(self.details)
-        row = QHBoxLayout()
+        row = FlowActions()
         self.retry = button("Retry / resume", role="primary")
         self.cancel = button("Cancel queued", role="outline")
         self.folder = button("Open saved files", role="outline")

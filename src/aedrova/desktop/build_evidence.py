@@ -11,11 +11,13 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QPlainTextEdit,
     QVBoxLayout,
+    QWidget,
 )
 
 from aedrova.agents.context import authorize
 from aedrova.delivery.evidence import manifest, validate
 from aedrova.desktop.controls import AppDialog, ChoiceBox
+from aedrova.desktop.design_system import FlowActions, MasterDetail
 from aedrova.desktop.dialogs import button, label
 
 
@@ -58,7 +60,13 @@ class SharedBuilds(AppDialog):
         self.records.setAccessibleName("Shared build reviews")
         self.records.setProperty("accountList", True)
         self.records.setMaximumHeight(76)
-        layout.addWidget(self.records)
+        detail_panel = QWidget()
+        detail_layout = QVBoxLayout(detail_panel)
+        detail_layout.setContentsMargins(0, 0, 0, 0)
+        self.master_detail = MasterDetail(self.records, detail_panel)
+        layout.addWidget(self.master_detail, 1)
+        root_layout = layout
+        layout = detail_layout
         row = QHBoxLayout()
         self.requirements = QListWidget()
         self.requirements.setAccessibleName("Build requirements")
@@ -102,7 +110,8 @@ class SharedBuilds(AppDialog):
         self.note.setAccessibleName("Build review note")
         self.note.setMaximumHeight(70)
         layout.addWidget(self.note)
-        actions = QHBoxLayout()
+        layout = root_layout
+        actions = FlowActions()
         self.refresh_button = button("Refresh", role="outline")
         self.share = button("Share exact evidence", role="primary")
         self.decision = ChoiceBox()

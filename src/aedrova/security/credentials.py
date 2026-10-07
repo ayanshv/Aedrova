@@ -5,6 +5,8 @@ import json
 import re
 
 PATTERNS = {
+    "figma-token": rb"figd_[A-Za-z0-9_-]{20,}",
+    "notion-token": rb"ntn_[A-Za-z0-9_-]{20,}",
     "private-key": rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",
     "supabase-secret": rb"sb_secret_[A-Za-z0-9_-]{20,}",
     "google-client-secret": rb"GOCSPX-[A-Za-z0-9_-]{20,}",

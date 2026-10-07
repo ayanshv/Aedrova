@@ -47,6 +47,30 @@ class ContextIndex:
         self.memory_snapshot = next(
             (r["product_memory_snapshot"] for r in records if "product_memory_snapshot" in r), {}
         )
+        for record in records:
+            if "connector_source" not in record:
+                continue
+            from aedrova.connectors.service import resource_id
+
+            kind, resource = record["connector_source"], record["resource"]
+            resource_id(kind, resource)
+            citation = "connector:" + kind + ":" + resource
+            if record.get("citation") != citation:
+                raise PermissionError("Invalid connector evidence citation.")
+            body = record["coverage"] + "\n" + json.dumps(record["untrusted_evidence"])
+            self._add(
+                Source(
+                    citation,
+                    citation,
+                    "Connected " + kind,
+                    body,
+                    None,
+                    "",
+                    "external_untrusted",
+                    "",
+                    hashlib.sha256(body.encode()).hexdigest(),
+                )
+            )
         for item in self.memory_snapshot.get("items", []):
             if item["channel_id"] not in context.channel_ids:
                 raise PermissionError("Memory is outside this context scope.")
@@ -210,7 +234,13 @@ def validate_citations(context, plan):
     index = ContextIndex(context)
     try:
         available = {s.citation for s in index.sources}
-        cited = set(re.findall(r"(?:message|attachment|meeting|memory):[A-Za-z0-9_-]+", plan))
+        cited = set(
+            re.findall(
+                r"(?:message|attachment|meeting|memory):[A-Za-z0-9_-]+"
+                r"|connector:(?:github|figma|notion):[A-Za-z0-9_./-]+",
+                plan,
+            )
+        )
         unknown = cited - available
         if unknown:
             raise ValueError(

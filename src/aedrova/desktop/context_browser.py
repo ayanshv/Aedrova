@@ -4,7 +4,6 @@ import threading
 
 from PySide6.QtCore import Qt, QThreadPool, Slot
 from PySide6.QtWidgets import (
-    QHBoxLayout,
     QLineEdit,
     QListWidget,
     QPlainTextEdit,
@@ -14,6 +13,7 @@ from PySide6.QtWidgets import (
 from aedrova.agents.context import authorize
 from aedrova.agents.retrieval import ContextIndex
 from aedrova.desktop.controls import AppDialog
+from aedrova.desktop.design_system import FlowActions
 from aedrova.desktop.dialogs import button, label
 
 
@@ -57,7 +57,7 @@ class ContextBrowser(AppDialog):
         self.detail.setReadOnly(True)
         self.detail.setAccessibleName("Source citation and content")
         layout.addWidget(self.detail, 1)
-        actions = QHBoxLayout()
+        actions = FlowActions()
         self.refresh_button = button("Refresh", role="outline")
         self.confirm = button("Confirm decision", role="primary")
         self.retire = button("Retire decision", role="outline")

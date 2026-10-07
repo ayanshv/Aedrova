@@ -33,6 +33,10 @@ def validate(config):
         raise ValueError("Describe responsibilities in 1–2,000 characters.")
     if credential_rules(json.dumps(config).encode()):
         raise ValueError("Remove recognizable credentials from teammate settings.")
+    if "connections" in config:
+        from aedrova.connectors.service import validate_connections
+
+        validate_connections(config["connections"])
     return config
 
 

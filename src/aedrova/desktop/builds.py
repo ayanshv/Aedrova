@@ -4,6 +4,7 @@ import json
 import os
 import threading
 import time
+from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
 
@@ -25,6 +26,7 @@ from aedrova.agents.managed import ManagedClient, ai_access_mode, application_ai
 from aedrova.agents.retrieval import retrieval_record, validate_citations
 from aedrova.agents.runtime import BuildCancelled, LocalRunner, instructions
 from aedrova.desktop.controls import AppDialog, ChoiceBox, choose_project
+from aedrova.desktop.design_system import FlowActions
 from aedrova.desktop.dialogs import button, label
 
 
@@ -78,6 +80,29 @@ class ContextJob(QRunnable):
                 )
                 if not live or live["paused"] or live["version"] != self.teammate["version"]:
                     raise PermissionError("Teammate settings changed. Send a fresh assignment.")
+                from aedrova.connectors.service import evidence
+
+                self.signals.progress.emit("Reading the teammate’s connected tool resources…")
+                external = evidence(
+                    str(self.service.user.id),
+                    self.workspace,
+                    live,
+                    cancelled=self.cancelled.is_set,
+                )
+                # Check fresh membership and profile after external network requests as well.
+                authorize(self.service.snapshot(), self.workspace, str(self.service.user.id))
+                fresh = next(
+                    (
+                        r
+                        for r in self.service.ai_teammates(self.workspace)["items"]
+                        if r["id"] == live["id"]
+                    ),
+                    None,
+                )
+                if not fresh or fresh["paused"] or fresh["version"] != live["version"]:
+                    raise PermissionError("Teammate settings changed during tool retrieval.")
+                context = result["context"]
+                result["context"] = replace(context, text=context.text + "\n" + external)
             if self.managed_origin:
                 _, _, access, user = self.service.realtime_credentials()
                 if user != str(self.service.user.id):
@@ -128,6 +153,23 @@ class BuildJob(QRunnable):
         try:
             if self.runner.cancelled.is_set():
                 raise BuildCancelled()
+            if self.teammate:
+                from aedrova.connectors.service import evidence
+
+                self.signals.progress.emit("Rechecking connected tools before this work phase…")
+                external = evidence(
+                    self.context.user_id,
+                    self.context.workspace_id,
+                    self.teammate,
+                    cancelled=self.runner.cancelled.is_set,
+                )
+                # A disconnected/revoked resource may not be used from an earlier plan.
+                retained = [
+                    line
+                    for line in self.context.text.splitlines()
+                    if line and "connector_source" not in json.loads(line)
+                ]
+                self.context = replace(self.context, text="\n".join(retained) + "\n" + external)
             if self.project is None:
                 self.signals.progress.emit("Preparing an independent local Git copy…")
                 self.project = prepare(
@@ -346,7 +388,7 @@ class BuildDialog(AppDialog):
         )
         self.output.document().setMaximumBlockCount(5000)
         layout.addWidget(self.output, 1)
-        actions = QHBoxLayout()
+        actions = FlowActions()
         self.plan_button = button("Plan internally", role="primary")
         self.build_button = button("Approve plan && build", role="primary")
         self.cancel_button = button("Cancel run", role="outline")

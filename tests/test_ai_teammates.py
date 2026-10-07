@@ -14,6 +14,23 @@ from aedrova.desktop.execution import execution_queue
 from aedrova.teammates.model import prompt, resolve, validate
 
 
+def connect_test_tools(monkeypatch):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(
+        "aedrova.connectors.service.Vault", lambda: SimpleNamespace(get=lambda *_: "test-token")
+    )
+
+    def fetch(url, headers):
+        if "/issues?" in url:
+            return []
+        if url.endswith("/readme"):
+            return {}
+        return {"full_name": "owner/repo", "description": "Test project"}
+
+    monkeypatch.setattr("aedrova.connectors.service.get_json", fetch)
+
+
 def profile(role="engineering"):
     return {
         "id": "specialist",
@@ -30,6 +47,7 @@ def profile(role="engineering"):
             "effort": "quick",
             "importance": "normal",
             "responsibilities": "Help the team with scoped work.",
+            "connections": [{"tool": "github", "resource": "owner/repo"}],
         },
     }
 
@@ -68,6 +86,7 @@ def test_specialist_autocomplete_keeps_persistent_actor_token(qtbot):
 
 
 def test_real_analysis_mode_uses_read_only_phase_and_named_result(qtbot, tmp_path, monkeypatch):
+    connect_test_tools(monkeypatch)
     window, service, source = configured(qtbot, tmp_path, monkeypatch)
     row = profile("research")
     window.account_dialog.snapshot["ai_teammates"] = [row]
@@ -93,6 +112,7 @@ def test_real_analysis_mode_uses_read_only_phase_and_named_result(qtbot, tmp_pat
 
 
 def test_engineering_keeps_plan_build_and_isolated_checkout(qtbot, tmp_path, monkeypatch):
+    connect_test_tools(monkeypatch)
     window, service, source = configured(qtbot, tmp_path, monkeypatch)
     row = profile()
     window.account_dialog.snapshot["ai_teammates"] = [row]
