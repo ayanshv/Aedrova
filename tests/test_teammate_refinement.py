@@ -111,19 +111,26 @@ def test_twelve_marbles_settle_without_respawning_and_hidden_timer_stops(qtbot):
     assert not habitat.marbles
 
 
-def test_reduced_motion_is_still_and_click_inserts_identity_without_running(qtbot, tmp_path):
+def test_reduced_motion_dot_click_opens_profile_without_running(qtbot, tmp_path, monkeypatch):
     window, service = setup(qtbot, tmp_path)
     window.reduced_motion = True
     section = window.ai_team_section
-    section.sync(rows(3), "w")
+    dots = [
+        {
+            "id": "dot-" + str(i),
+            "workspace_id": "w",
+            "name": "GitHub " + str(i),
+            "provider": "github",
+            "version": 1,
+            "shape": "round",
+            "color": "#4388F5",
+        }
+        for i in range(3)
+    ]
+    opened = []
+    monkeypatch.setattr("aedrova.desktop.dots.open_dots", lambda window, key: opened.append(key))
+    section.sync(dots, "w")
     assert not section.habitat.timer.isActive()
-    called = []
-    window.start_agent_request = lambda *_: called.append(True)
-    row = rows(3)[1]
-    section.mention(row)
-    assert window.composer.editor.toPlainText() == "@Pixel1 "
-    assert window.composer.mention_tokens["Pixel1"] == "<@ai:orb-1|Pixel1>"
-    assert not called
-    row["paused"] = True
-    section.mention(row)
-    assert window.composer.editor.toPlainText() == "@Pixel1 "
+    section.habitat.wake("dot-0")
+    assert opened == ["dot-0"]
+    assert not window.composer.editor.toPlainText()

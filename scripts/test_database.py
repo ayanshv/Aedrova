@@ -83,7 +83,15 @@ try {
    'supabase/migrations/202610060003_build_reviews.sql',
    'supabase/tests/build_reviews.sql',
    'supabase/migrations/202610060004_ai_teammates.sql',
-   'supabase/tests/ai_teammates.sql']) {
+   'supabase/tests/ai_teammates.sql',
+   'supabase/migrations/202610070001_workspace_dots.sql',
+   'supabase/tests/workspace_dots.sql',
+   'supabase/migrations/202610070002_bud_profiles.sql',
+   'supabase/migrations/202610070002_bud_profiles.sql',
+   'supabase/tests/bud_profiles.sql',
+   'supabase/migrations/202610070003_bud_appearance.sql',
+   'supabase/migrations/202610070003_bud_appearance.sql',
+   'supabase/tests/bud_appearance.sql']) {
   let sql = fs.readFileSync(file,'utf8');
   // Reproduce the already-activated original function, then verify its additive
   // conflict-response upgrade before running the lifecycle tests.

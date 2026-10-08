@@ -71,13 +71,8 @@ class ExecutionQueue(QObject):
             )
             return False
         if teammate:
-            from aedrova.teammates.model import validate
-
-            validate(teammate["config"])
-            if teammate["workspace_id"] != self.window.workspace_id or teammate["paused"]:
-                self.window.notify("Teammate is unavailable. Refresh the workspace.")
-                return False
-            saved["ai_teammate"] = teammate
+            self.window.notify("Use the central agent with Buds. Legacy specialists are retired.")
+            return False
         try:
             run_id, fresh = self.ledger.enqueue(user, self.window.workspace_id, task, saved)
         except ValueError as exc:
@@ -90,6 +85,8 @@ class ExecutionQueue(QObject):
         return True
 
     def tick(self):
+        if getattr(self.window, "dot_query", None):
+            return
         if not self.lease:
             return
         user = self.identity()
@@ -141,18 +138,12 @@ class ExecutionQueue(QObject):
         pinned = json.loads(row["settings"])
         teammate = pinned.pop("ai_teammate", None)
         if teammate:
-            live = next(
-                (
-                    r
-                    for r in self.window.account_dialog.snapshot.get("ai_teammates", [])
-                    if r["id"] == teammate["id"] and r["workspace_id"] == row["workspace"]
-                ),
-                None,
+            self.ledger.update(row["id"], "paused")
+            self.window.notify(
+                "Legacy teammate work is paused. "
+                "Send a fresh request to your central agent using Buds."
             )
-            if not live or live["paused"] or live["version"] != teammate["version"]:
-                self.ledger.update(row["id"], "paused")
-                self.window.notify("Teammate settings changed. Send a fresh assignment.")
-                return
+            return
         if pinned != scope(binding(self.window)):
             self.ledger.update(row["id"], "paused")
             self.window.notify(

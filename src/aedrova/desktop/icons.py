@@ -36,7 +36,11 @@ def icon(name, color):
         )
     )
     p.setBrush(Qt.BrushStyle.NoBrush)
-    if name == "plus":
+    if name == "spaces":
+        for x in (4, 11):
+            for y in (4, 11):
+                p.drawRoundedRect(QRectF(x, y, 5, 5), 1, 1)
+    elif name == "plus":
         p.drawLine(10, 4, 10, 16)
         p.drawLine(4, 10, 16, 10)
     elif name == "chevron":

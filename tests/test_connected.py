@@ -95,7 +95,7 @@ def test_failed_send_keeps_draft_and_reuses_message_id(qtbot, tmp_path):
     service.rpc = fail
     window.composer.editor.setPlainText("Keep me")
     window.send_message("Keep me")
-    qtbot.waitUntil(lambda: not window.account_dialog.busy)
+    qtbot.waitUntil(lambda: bool(calls) and not window.account_dialog.busy)
     assert window.composer.editor.toPlainText() == "Keep me"
     window.connected.retry_at = 0
     window.send_message("Keep me")
@@ -137,7 +137,7 @@ def test_successful_send_persists_and_clears_only_sent_draft(qtbot, tmp_path):
     service.rpc = save
     window.composer.editor.setPlainText("Hello")
     window.send_message("Hello")
-    qtbot.waitUntil(lambda: not window.account_dialog.busy)
+    qtbot.waitUntil(lambda: bool(calls) and not window.account_dialog.busy)
     assert calls[0][0] == "send_message"
     assert calls[0][1]["p_body"] == "Hello"
     assert window.composer.editor.toPlainText() == ""

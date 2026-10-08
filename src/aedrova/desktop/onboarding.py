@@ -58,11 +58,11 @@ STEPS = (
     ),
     Step(
         "Your team",
-        "Meet your AI teammates.",
-        "Use + to create a teammate. Describe their role and review suggested tools. "
-        "Click a character to mention them, then send an assignment.",
+        "Connect your Buds.",
+        "Use + to connect a source. Authorize one repository and inspect its capabilities. "
+        "Click a Bud for permissions and status; mention it in a question to your agent.",
         "ai_team_section",
-        ("ai_teammates", "custom_roles", "tool_suggestions"),
+        ("dots", "source_permissions", "tool_selection"),
         0,
     ),
     Step(
@@ -168,7 +168,7 @@ STEPS = (
     Step(
         "Build",
         "From a decision to a build.",
-        "Type @ to choose your agent or a teammate. Your agent builds from accessible team "
+        "Type @ to choose your agent, a Bud or a teammate. Your agent builds from accessible team "
         "context after your request.",
         "composer",
         ("mentions", "builds", "context"),
@@ -378,14 +378,16 @@ class SpotlightTour(QWidget):
             + ("#38383A" if dark else "#E5E5E7")
             + ";border-radius:24px;}"
         )
+        if STEPS[self.index].target in ("memory_button", "build_history", "button:Activity"):
+            self.window.workspace_tools_toggle.setChecked(True)
         target = getattr(self.window, STEPS[self.index].target, None)
         if STEPS[self.index].target.startswith("button:"):
             names = STEPS[self.index].target.removeprefix("button:").split("|")
             target = next(
                 (
                     control
-                    for control in self.window.pages.currentWidget().findChildren(QPushButton)
-                    if control.text() in names and control.isVisible()
+                    for control in self.window.findChildren(QPushButton)
+                    if control.text().split(" · ")[0] in names and control.isVisible()
                 ),
                 None,
             )

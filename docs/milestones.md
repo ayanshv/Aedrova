@@ -1,4 +1,96 @@
+## October 7 — M17G: AI economics and sustainable plan allowances
+
+**Status: planned; implementation requires owner approval.** Run after the builder,
+AI teammates, Dots and planned background workflows are implemented, before remaining
+M14 production billing/provider activation and M18 launch. Updated remaining order:
+M17F → M17 → M17A–M17E → M17G → remaining M14 → M18 → deployed-codebase walkthrough.
+
+Objective: measure realistic team workloads and establish useful, sustainable included
+AI access before finalizing public plan promises. Current configured baselines are
+$49/month with $10 of provider usage (20.4% of gross plan revenue at full utilization)
+and $10/week with $1 (10%). These are capped budget scenarios, not measured average
+customer costs, profit margins or unlimited-build commitments.
+
+Deliverables and acceptance:
+- Benchmark representative small, medium and large coding tasks, context gathering,
+  teammate assignments, Dots reports and background work. Record actual input/output/
+  cached/reasoning usage, retries, failures, task outcomes and cost; measure what useful
+  work each allowance buys. Clearly separate measured data from extrapolation.
+- Meter every paid model request against one shared workspace allowance, including
+  builders, mini teammates and background work. Audit paths for unmetered spend.
+  Attribute costs to workspace, task, provider and model without logging secrets or
+  private prompt contents. Account separately for transcription and other paid tools.
+- Validate atomic reservations, concurrent users, account/workspace isolation,
+  cancellation, uncertain provider charges, renewals and exhausted allowances. Stop
+  before further billable work when funds are insufficient; no automatic overages,
+  silent refill or fallback to an unmetered provider. Reconcile usage with provider
+  billing and test explicit credit purchases through Stripe test mode.
+- Produce measured low/typical/heavy usage scenarios and per-plan contribution after
+  API usage, payment fees, hosting, meetings and storage. Include capacity/rate-limit
+  behavior and sensitivity to provider price/model changes. Do not treat API budget
+  as total operating cost or turn the tiny local proof build into an average estimate.
+- Recommend final allowances, pricing/top-up margins, background-work cadence and
+  economical model routing based on results. Present trade-offs and obtain owner
+  approval before changing prices, public allowances or activating real checkout.
+  Publish clear usage/remaining-budget and pause/resume states with useful next actions.
+
+### M17G / M14B — automatic provider funding from revenue
+
+**Planned, not activated.** Owner requested automatic API payments funded by Aedrova
+subscription revenue. Build the accounting and guardrails in M17G; configure real
+payment methods and provider auto-recharge during remaining M14B, before M18 launch.
+
+- Planned payment flow: customer subscriptions → Stripe payouts → Aedrova business
+  bank account → linked business payment card → OpenAI prepaid automatic recharge.
+  Use supported provider billing controls; do not invent a direct Stripe-to-OpenAI
+  transfer API or automatically modify financial accounts through scraping.
+- Distinguish gross sales, refunds/disputes/fees, net collected revenue, settled
+  payouts, cash reserves and actual provider costs. Set an owner-approved AI budget
+  policy using measured M17G costs; a percentage allocation is accounting, not a
+  guarantee that money has already reached the bank or provider.
+- Configure an approved recharge threshold, amount and monthly recharge limit.
+  Provider recharge limits do not replace Aedrova's per-workspace and global usage
+  controls. Company funding must never silently refill customers' allowances or
+  create customer overage charges. Keep a cash buffer for payout delays/refunds.
+- Monitor supported provider cost/usage data and available funding signals; show
+  reconciliation and stale/unavailable data clearly. Alert on nearing budget,
+  failed recharge, delayed payouts and insufficient reserves. Pause new unfunded
+  billable work gracefully; preserve tasks and reconcile in-flight charges.
+- Test duplicate/out-of-order Stripe events, refunds, payout/recharge failures,
+  delayed financial data, budget exhaustion and restart recovery with fixtures and
+  sandbox support. Do not run real recharge purchases without explicit approval.
+
+**Owner action now: none. Required later in M14B:** complete live Stripe verification,
+configure Stripe payouts to the business bank account, provide the business payment
+method directly in OpenAI billing, approve the initial reserve and recharge settings,
+and personally complete any purchase/payment confirmation. Walk through these one
+requirement per response; never request bank/card credentials in chat. Activation
+requires live acceptance and owner approval, not merely saved configuration.
+
+Owner action now: **none** to schedule this milestone. At execution, disclose a bounded
+paid benchmark budget and get approval for any additional spend not already authorized;
+provide secure provider setup steps if needed. Live Stripe, production hosting and
+Apple/Windows signing remain deferred to remaining M14. Advertise verified included
+AI limits on the website alongside implementation, without implying unlimited usage.
+
 # Delivery gates
+
+## October 7 — Dots replace prototype mini teammates
+
+Owner explicitly authorized the attached Dots architecture request. Implemented the
+native Dot shelf/profile/mentions, central targeted source selection, read-only query
+path, server-encrypted per-user grants, GitHub App OAuth, bounded GitHub tools, signed
+event invalidation and versioned shared identities/RLS. Legacy resource metadata is
+migrated; legacy credentials require explicit reauthorization. Legacy specialist tasks
+pause. Existing coding queue/checkouts/evidence/delivery and original chibi rendering
+remain. Registry-only Stripe/Supabase/Vercel/PostHog and migrated Figma/Notion sources
+are unavailable until their server adapters are completed.
+
+**Owner action now:** apply `202610070001_workspace_dots.sql`; create/install a read-only
+GitHub App; configure server OAuth credentials and the existing encryption key; complete
+same-account authorization and live acceptance. Exact instructions: [dots.md](dots.md).
+No push, website deployment, public release or live credential setup is claimed complete.
+Do not start the next provider/milestone without asking. M14 remains after feature work.
 
 ## October 6 — Workroom product redesign
 
@@ -863,3 +955,121 @@ Expanded the introduction into 12 screens and real optional profile, appearance,
 project/workflow, GitHub and meeting-device setup. Saved grants remain explicit,
 scoped to the account/workspace, and do not start work. See `docs/zen-onboarding.md`.
 No new SQL is required. M14 Apple enrollment/release setup remains separate.
+
+## October 7 — Startup Pulse command center
+
+Implemented the workspace Pulse surface over Dots: cached authorized source evidence,
+GitHub engineering observations, period filters, drill-down, pin/order, source-backed
+changes, central-agent investigation and conversation/build drafts. See `docs/pulse.md`.
+No new Supabase migration. GitHub App consent/server configuration and live acceptance
+remain required. Business/product analytics need real provider adapters; unavailable
+figures stay hidden. Next staged adapter: Stripe, then Supabase/PostHog, Vercel/Linear,
+then supported comparisons/anomaly insights and approved action workflows. Obtain owner
+permission before each next implementation task. M14 remains deferred until feature work.
+
+### Pulse dashboard design refinement — October 7, 2026
+
+Implemented the owner's analytics-dashboard reference in the native Pulse page:
+responsive metric summaries, source filter, chart/records switch, hover interval
+readouts, source health and recent activity. Existing Dots and agent workflows are
+preserved. The paid OpenAI key is owner-held and still needs secure server setup;
+this change does not enable provider spending or deploy the website.
+
+### Instant message delivery and OpenAI setup — October 7, 2026
+
+Outgoing channel messages/replies paint their local echo before deferred network
+dispatch. New tail messages insert incrementally rather than resetting the feed.
+A 260 ms scale/fade/upward animation follows the existing Reduce Motion setting.
+Pending transport stays in the background; failures retain the visible retry state
+and recoverable draft, and acknowledgments preserve subsequent typing.
+
+Secure OpenAI-only server setup is prepared in the website repository. Owner-held
+credentials are absent from current server environment files. Run the hidden-input
+`Aedrova_site/scripts/setup_openai.py` command, then reply ready. It verifies model
+access without paid inference, writes the Git-ignored key file with 0600 permissions,
+and leaves activation explicit. Workspace allowance and included-mode desktop live
+acceptance remain required before claiming the OpenAI connection is operational.
+No new SQL, deployment or public checkout activation is part of this task.
+
+Validation: all 646 desktop tests and all 289 shared-server tests pass. Focused
+checks cover slow transport, immediate echo before dispatch, draft preservation,
+no duplicate acknowledgment, stable message grouping, reduced motion and replies.
+OpenAI setup tests cover read-only model probing, provider failures, private file
+permissions, OpenAI-only configuration and explicit loopback activation. Rebuilt
+preview passes deep/strict signature verification and packaged launch smoke.
+Live paid inference remains untested until the owner installs the server key.
+
+### Local managed OpenAI acceptance — October 7, 2026
+
+Owner credential setup completed. Actual model access and paid Responses requests
+passed. Fresh Google authorization, a workspace-scoped gateway token, and the
+bundled Codex runtime successfully created and verified a local proof file in an
+isolated temporary Git project. No user project changes were applied or published.
+The signed preview now uses included AI at loopback port 8090; no provider key is
+bundled. Production deployment and Claude provider activation remain pending.
+
+Aedrova showcase (`6047c111-9eda-477d-a0d1-e9d5d831227e`) has an owner-only $2
+local development allowance, expiring after 24 hours, with one concurrent build and
+no automatic replenishment. It is explicitly not a Stripe subscription. Usage was
+reconciled with no outstanding reservations. This grant is disabled for production,
+public origins, PostgreSQL, checkout and release configurations. Other workspaces
+need a separately reviewed allowance; other accounts cannot spend this grant.
+
+Validation: 646 desktop tests, 298 server tests, lint, packaged launch smoke and
+strict/deep signature verification passed. Actual authenticated gateway and local
+file creation passed. Interactive in-chat acceptance still needs the owner's
+chosen project and a task in the funded workspace. No new Supabase SQL is required.
+Next proposed task: validate real AI teammate assignments and connector evidence
+against this OpenAI connection, then configure a chosen useful workspace for the
+owner. Request permission before starting that task; M14 remains deferred.
+
+### October 7 — stray participant window removed
+
+Fixed the unused participant label's ownership: it is now a hidden child of the
+channel header. Removed the resize handler that exposed it as a standalone window.
+This prevents the blank “Your team” popup during account launch and resizing.
+Added a regression check for parentage, top-level window enumeration and visibility
+across wide/narrow resizing and account launch. Rebuilt the signed preview; account
+launch smoke and strict/deep signing checks passed. Already-running older instances
+must be quit and reopened to load the replacement binary; no SQL or credentials.
+
+### Buds refinement — October 7
+
+- Dots presentation renamed Buds; stable IDs, routes and grant boundaries retained.
+- Four-step setup, editable role/instructions, planet/moon/ringed styles, custom colors.
+- Draft saving separated from actual GitHub authorization; no simulated Connected states.
+- Local launcher enables Buds and loads optional ignored connector credentials.
+- Empty meeting announcements hidden; neutral charcoal dark theme.
+- Additive SQL: `202610070002_bud_profiles.sql`. Owner must run before hosted notes work.
+- Next: real GitHub Bud connection and permission/revocation acceptance, then Stripe
+  source adapter and Pulse revenue evidence. Require user permission before starting.
+
+### Bud sculpted artwork refinement
+
+- Reference-derived six-character atlas integrated into the native shared renderer.
+- Independent appearance tiles and role matching; body tinting cached, no idle API costs.
+- Appearance persistence uses additive `202610070003_bud_appearance.sql`, after profiles SQL.
+- Existing per-user tool grants, access checks, versions and mention identifiers retained.
+
+### Bud onboarding visual refinement
+
+Reference-led six-step native configuration with warm-white/charcoal material,
+image-led appearance choices, compact color configuration, purpose guidance,
+real tool authorization, reduced-motion-aware fades and retained drafts on Back.
+No new SQL or external setup is introduced by this UI-only change. Owner reports
+the previously requested SQL ran; live GitHub OAuth acceptance remains pending.
+
+### Bud specialty connector rollout
+
+- Delivered: six explicit specialties with persisted optional purposes, independent
+  character appearance, and curated primary/additional connector recommendations.
+  Setup labels availability accurately; no SQL change for presets.
+- Next task, approval required: support multiple individually authorized connections
+  per Bud (additive schema, encrypted per-user grants, resource scopes, revocation,
+  isolation tests). Keep legacy single-provider profiles compatible.
+- Adapter order: validate GitHub live; Figma/Notion/Google Drive; Supabase/Linear/Vercel;
+  Stripe and aggregate finance tools; approved Search; social analytics followed by
+  Instagram/TikTok publishing with explicit approval; supplementary tools afterward.
+- Product reuses approved connectors across domains; role suggestions confer no access.
+- Owner/provider setup and real acceptance tests are gates for each adapter. No fake
+  connected states. M14 remains after remaining feature work.

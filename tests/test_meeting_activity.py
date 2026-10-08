@@ -81,3 +81,16 @@ def test_card_click_is_explicit_and_avatars_are_accessible(qtbot):
     assert card.findChildren(ParticipantAvatar)[0].accessibleName().endswith("A teammate")
     card.action.click()
     assert calls == [True]
+
+
+def test_empty_meeting_removes_banner_and_returns_start_state(qtbot, tmp_path):
+    window, _ = setup(qtbot, tmp_path)
+    meeting = active(window)
+    window.account_dialog.snapshot["meeting_activity"] = {"meetings": [meeting], "preferences": []}
+    update_meeting_ui(window)
+    assert window.meeting_announcements_layout.count() == 1
+    meeting["participants"] = []
+    update_meeting_ui(window)
+    assert window.meeting_announcements_layout.count() == 0
+    assert window.meeting_announcements.isHidden()
+    assert window.call_count.isHidden()

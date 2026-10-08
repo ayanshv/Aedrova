@@ -203,6 +203,7 @@ class ConnectedDashboard(QObject):
         QTimer.singleShot(0, self.refresh)
 
     def account_changed(self):
+        self.window.pulse_page.reset()
         if self.active:
             self.cache.clear()
             self.files.clear()
@@ -210,6 +211,7 @@ class ConnectedDashboard(QObject):
             self.apply(self.account.snapshot, [], self.window.workspace_id, self.window.channel_id)
 
     def disconnect(self):
+        self.window.pulse_page.reset()
         teammate_dialog = getattr(self.window, "teammates_dialog", None)
         if teammate_dialog and not teammate_dialog.closed:
             teammate_dialog.reject()
@@ -330,7 +332,11 @@ class ConnectedDashboard(QObject):
             self.queue.insert(position, action)
         else:
             self.queue.append(action)
-        self.refresh()
+        if priority:
+            # Paint the local echo before dispatching any network work.
+            QTimer.singleShot(0, self.refresh)
+        else:
+            self.refresh()
         return True
 
     def refresh(self):
@@ -558,6 +564,7 @@ class ConnectedDashboard(QObject):
                     item.setText(item.text() + f"  ({count})")
                 item.setToolTip(f"{count} unread messages")
         w._load_channel()
+        w.pulse_page.sync_access()
         if old_workspace != w.workspace_id or not getattr(self, "pages_ready", False):
             w._render_pages()
             self.pages_ready = True
@@ -665,7 +672,9 @@ class ConnectedDashboard(QObject):
         editor.clear()
         w.store.drafts[(workspace_id, channel_id, parent_id or "")] = ""
         self.render_local_messages()
-        (w.thread_messages if parent_id else w.messages).scrollToBottom()
+        view = w.thread_messages if parent_id else w.messages
+        view.scrollToBottom()
+        view.animate_sent(message_id)
 
     def reaction_overlay(self, rows, channel):
         edits = [(key, value) for key, value in self.reaction_edits.items() if key[0] == channel]

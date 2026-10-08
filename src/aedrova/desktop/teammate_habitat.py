@@ -5,51 +5,90 @@ import time
 from dataclasses import dataclass
 
 from PySide6.QtCore import QRectF, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QCursor, QPainter, QPen, QRadialGradient
+from PySide6.QtGui import QColor, QCursor, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QAbstractButton, QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from aedrova.desktop.dialogs import button, label
 
 
+def _planet_clip(r):
+    path = QPainterPath()
+    path.addEllipse(QRectF(-r, -r, 2 * r, 2 * r))
+    return path
+
+
 def paint_orb(p, rect, config, *, phase=0.0, blink=False, look=0.0, rotation=0.0):
+    from aedrova.desktop.bud_art import paint_bud
+
+    if paint_bud(p, rect, config, phase=phase, blink=blink, look=look, rotation=rotation):
+        return
     p.save()
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
     p.translate(rect.center())
     p.rotate(rotation)
     scale = 1 + math.sin(phase * 1.7) * 0.018
     p.scale(scale, scale)
-    r = min(rect.width(), rect.height()) * 0.45
-    sphere = QRectF(-r, -r, r * 2, r * 2)
+    # Planets stay legible at sidebar scale: one sphere, two eyes, one smile.
+    r = min(rect.width(), rect.height()) * 0.37
     base = QColor(config.get("color", "#4388F5"))
-    glow = QRadialGradient(-r * 0.4, -r * 0.5, r * 2.2)
-    glow.setColorAt(0, QColor("#FFFFFF"))
-    glow.setColorAt(0.38, base.lighter(170))
-    glow.setColorAt(1, base.darker(120))
-    p.setPen(QPen(base.lighter(140), 0.8))
-    p.setBrush(glow)
+    if not base.isValid():
+        base = QColor("#4388F5")
     shape = config.get("shape", "round")
-    if shape == "cloud":
-        p.drawRoundedRect(sphere, r * 0.65, r * 0.65)
-        for x in (-r * 0.55, 0, r * 0.55):
-            p.drawEllipse(QRectF(x - r * 0.4, -r * 1.03, r * 0.8, r * 0.8))
-    else:
-        p.drawRoundedRect(
-            sphere, r if shape == "round" else r * 0.65, r if shape == "round" else r * 0.65
-        )
-    visor = QRectF(-r * 0.77, -r * 0.47, r * 1.54, r * 0.95)
+    ringed = shape in {"cloud", "ringed"}
+    ink = QColor("#FFFFFF") if base.lightnessF() < 0.53 else QColor("#202124")
+    if ringed:
+        p.save()
+        p.rotate(-18)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(QPen(base.lighter(140), max(1.4, r * 0.11)))
+        p.drawEllipse(QRectF(-r * 1.47, -r * 0.34, r * 2.94, r * 0.68))
+        p.restore()
+    from PySide6.QtGui import QRadialGradient
+
+    gradient = QRadialGradient(-r * 0.4, -r * 0.5, r * 2.2)
+    gradient.setColorAt(0, base.lighter(115))
+    gradient.setColorAt(1, base.darker(115))
     p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(QColor("#15243B"))
-    p.drawRoundedRect(visor, r * 0.35, r * 0.35)
-    for x in (-r * 0.32, r * 0.32):
-        p.setBrush(QColor("#D6F2FF"))
-        eyes = QRectF(
-            x - r * 0.09 + look * r * 0.08, -r * 0.17, r * 0.18, r * (0.045 if blink else 0.28)
+    p.setBrush(gradient)
+    p.drawEllipse(QRectF(-r, -r, r * 2, r * 2))
+    if shape in {"squircle", "moon"}:
+        p.save()
+        p.setClipPath(_planet_clip(r))
+        crater = QColor(base.darker(120))
+        crater.setAlpha(55)
+        p.setBrush(crater)
+        for x, y, size in [(-0.6, -0.5, 0.24), (0.56, 0.44, 0.30), (0.68, -0.48, 0.17)]:
+            p.drawEllipse(QRectF(x * r, y * r, size * r, size * r))
+        p.restore()
+    if ringed:
+        p.save()
+        p.rotate(-18)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(
+            QPen(
+                base.lighter(140),
+                max(1.4, r * 0.11),
+                Qt.PenStyle.SolidLine,
+                Qt.PenCapStyle.RoundCap,
+            )
         )
-        p.drawRoundedRect(eyes, r * 0.085, r * 0.085)
-    p.setPen(
-        QPen(base.lighter(160), max(1, r * 0.035), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
-    )
-    p.drawArc(QRectF(-r * 0.13, r * 0.14, r * 0.26, r * 0.14), 190 * 16, 160 * 16)
+        p.drawArc(QRectF(-r * 1.47, -r * 0.34, r * 2.94, r * 0.68), 180 * 16, 180 * 16)
+        p.restore()
+    gaze = max(-1.0, min(1.0, look)) * r * 0.06
+    p.setBrush(ink)
+    for x in (-r * 0.25, r * 0.25):
+        if blink:
+            p.setPen(QPen(ink, max(1.2, r * 0.08), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+            p.drawLine(x - r * 0.04 + gaze, -r * 0.08, x + r * 0.04 + gaze, -r * 0.08)
+            p.setPen(Qt.PenStyle.NoPen)
+        else:
+            p.drawEllipse(QRectF(x - r * 0.055 + gaze, -r * 0.15, r * 0.11, r * 0.13))
+    smile = QPainterPath()
+    smile.moveTo(-r * 0.10, r * 0.15)
+    smile.cubicTo(-r * 0.08, r * 0.34, r * 0.08, r * 0.34, r * 0.10, r * 0.15)
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.setPen(QPen(ink, max(1.1, r * 0.05), Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+    p.drawPath(smile)
     p.restore()
 
 
@@ -76,7 +115,7 @@ class OrbButton(QAbstractButton):
         blink = self.phase > 0 and self.phase % period < 0.14
         paint_orb(
             p,
-            QRectF(self.rect()).adjusted(3, 3, -3, -3),
+            QRectF(self.rect()).adjusted(2, 2, -2, -2),
             self.row["config"],
             phase=self.phase,
             blink=blink,
@@ -87,6 +126,18 @@ class OrbButton(QAbstractButton):
             p.setPen(QPen(QColor("#7A8CA6"), 2))
             p.drawLine(24, 40, 24, 46)
             p.drawLine(30, 40, 30, 46)
+        if self.row.get("provider"):
+            status = self.row.get("status", "Needs authorization")
+            colors = {
+                "Connected": "#4388F5",
+                "Syncing": "#8275E6",
+                "Connecting": "#8275E6",
+                "Error": "#D981A3",
+                "Permission issue": "#D981A3",
+            }
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QColor(colors.get(status, "#7A8CA6")))
+            p.drawEllipse(QRectF(42, 43, 5, 5))
         if self.hasFocus():
             p.setBrush(Qt.BrushStyle.NoBrush)
             p.setPen(QPen(QColor("#4388F5"), 2))
@@ -112,13 +163,13 @@ class Habitat(QWidget):
         self.workspace = None
         self.marbles = {}
         self.last = time.monotonic()
-        self.setMinimumHeight(112)
+        self.setMinimumHeight(82)
         self.setMouseTracking(True)
         self.timer = QTimer(self)
         self.timer.setTimerType(Qt.TimerType.PreciseTimer)
         self.timer.setInterval(16)
         self.timer.timeout.connect(self.tick)
-        self.empty = QLabel("A small team.\nBig possibilities.", self)
+        self.empty = QLabel("Another pair of hands.\nCreate your first AI teammate.", self)
         self.empty.setProperty("role", "muted")
         self.empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.empty.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
@@ -144,7 +195,7 @@ class Habitat(QWidget):
                 widget, 8 + (n % 3) * 57, -58 - n * 18, (-1 if n % 2 else 1) * 35
             )
             widget.show()
-        self.setFixedHeight(max(112, min(250, 64 * math.ceil(max(1, len(live)) / 3) + 12)))
+        self.setFixedHeight(max(82, min(250, 64 * math.ceil(max(1, len(live)) / 3) + 12)))
         self.empty.setVisible(not live)
         if self.window.reduced_motion:
             self.settle_grid()
@@ -254,7 +305,7 @@ class TeamSection(QFrame):
         column.setContentsMargins(8, 10, 8, 8)
         column.setSpacing(4)
         header = QHBoxLayout()
-        self.title = label("AI TEAMMATES", "section")
+        self.title = label("AI teammates", "section")
         header.addWidget(self.title)
         header.addStretch()
         add = button("+", "Create or manage AI teammates", "icon")
@@ -262,6 +313,7 @@ class TeamSection(QFrame):
         from aedrova.desktop.ai_teammates import open_teammates
 
         add.clicked.connect(lambda: open_teammates(window))
+        self.add_button = add
         header.addWidget(add)
         column.addLayout(header)
         self.habitat = Habitat(window)
@@ -281,5 +333,5 @@ class TeamSection(QFrame):
         composer.editor.setFocus()
 
     def sync(self, rows, workspace):
-        self.title.setText("AI TEAMMATES" + (f" · {len(rows)}" if rows else ""))
+        self.title.setText("AI teammates" + (f" · {len(rows)}" if rows else ""))
         self.habitat.sync(rows, workspace)

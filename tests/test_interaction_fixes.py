@@ -137,6 +137,6 @@ def test_message_header_and_long_body_fit_row(qtbot, tmp_path):
     body = view.delegate.document(message, view.viewport().width() - 94)
     assert (
         size.height()
-        >= 18 + QFontMetrics(font(14, True)).height() + 6 + ceil(body.size().height()) + 58 + 22
+        >= 14 + QFontMetrics(font(14, True)).height() + 6 + ceil(body.size().height()) + 58 + 10
     )
     assert view.grab().save(str(tmp_path / "timestamp-layout.png"))

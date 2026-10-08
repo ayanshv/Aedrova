@@ -76,7 +76,7 @@ class ActivityRow(QFrame):
             layout.addWidget(self.details)
             self.expand(False)
         else:
-            layout.setContentsMargins(28, 18, 20, 22)
+            layout.setContentsMargins(28, 10, 20, 12)
             layout.setSpacing(6)
             body = QHBoxLayout()
             body.setSpacing(12)
@@ -100,6 +100,7 @@ class ActivityRow(QFrame):
             self.author.setAccessibleName("Agent sender: " + author)
             self.timestamp = QLabel(self.sent_at.strftime("%-I:%M %p · %b %-d"))
             self.timestamp.setProperty("role", "muted")
+            self.timestamp.setObjectName("MessageTimestamp")
             self.timestamp.setFont(system_font(11))
             self.timestamp.setToolTip(self.sent_at.strftime("%A, %B %-d, %Y at %-I:%M:%S %p %Z"))
             header.addWidget(self.author)

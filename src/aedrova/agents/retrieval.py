@@ -71,6 +71,31 @@ class ContextIndex:
                     hashlib.sha256(body.encode()).hexdigest(),
                 )
             )
+        for record in records:
+            dot = record.get("dot_evidence")
+            if dot is None:
+                continue
+            from uuid import UUID
+
+            if (
+                dot.get("untrusted") is not True
+                or dot.get("citation") != "dot:" + str(UUID(dot["dot"])) + ":" + dot["tool"]
+            ):
+                raise PermissionError("Invalid Dot evidence citation.")
+            body = dot["coverage"] + "\n" + json.dumps(dot["records"])
+            self._add(
+                Source(
+                    dot["citation"],
+                    dot["citation"],
+                    "Dot " + dot["name"],
+                    body,
+                    None,
+                    "",
+                    "external_untrusted",
+                    "",
+                    hashlib.sha256(body.encode()).hexdigest(),
+                )
+            )
         for item in self.memory_snapshot.get("items", []):
             if item["channel_id"] not in context.channel_ids:
                 raise PermissionError("Memory is outside this context scope.")
@@ -237,7 +262,8 @@ def validate_citations(context, plan):
         cited = set(
             re.findall(
                 r"(?:message|attachment|meeting|memory):[A-Za-z0-9_-]+"
-                r"|connector:(?:github|figma|notion):[A-Za-z0-9_./-]+",
+                r"|connector:(?:github|figma|notion):[A-Za-z0-9_./-]+"
+                r"|dot:[a-f0-9-]{36}:[a-z_]+",
                 plan,
             )
         )

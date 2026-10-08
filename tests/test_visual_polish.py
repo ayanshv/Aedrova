@@ -103,7 +103,11 @@ def test_compact_chat_keeps_composer_and_footer_separate_during_activity(qtbot, 
     area = window.composer.parentWidget()
     assert area.height() >= area.minimumSizeHint().height()
     footer = area.layout().itemAt(area.layout().count() - 1).widget()
-    assert window.composer.geometry().bottom() < footer.geometry().top()
+    assert footer.isHidden()  # Replaced by the integrated composer cue.
+    assert window.composer.command_cue.isVisible()
+    assert window.notice.mapTo(window, window.notice.rect().topLeft()).y() > (
+        window.composer.mapTo(window, window.composer.rect().bottomLeft()).y()
+    )
 
 
 def test_profile_popup_mouse_activation_and_theme(qtbot, tmp_path):

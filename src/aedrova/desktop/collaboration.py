@@ -11,7 +11,6 @@ from PySide6.QtCore import QEvent, QObject, Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices, QImageReader, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -19,7 +18,6 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QScrollArea,
     QVBoxLayout,
-    QWidget,
 )
 
 from aedrova.desktop.controls import AppDialog, AppMenu, ChoiceBox
@@ -28,7 +26,7 @@ from aedrova.desktop.dialogs import button, label
 
 
 def snippet(body):
-    body = re.sub(r"<@([a-f0-9-]{36})\|([^>\n]{1,80})>", lambda m: "@" + m[2], body)
+    body = re.sub(r"<@(?:dot:|ai:)?([a-f0-9-]{36})\|([^>\n]{1,80})>", lambda m: "@" + m[2], body)
     document = SafeDocument()
     from html import escape
 
@@ -191,23 +189,18 @@ class Collaboration(QObject):
         self.pending_link = None
         self.scope_workspace = None
         self.allowed_channels = set()
-        self.toolbar = QWidget()
-        row = QHBoxLayout(self.toolbar)
-        row.setContentsMargins(28, 4, 28, 4)
-        row.setSpacing(8)
-        for title, section in [("Activity", "activity"), ("Saved", "saved"), ("Files", "files")]:
+        # One navigation row; the Files tab already opens the workspace file browser.
+        for title, section in [("Activity", "activity"), ("Saved", "saved")]:
             control = button(title, role="outline")
             control.clicked.connect(lambda checked=False, s=section: self.panel(s))
-            row.addWidget(control)
+            window.workspace_tools_layout.addWidget(control)
             if section == "activity":
                 self.activity_button = control
-        more = button("•••", "More chat tools", "icon")
-        more.clicked.connect(self.menu)
-        row.addWidget(more)
-        row.addStretch()
+        self.more_button = button("•••", "More chat tools", "icon")
+        self.more_button.clicked.connect(self.menu)
+        window.primary_tabs_layout.addWidget(self.more_button)
         self.typing_label = label("", "muted")
-        row.addWidget(self.typing_label, 1)
-        self.window.chat_column.layout().insertWidget(0, self.toolbar)
+        window.conversation_header_layout.addWidget(self.typing_label)
         for view in (window.messages, window.thread_messages):
             view.action_requested.connect(self.action)
             view.link_requested.connect(self.preview_link)
@@ -478,6 +471,9 @@ class Collaboration(QObject):
         self.activity_button.setText(
             "Activity" + (f" · {data['unseen']}" if data.get("unseen") else "")
         )
+        window.workspace_tools_toggle.setText(
+            "Workspace tools" + (f" · {data['unseen']}" if data.get("unseen") else "") + "  ⌄"
+        )
         names = {p["user_id"]: p["display_name"] for p in people}
         typing = [
             names.get(t["user_id"], "A teammate")
@@ -511,6 +507,7 @@ class Collaboration(QObject):
         self.scope_workspace = None
         self.allowed_channels.clear()
         self.activity_button.setText("Activity")
+        self.window.workspace_tools_toggle.setText("Workspace tools  ⌄")
         self.typing_label.clear()
         for composer in (self.window.composer, self.window.thread_composer):
             composer.people = []
@@ -576,7 +573,7 @@ class Collaboration(QObject):
             ("Notification preferences…", self.preferences),
         ]:
             menu.addAction(title, callback)
-        menu.exec(self.toolbar.mapToGlobal(self.toolbar.rect().bottomLeft()))
+        menu.exec(self.more_button.mapToGlobal(self.more_button.rect().bottomLeft()))
 
     def action(self, action, identifier):
         message = self.window._local_message(identifier)
@@ -1195,6 +1192,7 @@ class Collaboration(QObject):
                 ("channel", "@channel"),
                 ("everyone", "@everyone"),
             ]
+            + [(r["name"], "<@dot:" + r["id"] + "|" + r["name"] + ">") for r in composer.dots]
             + [
                 (r["config"]["name"], "<@ai:" + r["id"] + "|" + r["config"]["name"] + ">")
                 for r in composer.ai_teammates
@@ -1212,7 +1210,7 @@ class Collaboration(QObject):
         )
         for name, token in choices:
             menu.addAction(
-                "@" + name + (" · AI teammate" if token.startswith("<@ai:") else ""),
+                "@" + name + (" · Bud" if token.startswith("<@dot:") else ""),
                 lambda checked=False, t=token, n=name: self.insert_person(composer, n, t),
             )
         menu.exec(composer.mention.mapToGlobal(composer.mention.rect().topLeft()))

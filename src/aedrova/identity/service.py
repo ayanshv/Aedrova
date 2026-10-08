@@ -190,6 +190,66 @@ class IdentityService:
             self.user = None
             raise
 
+    def dots(self, workspace=None):
+        self._authenticated()
+        try:
+            query = (
+                self.client.table("workspace_dots").select("*").is_("deleted_at", "null").limit(200)
+            )
+            if workspace:
+                query = query.eq("workspace_id", workspace)
+            return {"items": query.execute().data, "setup_required": False}
+        except Exception as error:
+            if getattr(error, "code", None) == "PGRST205":
+                return {"items": [], "setup_required": True}
+            raise
+
+    def save_dot(self, parameters):
+        self._authenticated()
+        return self.client.rpc("save_workspace_dot", parameters).execute().data
+
+    def save_bud(self, parameters):
+        self._authenticated()
+        appearance = parameters.get("p_appearance", "auto")
+        if "p_appearance" in parameters:
+            try:
+                return self.client.rpc("save_workspace_bud_appearance", parameters).execute().data
+            except Exception as error:
+                if getattr(error, "code", None) == "PGRST202" and appearance != "auto":
+                    raise ValueError(
+                        "Saving your Bud’s appearance needs the Buds SQL update. "
+                        "Run 202610070003_bud_appearance.sql in Supabase, then retry."
+                    ) from None
+                if getattr(error, "code", None) != "PGRST202":
+                    raise
+        parameters = {k: v for k, v in parameters.items() if k != "p_appearance"}
+        try:
+            return self.client.rpc("save_workspace_bud", parameters).execute().data
+        except Exception as error:
+            if getattr(error, "code", None) == "PGRST202":
+                # Older installations can save an identity, but never silently lose notes.
+                if parameters.get("p_role") or parameters.get("p_instructions"):
+                    raise ValueError(
+                        "Bud purpose and instructions need the Buds SQL update. "
+                        "Ask your workspace owner to run 202610070002_bud_profiles.sql "
+                        "in Supabase, then retry."
+                    ) from None
+                return self.save_dot(
+                    {k: v for k, v in parameters.items() if k not in {"p_role", "p_instructions"}}
+                )
+            raise
+
+    def remove_dot(self, identifier, workspace, version):
+        self._authenticated()
+        return (
+            self.client.rpc(
+                "remove_workspace_dot",
+                {"p_id": identifier, "p_workspace": workspace, "p_version": version},
+            )
+            .execute()
+            .data
+        )
+
     def ai_teammates(self, workspace=None):
         self._authenticated()
         try:
@@ -239,7 +299,8 @@ class IdentityService:
             .data
         )
         return {
-            "ai_teammates": self.ai_teammates()["items"],
+            "ai_teammates": [],
+            "dots": self.dots()["items"],
             "user_profile": self.my_profile(),
             "directory": self.client.rpc("team_directory", {}).execute().data,
             "unread": self.client.rpc("unread_counts", {}).execute().data,

@@ -69,9 +69,10 @@ class Character(QWidget):
         from aedrova.desktop.teammate_habitat import paint_orb
 
         p = QPainter(self)
+        inset = min(10, min(self.width(), self.height()) * 0.075)
         paint_orb(
             p,
-            QRectF(self.rect()).adjusted(10, 10, -10, -10),
+            QRectF(self.rect()).adjusted(inset, inset, -inset, -inset),
             self.config,
             phase=self.phase if not self.reduced_motion else 1,
             blink=self.blink,
@@ -567,12 +568,7 @@ class TeammatesDialog(AppDialog):
 
 
 def open_teammates(window):
-    if not window.current_user() or not window.connected or not window.connected.active:
-        window.notify("Sign in to manage workspace AI teammates.")
-        return
-    old = getattr(window, "teammates_dialog", None)
-    if old and not old.closed:
-        old.raise_()
-        return
-    window.teammates_dialog = TeammatesDialog(window)
-    window.teammates_dialog.show()
+    """Compatibility entry point for old menus; only the Dot model is exposed."""
+    from aedrova.desktop.dots import open_dots
+
+    return open_dots(window)

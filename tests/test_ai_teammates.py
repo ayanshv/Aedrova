@@ -85,39 +85,34 @@ def test_specialist_autocomplete_keeps_persistent_actor_token(qtbot):
     assert composer.mention_tokens["Pixel"] == "<@ai:specialist|Pixel>"
 
 
-def test_real_analysis_mode_uses_read_only_phase_and_named_result(qtbot, tmp_path, monkeypatch):
-    connect_test_tools(monkeypatch)
+def test_legacy_mentions_no_longer_route_autonomous_specialists(qtbot, tmp_path, monkeypatch):
     window, service, source = configured(qtbot, tmp_path, monkeypatch)
-    row = profile("research")
-    window.account_dialog.snapshot["ai_teammates"] = [row]
-    service.snapshot = lambda: deepcopy(window.account_dialog.snapshot)
-    service.ai_teammates = lambda _: {"items": [row], "setup_required": False}
-    runs = []
-
-    def run(self, provider, project, text, *, plan):
-        runs.append(plan)
-        assert "Do not edit files" in text and "AI teammate Pixel" in text
-        assert self.timeout == 300
-        return "The team requested hello.py. [message:requirement]"
-
-    monkeypatch.setattr(LocalRunner, "run", run)
-    assert window.start_agent_request("@Pixel summarize the agreed requirement")
-    dialog = window.build_dialog
-    qtbot.waitUntil(lambda: dialog.successful_build, timeout=10000)
-    assert runs == [True] and not dialog.background_transition
-    assert not list(source.iterdir())
-    assert "requested hello.py" in window.agent_feed.toPlainText()
-    assert window.agent_feed.author_name == "Pixel"
-    assert not dialog.review_button.isEnabled()
+    window.account_dialog.snapshot["ai_teammates"] = [profile("research")]
+    called = []
+    monkeypatch.setattr(LocalRunner, "run", lambda *a, **k: called.append(True))
+    assert not window.start_agent_request("@Pixel summarize the agreed requirement")
+    assert not called and not list(source.iterdir())
 
 
-def test_engineering_keeps_plan_build_and_isolated_checkout(qtbot, tmp_path, monkeypatch):
-    connect_test_tools(monkeypatch)
+def test_legacy_queue_is_paused_for_explicit_migration(qtbot, tmp_path, monkeypatch):
+    from aedrova.desktop.execution import scope
+    from aedrova.desktop.projects import binding
+
     window, service, source = configured(qtbot, tmp_path, monkeypatch)
-    row = profile()
-    window.account_dialog.snapshot["ai_teammates"] = [row]
-    service.snapshot = lambda: deepcopy(window.account_dialog.snapshot)
-    service.ai_teammates = lambda _: {"items": [row], "setup_required": False}
+    queue = execution_queue(window)
+    saved = scope(binding(window))
+    saved["ai_teammate"] = profile()
+    run, _ = queue.ledger.enqueue("u", "w", "Build hello", saved)
+    called = []
+    monkeypatch.setattr(LocalRunner, "run", lambda *a, **k: called.append(True))
+    queue.tick()
+    assert next(r for r in queue.ledger.rows("u", "w") if r["id"] == run)["state"] == "paused"
+    assert not called and not list(source.iterdir())
+
+
+def test_central_builder_remains_available_without_dots(qtbot, tmp_path, monkeypatch):
+    window, service, source = configured(qtbot, tmp_path, monkeypatch)
+    window.account_dialog.snapshot["dots"] = []
     runs = []
 
     def run(self, provider, project, text, *, plan):
@@ -128,29 +123,11 @@ def test_engineering_keeps_plan_build_and_isolated_checkout(qtbot, tmp_path, mon
         return "Implemented hello.py."
 
     monkeypatch.setattr(LocalRunner, "run", run)
-    assert execution_queue(window).submit("Build hello", teammate=row)
+    assert window.start_agent_request("@Aedrova build hello")
     dialog = window.build_dialog
     qtbot.waitUntil(lambda: dialog.successful_build, timeout=10000)
     assert runs == [True, False]
     assert (dialog.project / "hello.py").exists() and not (source / "hello.py").exists()
-
-
-def test_revoked_teammate_cancels_and_clears_running_context(qtbot, tmp_path, monkeypatch):
-    window, service, source = configured(qtbot, tmp_path, monkeypatch)
-    row = profile()
-    window.account_dialog.snapshot["ai_teammates"] = [row]
-    service.snapshot = lambda: deepcopy(window.account_dialog.snapshot)
-    service.ai_teammates = lambda _: {"items": [], "setup_required": False}
-    called = []
-    monkeypatch.setattr(LocalRunner, "run", lambda *a, **k: called.append(True))
-    execution_queue(window).submit("Build hello", teammate=row)
-    dialog = window.build_dialog
-    qtbot.waitUntil(lambda: not dialog.pending, timeout=10000)
-    assert not called
-    snapshot = deepcopy(window.account_dialog.snapshot)
-    snapshot["ai_teammates"] = []
-    dialog.verify_access(snapshot)
-    assert dialog.invalidated and dialog.context is None
 
 
 def test_editor_missing_migration_and_character_do_not_call_provider(qtbot, tmp_path):

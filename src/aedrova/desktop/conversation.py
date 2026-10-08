@@ -2,12 +2,14 @@
 
 import re
 from collections import OrderedDict
+from datetime import datetime
 from html import escape
 from math import ceil
 from urllib.parse import urlsplit
 
 from PySide6.QtCore import (
     QAbstractListModel,
+    QEasingCurve,
     QEvent,
     QPersistentModelIndex,
     QPoint,
@@ -16,6 +18,7 @@ from PySide6.QtCore import (
     QSize,
     Qt,
     QTimer,
+    QVariantAnimation,
     Signal,
 )
 from PySide6.QtGui import (
@@ -103,7 +106,7 @@ class ConversationModel(QAbstractListModel):
         for row, message in enumerate(self.messages):
             if message.id == message_id:
                 index = self.index(row)
-                self.dataChanged.emit(index, index, [])
+                self.dataChanged.emit(index, self.index(min(row + 1, len(self.messages) - 1)), [])
                 break
 
 
@@ -147,7 +150,11 @@ class MessageDelegate(QStyledItemDelegate):
                 "a { color: " + self.theme.accent + "; } pre { white-space: pre-wrap; }"
             )
             document.setDocumentMargin(0)
-            text = re.sub(r"<@([a-f0-9-]{36})\|([^>\n]{1,80})>", lambda m: "@" + m[2], message.body)
+            text = re.sub(
+                r"<@(?:dot:|ai:)?([a-f0-9-]{36})\|([^>\n]{1,80})>",
+                lambda m: "@" + m[2],
+                message.body,
+            )
             document.setMarkdown(escape(text, quote=False))
             previews = ""
             for url in message_urls(message.body):
@@ -173,8 +180,8 @@ class MessageDelegate(QStyledItemDelegate):
                 block_format.setLineHeight(
                     135, QTextBlockFormat.LineHeightTypes.ProportionalHeight.value
                 )
-                block_format.setTopMargin(3)
-                block_format.setBottomMargin(4)
+                block_format.setTopMargin(1)
+                block_format.setBottomMargin(2)
                 block_format.setNonBreakableLines(False)
                 cursor.setBlockFormat(block_format)
                 fragments = block.begin()
@@ -198,6 +205,43 @@ class MessageDelegate(QStyledItemDelegate):
         self.documents.move_to_end(key)
         return self.documents[key]
 
+    def grouped(self, index):
+        """Group nearby messages by actual sender, without merging their data or actions."""
+        if index.row() == 0:
+            return False
+        message = index.data(MESSAGE_ROLE)
+        previous = index.model().index(index.row() - 1, 0).data(MESSAGE_ROLE)
+        if (
+            not previous
+            or message.unsent
+            or previous.unsent
+            or message.decision
+            or (message.delivery and message.delivery not in {"Sending…", "Retrying…"})
+            or message.edited
+            or message.saved
+            or message.pinned
+        ):
+            return False
+        if message.id == getattr(self.view, "agent_message_id", None) or previous.id == getattr(
+            self.view, "agent_message_id", None
+        ):
+            return False
+        if (message.sender_id or message.author) != (previous.sender_id or previous.author):
+            return False
+        for pattern in ("%Y-%m-%d %H:%M", "%H:%M", "%I:%M %p"):
+            try:
+                delta = (
+                    datetime.strptime(message.time, pattern)
+                    - datetime.strptime(previous.time, pattern)
+                ).total_seconds()
+                return 0 <= delta <= 300
+            except ValueError:
+                continue
+        return False
+
+    def body_offset(self, index):
+        return 5 if self.grouped(index) else 14 + QFontMetrics(font(14, True)).height() + 6
+
     def sizeHint(self, option, index):  # noqa: N802
         message = index.data(MESSAGE_ROLE)
         width = self.view.viewport().width()
@@ -207,11 +251,11 @@ class MessageDelegate(QStyledItemDelegate):
         extra = (58 if message.attachment else 0) + (
             26 if message.replies and self.view.allow_threads else 0
         )
-        header = QFontMetrics(font(14, True)).height() + 6
         chips = reaction_chips(message, width, 0)
         reaction_height = int(chips[-1][0].bottom()) + 8 if chips else 0
         return QSize(
-            width, 18 + header + ceil(document.size().height()) + extra + 22 + reaction_height
+            width,
+            self.body_offset(index) + ceil(document.size().height()) + extra + 10 + reaction_height,
         )
 
     def paint(self, painter: QPainter, option, index):
@@ -223,6 +267,15 @@ class MessageDelegate(QStyledItemDelegate):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = option.rect
         painter.setClipRect(rect)
+        animation = self.view.send_animations.get(message.id)
+        if animation is not None:
+            progress = float(animation.currentValue() or 0)
+            scale = 0.96 + 0.04 * progress
+            origin = QRectF(rect).bottomRight()
+            painter.translate(origin.x(), origin.y() + 12 * (1 - progress))
+            painter.scale(scale, scale)
+            painter.translate(-origin.x(), -origin.y())
+            painter.setOpacity(0.4 + 0.6 * progress)
         selected = option.state & QStyle.StateFlag.State_Selected
         hovered = option.state & QStyle.StateFlag.State_MouseOver
         if selected or hovered:
@@ -230,81 +283,94 @@ class MessageDelegate(QStyledItemDelegate):
         if selected and option.state & QStyle.StateFlag.State_HasFocus:
             painter.setPen(QColor(t.accent))
             painter.drawRoundedRect(QRectF(rect).adjusted(3, 1, -3, -1), 5, 5)
-        x, y = rect.x() + 28, rect.y() + 18
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor(t.avatars[message.tone % len(t.avatars)]))
-        painter.drawRoundedRect(QRectF(x, y, 34, 34), 12, 12)
-        painter.setPen(QColor(t.text))
-        painter.setFont(font(11, True))
-        painter.drawText(QRectF(x, y, 34, 34), Qt.AlignmentFlag.AlignCenter, message.initials)
-        photo = getattr(self.view, "avatar_images", {}).get(
-            getattr(self.view, "avatar_paths", {}).get(message.sender_id)
-        )
-        if photo is not None and not photo.isNull():
-            painter.save()
-            clip = QPainterPath()
-            clip.addRoundedRect(QRectF(x, y, 34, 34), 12, 12)
-            painter.setClipPath(clip)
-            painter.drawPixmap(int(x), int(y), 34, 34, photo)
-            painter.restore()
-        x += 46
-        header_height = QFontMetrics(font(14, True)).height() + 6
-        available = max(0, rect.width() - 94)
-        badge_width = 76 if message.decision else 0
-        timestamp = message.delivery or (
-            message.time
-            + (" · edited" if message.edited else "")
-            + (" · pinned" if message.pinned else "")
-            + (" · saved" if message.saved else "")
-        )
-        time_metrics = QFontMetrics(font(11))
-        time_width = min(
-            time_metrics.horizontalAdvance(timestamp) + 2,
-            max(0, int((available - badge_width) * 0.65)),
-        )
-        name_width = max(
-            0,
-            min(
-                QFontMetrics(font(14, True)).horizontalAdvance(message.author) + 4,
-                available - time_width - badge_width - 12,
-            ),
-        )
-        line_flags = Qt.AlignmentFlag.AlignVCenter | Qt.TextFlag.TextSingleLine
-        painter.setFont(font(14, True))
-        painter.drawText(
-            QRectF(x, y, name_width, header_height - 6),
-            line_flags,
-            painter.fontMetrics().elidedText(
-                message.author, Qt.TextElideMode.ElideRight, int(name_width)
-            ),
-        )
-        painter.setFont(font(11))
-        painter.setPen(QColor(t.muted))
-        painter.drawText(
-            QRectF(x + name_width + 12, y, time_width, header_height - 6),
-            line_flags,
-            time_metrics.elidedText(timestamp, Qt.TextElideMode.ElideRight, int(time_width)),
-        )
-        if message.decision:
-            bx = x + name_width + time_width + 20
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor(t.surface))
-            painter.drawRoundedRect(QRectF(bx, y, 66, header_height - 6), 8, 8)
-            painter.setPen(QColor(t.muted))
-            painter.setFont(font(9, True))
+        grouped = self.grouped(index)
+        x, y = rect.x() + 74, rect.y() + self.body_offset(index)
+        if grouped and hovered:
+            painter.setPen(QColor(t.secondary))
+            painter.setFont(font(9))
             painter.drawText(
-                QRectF(bx, y, 66, header_height - 6),
-                Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextSingleLine,
-                "DECISION",
+                QRectF(rect.x() + 10, rect.y() + 5, 54, 18),
+                Qt.AlignmentFlag.AlignCenter,
+                message.time[-5:],
             )
+        if not grouped:
+            x, y = rect.x() + 28, rect.y() + 14
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(t.avatars[message.tone % len(t.avatars)]))
+            painter.drawRoundedRect(QRectF(x, y, 34, 34), 12, 12)
+            painter.setPen(QColor(t.text))
+            painter.setFont(font(11, True))
+            painter.drawText(QRectF(x, y, 34, 34), Qt.AlignmentFlag.AlignCenter, message.initials)
+            photo = getattr(self.view, "avatar_images", {}).get(
+                getattr(self.view, "avatar_paths", {}).get(message.sender_id)
+            )
+            if photo is not None and not photo.isNull():
+                painter.save()
+                clip = QPainterPath()
+                clip.addRoundedRect(QRectF(x, y, 34, 34), 12, 12)
+                painter.setClipPath(clip)
+                painter.drawPixmap(int(x), int(y), 34, 34, photo)
+                painter.restore()
+            x += 46
+            header_height = QFontMetrics(font(14, True)).height() + 6
+            available = max(0, rect.width() - 94)
+            badge_width = 76 if message.decision else 0
+            delivery = message.delivery if message.delivery not in {"Sending…", "Retrying…"} else ""
+            timestamp = delivery or (
+                message.time
+                + (" · edited" if message.edited else "")
+                + (" · pinned" if message.pinned else "")
+                + (" · saved" if message.saved else "")
+            )
+            time_metrics = QFontMetrics(font(11))
+            time_width = min(
+                time_metrics.horizontalAdvance(timestamp) + 2,
+                max(0, int((available - badge_width) * 0.65)),
+            )
+            name_width = max(
+                0,
+                min(
+                    QFontMetrics(font(14, True)).horizontalAdvance(message.author) + 4,
+                    available - time_width - badge_width - 12,
+                ),
+            )
+            line_flags = Qt.AlignmentFlag.AlignVCenter | Qt.TextFlag.TextSingleLine
+            painter.setFont(font(14, True))
+            painter.drawText(
+                QRectF(x, y, name_width, header_height - 6),
+                line_flags,
+                painter.fontMetrics().elidedText(
+                    message.author, Qt.TextElideMode.ElideRight, int(name_width)
+                ),
+            )
+            painter.setFont(font(11))
+            painter.setPen(QColor(t.secondary))
+            painter.drawText(
+                QRectF(x + name_width + 12, y, time_width, header_height - 6),
+                line_flags,
+                time_metrics.elidedText(timestamp, Qt.TextElideMode.ElideRight, int(time_width)),
+            )
+            if message.decision:
+                bx = x + name_width + time_width + 20
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QColor(t.surface))
+                painter.drawRoundedRect(QRectF(bx, y, 66, header_height - 6), 8, 8)
+                painter.setPen(QColor(t.muted))
+                painter.setFont(font(9, True))
+                painter.drawText(
+                    QRectF(bx, y, 66, header_height - 6),
+                    Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextSingleLine,
+                    "DECISION",
+                )
         document = self.document(message, rect.width() - 94)
         painter.save()
-        painter.translate(x, y + header_height)
+        painter.translate(rect.x() + 74, rect.y() + self.body_offset(index))
         context = QAbstractTextDocumentLayout.PaintContext()
         context.palette.setColor(QPalette.ColorRole.Text, QColor(t.secondary))
         document.documentLayout().draw(painter, context)
         painter.restore()
-        bottom = y + header_height + document.size().height()
+        x = rect.x() + 74
+        bottom = rect.y() + self.body_offset(index) + document.size().height()
         if message.attachment:
             painter.setPen(QColor(t.border))
             painter.setBrush(QColor(t.surface))
@@ -378,6 +444,7 @@ class MessageView(QListView):
         self.setResizeMode(QListView.ResizeMode.Adjust)
         self.setLayoutMode(QListView.LayoutMode.Batched)
         self.setBatchSize(100)
+        self.send_animations = {}
         self.conversation_model = ConversationModel(parent=self, allow_threads=allow_threads)
         self.setModel(self.conversation_model)
         self.delegate = MessageDelegate(self)
@@ -391,14 +458,14 @@ class MessageView(QListView):
         self.hover_message = None
         for emoji in QUICK_EMOJI:
             control = SpringButton(emoji)
-            control.setFixedSize(32, 30)
+            control.setFixedSize(32, 32)
             control.setAccessibleName("React " + emoji)
             control.clicked.connect(
                 lambda checked=False, e=emoji: self.react(self.hover_message, e)
             )
             bar.addWidget(control)
         more = SpringButton("+")
-        more.setFixedSize(32, 30)
+        more.setFixedSize(32, 32)
         more.setAccessibleName("React with any emoji")
         more.setToolTip("Choose any emoji")
         more.clicked.connect(self.pick_reaction)
@@ -431,7 +498,7 @@ class MessageView(QListView):
         message = index.data(MESSAGE_ROLE)
         rect = self.visualRect(index)
         document = self.delegate.document(message, rect.width() - 94)
-        top = rect.top() + 18 + QFontMetrics(font(14, True)).height() + 6
+        top = rect.top() + self.delegate.body_offset(index)
         top += document.size().height() + (58 if message.attachment else 0)
         top += 30 if message.replies and self.allow_threads else 8
         point = getattr(self, "_click_position", QPoint(-1, -1))
@@ -439,7 +506,7 @@ class MessageView(QListView):
             if box.contains(point):
                 self.react(message.id, reaction["emoji"])
                 return
-        body_top = rect.top() + 18 + QFontMetrics(font(14, True)).height() + 6
+        body_top = rect.top() + self.delegate.body_offset(index)
         link = document.documentLayout().anchorAt(QPointF(point.x() - 74, point.y() - body_top))
         if link and urlsplit(link).scheme in ("https", "http"):
             self.link_requested.emit(link)
@@ -600,6 +667,28 @@ class MessageView(QListView):
         self._scroll_target = None
         super().wheelEvent(event)
 
+    def animate_sent(self, identifier):
+        """A short, compositor-free message pop; reduced motion stays instantaneous."""
+        if getattr(self.window(), "reduced_motion", False):
+            return
+        if identifier in self.send_animations:
+            return
+        animation = QVariantAnimation(self)
+        animation.setDuration(260)
+        animation.setStartValue(0.0)
+        animation.setEndValue(1.0)
+        animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        animation.valueChanged.connect(lambda _: self.viewport().update())
+        self.send_animations[identifier] = animation
+
+        def finished():
+            self.send_animations.pop(identifier, None)
+            animation.deleteLater()
+            self.viewport().update()
+
+        animation.finished.connect(finished)
+        animation.start()
+
     def set_theme(self, theme: Theme):
         self.delegate.theme = theme
         self.viewport().update()
@@ -661,7 +750,18 @@ class MessageView(QListView):
             self.agent_feed.setParent(self)
         if self.agent_feed and self.agent_visible:
             self.agent_feed.content_height(self.viewport().width())
-        self.conversation_model.replace(rows)
+        old = self.conversation_model.messages
+        append_only = (
+            not force
+            and not self.agent_visible
+            and len(rows) > len(old)
+            and rows[: len(old)] == old
+        )
+        if append_only:
+            for message in rows[len(old) :]:
+                self.conversation_model.append(message)
+        else:
+            self.conversation_model.replace(rows)
         if self.agent_visible and self.agent_message_id:
             for row, message in enumerate(rows):
                 if message.id == self.agent_message_id:
@@ -759,14 +859,20 @@ class Composer(QFrame):
         self.setObjectName("Composer")
         self.thread = thread
         self.agent_name = "Aedrova"
-        self.ai_teammates = []
+        self.ai_teammates = []  # Legacy fixture compatibility; no production routing.
+        self.dots = []
         self.people = []
         self.mention_tokens = {}
         self.mention_choice = None
         layout = QVBoxLayout(self)
         layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
-        layout.setContentsMargins(12, 8, 12, 10)
-        layout.setSpacing(0)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(6)
+        self.command_cue = QLabel(
+            ("IN THIS THREAD" if thread else "TO YOUR TEAM") + "  ·  @Aedrova to build"
+        )
+        self.command_cue.setObjectName("ComposerCue")
+        layout.addWidget(self.command_cue)
         self.editor = MessageEditor()
         self.editor.setObjectName("ComposerEditor")
         self.editor.focus_changed.connect(self._focus_changed)
@@ -787,7 +893,9 @@ class Composer(QFrame):
         bottom = QHBoxLayout()
         self.mention = SpringButton("@")
         self.mention.setProperty("role", "icon")
-        self.mention.setFixedSize(30, 29)
+        self.mention.setFixedHeight(30)
+        self.mention.setMaximumWidth(180)
+        self.mention.setText("Ask Aedrova")
         self.mention.setAccessibleName("Mention Aedrova")
         self.mention.setToolTip("Insert @Aedrova · ask your agent to build")
         self.mention.clicked.connect(self.insert_mention)
@@ -799,7 +907,7 @@ class Composer(QFrame):
         self.emoji.setToolTip("Choose an emoji")
         self.emoji.clicked.connect(self.insert_emoji)
         bottom.addWidget(self.emoji)
-        self.hint = QLabel("Shift ↵ for a new line")
+        self.hint = QLabel("↵ send  ·  ⇧↵ new line")
         self.hint.setProperty("role", "muted")
         bottom.addWidget(self.hint)
         bottom.addStretch()
@@ -817,7 +925,8 @@ class Composer(QFrame):
 
         for control, name in ((self.mention, "mention"), (self.emoji, "smile")):
             assign(control, name)
-            control.setText("")
+            if control is not self.mention:
+                control.setText("")
         assign(self.send, "send")
 
     def insert_emoji(self):
@@ -845,6 +954,13 @@ class Composer(QFrame):
         mention = "@" + self.agent_name
         self.suggestion.setText(f"{mention}    ·    Tab or ↵")
         self.suggestion.setAccessibleName(f"Complete mention {mention}. Tab or Return.")
+        self.mention.setText("Ask " + self.agent_name)
+        self.command_cue.setText(
+            ("IN THIS THREAD" if self.thread else "TO YOUR TEAM")
+            + "  ·  @"
+            + self.agent_name
+            + " to build"
+        )
         self.mention.setAccessibleName("Mention " + self.agent_name)
         self.mention.setToolTip(f"Insert {mention} · ask your agent to build")
         self.update_suggestion()
@@ -867,6 +983,7 @@ class Composer(QFrame):
                     ("channel", "@channel"),
                     ("everyone", "@everyone"),
                 ]
+                + [(r["name"], "<@dot:" + r["id"] + "|" + r["name"] + ">") for r in self.dots]
                 + [
                     (r["config"]["name"], "<@ai:" + r["id"] + "|" + r["config"]["name"] + ">")
                     for r in self.ai_teammates
@@ -896,7 +1013,7 @@ class Composer(QFrame):
     def update_suggestion(self):
         self.suggestion.setVisible(self.mention_start() is not None)
         if self.mention_choice:
-            suffix = " · AI teammate" if self.mention_choice[1].startswith("<@ai:") else ""
+            suffix = " · Bud" if self.mention_choice[1].startswith("<@dot:") else ""
             self.suggestion.setText("@" + self.mention_choice[0] + suffix + "    ·    Tab or ↵")
 
     def completion_key(self, event):
@@ -944,7 +1061,7 @@ class Composer(QFrame):
         if len(text) > 10_000:
             self.hint.setText("Limit: 10,000 characters")
         else:
-            self.hint.setText("Shift ↵ for a new line")
+            self.hint.setText("↵ send  ·  ⇧↵ new line")
 
     def _submit(self):
         text = self.editor.toPlainText().strip()

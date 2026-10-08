@@ -140,6 +140,7 @@ def current_meetings(window):
         for meeting in activity.get("meetings", [])
         if meeting.get("workspace_id") == window.workspace_id
         and meeting.get("channel_id") in allowed
+        and bool(meeting.get("participants"))
     ]
 
 

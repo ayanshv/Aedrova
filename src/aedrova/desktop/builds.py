@@ -103,6 +103,12 @@ class ContextJob(QRunnable):
                     raise PermissionError("Teammate settings changed during tool retrieval.")
                 context = result["context"]
                 result["context"] = replace(context, text=context.text + "\n" + external)
+            from aedrova.agents.managed import application_origin
+
+            if application_origin() and self.service.dots(self.workspace)["items"]:
+                from aedrova.dots.client import client
+
+                result["dot_client"] = client(self.service)
             if self.managed_origin:
                 _, _, access, user = self.service.realtime_credentials()
                 if user != str(self.service.user.id):
@@ -135,6 +141,7 @@ class BuildJob(QRunnable):
         self.teammate = None
         self.ledger = None
         self.managed_client = None
+        self.dot_client = None
         self.run_id = None
         self.runner = LocalRunner(self.signals.progress.emit, self.permission)
 
@@ -218,7 +225,27 @@ class BuildJob(QRunnable):
                 self.runner.managed = self.managed_client.begin(
                     self.context.workspace_id, self.provider, str(uuid4())
                 )
+            if self.dot_client:
+                from aedrova.dots.client import retrieve
+
+                self.context = retrieve(
+                    self.dot_client,
+                    self.context,
+                    self.task,
+                    self.runner,
+                    self.provider,
+                    self.project,
+                    self.signals.progress.emit,
+                )
+                context_file.write_text(
+                    retrieval_record(self.context, self.task) + "\n" + self.context.text,
+                    encoding="utf-8",
+                )
             result = self.runner.run(self.provider, self.project, prompt, plan=self.plan)
+            if self.dot_client:
+                from aedrova.dots.client import recheck
+
+                recheck(self.dot_client, self.context)
             if self.runner.cancelled.is_set():
                 raise BuildCancelled()
             if self.plan:
@@ -237,7 +264,7 @@ class BuildJob(QRunnable):
                 "text": "Cancelled. Partial edits are retained in the build folder for review.",
                 "project": self.project,
             }
-        except (ValueError, TimeoutError, RuntimeError) as exc:
+        except (ValueError, TimeoutError, RuntimeError, PermissionError) as exc:
             outcome = {"ok": False, "text": str(exc), "project": self.project}
         except Exception:
             outcome = {
@@ -690,6 +717,7 @@ class BuildDialog(AppDialog):
             )
             self.job.teammate = getattr(self, "teammate", None)
             self.job.managed_client = result.get("managed")
+            self.job.dot_client = result.get("dot_client")
             if self.execution_queue and self.run_id:
                 self.job.ledger = self.execution_queue.ledger
                 self.job.run_id = self.run_id
