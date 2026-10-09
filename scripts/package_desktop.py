@@ -10,7 +10,7 @@ import sys
 import tomllib
 from pathlib import Path
 
-from aedrova.agents.managed import application_origin
+from aedrova.agents.managed import application_origin, connector_origin
 from aedrova.agents.runtime import executable
 from aedrova.identity.service import Connection
 
@@ -125,6 +125,7 @@ if connection:
                 "supabase_url": connection.url,
                 "supabase_publishable_key": connection.public_key,
                 "managed_origin": application_origin(),
+                "connector_origin": connector_origin(),
                 "ai_access_mode": ai_mode,
                 "meeting_context_enabled": os.getenv("AEDROVA_MEETING_CONTEXT_ENABLED") == "true",
             }

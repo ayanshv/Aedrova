@@ -1,5 +1,6 @@
 """Working account and desktop preferences; no placeholder account actions."""
 
+from datetime import UTC, datetime
 from urllib.parse import quote
 
 from PySide6.QtCore import QUrl
@@ -72,6 +73,13 @@ class SettingsDialog(AppDialog):
             row.addWidget(self.name, 1)
             row.addWidget(self.save)
             layout.addLayout(row)
+        if self.user:
+            from aedrova.desktop.bud_connectors import open_connectors
+
+            layout = section(root_layout, "Connectors", "Bring your tools into your Buds’ work.")
+            connectors = button("Manage connectors…", role="outline")
+            connectors.clicked.connect(lambda: open_connectors(window))
+            layout.addWidget(connectors)
         layout = section(root_layout, "Appearance", "Choose a comfortable way to work.")
         self.appearance = ChoiceBox()
         self.appearance.setAccessibleName("Appearance")
@@ -185,10 +193,19 @@ class SettingsDialog(AppDialog):
             if result.get("error"):
                 self.billing_status.setText(result["error"])
             elif result.get("status") == "active":
+                names = {"free": "Free", "monthly": "Pro", "annual": "Team"}
+                plan = names.get(result["plan"], result["plan"].title())
+                spent = result.get("monthly_spent", result["spent"])
+                budget = max(1, result.get("monthly_budget", result["allowance"]))
+                remaining = max(0, min(100, round(100 * (1 - spent / budget))))
+                reset = ""
+                if result.get("reset_at"):
+                    date = datetime.fromtimestamp(result["reset_at"], UTC).strftime("%b %d")
+                    reset = f"Resets {date} (UTC). "
                 self.billing_status.setText(
-                    f"{result['plan'].title()} plan · ${result['available'] / 1_000_000:.2f} "
-                    f"AI allowance available · ${result['spent'] / 1_000_000:.2f} used. "
-                    "No automatic overage charges."
+                    f"{plan} plan · {remaining}% monthly AI capacity remaining. "
+                    + reset
+                    + "No automatic overage charges."
                 )
             else:
                 self.billing_status.setText(

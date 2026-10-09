@@ -24,7 +24,43 @@ def editor(qtbot, tmp_path, monkeypatch):
     ]
 
     class API:
-        def request(self, path):
+        def request(self, path, body=None, **kwargs):
+            if path == "/api/buds/connectors":
+                return {
+                    "providers": [
+                        dict(
+                            id=key,
+                            name=name,
+                            group=group,
+                            description=description,
+                            resource_hint=hint,
+                            available=True,
+                        )
+                        for key, name, group, description, hint in [
+                            (
+                                "github",
+                                "GitHub",
+                                "Code & delivery",
+                                "Repository context",
+                                "owner/repository",
+                            ),
+                            ("figma", "Figma", "Design & knowledge", "Design context", "file key"),
+                            ("notion", "Notion", "Design & knowledge", "Shared notes", "page UUID"),
+                        ]
+                    ]
+                }
+            if path == "/api/buds/connections":
+                rows[0]["connections"] = [
+                    dict(
+                        id="grant-1",
+                        provider=body["provider"],
+                        resource=body["resource"],
+                        status="Connected",
+                        version="grant-1",
+                    )
+                ]
+                rows[0]["status"] = "Connected"
+                return {"connected": True}
             return (
                 {"providers": providers}
                 if path.endswith("providers")
@@ -62,6 +98,12 @@ def editor(qtbot, tmp_path, monkeypatch):
 
     service.save_bud = save
     monkeypatch.setattr("aedrova.desktop.dots.client", lambda service: API())
+    monkeypatch.setattr("aedrova.desktop.bud_connectors.client", lambda service: API())
+    from aedrova.desktop.bud_connectors import ConnectorsDialog
+
+    monkeypatch.setattr(
+        ConnectorsDialog, "run", lambda self, operation, completed: completed(operation(service))
+    )
     monkeypatch.setattr(
         DotDialog, "run", lambda self, operation, completed: completed(operation(service))
     )
@@ -94,7 +136,7 @@ def test_six_stages_save_without_oauth_and_never_fake_ready(editor, qtbot):
     assert dialog.pages.currentIndex() == 4
     dialog.next.click()
     assert len(saved) == 1
-    assert "Connect its tool" in dialog.status.text()
+    assert "connector card" in dialog.status.text()
     assert dialog.pages.currentIndex() == 4
     rows[0]["status"] = "Connected"
     dialog.refresh()
@@ -206,7 +248,7 @@ def test_role_presets_persist_independently_of_appearance(editor):
     dialog.resource.setText("team/project")
     assert "Figma — coming next" in dialog.recommendations.text()
     assert "Notion — coming next" in dialog.recommendations.text()
-    assert "one external connection" in dialog.recommendations.text()
+    assert "Each account authorizes its own access" in dialog.recommendations.text()
     dialog.save_dot()
     assert saved[-1]["p_role"] == "Designer · Review our designs"
     assert saved[-1]["p_appearance"] == "marketing"
@@ -223,7 +265,7 @@ def test_every_specialty_has_curated_tools_without_fake_access(editor):
         "marketing": ("Instagram — coming next", "TikTok — coming next"),
         "finance": ("Stripe — coming next", "QuickBooks"),
         "research": ("AI model — uses workspace AI access", "Web search — coming next"),
-        "product": ("Notion — coming next", "Linear — coming next"),
+        "product": ("Notion — coming next", "PostHog"),
     }
     for specialty, phrases in expected.items():
         dialog.job_role.setCurrentIndex(dialog.job_role.findData(specialty))
@@ -245,3 +287,173 @@ def test_legacy_long_purpose_survives_role_picker(editor):
     assert dialog.role.text() == rows[0]["role"]
     assert dialog.configured_role() == rows[0]["role"]
     assert not dialog.has_changes()
+
+
+def test_connector_step_is_inline_gallery_and_draft_connects_without_extra_window(editor, qtbot):
+    from PySide6.QtWidgets import QFrame
+
+    dialog, rows, saved, window = editor
+    dialog.show_step(4)
+    gallery = dialog.embedded_connectors
+    assert not gallery.isWindow()
+    assert gallery.parentWidget() is dialog.pages.widget(4)
+    assert not dialog.provider.isVisible() and not dialog.resource.isVisible()
+    assert not dialog.recommendations.isVisible()
+    assert gallery.filter.currentData() == "builder"
+    assert len(gallery.findChildren(QFrame, "ConnectorCard")) == 1
+    qtbot.wait(40)
+    assert gallery.columns == 3
+    assert gallery.gallery.horizontalScrollBar().maximum() == 0
+    gallery.open_provider(gallery.providers[0])
+    gallery.resource.setText("team/project")
+    gallery.credential.setText("private-fixture-token")
+    gallery.connect_tool()
+    assert len(saved) == 1
+    assert rows[0]["connections"][0]["resource"] == "team/project"
+    assert gallery.credential.text() == ""
+    assert dialog.pages.currentIndex() == 4
+    dialog.next.click()
+    assert dialog.pages.currentIndex() == 5
+    dialog.back.click()
+    assert gallery.bud.currentData() == rows[0]["id"]
+    gallery.credential.setText("never-retain-this")
+    dialog.reject()
+    assert gallery.credential.text() == ""
+
+
+def test_new_bud_clears_previous_connector_target(editor):
+    dialog, rows, saved, _ = editor
+    dialog.resource.setText("team/project")
+    dialog.save_dot()
+    gallery = dialog.embedded_connectors
+    assert gallery.bud.currentData() == rows[0]["id"]
+    dialog.new_dot()
+    dialog.show_step(4)
+    assert gallery.bud.currentData() is None
+    assert gallery.row().get("connections") == []
+
+
+def test_connector_saves_changed_profile_before_authorizing_current_version(editor):
+    dialog, rows, saved, _ = editor
+    dialog.resource.setText("team/project")
+    dialog.save_dot()
+    dialog.name.setText("Renamed Bud")
+    dialog.show_step(4)
+    gallery = dialog.embedded_connectors
+    gallery.open_provider(gallery.providers[0])
+    gallery.resource.setText("team/project")
+    gallery.credential.setText("private-fixture-token")
+    gallery.connect_tool()
+    assert len(saved) == 2
+    assert rows[0]["name"] == "Renamed Bud"
+    assert rows[0]["status"] == "Connected"
+    assert not dialog.has_changes()
+    dialog.next.click()
+    assert dialog.pages.currentIndex() == 5
+
+
+def test_pending_inline_connection_prevents_changing_bud_or_advancing(editor):
+    dialog, _, _, _ = editor
+    dialog.show_step(4)
+    gallery = dialog.embedded_connectors
+    gallery.pending = True
+    gallery.update_controls()
+    assert not dialog.back.isEnabled()
+    assert not dialog.next.isEnabled()
+    assert not dialog.new.isEnabled()
+    assert not dialog.list.isEnabled()
+    gallery.pending = False
+    gallery.update_controls()
+    assert dialog.back.isEnabled() and dialog.next.isEnabled()
+
+
+def test_inline_oauth_saves_draft_opens_same_service_and_updates_real_connection(
+    editor, monkeypatch
+):
+    dialog, rows, saved, window = editor
+    dialog.show_step(4)
+    gallery = dialog.embedded_connectors
+    provider = {
+        **gallery.providers[0],
+        "oauth_available": True,
+        "oauth_supported": True,
+        "permissions": "Read-only repository",
+    }
+    gallery.open_provider(provider)
+    gallery.resource.setText("team/project")
+    origin, state = "http://127.0.0.1:8090", "a" * 43
+    monkeypatch.setattr("aedrova.desktop.bud_connectors.connector_origin", lambda: origin)
+    opened = []
+    monkeypatch.setattr(
+        "aedrova.desktop.bud_connectors.QDesktopServices.openUrl",
+        lambda url: opened.append(url.toString()) or True,
+    )
+    original = __import__("aedrova.desktop.bud_connectors", fromlist=["client"]).client
+    calls = []
+
+    class API:
+        def request(self, path, body=None, **kwargs):
+            calls.append((path, body))
+            if path == "/api/buds/oauth/start":
+                return {"url": origin + "/buds/authorize/" + state, "state": state}
+            if path.startswith("/api/buds/oauth/status?"):
+                rows[0]["status"] = "Connected"
+                rows[0]["connections"] = [
+                    dict(id="grant", provider="github", resource="team/project", status="Connected")
+                ]
+                return {"status": "connected", "connection": "grant"}
+            return original(None).request(path, body, **kwargs)
+
+    monkeypatch.setattr("aedrova.desktop.bud_connectors.client", lambda _: API())
+    gallery.connect_oauth()
+    assert len(saved) == 1 and opened == [origin + "/buds/authorize/" + state]
+    assert gallery.oauth_timer.isActive() and gallery.oauth_state == state
+    assert "credential" not in calls[0][1] and calls[0][1]["dot"] == rows[0]["id"]
+    gallery.poll_oauth()
+    assert not gallery.oauth_timer.isActive() and not gallery.oauth_state
+    assert dialog.current()["status"] == "Connected"
+    assert window.composer.dots[0]["status"] == "Connected"
+    dialog.next.click()
+    assert dialog.pages.currentIndex() == 5
+
+
+def test_oauth_rejects_external_redirect_and_stops_polling_when_closed(editor, monkeypatch):
+    dialog, _, _, _ = editor
+    dialog.resource.setText("team/project")
+    dialog.save_dot()
+    gallery = dialog.embedded_connectors
+    gallery.open_provider(
+        {
+            **gallery.providers[0],
+            "oauth_available": True,
+            "oauth_supported": True,
+            "permissions": "Read-only repository",
+        }
+    )
+    gallery.resource.setText("team/project")
+    monkeypatch.setattr(
+        "aedrova.desktop.bud_connectors.connector_origin", lambda: "http://127.0.0.1:8090"
+    )
+
+    class API:
+        def request(self, *_args, **_kwargs):
+            return {"url": "https://evil.test/authorize", "state": "a" * 43}
+
+    monkeypatch.setattr("aedrova.desktop.bud_connectors.client", lambda _: API())
+    gallery.connect_oauth()
+    assert "invalid authorization link" in gallery.status.text()
+    assert not gallery.oauth_state
+    gallery.oauth_state = "a" * 43
+    gallery.oauth_timer.start()
+    dialog.reject()
+    assert not gallery.oauth_timer.isActive() and not gallery.oauth_state
+
+
+def test_look_selection_sets_specialty_and_recommendations(editor):
+    dialog, _, _, _ = editor
+    for tile, specialty in dialog.appearance_buttons:
+        tile.click()
+        assert dialog.appearance.currentData() == specialty
+        assert dialog.job_role.currentData() == specialty
+        assert dialog.recommendations.text().startswith(specialty.title() + " tools")
+    assert not any("Match" in tile.text() for tile, _ in dialog.appearance_buttons)

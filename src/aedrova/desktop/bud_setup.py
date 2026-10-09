@@ -86,6 +86,7 @@ def build_setup(d, window):
     outer.addWidget(d.list)
     panel = QFrame(d)
     panel.setObjectName("BudSetupPanel")
+    d.setup_panel = panel
     panel.setMinimumWidth(500)
     panel.setMaximumWidth(560)
     outer.addWidget(panel, 1, Qt.AlignmentFlag.AlignHCenter)
@@ -175,17 +176,10 @@ def build_setup(d, window):
         tile.setIconSize(QSize(52, 52))
         tile.setMinimumHeight(86)
         tile.setAccessibleName("Choose " + title + " appearance")
-        tile.clicked.connect(
-            lambda checked=False, v=value: d.appearance.setCurrentIndex(d.appearance.findData(v))
-        )
+        tile.clicked.connect(lambda checked=False, v=value: choose_look(d, v))
         grid.addWidget(tile, index // 3, index % 3)
         d.appearance_buttons.append((tile, value))
     looks.addLayout(grid)
-    automatic = button("Match its look to its role")
-    automatic.setCheckable(True)
-    automatic.clicked.connect(lambda: d.appearance.setCurrentIndex(0))
-    d.appearance_buttons.append((automatic, "auto"))
-    looks.addWidget(automatic)
     looks.addStretch()
 
     identity = page("Make it yours", "Give your Bud a name and choose its color.")
@@ -250,41 +244,40 @@ def build_setup(d, window):
     purpose.addWidget(d.instructions)
     purpose.addStretch()
 
-    tools = page("Connect your tools", "Let your Bud work with the context you already have.")
+    # Keep profile fields as state holders for existing save/version semantics.
+    # The user-facing tool step is the shared connector gallery, mounted inline.
+    tools = QWidget(panel)
+    d.tools_layout = QVBoxLayout(tools)
+    d.tools_layout.setContentsMargins(0, 12, 0, 0)
+    d.pages.addWidget(tools)
+    d.embedded_connectors = None
     d.provider = ChoiceBox(panel)
     d.provider.setAccessibleName("Bud connected tool")
     d.provider.currentIndexChanged.connect(d.provider_changed)
     d.resource = QLineEdit(panel)
     d.resource.setAccessibleName("Bud tool resource")
-    d.resource.setPlaceholderText("your-team/your-repository")
     d.recommendations = label("", "muted", wrap=True)
-    d.recommendations.setTextFormat(Qt.TextFormat.PlainText)
-    tools.addWidget(d.recommendations)
-    tools.addWidget(label("Current external connection", "muted"))
-    tools.addWidget(d.provider)
-    tools.addWidget(label("Repository", "muted"))
-    tools.addWidget(d.resource)
-    tools.addWidget(d.capabilities)
     d.connection_hint = label("", "muted", wrap=True)
-    tools.addWidget(d.connection_hint)
     d.connect = button("Connect GitHub", role="primary")
     d.connect.clicked.connect(d.authorize)
-    tools.addWidget(d.connect)
+    d.connector_gallery = button("Browse connectors →")
+    d.connector_gallery.clicked.connect(d.open_connectors)
     d.save = button("Save changes")
     d.save.clicked.connect(d.save_dot)
-    maintenance = QHBoxLayout()
-    maintenance.addWidget(d.save)
-    refresh = button("Refresh connection")
-    refresh.clicked.connect(d.refresh)
-    maintenance.addWidget(refresh)
-    tools.addLayout(maintenance)
     d.disconnect = button("Disconnect my access")
     d.disconnect.clicked.connect(d.disconnect_dot)
-    tools.addWidget(d.disconnect)
-    tools.addWidget(
-        label("Read-only access. Each teammate connects their own account.", "muted", wrap=True)
-    )
-    tools.addStretch()
+    for control in (
+        d.provider,
+        d.resource,
+        d.recommendations,
+        d.capabilities,
+        d.connection_hint,
+        d.connect,
+        d.connector_gallery,
+        d.save,
+        d.disconnect,
+    ):
+        control.hide()
 
     ready = page(
         "Meet your Bud", "A familiar face. Your tools. Right in your conversation.", centered=True
@@ -329,3 +322,9 @@ def build_setup(d, window):
     d.transition.setEasingCurve(QEasingCurve.Type.OutCubic)
     d.after_refresh = None
     d.show_step(0)
+
+
+def choose_look(dialog, look):
+    """A visual specialty selection also selects its actual role and tool recommendations."""
+    dialog.appearance.setCurrentIndex(dialog.appearance.findData(look))
+    dialog.job_role.setCurrentIndex(dialog.job_role.findData(look))

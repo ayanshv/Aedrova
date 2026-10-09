@@ -137,6 +137,23 @@ class DotDialog(AppDialog):
             self.status.setText("Reconnect the workspace before managing Buds.")
             self.update_controls()
 
+    def sync_connection_rows(self, rows):
+        cache = getattr(self.window, "dot_connection_states", {})
+        for row in rows:
+            cache[(self.user, row["id"], row["version"])] = {
+                "status": row["status"],
+                "last_sync": row["last_sync"],
+            }
+        self.window.dot_connection_states = cache
+        self.window.account_dialog.snapshot["dots"] = [
+            r
+            for r in self.window.account_dialog.snapshot.get("dots", [])
+            if r["workspace_id"] != self.workspace
+        ] + rows
+        self.window.ai_team_section.sync(rows, self.workspace)
+        self.window.composer.dots = rows
+        self.window.thread_composer.dots = rows
+
     def refresh(self):
         resume_step = self.pages.currentIndex() if self.current() else None
 
@@ -148,21 +165,7 @@ class DotDialog(AppDialog):
 
         def loaded(value):
             self.providers, self.rows = value
-            cache = getattr(self.window, "dot_connection_states", {})
-            for row in self.rows:
-                cache[(self.user, row["id"], row["version"])] = {
-                    "status": row["status"],
-                    "last_sync": row["last_sync"],
-                }
-            self.window.dot_connection_states = cache
-            self.window.account_dialog.snapshot["dots"] = [
-                r
-                for r in self.window.account_dialog.snapshot.get("dots", [])
-                if r["workspace_id"] != self.workspace
-            ] + self.rows
-            self.window.ai_team_section.sync(self.rows, self.workspace)
-            self.window.composer.dots = self.rows
-            self.window.thread_composer.dots = self.rows
+            self.sync_connection_rows(self.rows)
             self.provider.blockSignals(True)
             self.provider.clear()
             for provider in self.providers:
@@ -195,6 +198,9 @@ class DotDialog(AppDialog):
             elif resume_step is not None and self.rows:
                 self.show_step(resume_step)
             self.update_controls()
+            callback, self.after_save = getattr(self, "after_save", None), None
+            if callback:
+                callback(self.current())
 
         self.run(fetch, loaded)
 
@@ -298,9 +304,12 @@ class DotDialog(AppDialog):
             + "\n".join(description(key) for key in core)
             + "\n\nAlso useful: "
             + ", ".join(NAMES[key] for key in additional)
-            + "\nAdditional tools are recommendations, not granted access. "
-            "Each Bud currently supports one external connection."
+            + "\nConnect tools in the gallery. Each account authorizes its own access."
         )
+        if not self.current() and self.provider.count():
+            suggested = next((key for key in core if self.provider.findData(key) >= 0), None)
+            if suggested:
+                self.provider.setCurrentIndex(self.provider.findData(suggested))
         self.preview()
 
     def provider_changed(self):
@@ -311,7 +320,9 @@ class DotDialog(AppDialog):
             self.capabilities.setText(provider["permissions"])
             self.save.setEnabled(self.admin())
             self.resource.setPlaceholderText(
-                "owner/repository" if provider["id"] == "github" else "Resource identifier"
+                "owner/repository"
+                if provider["id"] == "github"
+                else provider.get("resource_hint", "Resource identifier")
             )
             self.update_controls()
 
@@ -385,6 +396,23 @@ class DotDialog(AppDialog):
 
     def show_step(self, step):
         changed = self.pages.currentIndex() != step
+        self.setup_panel.setMinimumWidth(900 if step == 4 else 500)
+        self.setup_panel.setMaximumWidth(1120 if step == 4 else 560)
+        if step == 4:
+            self.setMinimumWidth(960)
+            if self.width() < 1100:
+                self.resize(1100, max(800, self.height()))
+            if self.embedded_connectors is None:
+                from aedrova.desktop.bud_connectors import ConnectorsDialog
+
+                self.embedded_connectors = ConnectorsDialog(
+                    self.window, self.selected_id, embedded_owner=self
+                )
+                self.tools_layout.addWidget(self.embedded_connectors)
+            else:
+                self.embedded_connectors.sync_target()
+        else:
+            self.setMinimumWidth(600)
         self.pages.setCurrentIndex(step)
         size = {1: 128, 2: 144, 3: 100, 5: 210}.get(step, 100)
         self.character.setFixedSize(size, size)
@@ -415,16 +443,30 @@ class DotDialog(AppDialog):
     def update_controls(self):
         if not hasattr(self, "next"):
             return
-        busy = self.pending or self.job is not None
+        gallery = getattr(self, "embedded_connectors", None)
+        busy = (
+            self.pending
+            or self.job is not None
+            or bool(gallery and (gallery.pending or gallery.job))
+        )
+        self.back.setEnabled(not busy)
+        self.list.setEnabled(not busy)
         self.next.setEnabled(not busy)
         self.new.setEnabled(self.admin() and not busy)
         self.save.setEnabled(
             self.admin()
             and not busy
-            and (self.provider.currentData() == "github" or self.current() is not None)
+            and (
+                any(
+                    p.get("configurable") and p["id"] == self.provider.currentData()
+                    for p in self.providers
+                )
+                or self.current() is not None
+            )
         )
         row = self.current()
         provider = next((p for p in self.providers if p["id"] == self.provider.currentData()), {})
+        self.connector_gallery.setEnabled(bool(row) and not busy)
         self.connect.setText("Connect " + provider.get("name", "tool"))
         self.connect.setEnabled(bool(row and provider.get("available")) and not busy)
         self.connect.setToolTip(
@@ -432,15 +474,23 @@ class DotDialog(AppDialog):
             if provider.get("available")
             else "Aedrova’s owner must configure this connector. Your Bud can still be saved."
         )
-        self.disconnect.setEnabled(bool(row and row.get("tools")) and not busy)
-        self.disconnect.setVisible(bool(row and row.get("tools")))
+        legacy_access = bool(
+            row
+            and row.get("provider") == "github"
+            and any("." not in tool for tool in row.get("tools", {}))
+        )
+        self.disconnect.setText("Disconnect my GitHub OAuth access")
+        self.disconnect.setEnabled(legacy_access and not busy)
+        # Legacy controls are backing state only; the inline gallery owns the UI.
+        self.disconnect.hide()
         self.remove.setEnabled(bool(row) and self.admin() and not busy)
         self.remove.setVisible(bool(row) and self.admin())
         self.connection_hint.setText(
             ""
             if provider.get("available")
             else "Connector setup is pending. Save your Bud now; your workspace owner "
-            "must configure GitHub before you can connect it."
+            "must configure this connector before you can connect it. "
+            "You can also use a scoped access token in Browse connectors."
         )
 
     def continue_setup(self):
@@ -460,14 +510,21 @@ class DotDialog(AppDialog):
                 and self.current().get("status") == "Connected"
                 and not self.has_changes()
             ):
-                self.ready_copy.setText(self.name.text() + " · " + self.provider.currentText())
+                sources = list(
+                    dict.fromkeys(
+                        c["provider"].title()
+                        for c in self.current().get("connections", [])
+                        if c["status"] == "Connected"
+                    )
+                )
+                self.ready_copy.setText(
+                    self.name.text()
+                    + " · "
+                    + (", ".join(sources) if sources else self.provider.currentText())
+                )
                 self.show_step(5)
             elif self.current() and not self.has_changes():
-                self.status.setText(
-                    "Your Bud is saved. Connect its tool to finish setup. "
-                    "GitHub app credentials must be configured by Aedrova’s owner "
-                    "if connection is unavailable."
-                )
+                self.status.setText("Choose a connector card and authorize a tool to finish setup.")
             else:
                 self.save_dot()
         else:
@@ -494,13 +551,15 @@ class DotDialog(AppDialog):
             ]
         )
 
-    def save_dot(self):
+    def save_dot(self, checked=False, *, on_saved=None):
         row = self.current()
         if not self.admin():
             self.status.setText("Only workspace owners or admins can configure Buds.")
             return
-        if not row and self.provider.currentData() != "github":
-            self.status.setText("This tool is coming next. Choose GitHub to configure a Bud now.")
+        if not row and not any(
+            p.get("configurable") and p["id"] == self.provider.currentData() for p in self.providers
+        ):
+            self.status.setText("This tool is not available yet. Choose an available connector.")
             return
         if not self.name.text().strip() or not self.resource.text().strip():
             self.status.setText("Add a Bud name and a tool resource before saving.")
@@ -546,13 +605,20 @@ class DotDialog(AppDialog):
         def saved(value):
             self.selected_id = value["id"]
             self.after_refresh = 4
+            self.after_save = on_saved
             self.refresh()
 
         self.run(lambda service: service.save_bud(parameters), saved)
 
+    def open_connectors(self):
+        self.show_step(4)
+
     def authorize(self):
         row = self.current()
         if not row:
+            return
+        if row["provider"] != "github":
+            self.open_connectors()
             return
         self.status.setText("Connecting… Authorize only the repository you selected.")
         self.run(
@@ -582,6 +648,12 @@ class DotDialog(AppDialog):
                 ),
                 disconnected,
             )
+
+    def done(self, result):
+        if self.embedded_connectors:
+            self.embedded_connectors.stop_oauth()
+            self.embedded_connectors.credential.clear()
+        super().done(result)
 
     def remove_dot(self):
         row = self.current()

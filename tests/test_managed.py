@@ -127,19 +127,21 @@ def test_packaged_runtime_prefers_bundled_codex_and_fails_closed_if_missing(tmp_
 
 def test_local_build_mode_keeps_meeting_origin_without_creating_managed_access(monkeypatch):
     from aedrova.agents.managed import application_ai_origin, application_origin
-    monkeypatch.setenv('AEDROVA_MANAGED_ORIGIN', 'http://127.0.0.1:8090')
-    monkeypatch.setenv('AEDROVA_AI_ACCESS_MODE', 'local')
-    assert application_origin() == 'http://127.0.0.1:8090'
-    assert application_ai_origin() == ''
+
+    monkeypatch.setenv("AEDROVA_MANAGED_ORIGIN", "http://127.0.0.1:8090")
+    monkeypatch.setenv("AEDROVA_AI_ACCESS_MODE", "local")
+    assert application_origin() == "http://127.0.0.1:8090"
+    assert application_ai_origin() == ""
 
 
 def test_included_build_mode_never_silently_falls_back(monkeypatch):
     from aedrova.agents.managed import application_ai_origin
-    monkeypatch.setenv('AEDROVA_MANAGED_ORIGIN', 'https://aedrova.example')
-    monkeypatch.setenv('AEDROVA_AI_ACCESS_MODE', 'included')
-    assert application_ai_origin() == 'https://aedrova.example'
-    monkeypatch.setenv('AEDROVA_MANAGED_ORIGIN', '')
-    with pytest.raises(ValueError, match='Included AI needs'):
+
+    monkeypatch.setenv("AEDROVA_MANAGED_ORIGIN", "https://aedrova.example")
+    monkeypatch.setenv("AEDROVA_AI_ACCESS_MODE", "included")
+    assert application_ai_origin() == "https://aedrova.example"
+    monkeypatch.setenv("AEDROVA_MANAGED_ORIGIN", "")
+    with pytest.raises(ValueError, match="Included AI needs"):
         application_ai_origin()
 
 
@@ -147,12 +149,34 @@ def test_frozen_managed_build_ignores_personal_provider_override(monkeypatch):
     import json
 
     from aedrova.agents import managed
+
     original = managed.Path.read_text
-    monkeypatch.setattr(managed.Path, 'read_text', lambda path, *a, **k:
-                        json.dumps({'managed_origin': 'https://aedrova.example',
-                                    'ai_access_mode': 'included'})
-                        if path.name == 'public-config.json' else original(path, *a, **k))
-    monkeypatch.setattr(managed.sys, 'frozen', True, raising=False)
-    monkeypatch.setenv('AEDROVA_AI_ACCESS_MODE', 'local')
-    monkeypatch.setenv('AEDROVA_MANAGED_ORIGIN', 'http://127.0.0.1:9999')
-    assert managed.application_ai_origin() == 'https://aedrova.example'
+    monkeypatch.setattr(
+        managed.Path,
+        "read_text",
+        lambda path, *a, **k: (
+            json.dumps({"managed_origin": "https://aedrova.example", "ai_access_mode": "included"})
+            if path.name == "public-config.json"
+            else original(path, *a, **k)
+        ),
+    )
+    monkeypatch.setattr(managed.sys, "frozen", True, raising=False)
+    monkeypatch.setenv("AEDROVA_AI_ACCESS_MODE", "local")
+    monkeypatch.setenv("AEDROVA_MANAGED_ORIGIN", "http://127.0.0.1:9999")
+    assert managed.application_ai_origin() == "https://aedrova.example"
+
+
+def test_connector_origin_is_independent_of_ai_and_ignores_environment_in_frozen_build(monkeypatch):
+    import sys
+
+    from aedrova.agents.managed import application_origin, connector_origin
+
+    before = application_origin()
+    monkeypatch.setenv("AEDROVA_CONNECTOR_ORIGIN", "https://connections.example.test")
+    assert connector_origin() == "https://connections.example.test"
+    assert application_origin() == before
+    monkeypatch.setenv("AEDROVA_CONNECTOR_ORIGIN", "http://untrusted.example")
+    with pytest.raises(ValueError):
+        connector_origin()
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    assert connector_origin() == application_origin()

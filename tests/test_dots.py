@@ -138,11 +138,15 @@ def test_dot_question_routes_to_central_analysis_and_build_keeps_existing_queue(
     window.account_dialog.snapshot["dots"] = [dot()]
     requests = []
     monkeypatch.setattr(
-        "aedrova.desktop.dot_analysis.start_analysis", lambda w, task: requests.append(task) or True
+        "aedrova.desktop.dot_analysis.start_analysis",
+        lambda w, task, **kwargs: requests.append((task, kwargs.get("bud"))) or True,
     )
     assert window.start_agent_request("@GitHub what changed?")
     assert window.start_agent_request("@Aedrova explain recent deployments")
-    assert requests == ["@GitHub what changed?", "explain recent deployments"]
+    assert requests == [
+        ("@GitHub what changed?", window.account_dialog.snapshot["dots"][0]),
+        ("explain recent deployments", None),
+    ]
     builds = []
     monkeypatch.setattr(
         "aedrova.desktop.builds.start_background_build", lambda w, task: builds.append(task) or True
@@ -248,7 +252,10 @@ def test_native_dot_profile_and_picker_states_in_both_themes(qtbot, tmp_path, mo
     dialog.reject()
 
 
-def test_cross_source_query_job_selects_fetches_and_answers_with_citations(monkeypatch):
+@pytest.mark.parametrize("addressed_bud", [False, True])
+def test_cross_source_query_job_selects_fetches_and_answers_with_citations(
+    monkeypatch, addressed_bud
+):
     from test_connected import snapshot
 
     from aedrova.desktop.dot_analysis import QueryJob
@@ -288,7 +295,7 @@ def test_cross_source_query_job_selects_fetches_and_answers_with_citations(monke
         assert plan is True
         if len(calls) == 1:
             return json.dumps({"calls": [{"dot": row["id"], "tool": "changes"}]})
-        assert "central Aedrova" in prompt
+        assert ("Respond as the addressed Bud" if addressed_bud else "central Aedrova") in prompt
         evidence = (project / "context.jsonl").read_text()
         assert "Updated sign in" in evidence and "untrusted" in evidence
         return "Sign in changed. [" + citation + "]"
@@ -298,7 +305,7 @@ def test_cross_source_query_job_selects_fetches_and_answers_with_citations(monke
     service = SimpleNamespace(
         context_snapshot=lambda _: snapshot(), close_context=lambda: closed.append(True)
     )
-    job = QueryJob(service, "w", "c", "What changed?", "codex")
+    job = QueryJob(service, "w", "c", "What changed?", "codex", bud=row if addressed_bud else None)
     results = []
     job.signals.finished.connect(results.append)
     job.run()
@@ -339,3 +346,63 @@ def test_dot_working_state_uses_existing_chat_cancel_control(qtbot, tmp_path):
     window.finish_agent_response("w", "Source analysis complete.")
     assert window.stop_agent.isHidden()
     assert "Source analysis complete." in window.agent_feed.toPlainText()
+
+
+def test_bud_build_keeps_addressed_identity(qtbot, tmp_path, monkeypatch):
+    window, _ = setup(qtbot, tmp_path)
+    row = dot()
+    window.account_dialog.snapshot["dots"] = [row]
+    builds = []
+    monkeypatch.setattr(
+        "aedrova.desktop.builds.start_background_build",
+        lambda w, task, **kw: builds.append((task, kw.get("bud"))) or True,
+    )
+    assert window.start_agent_request("@GitHub build a status page")
+    assert builds == [("build a status page", row)]
+    window.dot_query = SimpleNamespace(workspace="w", bud=row)
+    window.agent_feed.character_config = {
+        "name": row["name"],
+        "shape": row["shape"],
+        "color": row["color"],
+    }
+    window.agent_activity("w", "Reading repository…")
+    assert window.agent_feed.author_name == row["name"]
+    window.agent_event("w", "Analyzing commits", update_activity=False)
+    assert window.agent_feed.author_name == row["name"]
+    window.finish_agent_response("w", "Repository summary")
+    assert window.agent_feed.rows[-1].author.text() == row["name"]
+    from aedrova.desktop.ai_teammates import Character
+
+    assert window.agent_feed.rows[-1].findChild(Character) is not None
+    window.dot_query = None
+
+
+def test_addressed_bud_cannot_select_another_buds_tools(tmp_path):
+    first, other = dot("First"), dot("Other")
+    context = WorkspaceContext("w", "u", frozenset(), "", 0, "Aedrova", "codex")
+
+    class API:
+        def request(self, path, body=None, **kwargs):
+            assert body is None, "Unauthorized tools must never execute"
+            return {"items": [first, other]}
+
+    class Runner:
+        def emit(self, *args):
+            pass
+        command_results = []
+
+        def run(self, provider, project, prompt, **kwargs):
+            assert '"name": "Other"' not in prompt
+            return json.dumps({"calls": [{"dot": other["id"], "tool": "changes"}]})
+
+    with pytest.raises(ValueError, match="unavailable Bud tool"):
+        retrieve(
+            API(),
+            context,
+            "@First summarize commits",
+            Runner(),
+            "codex",
+            tmp_path,
+            lambda text: None,
+            bud_id=first["id"],
+        )

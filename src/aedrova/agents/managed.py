@@ -35,6 +35,16 @@ def application_origin():
     return validate_origin(value) if value else ""
 
 
+def connector_origin():
+    """Independent Bud endpoint; AI and meeting traffic retain their existing origin."""
+    path = Path(__file__).parents[1] / "desktop/assets/public-config.json"
+    config = json.loads(path.read_text()) if path.exists() else {}
+    value = config.get("connector_origin", "")
+    if not getattr(sys, "frozen", False):
+        value = os.getenv("AEDROVA_CONNECTOR_ORIGIN", value)
+    return validate_origin(value) if value else application_origin()
+
+
 def ai_access_mode():
     """Build authentication is an explicit product mode, independent of meetings.
 
@@ -67,6 +77,7 @@ class BuildAccess:
     model: str
     base_url: str
     token: str = field(repr=False)
+    limits: dict = field(default_factory=dict)
 
 
 class ManagedClient:
@@ -117,9 +128,14 @@ class ManagedClient:
             raise RuntimeError(
                 "Included AI returned invalid build access. No provider was started."
             )
+        limits = result.get("limits", {})
+        if not isinstance(limits, dict) or any(
+            type(v) is not int or not 0 < v <= 1_000_000_000 for v in limits.values()
+        ):
+            raise RuntimeError("Included AI returned invalid execution limits.")
         self._run_id = result["id"]
         return BuildAccess(
-            result["id"], provider, result["model"], result["base_url"], result["token"]
+            result["id"], provider, result["model"], result["base_url"], result["token"], limits
         )
 
     def close(self):

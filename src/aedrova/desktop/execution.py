@@ -56,7 +56,7 @@ class ExecutionQueue(QObject):
         user = self.window.current_user()
         return str(user.id) if user else ""
 
-    def submit(self, task, *, teammate=None):
+    def submit(self, task, *, teammate=None, bud=None):
         if not self.lease:
             self.window.notify(
                 "Another Aedrova instance owns the build queue. Close it and reopen this app."
@@ -73,6 +73,8 @@ class ExecutionQueue(QObject):
         if teammate:
             self.window.notify("Use the central agent with Buds. Legacy specialists are retired.")
             return False
+        if bud:
+            saved["bud"] = dict(bud)
         try:
             run_id, fresh = self.ledger.enqueue(user, self.window.workspace_id, task, saved)
         except ValueError as exc:
@@ -136,6 +138,11 @@ class ExecutionQueue(QObject):
             self.ledger.update(row["id"], "paused")
             return
         pinned = json.loads(row["settings"])
+        bud = pinned.pop("bud", None)
+        if bud and not live_bud(self.window, bud, row["workspace"]):
+            self.ledger.update(row["id"], "paused")
+            self.window.notify("Bud settings changed. Send a fresh request.")
+            return
         teammate = pinned.pop("ai_teammate", None)
         if teammate:
             self.ledger.update(row["id"], "paused")
@@ -156,7 +163,9 @@ class ExecutionQueue(QObject):
 
         try:
             started = (
-                _start_background_build(self.window, row["task"], teammate=teammate)
+                _start_background_build(self.window, row["task"], bud=bud)
+                if bud
+                else _start_background_build(self.window, row["task"], teammate=teammate)
                 if teammate
                 else _start_background_build(self.window, row["task"])
             )
@@ -295,6 +304,10 @@ class RunHistory(AppDialog):
         if not row or row["state"] not in {"paused", "failed", "interrupted", "cancelled"}:
             return
         saved = json.loads(row["settings"])
+        bud = saved.pop("bud", None)
+        if bud and not live_bud(self.queue.window, bud, self.workspace):
+            self.queue.window.notify("Bud settings changed. Send a fresh request.")
+            return
         teammate = saved.pop("ai_teammate", None)
         if teammate:
             live = next(
@@ -352,6 +365,10 @@ class RunHistory(AppDialog):
             )
             return
         saved = json.loads(row["settings"])
+        bud = saved.pop("bud", None)
+        if bud and not live_bud(self.queue.window, bud, self.workspace):
+            self.queue.window.notify("Bud settings changed. Send a fresh request.")
+            return
         teammate = saved.pop("ai_teammate", None)
         if teammate:
             live = next(
@@ -385,6 +402,7 @@ class RunHistory(AppDialog):
 
         studio = BuildDialog(window, row["task"])
         studio.teammate = teammate
+        studio.bud = bud
         window.build_dialog = studio
         studio.project = Path(row["project"])
         studio.baseline = row["baseline"]
@@ -411,3 +429,10 @@ def execution_queue(window):
         queue = ExecutionQueue(window)
         window.execution_queue = queue
     return queue
+
+
+def live_bud(window, bud, workspace):
+    return any(
+        r["id"] == bud["id"] and r["workspace_id"] == workspace and r["version"] == bud["version"]
+        for r in window.account_dialog.snapshot.get("dots", [])
+    )

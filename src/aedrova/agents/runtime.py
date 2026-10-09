@@ -265,6 +265,8 @@ class LocalRunner:
 
     def run(self, provider, project, prompt, *, plan):
         self.evidence_project = project
+        if self.managed:
+            self.timeout = min(self.timeout, self.managed.limits.get("run_seconds", self.timeout))
         if self.cancelled.is_set():
             raise BuildCancelled()
         if provider == "codex":
@@ -357,12 +359,13 @@ class LocalRunner:
             pending = b""
             diagnostics = b""
             last_error = ""
+            tool_count = 0
             with selector:
                 while True:
                     if self.cancelled.is_set():
                         raise BuildCancelled()
                     if time.monotonic() - started > self.timeout:
-                        raise TimeoutError("Build exceeded its 30-minute time limit.")
+                        raise TimeoutError("Build exceeded its configured time limit.")
                     events = selector.select(0.1)
                     if not events:
                         continue
@@ -384,6 +387,17 @@ class LocalRunner:
                             except ValueError:
                                 continue
                             kind, item = event.get("type"), event.get("item", {})
+                            if kind == "item.started" and item.get("type") in {
+                                "command_execution",
+                                "file_change",
+                                "mcp_tool_call",
+                                "web_search",
+                            }:
+                                tool_count += 1
+                                if self.managed and tool_count > self.managed.limits.get(
+                                    "tool_calls", 200
+                                ):
+                                    raise RuntimeError("This workflow reached its tool limit.")
                             if kind == "item.completed":
                                 if item.get("type") == "agent_message":
                                     final = item.get("text", "")
@@ -470,6 +484,7 @@ class LocalRunner:
             # Defensive fallback: all supported tools pass the PreToolUse gate below.
             return PermissionResultDeny(message="Use the explicit Aedrova tool approval gate.")
 
+        tool_count = 0
         shell_deadline = None
 
         async def after_tool(event, _tool_id, _context):
@@ -497,7 +512,10 @@ class LocalRunner:
             }
 
         async def before_tool(event, _tool_id, _context):
-            nonlocal shell_deadline
+            nonlocal shell_deadline, tool_count
+            tool_count += 1
+            if self.managed and tool_count > self.managed.limits.get("tool_calls", 200):
+                raise RuntimeError("This workflow reached its tool limit. Start a smaller task.")
             tool, data = event["tool_name"], event["tool_input"]
             allowed = False
             if not self.cancelled.is_set():
@@ -643,7 +661,7 @@ class LocalRunner:
                 if self.cancelled.is_set():
                     raise BuildCancelled()
                 if time.monotonic() - started > self.timeout:
-                    raise TimeoutError("Build exceeded its 30-minute time limit.")
+                    raise TimeoutError("Build exceeded its configured time limit.")
                 if shell_deadline is not None and time.monotonic() > shell_deadline:
                     raise TimeoutError(
                         "Claude's shell command exceeded its deadline. External networking stays "

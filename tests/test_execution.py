@@ -205,3 +205,32 @@ print(json.dumps({'type':'turn.completed','usage':{'input_tokens':52,'output_tok
     runner = LocalRunner(lambda _: None)
     assert runner.run("codex", tmp_path, "task", plan=True) == "Done"
     assert runner.usage == {"input_tokens": 52, "output_tokens": 7}
+
+
+@pytest.mark.parametrize("changed", [False, True])
+def test_bud_identity_survives_queue_and_changed_profile_pauses(
+    qtbot, tmp_path, monkeypatch, changed
+):
+    from types import SimpleNamespace
+
+    from test_dots import dot
+
+    window, _, _ = configured(qtbot, tmp_path, monkeypatch)
+    bud = dot()
+    window.account_dialog.snapshot["dots"] = [bud]
+    queue = execution_queue(window)
+    queue.timer.stop()
+    window.dot_query = SimpleNamespace()
+    assert queue.submit("Build a status page", bud=bud)
+    calls = []
+    monkeypatch.setattr(
+        "aedrova.desktop.builds._start_background_build",
+        lambda w, task, **kwargs: calls.append(kwargs.get("bud")) or False,
+    )
+    if changed:
+        window.account_dialog.snapshot["dots"] = [{**bud, "version": bud["version"] + 1}]
+    window.dot_query = None
+    queue.tick()
+    assert calls == ([] if changed else [bud])
+    if changed:
+        assert queue.ledger.rows(queue.identity(), window.workspace_id)[0]["state"] == "paused"

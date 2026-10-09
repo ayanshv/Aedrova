@@ -12,7 +12,7 @@ central AI's existing model access; a name or instructions never expand permissi
   reduced-motion preferences. No blush or ornamental robot parts.
 - Bud drafts can be saved while provider OAuth setup is pending. The final ready
   screen requires a real connection; unsupported providers remain unavailable.
-- GitHub is the implemented read-only adapter. Other providers still need adapters.
+- Ten read-only adapters and multiple private resource connections per Bud are implemented; see `docs/bud-connectors.md` for scopes, setup and live-validation gates.
 - Bud mentions preserve existing identifiers, so earlier conversations and grants
   continue to work. The internal table/API names remain workspace_dots and /api/dots.
 - Neutral charcoal dark surfaces across the app; blue remains an accent.
@@ -44,9 +44,9 @@ the same Google account as the desktop. In Buds, save your repository profile,
 connect GitHub, finish consent, and refresh. Each teammate authorizes their own
 access. Existing provider tokens never enter the model or shared profile table.
 
-Next acceptance task: authorize a GitHub Bud and verify a source-backed answer,
-revocation, and a second user's independent permission boundary. Next adapter:
-Stripe revenue context for Buds and Pulse, after that acceptance succeeds.
+Next acceptance task: connect a chosen provider and verify source-backed answers,
+revocation and independent account boundaries. Stripe currently supplies account
+balance only; revenue reporting is separate future work.
 
 ## Sculpted reference artwork — October 7
 
@@ -98,21 +98,14 @@ Existing freeform purposes are preserved when unchanged. A character's look neve
 | Research | Workspace AI model, Web search, Notion | Google Drive, PostHog |
 | Product | Notion, Linear, PostHog | GitHub, Supabase, Figma, Stripe, Search, AI model, Instagram, TikTok, Google Drive |
 
-These are curated recommendations, **not completed integrations**. Current Buds
-have one external provider/resource per profile. Only GitHub has the server-backed
-adapter; its GitHub App credentials and real OAuth acceptance test remain required.
-Other providers are labeled coming next. AI model access uses the existing workspace
-provider configuration; choosing Research does not provision paid access. External
-web search is not enabled by selecting a role.
+The gallery now implements GitHub, Supabase, Figma, Notion, Stripe, Instagram,
+TikTok, Brave Search, Vercel and Linear. Other recommendations remain future adapters.
+Each Bud supports up to twelve independently authorized resource connections per
+user. Role suggestions never grant access. The workspace AI model uses existing
+provider configuration; no additional model subscription is provisioned by a role.
 
-Next implementation: additive per-Bud connection records, individual encrypted
-provider grants, resource allowlists, permission/version checks and revocation for
-each connection. Then implement and validate provider adapters sequentially. Product
-can use the broader catalog only after each tool is explicitly connected and scoped.
-Social publishing, finance mutations and production deployments require separate
-explicit approval; a role assignment is never permission to act.
-
-**Owner action now:** none for role presets. To enable GitHub, follow the GitHub App
-setup in `docs/dots.md` and fill the ignored server `.env.dots` locally; do not send
-secrets in chat. Additional provider account and consent setup will be supplied with
-each adapter rather than asking for credentials for unimplemented tools.
+Run `202610070004_bud_connectors.sql` after the earlier Bud migrations. Follow
+[connector setup](bud-connectors.md) for credentials, exact read boundaries and
+remaining live acceptance. Existing GitHub OAuth remains compatible; token-based
+GitHub connections do not require the owner's GitHub OAuth app configuration.
+Social publishing, finance mutations and deployments remain separate future work.

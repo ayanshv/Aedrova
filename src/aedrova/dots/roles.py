@@ -1,8 +1,8 @@
 """Curated role connector sets. Recommendations never confer provider access."""
 
 ROLES = {
-    "builder": ("Builder", ("github", "supabase"), ("vercel", "linear", "sentry")),
-    "designer": ("Designer", ("figma", "notion"), ("google_drive", "linear")),
+    "builder": ("Builder", ("github", "supabase"), ("vercel", "sentry")),
+    "designer": ("Designer", ("figma", "notion"), ("google_drive",)),
     "marketing": (
         "Marketing",
         ("instagram", "tiktok"),
@@ -12,7 +12,7 @@ ROLES = {
     "research": ("Research", ("llm", "search", "notion"), ("google_drive", "posthog")),
     "product": (
         "Product",
-        ("notion", "linear", "posthog"),
+        ("notion", "posthog"),
         (
             "github",
             "supabase",
@@ -30,7 +30,6 @@ NAMES = {
     "github": "GitHub",
     "supabase": "Supabase",
     "vercel": "Vercel",
-    "linear": "Linear",
     "sentry": "Sentry",
     "figma": "Figma",
     "notion": "Notion",

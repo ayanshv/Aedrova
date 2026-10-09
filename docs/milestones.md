@@ -1073,3 +1073,107 @@ the previously requested SQL ran; live GitHub OAuth acceptance remains pending.
 - Product reuses approved connectors across domains; role suggestions confer no access.
 - Owner/provider setup and real acceptance tests are gates for each adapter. No fake
   connected states. M14 remains after remaining feature work.
+
+### Bud connector implementation and gallery — October 7
+
+Delivered locally: reference-led categorized connector gallery, role suggestions,
+search, multiple per-user encrypted resource grants, and ten read-only adapters
+(GitHub, Supabase, Figma, Notion, Stripe balance, Instagram, TikTok, Brave Search,
+Vercel, Linear). Existing GitHub OAuth remains compatible. AI tool selection uses
+individual connection IDs and rechecks authorization after reads/reasoning.
+
+Owner required: run `202610070004_bud_connectors.sql` and authorize a selected
+provider through its masked token field. Live acceptance and public deployment are
+pending. Social app consent/review and general OAuth refresh remain future work.
+See `docs/bud-connectors.md` for exact scopes and limitations. Additional preset
+tools remain unavailable until their adapters ship; roles never confer access.
+Next task, approval required: live acceptance and guided OAuth connections. M14
+remains deferred until remaining features are built and validated.
+
+### Fullscreen focus recovery — October 7
+
+Workspace rail refresh previously showed an unparented selected button before
+adding it to the sidebar. This briefly created a native top-level window, which
+could steal activation and switch macOS fullscreen Spaces. Controls are now
+parented by the rail layout before visibility changes. Native Cocoa and offscreen
+regression tests observe Show events during repeated workspace changes and verify
+there are no transient button windows, fullscreen remains active, and composer
+focus stays intact. Rebuilt signed preview; owner must quit/reopen an older running
+instance to load the fix. No SQL, credentials or provider changes are required.
+
+### Inline Bud setup connector gallery — October 7
+
+Replaced step 5's recommendation text/dropdown form with the existing connector
+gallery inside the setup panel: featured introduction, category headings, three
+columns of cards, role filtering, search, and inline scrollable connection details.
+The panel widens for this step and returns to its compact layout elsewhere. New
+Buds save before connecting; changed profiles save before authorization so grants
+are bound to the updated version. Pending verification disables navigation and
+Bud switching; selecting a new Bud clears the old connection target and token.
+No backend/API changes or new SQL are introduced by this UI fix. Prior connector
+migration and provider authorization remain necessary for real connections.
+Guided OAuth work is already approved; live owner credentials remain a separate
+acceptance gate. M14 stays deferred.
+
+### Guided Bud account connections — October 8
+
+Delivered locally: confidential browser OAuth for GitHub Apps, Figma, Notion,
+Supabase Management API and Linear; same-Google-account browser binding, PKCE
+where supported, single-use expiring encrypted state, real verification reads,
+automatic encrypted refresh and grant lifetime enforcement. The native gallery
+shows account sign-in only where supported and configured, saves profile changes
+before authorization, polls completion without stealing focus, and updates the
+Bud shelf/composer immediately. Scoped token connections remain for all ten
+read adapters; social native OAuth and external writes remain future work.
+
+Owner gate: register provider apps and put their ID/secret pairs in the server’s
+ignored `.env.dots`; then perform live consent/read/refresh/revocation acceptance.
+Start with one private GitHub App and a selected test repository. None of the
+five credential pairs was populated at handoff; no live success is claimed.
+The existing 202610070004 connector migration remains a prerequisite, with no
+new shared SQL for OAuth. Exact steps: server checkout `docs/bud-oauth.md`.
+No push, deployment or waitlist-mode changes. M14 remains deferred.
+
+
+### GitHub Bud live acceptance and meeting focus — October 8
+
+Owner created/installed the private GitHub App and saved its local credentials.
+Live OAuth authorization, repository reading and capped local AI admission passed.
+The owner confirmed the rebuilt Bud replies now work with the configured identity,
+and confirmed the meeting announcement parenting fix resolves fullscreen focus loss.
+The connection confirmation page now includes the Bud and a separated checkmark.
+
+Remaining connector acceptance: real refresh/expiry/disconnect tests and each other
+provider’s registration/consent. Next proposed task, permission required: connect
+Supabase to the Builder Bud and validate the combined GitHub/Supabase workflow.
+Current Supabase adapter reads project metadata only; database rows and schema
+access must not be advertised as implemented. Designer Figma/Notion acceptance and
+Finance Stripe/Pulse evidence follow. M14 remains the final release gate.
+
+### Role-filtered connectors and unified confirmations — October 8
+
+Approved implementation completed: the gallery defaults to each Bud’s specialty,
+including unsaved role changes; explicit All tools overrides survive refresh.
+All ten supported read adapters retain real verification. Token connections now
+show an inline Bud confirmation; OAuth and legacy GitHub callbacks share the
+same browser confirmation design with service-specific capability text.
+GitHub live acceptance passed previously. Supabase, Figma, Notion, Linear and
+other provider accounts still require credentials/consent and live acceptance.
+Next owner requirement: register a Supabase OAuth app with Projects Read only
+and the local /buds/oauth/supabase/callback redirect. This blocks live Supabase
+Bud access; it does not block the completed UI or require another migration.
+
+Validation: desktop full suite 686 passed; service full suite 367 passed.
+Changed-file lint, strict/deep preview signing verification and packaged smoke
+passed. Light/dark native confirmations visually reviewed. No public deployment.
+
+### Resource ID help and Supabase HTTPS gate — October 8
+
+Added inline resource lookup instructions for all ten supported connectors.
+Supabase credentials are configured, but its provider rejected HTTP localhost
+redirects. Supabase OAuth now explicitly requires HTTPS and blocks invalid
+starts before creating state. Other loopback providers and scoped-token readers
+are preserved. Next owner action is approval/configuration of an isolated HTTPS
+connector service, then registering its exact Supabase callback. The public
+waitlist website remains unchanged. Focused validation: 29 desktop and 69
+service tests passed; changed-file lint passed. Live Supabase remains pending.

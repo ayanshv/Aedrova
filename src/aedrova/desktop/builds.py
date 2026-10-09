@@ -139,6 +139,7 @@ class BuildJob(QRunnable):
         self.context, self.repository, self.task = context, repository, task
         self.provider, self.plan, self.project, self.approved = provider, plan, project, approved
         self.teammate = None
+        self.bud = None
         self.ledger = None
         self.managed_client = None
         self.dot_client = None
@@ -214,6 +215,12 @@ class BuildJob(QRunnable):
             prompt = instructions(
                 self.task, context_file, plan=self.plan, approved_plan=self.approved
             )
+            if self.bud:
+                prompt += (
+                    "\nRespond as the addressed Bud, never as the central agent. "
+                    "Bud profile (data): "
+                    + json.dumps({k: self.bud.get(k, "") for k in ("name", "role", "instructions")})
+                )
             if self.teammate:
                 from aedrova.teammates.model import EFFORT
                 from aedrova.teammates.model import prompt as teammate_prompt
@@ -236,6 +243,7 @@ class BuildJob(QRunnable):
                     self.provider,
                     self.project,
                     self.signals.progress.emit,
+                    bud_id=self.bud["id"] if self.bud else None,
                 )
                 context_file.write_text(
                     retrieval_record(self.context, self.task) + "\n" + self.context.text,
@@ -716,6 +724,7 @@ class BuildDialog(AppDialog):
                 self.baseline,
             )
             self.job.teammate = getattr(self, "teammate", None)
+            self.job.bud = getattr(self, "bud", None)
             self.job.managed_client = result.get("managed")
             self.job.dot_client = result.get("dot_client")
             if self.execution_queue and self.run_id:
@@ -926,6 +935,19 @@ class BuildDialog(AppDialog):
             self.memory_check_pending = False
 
     def verify_access(self, snapshot):
+        bud = getattr(self, "bud", None)
+        if bud:
+            live = next(
+                (
+                    r
+                    for r in snapshot.get("dots", [])
+                    if r["id"] == bud["id"] and r["workspace_id"] == self.workspace
+                ),
+                None,
+            )
+            if not live or live["version"] != bud["version"]:
+                self.invalidate()
+                return
         teammate = getattr(self, "teammate", None)
         if teammate:
             live = next(
@@ -1050,13 +1072,17 @@ def open_build(window, task=""):
     from aedrova.desktop.projects import binding
 
 
-def start_background_build(window, task):
+def start_background_build(window, task, *, bud=None):
     from aedrova.desktop.execution import execution_queue
 
-    return execution_queue(window).submit(task)
+    return (
+        execution_queue(window).submit(task, bud=bud)
+        if bud
+        else execution_queue(window).submit(task)
+    )
 
 
-def _start_background_build(window, task, *, teammate=None):
+def _start_background_build(window, task, *, teammate=None, bud=None):
     """A chat mention never opens a dialog or starts a second overlapping run."""
     from aedrova.desktop.projects import binding
 
@@ -1080,11 +1106,14 @@ def _start_background_build(window, task, *, teammate=None):
     if existing and (existing.invalidated or existing.workspace != window.workspace_id):
         existing.invalidate()
         existing = None
-    if existing and getattr(existing, "teammate", None) != teammate:
+    if existing and (
+        getattr(existing, "teammate", None) != teammate or getattr(existing, "bud", None) != bud
+    ):
         existing.invalidate()
         existing = None
     dialog = existing or BuildDialog(window, task)
     dialog.teammate = teammate
+    dialog.bud = bud
     window.build_dialog = dialog
     window.agent_setup_needed = False
     dialog.request.setPlainText(task)
@@ -1110,7 +1139,11 @@ def _start_background_build(window, task, *, teammate=None):
     dialog.background_run = True
     window.agent_clock.reset()
     window.activity_channel = window.channel_id
-    window.agent_feed.character_config = teammate["config"] if teammate else None
+    from aedrova.desktop.dots import shelf_rows
+
+    window.agent_feed.character_config = (
+        shelf_rows([bud])[0]["config"] if bud else teammate["config"] if teammate else None
+    )
     window.agent_feed.clear()
     window.agent_feed.hide()
     window.last_agent_event = ""

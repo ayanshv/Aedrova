@@ -5,17 +5,32 @@ import re
 from dataclasses import replace
 from urllib.parse import urlencode
 
-from aedrova.agents.managed import ManagedClient, application_origin
+from aedrova.agents.managed import ManagedClient, connector_origin
+
+
+class BudClient(ManagedClient):
+    """Allow a sleeping staging host to wake in the existing background worker."""
+
+    def request(self, path, body=None, *, timeout=90):
+        try:
+            return super().request(path, body, timeout=timeout)
+        except RuntimeError as exc:
+            if str(exc).startswith("Could not reach Aedrova’s included AI service."):
+                raise RuntimeError(
+                    "Could not reach the Bud connector service. It may be waking up. "
+                    "Check your connection and retry. Your chats still work."
+                ) from exc
+            raise
 
 
 def client(service):
-    origin = application_origin()
+    origin = connector_origin()
     if not origin:
         raise RuntimeError("Buds need the shared Aedrova service. Your chats still work.")
     _, _, token, user = service.realtime_credentials()
     if str(service.user.id) != user:
         raise PermissionError("Sign in again before using Buds.")
-    return ManagedClient(origin, token)
+    return BudClient(origin, token)
 
 
 def mention(text, rows):
@@ -64,7 +79,7 @@ def calls_from_model(output, rows):
     return selected
 
 
-def retrieve(api, context, task, runner, provider, project, emit):
+def retrieve(api, context, task, runner, provider, project, emit, *, bud_id=None):
     context = replace(
         context,
         text="\n".join(
@@ -74,6 +89,10 @@ def retrieve(api, context, task, runner, provider, project, emit):
         ),
     )
     rows = api.request("/api/dots?" + urlencode({"workspace": context.workspace_id}))["items"]
+    if bud_id:
+        rows = [r for r in rows if r["id"] == bud_id]
+        if not rows:
+            raise PermissionError("This Bud is no longer available in your workspace.")
     connected = [r for r in rows if r["status"] in {"Connected", "Error"} and r["tools"]]
     if not connected:
         requested = mention(task, rows)
@@ -88,6 +107,11 @@ def retrieve(api, context, task, runner, provider, project, emit):
             "resource": r["resource"],
             "purpose": r.get("role", ""),
             "focus_notes": r.get("instructions", ""),
+            "connections": [
+                {"id": c["id"], "provider": c["provider"], "resource": c["resource"]}
+                for c in r.get("connections", [])
+                if c["status"] == "Connected"
+            ],
             "tools": r["tools"],
         }
         for r in connected
@@ -124,7 +148,7 @@ def retrieve(api, context, task, runner, provider, project, emit):
     )
     emit("Analyzing: " + " · ".join(names))
     results = api.request(
-        "/api/dots/tools", {"workspace": context.workspace_id, "calls": selected}, timeout=45
+        "/api/dots/tools", {"workspace": context.workspace_id, "calls": selected}, timeout=90
     )["results"]
     if runner.cancelled.is_set():
         from aedrova.agents.runtime import BuildCancelled
@@ -151,3 +175,15 @@ def recheck(api, context):
         row = live.get(source["dot"])
         if not row or row["status"] != "Connected" or row["version"] != source["dot_version"]:
             raise PermissionError("Bud access changed while working. Send a fresh request.")
+        if source.get("connection_id"):
+            connection = next(
+                (c for c in row.get("connections", []) if c["id"] == source["connection_id"]), None
+            )
+            if (
+                not connection
+                or connection["status"] != "Connected"
+                or connection["version"] != source["connection_version"]
+            ):
+                raise PermissionError(
+                    "Connector access changed while working. Send a fresh request."
+                )

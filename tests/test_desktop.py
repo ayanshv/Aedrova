@@ -61,3 +61,47 @@ def test_resizing_shell_never_spawns_participant_label_window(qtbot, tmp_path):
     QApplication.processEvents()
     assert not window.members_label.isVisible()
     assert window.members_label not in QApplication.topLevelWidgets()
+
+
+def test_workspace_refresh_never_shows_top_level_buttons_or_changes_focus(qtbot, tmp_path):
+    from PySide6.QtCore import QEvent, QObject, QSettings
+    from PySide6.QtWidgets import QApplication, QWidget
+
+    from aedrova.desktop.window import AedrovaWindow
+
+    window = AedrovaWindow(
+        settings=QSettings(str(tmp_path / "fullscreen.ini"), QSettings.Format.IniFormat)
+    )
+    qtbot.addWidget(window)
+    stray = []
+
+    class WindowWatch(QObject):
+        def eventFilter(self, watched, event):  # noqa: N802
+            if (
+                event.type() == QEvent.Type.Show
+                and isinstance(watched, QWidget)
+                and watched.property("role") == "workspace"
+                and watched.isWindow()
+            ):
+                stray.append(watched.accessibleName())
+            return False
+
+    app = QApplication.instance()
+    watch = WindowWatch(app)
+    app.installEventFilter(watch)
+    try:
+        window.showFullScreen()
+        window.activateWindow()
+        window.composer.editor.setFocus()
+        qtbot.waitUntil(lambda: window.composer.editor.hasFocus())
+        for space in window.store.workspaces:
+            window.workspace_id = space.id
+            window._populate_rail()
+            QApplication.processEvents()
+            assert window.isFullScreen()
+            assert window.composer.editor.hasFocus()
+            assert all(not item.isWindow() for item in window.workspace_buttons.values())
+        assert stray == []
+    finally:
+        app.removeEventFilter(watch)
+        window.showNormal()

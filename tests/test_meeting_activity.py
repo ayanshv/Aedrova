@@ -94,3 +94,46 @@ def test_empty_meeting_removes_banner_and_returns_start_state(qtbot, tmp_path):
     assert window.meeting_announcements_layout.count() == 0
     assert window.meeting_announcements.isHidden()
     assert window.call_count.isHidden()
+
+
+def test_meeting_updates_never_show_transient_windows_over_fullscreen_call(qtbot, tmp_path):
+    from PySide6.QtCore import QEvent, QObject
+    from PySide6.QtWidgets import QApplication, QWidget
+    from test_meeting_calls import Backend, Worker
+
+    from aedrova.desktop.meeting_call import MeetingCall
+    from aedrova.meetings.devices import DeviceCheck
+
+    window, _ = setup(qtbot, tmp_path)
+    call = MeetingCall(window, Worker(), devices=DeviceCheck(backend=Backend()))
+    qtbot.addWidget(call)
+    call.showFullScreen()
+    QApplication.processEvents()
+    unexpected = []
+
+    class Watch(QObject):
+        def eventFilter(self, watched, event):
+            if event.type() == QEvent.Type.Show and isinstance(watched, QWidget):
+                if watched.isWindow() and watched not in (call, window):
+                    unexpected.append(watched.objectName() or type(watched).__name__)
+            return False
+
+    watch = Watch()
+    app = QApplication.instance()
+    app.installEventFilter(watch)
+    try:
+        for participants in (True, False, True):
+            meeting = active(window)
+            if not participants:
+                meeting["participants"] = []
+            window.account_dialog.snapshot["meeting_activity"] = {
+                "meetings": [meeting],
+                "preferences": [],
+            }
+            update_meeting_ui(window)
+            QApplication.processEvents()
+            assert call.isFullScreen() and call.isVisible()
+        assert unexpected == []
+    finally:
+        app.removeEventFilter(watch)
+        call.reject()

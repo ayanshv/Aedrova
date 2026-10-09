@@ -99,6 +99,16 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     selected = t.accent_bg
     bud_surface = "#FEFDFC" if t.name == "light" else t.surface
     return f"""
+    QDialog#Connectors {{ background: {t.bg}; }}
+    QDialog#EmbeddedConnectors {{ background: transparent; }}
+    QFrame#ConnectorRail {{ background: {t.canvas}; border-right: 1px solid {t.border}; }}
+    QWidget#ConnectorGallery {{ background: transparent; }}
+    QFrame#ConnectorCard {{ background: {t.bg}; border: 1px solid {t.border};
+        border-radius: 12px; }}
+    QFrame#ConnectorCard:hover {{ border-color: {t.accent}; }}
+    QFrame#ConnectorFeature {{ background: {t.canvas}; border: 1px solid {t.border};
+        border-radius: 14px; }}
+    QLabel#ConnectorGlyph {{ background: {t.canvas}; border-radius: 9px; color: {t.text}; }}
     QDialog#BudSetup {{ background: {t.canvas}; }}
     QFrame#BudSetupPanel {{ background: {bud_surface};
         border: 1px solid {t.border}; border-radius: 22px; }}

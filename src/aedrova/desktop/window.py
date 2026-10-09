@@ -544,9 +544,11 @@ class AedrovaWindow(QMainWindow):
                     else self.switch_workspace(wid)
                 )
             )
+            # Parent the control before showing it. An unparented visible button
+            # briefly becomes a native window and can switch macOS fullscreen Spaces.
+            self.rail_items.addWidget(item)
             item.setVisible(workspace.id == self.workspace_id)
             self.workspace_buttons[workspace.id] = item
-            self.rail_items.addWidget(item)
 
     def _populate_channels(self):
         self.workspace_title.setText(
@@ -831,6 +833,16 @@ class AedrovaWindow(QMainWindow):
         active = getattr(self, "build_dialog", None)
         if active and getattr(active, "teammate", None) and active.workspace == workspace:
             self.agent_feed.author_name = active.teammate["config"]["name"]
+        query = getattr(self, "dot_query", None)
+        bud = (
+            getattr(query, "bud", None)
+            if query
+            else getattr(active, "bud", None)
+            if active and active.workspace == workspace
+            else None
+        )
+        if bud:
+            self.agent_feed.author_name = bud["name"]
         self.agent_feed.add_event(text)
         self.messages.set_agent_visible(self.activity_channel == self.channel_id)
         if self.messages.model().rowCount() == 0:
@@ -861,6 +873,13 @@ class AedrovaWindow(QMainWindow):
         active = getattr(self, "build_dialog", None)
         if active and getattr(active, "teammate", None) and active.workspace == workspace:
             nickname = active.teammate["config"]["name"]
+        bud = getattr(active, "bud", None)
+        if bud and active.workspace == workspace and not getattr(self, "dot_query", None):
+            nickname = bud["name"]
+        query = getattr(self, "dot_query", None)
+        bud = getattr(query, "bud", None)
+        if bud and getattr(query, "workspace", None) == workspace:
+            nickname = bud["name"]
         self.build_activity.setText(text[:105])
         if workspace == self.workspace_id:
             self.activity_channel = getattr(self, "activity_channel", self.channel_id)
@@ -917,6 +936,37 @@ class AedrovaWindow(QMainWindow):
         ]
         dot = mention(text, rows)
         task = build_command(text, nickname)
+        # A direct Bud mention owns the response, including action-word requests.
+        if dot and task is None:
+            import re
+
+            from aedrova.desktop.dot_analysis import start_analysis
+
+            request = re.sub(
+                r"^(?:@" + re.escape(dot["name"]) + r"|<@dot:[^>]+>)[,:]?\s*",
+                "",
+                text.strip(),
+                flags=re.IGNORECASE,
+            )
+            building = bool(
+                re.match(
+                    r"^(?:please\s+)?(?:/build|build|implement|fix|create|ship|add)\b",
+                    request,
+                    re.IGNORECASE,
+                )
+            )
+            if building:
+                from aedrova.desktop.builds import start_background_build
+
+                accepted = start_background_build(self, request, bud=dot)
+            else:
+                accepted = start_analysis(self, text, bud=dot)
+            if accepted:
+                for composer in (self.composer, self.thread_composer):
+                    if composer.editor.toPlainText().strip() == text.strip():
+                        composer.clear()
+                self._save_drafts()
+            return True
         import re
 
         candidate = text.strip()
@@ -1695,6 +1745,7 @@ class AedrovaWindow(QMainWindow):
         menu.addAction("Settings…", self.show_settings)
         if user:
             menu.addAction("Workspace settings…", lambda: self.show_account("manage"))
+            menu.addAction("Connectors…", self.open_connectors)
             menu.addAction("Invite teammates…", lambda: self.show_account("invite"))
             menu.addSeparator()
             menu.addAction("Log out", self.log_out)
@@ -1702,6 +1753,11 @@ class AedrovaWindow(QMainWindow):
             menu.addAction("Sign in with Google…", self.show_account)
         self.profile_menu = menu
         menu.popup(self.profile_button.mapToGlobal(self.profile_button.rect().topRight()))
+
+    def open_connectors(self):
+        from aedrova.desktop.bud_connectors import open_connectors
+
+        open_connectors(self)
 
     def show_settings(self):
         from aedrova.desktop.preferences import SettingsDialog
