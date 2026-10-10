@@ -417,7 +417,7 @@ class ConnectorsDialog(AppDialog):
             if on_loaded:
                 on_loaded()
 
-        self.run(fetch, loaded)
+        self.run(fetch, loaded, recovery=True)
 
     def bud_changed(self):
         self.credential.clear()

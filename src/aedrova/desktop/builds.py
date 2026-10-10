@@ -25,7 +25,7 @@ from aedrova.agents.context import authorize, gather
 from aedrova.agents.managed import ManagedClient, ai_access_mode, application_ai_origin
 from aedrova.agents.retrieval import retrieval_record, validate_citations
 from aedrova.agents.runtime import BuildCancelled, LocalRunner, instructions
-from aedrova.desktop.controls import AppDialog, ChoiceBox, choose_project
+from aedrova.desktop.controls import AppDialog, CodingProviderChoice, choose_project
 from aedrova.desktop.design_system import FlowActions
 from aedrova.desktop.dialogs import button, label
 
@@ -378,9 +378,7 @@ class BuildDialog(AppDialog):
         self.choose.clicked.connect(self.configure_project)
         row.addWidget(self.repository, 1)
         row.addWidget(self.choose)
-        self.provider = ChoiceBox()
-        self.provider.addItem("Codex", "codex")
-        self.provider.addItem("Claude Agent", "claude_code")
+        self.provider = CodingProviderChoice()
         self.provider.setCurrentIndex(1 if pref.get("provider") == "claude_code" else 0)
         row.addWidget(self.provider)
         layout.addLayout(row)

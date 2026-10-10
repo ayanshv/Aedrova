@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from aedrova.delivery.github import GitHub, repository_name
-from aedrova.desktop.controls import AppDialog, ChoiceBox, choose_project
+from aedrova.desktop.controls import AppDialog, CodingProviderChoice, choose_project
 from aedrova.desktop.design_system import FlowActions
 from aedrova.desktop.dialogs import button, label
 
@@ -158,10 +158,8 @@ class ProjectDialog(AppDialog):
             )
         )
         layout.addWidget(label("Coding provider", "title"))
-        self.provider = ChoiceBox()
+        self.provider = CodingProviderChoice()
         self.provider.setAccessibleName("Coding provider")
-        self.provider.addItem("Codex", "codex")
-        self.provider.addItem("Claude Agent", "claude_code")
         preferences = window.account_dialog.snapshot.get("agent_preferences", [])
         default = next(
             (

@@ -1,7 +1,7 @@
 """Themed, keyboard-accessible choices, including macOS popup menus."""
 
-from PySide6.QtCore import QRectF, Qt
-from PySide6.QtGui import QPainter, QPainterPath, QPalette, QPen, QRegion
+from PySide6.QtCore import QRectF, QSize, Qt
+from PySide6.QtGui import QIcon, QPainter, QPainterPath, QPalette, QPen, QRegion
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -33,9 +33,14 @@ class _PopupStyle(QProxyStyle):
         return super().pixelMetric(metric, option, widget)
 
     def drawPrimitive(self, element, option, painter, widget=None):  # noqa: N802
-        if widget is not None and widget.objectName() == "ChoicePopup" and element in (
-            QStyle.PrimitiveElement.PE_PanelMenu,
-            QStyle.PrimitiveElement.PE_FrameWindow,
+        if (
+            widget is not None
+            and widget.objectName() == "ChoicePopup"
+            and element
+            in (
+                QStyle.PrimitiveElement.PE_PanelMenu,
+                QStyle.PrimitiveElement.PE_FrameWindow,
+            )
         ):
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
             painter.setPen(Qt.PenStyle.NoPen)
@@ -105,6 +110,18 @@ class ChoiceBox(QComboBox):
         path.lineTo(x, y + 2)
         path.lineTo(x + 3.5, y - 1.5)
         painter.drawPath(path)
+
+
+class CodingProviderChoice(ChoiceBox):
+    """The same provider identities in onboarding, settings and build controls."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        from aedrova.desktop.connector_icons import connector_pixmap
+
+        self.setIconSize(QSize(28, 28))
+        for key, name in (("codex", "Codex"), ("claude_code", "Claude Code")):
+            self.addItem(QIcon(connector_pixmap(key, 28)), name, key)
 
 
 def choose_project(parent, initial=""):

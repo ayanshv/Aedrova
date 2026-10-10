@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
 )
 
 from aedrova.desktop.brand import BrandMark
-from aedrova.desktop.controls import AppDialog, ChoiceBox
+from aedrova.desktop.controls import AppDialog, ChoiceBox, CodingProviderChoice
 from aedrova.desktop.dialogs import button, label
 from aedrova.desktop.welcome_surface import WelcomeSurface
 from aedrova.identity.oauth import google_sign_in
@@ -365,10 +365,8 @@ class AccountDialog(AppDialog):
         self.add_page(page)
 
     def provider_choice(self):
-        choice = ChoiceBox()
+        choice = CodingProviderChoice()
         choice.setAccessibleName("Preferred building agent")
-        choice.addItem("Codex", "codex")
-        choice.addItem("Claude Code", "claude_code")
         return choice
 
     def _onboarding_page(self):

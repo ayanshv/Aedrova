@@ -7,6 +7,8 @@ from PySide6.QtGui import QColor, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
 COLORS = {
+    "codex": "#000000",
+    "claude_code": "#D97757",
     "github": "#181717",
     "supabase": "#3ECF8E",
     "figma": "#F24E1E",

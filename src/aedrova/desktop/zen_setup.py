@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 
 from aedrova.delivery.github import repository_name
 from aedrova.desktop.brand import ASSETS
-from aedrova.desktop.controls import ChoiceBox, choose_project
+from aedrova.desktop.controls import ChoiceBox, CodingProviderChoice, choose_project
 from aedrova.desktop.dialogs import button, label
 from aedrova.desktop.projects import binding, save_binding
 from aedrova.desktop.zen_visuals import ProjectPicker, SetupVisual, ThemePhoto
@@ -223,9 +223,7 @@ class SetupPages(QScrollArea):
             self.project_picker.clicked.connect(self.choose)
             self.column.addWidget(self.project_picker)
             self.column.addWidget(self.folder)
-            self.provider = ChoiceBox()
-            self.provider.addItem("Codex", "codex")
-            self.provider.addItem("Claude Code", "claude_code")
+            self.provider = CodingProviderChoice()
             self.provider.setCurrentIndex(
                 max(0, self.provider.findData(self.draft.get("provider", "codex")))
             )

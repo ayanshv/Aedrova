@@ -72,7 +72,9 @@ def gallery(qtbot, tmp_path, monkeypatch):
 
     monkeypatch.setattr("aedrova.desktop.bud_connectors.client", lambda service: API())
     monkeypatch.setattr(
-        ConnectorsDialog, "run", lambda self, operation, completed: completed(operation(service))
+        ConnectorsDialog,
+        "run",
+        lambda self, operation, completed, **kwargs: completed(operation(service)),
     )
     dialog = ConnectorsDialog(window, "bud-1")
     qtbot.addWidget(dialog)

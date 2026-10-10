@@ -102,10 +102,12 @@ def editor(qtbot, tmp_path, monkeypatch):
     from aedrova.desktop.bud_connectors import ConnectorsDialog
 
     monkeypatch.setattr(
-        ConnectorsDialog, "run", lambda self, operation, completed: completed(operation(service))
+        ConnectorsDialog,
+        "run",
+        lambda self, operation, completed, **kwargs: completed(operation(service)),
     )
     monkeypatch.setattr(
-        DotDialog, "run", lambda self, operation, completed: completed(operation(service))
+        DotDialog, "run", lambda self, operation, completed, **kwargs: completed(operation(service))
     )
     dialog = DotDialog(window)
     qtbot.addWidget(dialog)
