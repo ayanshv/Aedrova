@@ -466,3 +466,31 @@ def test_required_bud_setup_cannot_be_accepted_without_verified_connection(edito
     assert dialog.isVisible()
     assert "connect one tool" in dialog.status.text()
     assert not rows
+
+
+def test_required_setup_finishes_only_after_verified_tool_and_final_stage(editor):
+    dialog, rows, _, _ = editor
+    dialog.required = True
+    dialog.show_step(4)
+    gallery = dialog.embedded_connectors
+    gallery.open_provider(gallery.providers[0])
+    gallery.resource.setText("team/project")
+    gallery.credential.setText("private-fixture-token")
+    gallery.connect_tool()
+    assert rows[0]["status"] == "Connected"
+    dialog.accept()
+    assert dialog.isVisible()  # A connected grant cannot skip the final handoff.
+    dialog.next.click()
+    assert dialog.pages.currentIndex() == 5
+    for status in ("Needs authorization", "Disconnected", "Permission issue", "Error"):
+        dialog.current()["status"] = status
+        dialog.accept()
+        assert dialog.isVisible()
+    dialog.current()["status"] = "Connected"
+    dialog.name.setText("Changed after authorization")
+    dialog.accept()
+    assert dialog.isVisible()  # Old grants cannot authorize changed Bud settings.
+    dialog.name.setText(rows[0]["name"])
+    dialog.accept()
+    assert not dialog.isVisible()
+    assert dialog.result() == dialog.DialogCode.Accepted

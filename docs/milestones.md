@@ -1223,3 +1223,34 @@ business verification and billing configuration; second device for meetings.
 Walk through one requirement per response at release time. These gates block
 public Beta distribution, not current UI work. Codebase walkthrough stays after
 complete deployment. M14 remains deferred until feature completion.
+
+### Connector and required Bud onboarding validation — October 10
+
+Owner approved this validation task. Full desktop suite: 701 passed. Full website /
+service suite: 391 passed. After routing fixes and additional onboarding coverage,
+71 focused desktop tests passed; lint and whitespace checks passed.
+
+Fixed addressed Bud routing for names matching Aedrova / the central agent nickname,
+and for a short recipient name followed by a longer Bud name in the request. Explicit
+Bud tokens retain identity. Central-agent requests with incidental Bud mentions keep
+their existing routing. Added verified-tool onboarding acceptance tests: final-stage
+handoff required, disconnected/error/revoked grants rejected, edited Bud settings rejected.
+
+Live UI acceptance confirmed existing Google sign-in returned to the desktop and
+hosted Bud setup loaded. Earlier GitHub, Supabase, Figma, Notion and TikTok sandbox
+reads remain recorded evidence, not fresh refresh/disconnect acceptance. Existing
+Pebble/Orbit grants were not located in the inspected signed-in workspaces. Fresh
+Google-account onboarding and live source-backed Bud responses remain pending.
+No production grant was forcibly expired or disconnected for this test pass.
+
+Owner required now: reopen the rebuilt preview, sign in with the Google account
+owning Pebble/Orbit, select the workspace containing those Buds, and leave it open.
+This identifies the existing grants for live read/refresh validation without broader
+permissions. A new provider consent requires explicit approval at the consent step.
+No new SQL is required. Stripe/Instagram/Brave/Vercel credential and consent gates
+remain as detailed in docs/bud-connectors.md. Do not claim connector acceptance or
+fresh-account acceptance complete until their live checks pass.
+
+Marketing media studio and final Beta/DMG/Windows work remain planned, not started.
+M14 remains deferred. Continue this acceptance task after the account/workspace is
+identified, then report and request permission before the next feature milestone.

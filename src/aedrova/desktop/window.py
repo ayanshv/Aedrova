@@ -936,10 +936,16 @@ class AedrovaWindow(QMainWindow):
         ]
         dot = mention(text, rows)
         task = build_command(text, nickname)
-        # A direct Bud mention owns the response, including action-word requests.
-        if dot and task is None:
-            import re
+        import re
 
+        addressed_bud = dot and re.match(
+            r"^(?:@" + re.escape(dot["name"]) + r"(?=[,:\s]|$)|<@dot:[^>]+>)",
+            text.strip(),
+            re.IGNORECASE,
+        )
+        # A direct Bud mention owns the response, including action-word requests.
+        # Explicit Bud tokens also win when its name matches the main agent's nickname.
+        if dot and (task is None or addressed_bud):
             from aedrova.desktop.dot_analysis import start_analysis
 
             request = re.sub(
