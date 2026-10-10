@@ -1,4 +1,4 @@
-"""Qt-rendered frosted materials and spring motion. No browser or external assets."""
+"""Qt-rendered neutral surfaces and restrained tactile motion. No browser or external assets."""
 
 from PySide6.QtCore import (
     Property,
@@ -15,20 +15,14 @@ from PySide6.QtGui import (
     QFont,
     QFontDatabase,
     QImage,
-    QLinearGradient,
     QPainter,
     QPainterPath,
     QPen,
-    QPixmap,
-    QRadialGradient,
 )
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
-    QGraphicsBlurEffect,
     QGraphicsEffect,
-    QGraphicsPixmapItem,
-    QGraphicsScene,
     QGridLayout,
     QPushButton,
     QWidget,
@@ -46,11 +40,7 @@ def system_font(size=14, weight=QFont.Weight.Normal, tracking=0.0):
 
 
 class Backdrop(QWidget):
-    """A cached, genuinely blurred in-app backdrop, never a screen capture.
-
-    Glass surfaces sample this artwork only. This is not the macOS Liquid Glass API
-    and does not claim to refract other applications or content behind this window.
-    """
+    """Cached neutral canvas shared by native workspace surfaces."""
 
     def __init__(self):
         super().__init__()
@@ -68,40 +58,10 @@ class Backdrop(QWidget):
         if key == self._cache_key:
             return self.blurred
         self._cache_key = key
-        # Quarter-resolution artwork, blurred once per size/theme change, not per frame.
+        # Cache a small flat canvas once per size/theme change.
         width, height = max(1, self.width() // 4), max(1, self.height() // 4)
         source = QImage(width, height, QImage.Format.Format_ARGB32_Premultiplied)
         source.fill(QColor(self.theme.canvas))
-        if not self.reduced_transparency:
-            painter = QPainter(source)
-            painter.setPen(Qt.PenStyle.NoPen)
-            for x, y, radius, alpha, tint in (
-                (width * 0.04, height * 0.90, width * 0.28, 25, "#75C9BC"),
-                (width * 0.94, height * 0.06, width * 0.25, 24, "#9990EB"),
-                (width * 0.52, height * 0.98, width * 0.23, 16, "#80AEED"),
-            ):
-                glow = QRadialGradient(x, y, radius)
-                color = QColor(tint)
-                color.setAlpha(alpha if self.theme.name == "light" else alpha + 10)
-                glow.setColorAt(0, color)
-                color.setAlpha(0)
-                glow.setColorAt(1, color)
-                painter.setBrush(glow)
-                painter.drawEllipse(QRectF(x - radius, y - radius, radius * 2, radius * 2))
-            painter.end()
-            scene = QGraphicsScene()
-            item = QGraphicsPixmapItem(QPixmap.fromImage(source))
-            blur = QGraphicsBlurEffect()
-            blur.setBlurRadius(8)  # 32 logical px at the final scale.
-            blur.setBlurHints(QGraphicsBlurEffect.BlurHint.QualityHint)
-            item.setGraphicsEffect(blur)
-            scene.addItem(item)
-            result = QImage(source.size(), source.format())
-            result.fill(QColor(self.theme.canvas))
-            painter = QPainter(result)
-            scene.render(painter, QRectF(0, 0, width, height), QRectF(0, 0, width, height))
-            painter.end()
-            source = result
         self.blurred = source
         return source
 
@@ -111,20 +71,10 @@ class Backdrop(QWidget):
         painter.drawImage(self.rect(), self.texture())
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setPen(Qt.PenStyle.NoPen)
-        # Wide ambient shadow, painted behind surfaces so children stay crisp.
-        for panel in self.findChildren(GlassFrame):
-            if panel.layer not in ("main", "sidebar") or not panel.isVisible():
-                continue
-            rect = QRectF(panel.mapTo(self, QPoint()), panel.size())
-            for spread in range(18, 0, -3):
-                painter.setBrush(QColor(0, 0, 0, 2 if self.theme.name == "light" else 3))
-                painter.drawRoundedRect(
-                    rect.adjusted(-spread, 5 - spread, spread, spread + 5), 24 + spread, 24 + spread
-                )
 
 
 class GlassFrame(QFrame):
-    def __init__(self, *, layer="surface", radius=24):
+    def __init__(self, *, layer="surface", radius=10):
         super().__init__()
         self.layer = layer
         self.radius = radius
@@ -139,34 +89,15 @@ class GlassFrame(QFrame):
         path = QPainterPath()
         path.addRoundedRect(rect, self.radius, self.radius)
         painter.setClipPath(path)
-        root = self.window().centralWidget() if hasattr(self.window(), "centralWidget") else None
-        if isinstance(root, Backdrop) and not self.reduced_transparency:
-            origin = self.mapTo(root, QPoint())
-            texture = root.texture()
-            sx, sy = (
-                texture.width() / max(1, root.width()),
-                texture.height() / max(1, root.height()),
-            )
-            source = QRectF(origin.x() * sx, origin.y() * sy, self.width() * sx, self.height() * sy)
-            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-            painter.drawImage(rect, texture, source)
-        dark = self.theme.name == "dark"
-        fill = QColor("#1C1C1E" if dark else "#FFFFFF")
-        fill.setAlpha(255 if self.reduced_transparency else (232 if self.layer == "main" else 190))
-        painter.fillPath(path, fill)
-        if not self.reduced_transparency:
-            sheen = QLinearGradient(0, 0, self.width() * 0.7, self.height())
-            sheen.setColorAt(0, QColor(255, 255, 255, 8 if dark else 65))
-            sheen.setColorAt(0.5, QColor(255, 255, 255, 0))
-            painter.fillPath(path, sheen)
+        fill = self.theme.sidebar if self.layer == "sidebar" else self.theme.bg
+        painter.fillPath(path, QColor(fill))
         painter.setClipping(False)
-        edge = QLinearGradient(0, 0, 0, max(1, self.height()))
-        edge.setColorAt(0, QColor(255, 255, 255, 38 if dark else 230))
-        edge.setColorAt(0.35, QColor(255, 255, 255, 18) if dark else QColor(0, 0, 0, 14))
-        edge.setColorAt(1, QColor(255, 255, 255, 22) if dark else QColor(0, 0, 0, 10))
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.setPen(QPen(edge, 1))
-        painter.drawRoundedRect(rect, self.radius, self.radius)
+        painter.setPen(QPen(QColor(self.theme.border), 1))
+        if self.layer in ("main", "sidebar"):
+            # Structural divider, not floating nested cards.
+            painter.drawLine(0, 0, 0, self.height())
+        else:
+            painter.drawRoundedRect(rect, self.radius, self.radius)
 
 
 class ScaleEffect(QGraphicsEffect):
@@ -208,20 +139,18 @@ class SpringMotion(QObject):
         self.animation = QPropertyAnimation(self.effect, b"scale", self)
         self.enabled = True
         widget.installEventFilter(self)
-        widget.pressed.connect(lambda: self.animate(0.97, False))
-        widget.released.connect(lambda: self.animate(1.015 if widget.underMouse() else 1.0, True))
+        widget.pressed.connect(lambda: self.animate(0.99, False))
+        widget.released.connect(lambda: self.animate(1.0, True))
 
     def animate(self, target, spring=False):
         self.animation.stop()
         if not self.enabled:
             self.effect.set_scale(1.0)
             return
-        self.animation.setDuration(230 if spring else 150)
+        self.animation.setDuration(120 if spring else 90)
         self.animation.setStartValue(self.effect.get_scale())
         self.animation.setEndValue(target)
-        self.animation.setEasingCurve(
-            QEasingCurve.Type.OutBack if spring else QEasingCurve.Type.InOutSine
-        )
+        self.animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         self.animation.start()
 
     def set_enabled(self, enabled):
@@ -231,9 +160,13 @@ class SpringMotion(QObject):
             self.effect.set_scale(1.0)
 
     def eventFilter(self, watched, event):  # noqa: N802
-        if event.type() == QEvent.Type.Enter and self.widget.isEnabled():
-            self.animate(1.015)
-        elif event.type() == QEvent.Type.Leave:
+        if (
+            event.type() == QEvent.Type.Enter
+            and self.widget.isEnabled()
+            and not self.widget.isDown()
+        ):
+            self.animate(1.0)
+        elif event.type() == QEvent.Type.Leave and not self.widget.isDown():
             self.animate(1.0)
         elif event.type() == QEvent.Type.EnabledChange and not self.widget.isEnabled():
             self.animate(1.0)
@@ -256,7 +189,7 @@ class DocumentTile(SpringButton):
         self.theme = LIGHT
         self.setAccessibleName(f"Open {title}")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setMinimumHeight(230)
+        self.setMinimumHeight(188)
         self.setMinimumWidth(220)
 
     def paintEvent(self, event):  # noqa: N802
@@ -266,7 +199,7 @@ class DocumentTile(SpringButton):
         r = QRectF(self.rect()).adjusted(2, 2, -2, -2)
         painter.setPen(QColor(t.border))
         painter.setBrush(QColor(t.surface))
-        painter.drawRoundedRect(r, 24, 24)
+        painter.drawRoundedRect(r, 10, 10)
         painter.setPen(QColor(t.muted))
         painter.setFont(system_font(11, QFont.Weight.Medium))
         painter.drawText(QRectF(26, 23, 180, 18), f"{self.number}  /  REFERENCE")
@@ -276,15 +209,15 @@ class DocumentTile(SpringButton):
         for y, length in ((73, 21), (81, 21), (89, 14)):
             painter.drawLine(37, y, 37 + length, y)
         painter.setPen(QColor(t.text))
-        painter.setFont(system_font(21, QFont.Weight.DemiBold, -0.5))
+        painter.setFont(system_font(18, QFont.Weight.DemiBold, -0.3))
         title = painter.fontMetrics().elidedText(
             self.title, Qt.TextElideMode.ElideRight, self.width() - 54
         )
-        painter.drawText(QRectF(26, 131, self.width() - 52, 30), title)
+        painter.drawText(QRectF(26, 116, self.width() - 52, 30), title)
         painter.setPen(QColor(t.muted))
         painter.setFont(system_font(13))
         painter.drawText(
-            QRectF(26, 167, self.width() - 80, 42), Qt.TextFlag.TextWordWrap, self.subtitle
+            QRectF(26, 148, self.width() - 80, 36), Qt.TextFlag.TextWordWrap, self.subtitle
         )
         painter.setPen(QColor(t.accent))
         painter.setFont(system_font(20))
@@ -304,7 +237,7 @@ class AdaptiveBento(QWidget):
         self.columns = None
         self.grid = QGridLayout(self)
         self.grid.setContentsMargins(0, 0, 0, 0)
-        self.grid.setSpacing(20)
+        self.grid.setSpacing(16)
         self._reflow(1)
 
     def _reflow(self, columns):

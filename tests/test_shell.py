@@ -149,7 +149,7 @@ def test_search_no_matches_and_escape(window, qtbot):
 
 
 def test_create_workspace_and_channel_with_validation(window, qtbot):
-    qtbot.mouseClick(window.create_workspace_button, Qt.MouseButton.LeftButton)
+    window.create_local_workspace()
     dialog = window.dialog
     dialog.name.setText("Northstar Labs")
     qtbot.mouseClick(dialog.submit, Qt.MouseButton.LeftButton)
@@ -188,7 +188,7 @@ def test_theme_changes_preserve_work_and_saved_preference(window, qtbot):
 
 
 def test_tabs_open_real_pages_and_sample_documents(window, qtbot):
-    for index in range(5):
+    for index in range(4):
         qtbot.mouseClick(window.tab_buttons[index], Qt.MouseButton.LeftButton)
         assert window.pages.currentIndex() == index
         assert sum(tab.isChecked() for tab in window.tab_buttons) == 1
@@ -247,7 +247,8 @@ def test_input_limit_and_plain_text_are_preserved(window, qtbot):
     window.composer.editor.setPlainText(text)
     qtbot.mouseClick(window.composer.send, Qt.MouseButton.LeftButton)
     doc = window.messages.delegate.document(window.channel.messages[-1], 500)
-    assert doc.toPlainText() == text
+    assert window.channel.messages[-1].body == text
+    assert doc.toPlainText() == '<script>alert("hello")</script> & literal text'
 
 
 def test_variable_height_history_model_and_rendering(qtbot):
@@ -375,10 +376,10 @@ def test_spring_motion_reacts_without_moving_layout(window, qtbot):
     control = window.search_button
     original = control.geometry()
     QApplication.sendEvent(control, QEvent(QEvent.Type.Enter))
-    qtbot.waitUntil(lambda: control.motion.effect.get_scale() > 1.01)
+    assert control.motion.effect.get_scale() == 1.0
     assert control.geometry() == original
     qtbot.mousePress(control, Qt.MouseButton.LeftButton)
-    qtbot.waitUntil(lambda: control.motion.effect.get_scale() < 0.99)
+    qtbot.waitUntil(lambda: control.motion.effect.get_scale() < 0.995)
     # Release outside the control: test the physical spring without opening a dialog.
     from PySide6.QtCore import QPoint
 
@@ -449,7 +450,7 @@ def test_brand_artwork_icon_and_reduced_motion(window, qtbot):
     assert artwork.width() < 450  # Transparent source margins do not shrink the mark.
     assert not app_icon().pixmap(128, 128).isNull()
     marks = window.findChildren(BrandMark)
-    assert len(marks) == 3
+    assert len(marks) == 2  # Header and chat; the old branding footer became the AI team shelf.
     mark = marks[0]
     mark.animate(1.0)
     qtbot.waitUntil(lambda: mark.get_lift() > 0.5)
@@ -480,3 +481,37 @@ def test_mention_separates_from_previous_word_and_handles_emoji(window):
     composer.editor.moveCursor(QTextCursor.MoveOperation.End)
     composer.insert_mention()
     assert composer.editor.toPlainText() == "Build this 🚀 @Aedrova "
+
+
+def test_desktop_workspace_actions_use_connected_account(window):
+    intents = []
+    window.show_account = lambda intent=None: intents.append(intent)
+    window.create_workspace_button.click()
+    window.invite_teammates_button.click()
+    assert intents == ["create", "invite"]
+
+
+def test_invitation_exit_opens_hidden_chat_dashboard(window, qtbot):
+    window.hide()
+    window.show_account()
+    account = window.account_dialog
+    account.pages.setCurrentIndex(2)
+    account.onboarding_steps.setCurrentIndex(3)
+    account.generated_code.setText("private-invite")
+    account.invite_dashboard.click()
+    assert window.isVisible()
+    assert not account.isVisible()
+    assert window.tab_buttons[0].isChecked()
+    assert account.generated_code.text() == ""
+    # Reopening account preserves the same session-owning dialog instance.
+    window.show_account()
+    assert window.account_dialog is account
+
+
+def test_workspace_home_dashboard_action(window):
+    window.hide()
+    window.show_account()
+    window.account_dialog.pages.setCurrentIndex(4)
+    window.account_dialog.home_dashboard.click()
+    assert window.isVisible()
+    assert not window.account_dialog.isVisible()

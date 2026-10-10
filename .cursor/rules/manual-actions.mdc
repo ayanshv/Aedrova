@@ -1,0 +1,18 @@
+---
+description: Always explicitly identify actions the Aedrova owner must perform
+alwaysApply: true
+---
+
+# Manual-action handoffs
+
+For all Aedrova work, proactively tell the owner whenever they must personally act.
+State the exact action, where to do it, why it is needed, what it unlocks, and whether
+it blocks the current milestone. Distinguish required-now steps from later setup.
+Do not bury required actions solely in linked documentation. Include them in the
+user-facing response and keep the setup documentation current.
+Do not claim an integration is complete when accounts, migrations, keys, email setup,
+billing, signing, consent or live validation still require owner action.
+Complete independently authorized work before handing off; do not request approvals
+again when already granted. Never request secret keys in chat.
+Continue sequential milestone delivery: test, report results and outstanding manual
+actions, then obtain owner approval before the next milestone.

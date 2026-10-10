@@ -9,4 +9,5 @@ work/
 .env
 .env.*
 !.env.example
+!.env.meetings.example
 .DS_Store

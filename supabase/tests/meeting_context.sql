@@ -1,0 +1,84 @@
+begin;
+insert into auth.users(id,email,email_confirmed_at) values
+ ('71000000-0000-0000-0000-000000000001','host@context.test',now()),
+ ('71000000-0000-0000-0000-000000000002','peer@context.test',now()),
+ ('71000000-0000-0000-0000-000000000003','outside@context.test',now());
+create function pg_temp.check_true(ok boolean,description text) returns void language plpgsql as $$
+begin if ok is distinct from true then raise exception 'FAIL: %',description; end if; end $$;
+create function pg_temp.denied(statement text) returns void language plpgsql as $$
+begin begin execute statement; exception when insufficient_privilege then return; end;
+raise exception 'FAIL: unauthorized operation succeeded: %',statement; end $$;
+set local role authenticated;
+set local request.jwt.claim.sub='71000000-0000-0000-0000-000000000001';
+select set_config('test.w',public.onboard_workspace('Meeting context','Aedrova','codex')::text,true);
+select set_config('test.c',(select id::text from public.channels where workspace_id=current_setting('test.w')::uuid limit 1),true);
+select set_config('test.m',public.start_meeting(current_setting('test.c')::uuid,'Product sync')::text,true);
+select public.join_meeting(current_setting('test.m')::uuid);
+select set_config('test.rev',(select revision::text from public.meetings where id=current_setting('test.m')::uuid),true);
+select pg_temp.denied('select public.append_meeting_text(current_setting(''test.m'')::uuid,''72000000-0000-0000-0000-000000000001'',current_setting(''test.rev'')::bigint,array[''71000000-0000-0000-0000-000000000001''::uuid],''No consent'',0)');
+select public.set_meeting_consent(current_setting('test.m')::uuid,true,true);
+select set_config('test.rev',(select revision::text from public.meetings where id=current_setting('test.m')::uuid),true);
+select set_config('test.original_rev',current_setting('test.rev'),true);
+select set_config('test.ctxrev',public.context_revision(current_setting('test.c')::uuid)::text,true);
+select public.append_meeting_text(current_setting('test.m')::uuid,'72000000-0000-0000-0000-000000000001',current_setting('test.rev')::bigint,array['71000000-0000-0000-0000-000000000001'::uuid],'Use CSV export',120);
+select public.append_meeting_text(current_setting('test.m')::uuid,'72000000-0000-0000-0000-000000000001',current_setting('test.rev')::bigint,array['71000000-0000-0000-0000-000000000001'::uuid],'Use CSV export',120);
+select pg_temp.check_true((select count(*)=1 from public.meeting_text_context(current_setting('test.c')::uuid)),'idempotent context write');
+select pg_temp.check_true(public.context_revision(current_setting('test.c')::uuid)>current_setting('test.ctxrev')::bigint,'text updates context revision');
+select pg_temp.denied('insert into public.meeting_transcript_segments(id) values(gen_random_uuid())');
+select pg_temp.denied('select public.append_meeting_text(current_setting(''test.m'')::uuid,''72000000-0000-0000-0000-000000000001'',current_setting(''test.rev'')::bigint,array[''71000000-0000-0000-0000-000000000001''::uuid],''Forged replay'',120)');
+select set_config('test.code',public.create_invitation(current_setting('test.w')::uuid,'peer@context.test','member')::text,true);
+set local request.jwt.claim.sub='71000000-0000-0000-0000-000000000002';
+select public.accept_invitation(current_setting('test.code'));
+select public.join_meeting(current_setting('test.m')::uuid);
+select public.set_meeting_consent(current_setting('test.m')::uuid,true,false);
+select pg_temp.check_true((select count(*)=0 from public.meeting_text_context(current_setting('test.c')::uuid)),'AI withdrawal disables old sources');
+select public.set_meeting_consent(current_setting('test.m')::uuid,true,true);
+select pg_temp.check_true((select count(*)=0 from public.meeting_text_context(current_setting('test.c')::uuid)),'restored consent does not resurrect sources');
+select set_config('test.rev',(select revision::text from public.meetings where id=current_setting('test.m')::uuid),true);
+select pg_temp.denied('select public.append_meeting_text(current_setting(''test.m'')::uuid,''72000000-0000-0000-0000-000000000002'',current_setting(''test.rev'')::bigint,array[''71000000-0000-0000-0000-000000000002''::uuid],''Wrong roster'',0)');
+select public.append_meeting_text(current_setting('test.m')::uuid,'72000000-0000-0000-0000-000000000002',current_setting('test.rev')::bigint,array['71000000-0000-0000-0000-000000000001'::uuid,'71000000-0000-0000-0000-000000000002'::uuid],'Peer supplied text',150);
+select pg_temp.check_true((select speaker_id=auth.uid() from public.meeting_text_context(current_setting('test.c')::uuid)),'caller cannot impersonate speaker');
+select public.withdraw_meeting_text(current_setting('test.m')::uuid,true);
+select pg_temp.check_true((select count(*)=0 from public.meeting_transcript_segments),'withdrawal removes shared text');
+set local request.jwt.claim.sub='71000000-0000-0000-0000-000000000003';
+select pg_temp.check_true((select count(*)=0 from public.meeting_transcript_segments),'outside workspace hidden');
+select pg_temp.denied('select public.meeting_text_context(current_setting(''test.c'')::uuid)');
+select pg_temp.denied('select public.withdraw_meeting_text(current_setting(''test.m'')::uuid,true)');
+set local request.jwt.claim.sub='71000000-0000-0000-0000-000000000001';
+select public.set_meeting_consent(current_setting('test.m')::uuid,true,true);
+set local request.jwt.claim.sub='71000000-0000-0000-0000-000000000002';
+select public.set_meeting_consent(current_setting('test.m')::uuid,true,true);
+select set_config('test.rev',(select revision::text from public.meetings where id=current_setting('test.m')::uuid),true);
+select public.append_meeting_text(current_setting('test.m')::uuid,'72000000-0000-0000-0000-000000000003',current_setting('test.rev')::bigint,array['71000000-0000-0000-0000-000000000001'::uuid,'71000000-0000-0000-0000-000000000002'::uuid],'Expire me',0);
+select pg_temp.denied('select public.append_meeting_text(current_setting(''test.m'')::uuid,''72000000-0000-0000-0000-000000000005'',current_setting(''test.original_rev'')::bigint,array[''71000000-0000-0000-0000-000000000001''::uuid,''71000000-0000-0000-0000-000000000002''::uuid],''Stale revision'',0)');
+set local request.jwt.claim.sub='71000000-0000-0000-0000-000000000001';
+select public.end_meeting(current_setting('test.m')::uuid);
+select pg_temp.check_true((select count(*)=1 from public.meeting_text_context(current_setting('test.c')::uuid)),'ending preserves earlier explicit consent');
+select set_config('test.private',public.create_channel(current_setting('test.w')::uuid,'private-meeting',true)::text,true);
+select set_config('test.private_m',public.start_meeting(current_setting('test.private')::uuid,'Private sync')::text,true);
+select public.join_meeting(current_setting('test.private_m')::uuid);
+select public.set_meeting_consent(current_setting('test.private_m')::uuid,true,true);
+select public.append_meeting_text(current_setting('test.private_m')::uuid,'72000000-0000-0000-0000-000000000004',
+(select revision from public.meetings where id=current_setting('test.private_m')::uuid),
+array['71000000-0000-0000-0000-000000000001'::uuid],'Private discussion',0);
+set local request.jwt.claim.sub='71000000-0000-0000-0000-000000000002';
+select pg_temp.check_true((select count(*)=1 from public.meeting_transcript_segments),'same workspace private meeting hidden');
+select pg_temp.denied('select public.meeting_text_context(current_setting(''test.private'')::uuid)');
+set local request.jwt.claim.sub='71000000-0000-0000-0000-000000000001';
+select public.remove_member(current_setting('test.w')::uuid,'71000000-0000-0000-0000-000000000002');
+set local request.jwt.claim.sub='71000000-0000-0000-0000-000000000002';
+select pg_temp.check_true((select count(*)=0 from public.meeting_transcript_segments),'revoked workspace access hides meeting text');
+select pg_temp.denied('select public.meeting_text_context(current_setting(''test.c'')::uuid)');
+set local request.jwt.claim.sub='71000000-0000-0000-0000-000000000001';
+reset role;
+update public.meeting_transcript_segments set expires_at=now()-interval '1 second';
+set local role authenticated;
+select pg_temp.check_true((select count(*)=0 from public.meeting_transcript_segments),'expired text invisible');
+select pg_temp.check_true((select count(*)=0 from public.meeting_text_context(current_setting('test.c')::uuid)),'expired text excluded from AI');
+select pg_temp.denied('select aedrova_private.expire_meeting_text()');
+reset role;
+select pg_temp.check_true(aedrova_private.expire_meeting_text()=2,'maintenance deletes expired text');
+set local role anon;
+select pg_temp.denied('select * from public.meeting_transcript_segments');
+select pg_temp.denied('select public.meeting_text_context(current_setting(''test.c'')::uuid)');
+rollback;

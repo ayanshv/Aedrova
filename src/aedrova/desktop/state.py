@@ -16,6 +16,16 @@ class Message:
     decision: bool = False
     attachment: str = ""
     replies: list["Message"] = field(default_factory=list)
+    attachment_id: str = ""
+    sequence: int = 0
+    delivery: str = ""
+    mine: bool = False
+    unsent: bool = False
+    reactions: list[dict] = field(default_factory=list)
+    edited: bool = False
+    saved: bool = False
+    pinned: bool = False
+    sender_id: str = ""
 
 
 @dataclass
@@ -25,6 +35,9 @@ class Channel:
     topic: str
     messages: list[Message] = field(default_factory=list)
     direct: bool = False
+    private: bool = False
+    description: str = ""
+    posting: str = "members"
 
 
 @dataclass
@@ -82,7 +95,9 @@ class DemoStore:
         if len(body) > 10_000:
             raise ValueError("Keep messages under 10,000 characters in this preview.")
         channel = self.channel(workspace_id, channel_id)
-        message = Message(uuid4().hex, "You", "AV", datetime.now().strftime("%H:%M"), body, 3)
+        message = Message(
+            uuid4().hex, "You", "AV", datetime.now().strftime("%H:%M"), body, 3, mine=True
+        )
         if parent_id:
             parent = next(m for m in channel.messages if m.id == parent_id)
             parent.replies.append(message)

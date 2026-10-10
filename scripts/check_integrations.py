@@ -50,7 +50,7 @@ async def main():
             "live meeting connection",
             "camera/microphone capture",
             "screen sharing",
-            "network loss/echo cancellation",
+            "network loss/echo cancellation", 
         ],
     }
     Path("work").mkdir(exist_ok=True)

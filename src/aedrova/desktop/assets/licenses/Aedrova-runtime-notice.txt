@@ -1,0 +1,1 @@
+Aedrova bundles OpenAI Codex CLI 0.155.1 as a separate runtime. Its source is unmodified. macOS signatures may be replaced when Aedrova is packaged and signed. Original runtime: https://github.com/openai/codex/tree/rust-v0.155.1
