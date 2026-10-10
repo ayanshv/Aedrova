@@ -141,3 +141,8 @@ No role password has been submitted by the agent. Staging service is not configu
 Linux CI finished with 724 passing tests and one failure: provider mismatch validation
 ran after looking up an installed Codex executable. Fixed the ordering and tightened
 the test to forbid runtime lookup. Focused managed tests: 16 passed. Rerun pending.
+
+Staging backend credential handoff completed by owner; actual restricted database
+login verified, public workspace read denied. Server environment validated locally.
+Next gate: free Render staging service with staging-only credentials, then separate
+Google OAuth setup and end-to-end isolation validation. Phase 1 remains in progress.

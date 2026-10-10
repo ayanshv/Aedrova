@@ -1363,3 +1363,9 @@ Owner ran the 23-migration staging bundle successfully; hosted Table Editor veri
 new app tables. Next required owner step: run the service sql/supabase-website.sql
 in Aedrova Staging to create the restricted NOLOGIN role/private backend schema.
 Private password, service origin and Google staging OAuth remain subsequent steps.
+
+Owner completed the private staging role LOGIN/password SQL successfully. Actual
+staging pooler login verified as aedrova_website with aedrova_billing search_path;
+public.workspaces SELECT denied (42501). Separate staging encryption key and private
+Render environment prepared locally, configuration validation passed. Free HTTPS
+service creation and staging Google OAuth remain required; no cloud secrets uploaded.
