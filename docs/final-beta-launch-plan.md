@@ -143,13 +143,17 @@ Founder/business readiness → 5. Final release decision → 9.
 
 ## Owner actions and approval gates
 
-No new SQL is required for the immediate fixes. First connector setup action:
-complete the open Stripe login's personal passkey/Touch ID/2FA step, then confirm
-signed in. Do not share secrets here. Stripe app creation/credentials and public
-review, Meta developer/Instagram registration/review, Vercel integration registration
-and Brave's funded Search key remain setup gates; exact steps are in the website
-repository docs/account-connector-setup.md. These prevent claiming all connectors
-production-ready, but do not block saving this roadmap or the UI fixes.
+No new SQL is required for the immediate fixes. Stripe CLI login and Apps Developer
+Agreement are complete; Aedrova Buds v0.1.0 is uploaded and approved for testing.
+The owner deferred business verification. Customer OAuth is prepared for login,
+Stripe-hosted account selection, read-only approval and automatic Bud confirmation.
+Verified customers cannot bypass Aedrova's developer verification/public app review.
+Business verification, external test configuration, secure app credentials and fresh
+live acceptance remain Stripe gates. They do not block starting Phase 1's release
+baseline; record Stripe as prepared but not customer-validated in that inventory.
+Meta developer/Instagram registration/review, Vercel integration registration and
+Brave's funded Search key remain setup gates. Exact steps are in the website
+repository docs/account-connector-setup.md. Do not share secrets here.
 Later required: reviewed legal/business arrangements, real billing/provider keys,
 paid always-on hosting approval, signing/notarization and Windows signing setup,
 staging/live test consent and final launch approval. Walk through one requirement

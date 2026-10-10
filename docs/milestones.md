@@ -1321,3 +1321,17 @@ passed. Rebuilt dist/Aedrova.app and verified its deep code signature. UI proof:
 work/connector-confirmation-fixed.png. Source fixes/roadmap pushed as 2ae2c8f;
 connector deployment evidence pushed as 8a77e33 on the website branch. The currently
 running application must be quit/reopened to load these changes; no forced restart.
+
+
+## Stripe customer workflow preparation — October 10
+
+Owner deferred developer business verification and requested readiness for customer
+login/account selection. Stripe App v0.1.0 is registered and approved for testing.
+OAuth code binds the Stripe-selected account, verifies read access before Connected,
+and returns to the Bud confirmation without customer keys or manual codes. Focused
+HTTP regression tests cover successful binding, account mismatch and denied balance
+access. These are local tests, not fresh-customer/live acceptance.
+Aedrova developer verification, external testing, server credentials and public Stripe
+review remain gates; a verified customer account cannot bypass them. This preparation
+does not activate billing or public installation. Final-Beta Phase 1 is next and still
+requires explicit owner approval. No Final-Beta phase was started in this task.
