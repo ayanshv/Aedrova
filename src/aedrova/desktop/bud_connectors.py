@@ -2,7 +2,7 @@
 
 import re
 import time
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
@@ -110,6 +110,39 @@ GLYPHS = {
 }
 
 
+def normalize_resource(provider, value):
+    """Accept ordinary provider links without widening the authorized resource scope."""
+    value = value.strip()
+    if "://" not in value:
+        return value
+    parsed = urlparse(value)
+    if parsed.scheme != "https" or parsed.username or parsed.password:
+        raise ValueError("Paste a secure provider link without credentials.")
+    host, parts = (parsed.hostname or "").lower(), parsed.path.strip("/").split("/")
+    if provider == "github" and host == "github.com" and len(parts) >= 2:
+        return "/".join(parts[:2]).removesuffix(".git")
+    if (
+        provider == "figma"
+        and host in {"figma.com", "www.figma.com"}
+        and len(parts) >= 2
+        and parts[0] in {"file", "design", "board"}
+    ):
+        return parts[1]
+    if provider == "supabase" and host == "supabase.com" and "project" in parts:
+        index = parts.index("project") + 1
+        if index < len(parts):
+            return parts[index]
+    if provider == "notion" and (
+        host == "notion.so" or host.endswith(".notion.so") or host.endswith(".notion.site")
+    ):
+        match = re.search(
+            r"([a-fA-F0-9]{32}|[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12})$", parts[-1]
+        )
+        if match:
+            return match.group(1)
+    raise ValueError("Use a link to the selected provider’s resource, or its resource ID.")
+
+
 class ConnectorsDialog(AppDialog):
     run = DotDialog.run
 
@@ -204,9 +237,10 @@ class ConnectorsDialog(AppDialog):
         self.detail_copy.setTextFormat(Qt.TextFormat.PlainText)
         form.addWidget(self.detail_heading)
         form.addWidget(self.detail_copy)
-        form.addWidget(label("Selected resource", "muted"))
+        self.resource_label = label("Resource link or ID", "muted")
+        form.addWidget(self.resource_label)
         self.resource = QLineEdit(self)
-        self.resource.setMaxLength(200)
+        self.resource.setMaxLength(2048)
         self.resource.setAccessibleName("Connector resource")
         form.addWidget(self.resource)
         self.resource_help = label("", "muted", wrap=True)
@@ -228,14 +262,22 @@ class ConnectorsDialog(AppDialog):
         form.addWidget(self.oauth, alignment=Qt.AlignmentFlag.AlignLeft)
         self.oauth_hint = label("", "muted", wrap=True)
         form.addWidget(self.oauth_hint)
-        form.addWidget(label("Or use a scoped access token", "muted"))
+        self.advanced = button("Use an access token instead")
+        self.advanced.setCheckable(True)
+        self.token_panel = QWidget(self)
+        token_form = QVBoxLayout(self.token_panel)
+        token_form.setContentsMargins(0, 0, 0, 0)
+        self.advanced.toggled.connect(self.token_panel.setVisible)
+        form.addWidget(self.advanced)
+        form.addWidget(self.token_panel)
+        token_form.addWidget(label("Scoped access token", "muted"))
         self.credential = QLineEdit(self)
         self.credential.setEchoMode(QLineEdit.EchoMode.Password)
         self.credential.setMaxLength(4096)
         self.credential.setAccessibleName("Private provider access token")
         self.credential.setPlaceholderText("Paste securely here")
-        form.addWidget(self.credential)
-        form.addWidget(
+        token_form.addWidget(self.credential)
+        token_form.addWidget(
             label(
                 "Your token is encrypted on Aedrova’s service. It is never sent to the AI or "
                 "shared with teammates.",
@@ -245,7 +287,7 @@ class ConnectorsDialog(AppDialog):
         )
         self.connect = button("Verify & connect", role="primary")
         self.connect.clicked.connect(self.connect_tool)
-        form.addWidget(self.connect, alignment=Qt.AlignmentFlag.AlignLeft)
+        token_form.addWidget(self.connect, alignment=Qt.AlignmentFlag.AlignLeft)
         self.existing = QWidget(self)
         self.existing_layout = QVBoxLayout(self.existing)
         self.existing_layout.setContentsMargins(0, 8, 0, 0)
@@ -548,8 +590,25 @@ class ConnectorsDialog(AppDialog):
         self.resource.setText(
             self.row().get("resource", "") if self.row().get("provider") == provider["id"] else ""
         )
-        self.resource.setPlaceholderText(provider["resource_hint"])
-        self.resource_help.setText(RESOURCE_HELP[provider["id"]])
+        if provider["id"] == "tiktok" and provider.get("oauth_available"):
+            self.resource.setText("me")
+        self.resource.setPlaceholderText("Paste a resource link or " + provider["resource_hint"])
+        automatic = provider["id"] == "tiktok" and provider.get("oauth_available")
+        self.resource.setVisible(not automatic)
+        self.resource_label.setVisible(not automatic)
+        self.advanced.setChecked(not bool(provider.get("oauth_available")))
+        self.token_panel.setVisible(self.advanced.isChecked())
+        link_help = {
+            "github": "Paste your repository’s GitHub link. We’ll select that repository.",
+            "figma": "Paste your Figma file link. We’ll extract the file key for you.",
+            "notion": "Paste the shared Notion page link. We’ll extract its page ID.",
+            "supabase": "Paste your Supabase dashboard project link. We’ll select that project.",
+        }
+        self.resource_help.setText(
+            "Your signed-in TikTok account is selected automatically."
+            if automatic
+            else link_help.get(provider["id"], RESOURCE_HELP[provider["id"]])
+        )
         self.credential.clear()
         self.refresh_existing()
         self.pages.setCurrentIndex(1)
@@ -596,7 +655,11 @@ class ConnectorsDialog(AppDialog):
 
     def connect_oauth(self):
         provider = self.selected_provider
-        resource = self.resource.text().strip()
+        try:
+            resource = normalize_resource(provider["id"], self.resource.text()) if provider else ""
+        except ValueError as error:
+            self.status.setText(str(error))
+            return
         if not provider or not provider.get("oauth_available"):
             self.status.setText("Provider account sign-in needs owner setup first.")
             return
@@ -687,7 +750,12 @@ class ConnectorsDialog(AppDialog):
         if not self.selected_provider or (not self.bud.currentData() and not self.embedded_owner):
             self.status.setText("Choose a Bud and a tool first.")
             return
-        resource, credential = self.resource.text().strip(), self.credential.text().strip()
+        try:
+            resource = normalize_resource(self.selected_provider["id"], self.resource.text())
+        except ValueError as error:
+            self.status.setText(str(error))
+            return
+        credential = self.credential.text().strip()
         if not resource or not credential:
             self.status.setText("Add the resource and access token first.")
             return

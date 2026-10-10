@@ -437,6 +437,35 @@ class ZenOnboarding(AppDialog):
         if account_key(self.window) != self.prefix:
             self.reject()
             return
+        if not getattr(self, "bud_setup_completed", False):
+            if getattr(self, "buds_dialog", None) is not None:
+                return
+            if not self.window.current_user() or not self.window.workspace_id:
+                self.show_stage(5)
+                self.setup.status.setText(
+                    "Sign in and select your workspace before configuring your Bud."
+                )
+                return
+            from aedrova.desktop.dots import DotDialog
+
+            self.buds_dialog = DotDialog(self.window, required=True)
+            self.hide()
+
+            def bud_finished(result):
+                self.buds_dialog = None
+                if result == self.DialogCode.Accepted:
+                    self.bud_setup_completed = True
+                    self.complete()
+                else:
+                    self.show_stage(LAST_STAGE - 1)
+                    self.show()
+                    self.setup.status.setText(
+                        "Configure a Bud and connect a tool to finish onboarding."
+                    )
+
+            self.buds_dialog.finished.connect(bud_finished)
+            self.buds_dialog.open()
+            return
         self.finished_once = True
         self.window.settings.setValue(self.prefix + "/hasCompletedOnboarding", True)
         self.window.settings.setValue(self.prefix + "/setup", True)

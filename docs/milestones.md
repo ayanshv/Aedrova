@@ -1177,3 +1177,49 @@ are preserved. Next owner action is approval/configuration of an isolated HTTPS
 connector service, then registering its exact Supabase callback. The public
 waitlist website remains unchanged. Focused validation: 29 desktop and 69
 service tests passed; changed-file lint passed. Live Supabase remains pending.
+
+
+### Bud-led onboarding and simpler connector setup — October 9
+
+Research now defaults to teal in the app, matching the website. Website Buds are
+immediately below the hero and appear above inner-page content. Control tours
+illuminate actual controls without an external outline. Completing first-run
+onboarding opens the six-step Bud configuration and requires a saved Bud with
+one verified connected tool before workspace handoff. Cancelling returns to setup;
+existing completed accounts retain access.
+
+Configured OAuth is the primary connector path, advanced tokens are collapsible,
+TikTok selects the authorized account automatically, and GitHub/Figma/Notion/
+Supabase resource links are parsed locally. Provider consent and selecting a
+specific authorized resource remain intentional. Token-only adapters still need
+the provider’s scoped key; unconfigured OAuth requires developer registration.
+The account-mismatch browser page is branded; API authorization remains strict.
+
+### Planned: Marketing Bud media studio (after connector acceptance)
+
+Build image generation with OpenAI and a separately evaluated video provider.
+Use brand references, platform aspect-ratio presets and explicit drafts; show
+progress, cancellation and preview before download or publishing. Enforce plan
+budgets, reserve estimated costs, cap video duration/quality and concurrency,
+and never promise unlimited media. Separate read-only social connectors from
+publishing grants. Require approval for every external post. Validate failed
+jobs, refunds of unused reservations, retention/deletion and content safety.
+Advertise only capabilities delivered and tested. No media generation added yet.
+
+### Planned: final Beta completion and M14 release gate
+
+Finish connector consent/refresh/revocation and role acceptance; then run a
+full regression, permissions/privacy audit, onboarding light/dark/responsive
+checks, multi-account collaboration and two-device meeting acceptance.
+Create signed/notarized macOS DMG with clean-machine install/update/rollback
+checks. Add Windows packaging on Windows CI, signed installer, clean-machine
+acceptance, microphone/camera/screen-share and updater checks. Resolve platform
+incompatibilities before advertising Windows availability. Archive reproducible
+artifacts and release notes; maintain waitlist until release approval.
+
+Owner actions later: Apple Developer membership and Developer ID signing setup;
+Windows signing provider enrollment; Render always-on paid hosting; live Stripe
+business verification and billing configuration; second device for meetings.
+Walk through one requirement per response at release time. These gates block
+public Beta distribution, not current UI work. Codebase walkthrough stays after
+complete deployment. M14 remains deferred until feature completion.

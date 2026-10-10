@@ -457,3 +457,12 @@ def test_look_selection_sets_specialty_and_recommendations(editor):
         assert dialog.job_role.currentData() == specialty
         assert dialog.recommendations.text().startswith(specialty.title() + " tools")
     assert not any("Match" in tile.text() for tile, _ in dialog.appearance_buttons)
+
+
+def test_required_bud_setup_cannot_be_accepted_without_verified_connection(editor):
+    dialog, rows, saved, window = editor
+    dialog.required = True
+    dialog.accept()
+    assert dialog.isVisible()
+    assert "connect one tool" in dialog.status.text()
+    assert not rows

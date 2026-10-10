@@ -59,12 +59,13 @@ class DotSection(TeamSection):
 
 
 class DotDialog(AppDialog):
-    def __init__(self, window, selected=None):
+    def __init__(self, window, selected=None, *, required=False):
         super().__init__(window)
         self.window, self.workspace = window, window.workspace_id
         self.user = str(window.current_user().id)
         self.rows, self.providers, self.job = [], [], None
         self.pending = False
+        self.required = required
         from aedrova.desktop.bud_setup import build_setup
 
         build_setup(self, window)
@@ -650,6 +651,16 @@ class DotDialog(AppDialog):
             )
 
     def done(self, result):
+        if self.required and result == self.DialogCode.Accepted:
+            row = self.current()
+            if (
+                not row
+                or row.get("status") != "Connected"
+                or self.has_changes()
+                or self.pages.currentIndex() != 5
+            ):
+                self.status.setText("Finish configuring a Bud and connect one tool to continue.")
+                return
         if self.embedded_connectors:
             self.embedded_connectors.stop_oauth()
             self.embedded_connectors.credential.clear()

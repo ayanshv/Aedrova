@@ -189,7 +189,12 @@ def test_resource_lookup_help_covers_every_supported_connector(gallery):
     dialog, _, _, providers = gallery
     for provider in providers:
         dialog.open_provider(provider)
-        assert dialog.resource_help.text() == RESOURCE_HELP[provider["id"]]
+        assert dialog.resource_help.text()
+        assert (
+            "Paste" in dialog.resource_help.text()
+            if provider["id"] in {"github", "figma", "notion"}
+            else dialog.resource_help.text() == RESOURCE_HELP[provider["id"]]
+        )
     supabase = {
         **providers[0],
         "id": "supabase",
@@ -199,6 +204,40 @@ def test_resource_lookup_help_covers_every_supported_connector(gallery):
         "oauth_setup_hint": "Supabase requires an HTTPS callback.",
     }
     dialog.open_provider(supabase)
-    assert "Project Settings → General → Reference ID" in dialog.resource_help.text()
+    assert "Paste your Supabase dashboard project link" in dialog.resource_help.text()
     assert "HTTPS" in dialog.oauth_hint.text()
     assert not dialog.oauth.isEnabled()
+
+
+@pytest.mark.parametrize(
+    "provider,url,expected",
+    [
+        ("github", "https://github.com/team/project/tree/main", "team/project"),
+        ("figma", "https://www.figma.com/design/abc123/My-file", "abc123"),
+        ("supabase", "https://supabase.com/dashboard/project/abcdefgh/settings", "abcdefgh"),
+        (
+            "notion",
+            "https://www.notion.so/My-page-0123456789abcdef0123456789abcdef?source=copy",
+            "0123456789abcdef0123456789abcdef",
+        ),
+    ],
+)
+def test_resource_links_preserve_exact_scope(provider, url, expected):
+    from aedrova.desktop.bud_connectors import normalize_resource
+
+    assert normalize_resource(provider, url) == expected
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://github.com.evil.test/team/project",
+        "http://github.com/team/project",
+        "https://token@github.com/team/project",
+    ],
+)
+def test_resource_links_reject_foreign_hosts_and_credentials(url):
+    from aedrova.desktop.bud_connectors import normalize_resource
+
+    with pytest.raises(ValueError):
+        normalize_resource("github", url)
