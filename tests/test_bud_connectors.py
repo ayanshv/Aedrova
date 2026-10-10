@@ -243,3 +243,66 @@ def test_resource_links_reject_foreign_hosts_and_credentials(url):
 
     with pytest.raises(ValueError):
         normalize_resource("github", url)
+
+
+@pytest.mark.parametrize("provider_id", ["github", "notion", "figma", "tiktok"])
+def test_account_sign_in_requires_no_id_or_token(gallery, monkeypatch, provider_id):
+    dialog, _, _, providers = gallery
+    provider = next(p for p in providers if p["id"] == provider_id)
+    provider.update(oauth_available=True, oauth_supported=True, permissions="Read-only")
+    dialog.open_provider(provider)
+    assert not dialog.resource.isVisible() and not dialog.credential.isVisible()
+    calls = []
+    state, origin = "a" * 43, "https://connections.test"
+    monkeypatch.setattr("aedrova.desktop.bud_connectors.connector_origin", lambda: origin)
+    monkeypatch.setattr("aedrova.desktop.bud_connectors.QDesktopServices.openUrl", lambda url: True)
+
+    class API:
+        def request(self, path, body=None):
+            calls.append((path, body))
+            return {"state": state, "url": origin + "/buds/authorize/" + state}
+
+    monkeypatch.setattr("aedrova.desktop.bud_connectors.client", lambda _: API())
+    dialog.connect_oauth()
+    assert calls[0][1]["resource"] == ("me" if provider_id == "tiktok" else "")
+    assert "credential" not in calls[0][1]
+
+
+def test_authorized_account_picker_connects_only_selected_resource(gallery, monkeypatch):
+    dialog, _, _, providers = gallery
+    provider = {
+        **providers[0],
+        "oauth_available": True,
+        "oauth_supported": True,
+        "permissions": "Read-only",
+    }
+    dialog.open_provider(provider)
+    dialog.oauth_state = "a" * 43
+    import time
+
+    dialog.oauth_deadline = time.monotonic() + 600
+    calls = []
+
+    class API:
+        def request(self, path, body=None):
+            calls.append((path, body))
+            if path.startswith("/api/buds/oauth/status"):
+                return {
+                    "status": "choose_resource",
+                    "resources": [{"id": "team/app", "name": "Team app"}],
+                    "requires_link": False,
+                }
+            return {"id": "verified"}
+
+    monkeypatch.setattr("aedrova.desktop.bud_connectors.client", lambda _: API())
+    dialog.poll_oauth()
+    assert dialog.pages.currentIndex() == 3
+    assert dialog.resource_picker.itemText(1) == "Team app"
+    dialog.select_oauth_resource()
+    assert len(calls) == 1
+    dialog.resource_picker.setCurrentIndex(1)
+    confirmed = []
+    monkeypatch.setattr(dialog, "refresh", lambda *, on_loaded: confirmed.append(True))
+    dialog.select_oauth_resource()
+    assert calls[-1][1] == {"state": "a" * 43, "resource": "team/app"}
+    assert not dialog.oauth_state and confirmed

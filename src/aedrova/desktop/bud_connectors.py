@@ -267,7 +267,7 @@ class ConnectorsDialog(AppDialog):
         self.token_panel = QWidget(self)
         token_form = QVBoxLayout(self.token_panel)
         token_form.setContentsMargins(0, 0, 0, 0)
-        self.advanced.toggled.connect(self.token_panel.setVisible)
+        self.advanced.toggled.connect(self.show_token_fields)
         form.addWidget(self.advanced)
         form.addWidget(self.token_panel)
         token_form.addWidget(label("Scoped access token", "muted"))
@@ -331,6 +331,27 @@ class ConnectorsDialog(AppDialog):
         )
         success_layout.addStretch()
         self.pages.addWidget(success)
+        selection = QWidget(self)
+        selection_layout = QVBoxLayout(selection)
+        selection_layout.setContentsMargins(28, 28, 28, 28)
+        selection_layout.addWidget(label("Choose what your Bud can read", "heading"))
+        self.selection_copy = label("", "muted", wrap=True)
+        selection_layout.addWidget(self.selection_copy)
+        self.resource_picker = ChoiceBox(self)
+        self.resource_picker.setAccessibleName("Authorized resources")
+        selection_layout.addWidget(self.resource_picker)
+        self.selection_link = QLineEdit(self)
+        self.selection_link.setPlaceholderText("Paste your Figma file link")
+        self.selection_link.setAccessibleName("Authorized Figma file link")
+        selection_layout.addWidget(self.selection_link)
+        self.selection_submit = button("Connect selected resource", role="primary")
+        self.selection_submit.clicked.connect(self.select_oauth_resource)
+        selection_layout.addWidget(self.selection_submit)
+        self.selection_retry = button("Sign in again")
+        self.selection_retry.clicked.connect(self.connect_oauth)
+        selection_layout.addWidget(self.selection_retry)
+        selection_layout.addStretch()
+        self.pages.addWidget(selection)
         self.status = label("Loading connectors…", "muted", wrap=True)
         self.status.setTextFormat(Qt.TextFormat.PlainText)
         main.addWidget(self.status)
@@ -362,6 +383,10 @@ class ConnectorsDialog(AppDialog):
         self.resource.setEnabled(not busy)
         self.credential.setEnabled(not busy)
         self.hours.setEnabled(not busy)
+        self.selection_submit.setEnabled(not busy)
+        self.selection_retry.setEnabled(not busy)
+        self.resource_picker.setEnabled(not busy)
+        self.selection_link.setEnabled(not busy)
         for card in self.cards:
             card.setEnabled(not busy and bool(card.property("providerAvailable")) and can_connect)
         if self.embedded_owner:
@@ -593,11 +618,12 @@ class ConnectorsDialog(AppDialog):
         if provider["id"] == "tiktok" and provider.get("oauth_available"):
             self.resource.setText("me")
         self.resource.setPlaceholderText("Paste a resource link or " + provider["resource_hint"])
-        automatic = provider["id"] == "tiktok" and provider.get("oauth_available")
+        automatic = bool(provider.get("oauth_available"))
         self.resource.setVisible(not automatic)
         self.resource_label.setVisible(not automatic)
-        self.advanced.setChecked(not bool(provider.get("oauth_available")))
+        self.advanced.setChecked(False)
         self.token_panel.setVisible(self.advanced.isChecked())
+        self.show_token_fields(self.advanced.isChecked())
         link_help = {
             "github": "Paste your repository’s GitHub link. We’ll select that repository.",
             "figma": "Paste your Figma file link. We’ll extract the file key for you.",
@@ -605,23 +631,31 @@ class ConnectorsDialog(AppDialog):
             "supabase": "Paste your Supabase dashboard project link. We’ll select that project.",
         }
         self.resource_help.setText(
-            "Your signed-in TikTok account is selected automatically."
+            "Sign in first. Choose what your Bud can read when you return."
             if automatic
             else link_help.get(provider["id"], RESOURCE_HELP[provider["id"]])
         )
         self.credential.clear()
         self.refresh_existing()
         self.pages.setCurrentIndex(1)
-        self.resource.setFocus()
+        (self.oauth if automatic else self.resource).setFocus()
+
+    def show_token_fields(self, visible):
+        self.token_panel.setVisible(visible)
+        for control in (self.resource, self.resource_label, self.resource_help):
+            control.setVisible(visible)
 
     def auth_details(self, provider):
         self.detail_copy.setText(
-            provider["permissions"] if provider.get("oauth_available") else HELP[provider["id"]]
+            provider["permissions"]
+            if provider.get("oauth_available")
+            else "Account sign-in is not available for this service yet. "
+            "Advanced token setup is optional below."
         )
         self.oauth.setVisible(bool(provider.get("oauth_supported")))
         self.oauth_hint.setVisible(bool(provider.get("oauth_supported")))
         self.oauth_hint.setText(
-            "Authorize in your browser. Only this resource is available to your Bud."
+            "Sign in and approve read-only access. Finish here without copying codes or IDs."
             if provider.get("oauth_available")
             else provider.get("oauth_setup_hint")
             or "Account sign-in needs Aedrova’s provider app setup. A scoped token works below."
@@ -655,23 +689,19 @@ class ConnectorsDialog(AppDialog):
 
     def connect_oauth(self):
         provider = self.selected_provider
-        try:
-            resource = normalize_resource(provider["id"], self.resource.text()) if provider else ""
-        except ValueError as error:
-            self.status.setText(str(error))
-            return
+        resource = "me" if provider and provider["id"] == "tiktok" else ""
         if not provider or not provider.get("oauth_available"):
             self.status.setText("Provider account sign-in needs owner setup first.")
-            return
-        if not resource:
-            self.status.setText("Choose the resource your Bud may read first.")
-            self.resource.setFocus()
             return
         if self.embedded_owner and self.embedded_owner.has_changes():
             owner = self.embedded_owner
             if not owner.current():
                 owner.provider.setCurrentIndex(owner.provider.findData(provider["id"]))
-                owner.resource.setText(resource)
+                # A disconnected draft needs a nonempty legacy metadata field.
+                # This is not an authorization or a readable resource.
+                owner.resource.setText(
+                    "selection/pending" if provider["id"] == "github" else "pending"
+                )
 
             def saved(_row):
                 self.rows = owner.rows
@@ -732,6 +762,24 @@ class ConnectorsDialog(AppDialog):
                 self.stop_oauth()
                 provider, bud_id = dict(self.selected_provider), self.bud.currentData()
                 self.refresh(on_loaded=lambda: self.show_confirmation(provider, bud_id))
+            elif value.get("status") == "choose_resource":
+                self.resource_picker.clear()
+                self.resource_picker.addItem("Choose a resource…", "")
+                for row in value.get("resources", []):
+                    self.resource_picker.addItem(row["name"], row["id"])
+                link = bool(value.get("requires_link"))
+                self.resource_picker.setVisible(not link)
+                self.selection_link.setVisible(link)
+                self.selection_copy.setText(
+                    "Paste a Figma file link. Your Bud will only read that file."
+                    if link
+                    else "Select from your account. Your Bud will only use this resource."
+                    if value.get("resources")
+                    else "No resources found. Share a page or install Aedrova on a repository, "
+                    "then reconnect."
+                )
+                self.pages.setCurrentIndex(3)
+                self.status.setText("Account authorized. Choose a resource to finish.")
             elif value.get("status") == "failed":
                 self.stop_oauth()
                 self.status.setText("Authorization did not complete. Try Connect account again.")
@@ -745,6 +793,34 @@ class ConnectorsDialog(AppDialog):
             ),
             checked,
         )
+
+    def select_oauth_resource(self):
+        if not self.oauth_state or not self.selected_provider:
+            return
+        if time.monotonic() >= self.oauth_deadline:
+            self.stop_oauth()
+            self.status.setText("Authorization expired. Connect account again.")
+            return
+        try:
+            resource = (
+                normalize_resource("figma", self.selection_link.text())
+                if self.selection_link.isVisible()
+                else self.resource_picker.currentData()
+            )
+        except ValueError as error:
+            self.status.setText(str(error))
+            return
+        if not resource:
+            self.status.setText("Choose what your Bud may read.")
+            return
+        body = {"state": self.oauth_state, "resource": resource}
+
+        def connected(_value):
+            self.stop_oauth()
+            provider, bud_id = dict(self.selected_provider), self.bud.currentData()
+            self.refresh(on_loaded=lambda: self.show_confirmation(provider, bud_id))
+
+        self.run(lambda service: client(service).request("/api/buds/oauth/select", body), connected)
 
     def connect_tool(self):
         if not self.selected_provider or (not self.bud.currentData() and not self.embedded_owner):

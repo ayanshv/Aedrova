@@ -1254,3 +1254,21 @@ fresh-account acceptance complete until their live checks pass.
 Marketing media studio and final Beta/DMG/Windows work remain planned, not started.
 M14 remains deferred. Continue this acceptance task after the account/workspace is
 identified, then report and request permission before the next feature milestone.
+
+### Sign-in-first Bud connections — October 10
+
+Owner authorized simplifying the connector experience. GitHub, Supabase and
+Notion now offer named resource choices after browser OAuth; TikTok selects
+its authorized account. Figma uses sign-in followed by a file link. Tokens/IDs
+are removed from the normal pre-login flow, with token setup available only
+under an explicit advanced option. No broader provider scopes or SQL changes.
+
+398 website/service tests and 56 focused desktop checks passed. Connector
+service branch contains the selection API and private temporary-token handling.
+Real post-consent discovery/selection remains a live acceptance gate; these
+checks do not certify all provider registrations for public customers.
+Owner required now: quit Aedrova (⌘Q) and reopen the rebuilt preview at
+`/Users/ayanshvarma/Documents/Aedrova/dist/Aedrova.app` to use the new flow.
+Stripe, Instagram, Vercel and Search still need outstanding provider support /
+setup before login-only connections can be offered. M14 remains deferred;
+request owner approval before the next feature milestone.

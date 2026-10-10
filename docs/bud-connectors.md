@@ -83,3 +83,29 @@ for read-only connector testing.
 Marketing image/video generation remains planned after connector acceptance.
 Publishing will require separate scopes and approval. M14, always-on hosting,
 Apple signing/notarization and public DMG/Windows release remain deferred.
+
+## Sign-in-first connector experience — October 10
+
+Supported account connections no longer ask customers for IDs or credentials
+before sign-in. GitHub, Supabase and Notion show named choices after OAuth;
+TikTok uses the authorized account directly. Figma uses browser sign-in followed
+by a file link because its current file-content permission does not list all files.
+Token entry remains an explicitly opened advanced option, never the default.
+A disconnected Bud draft uses pending metadata until authorization; this does
+not grant access. Only verified resource reads create a connected grant.
+
+Picker discovery reads names and IDs only from the consented account. Choices
+are bounded: first 100 Supabase projects / Notion pages, or repositories from
+first 10 GitHub installations (100 each). Figma verifies its selected file.
+Intermediate tokens stay encrypted on the connector service for the existing
+10-minute authorization window and are removed when selection completes/fails.
+No new OAuth scopes, SQL migration, developer app or customer-entered code is
+required for this improvement. No provider publishing/review gates are bypassed.
+
+Owner required now: quit the desktop preview (⌘Q), reopen
+`/Users/ayanshvarma/Documents/Aedrova/dist/Aedrova.app`, open a Bud's Connectors,
+choose the service and click Connect account. Authorize only intended resources.
+Fresh live consent and selected-resource reads remain acceptance checks; local
+HTTP tests do not substitute for those. Instagram, Stripe, Vercel and Search
+still need their outstanding provider support/setup before they can offer the
+same account-login experience. M14 and public Beta remain deferred.
