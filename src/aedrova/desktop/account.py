@@ -987,6 +987,13 @@ class AccountDialog(AppDialog):
         self.setup_email.clear()
 
     def sign_out(self):
+        if self.busy:
+            if not getattr(self, "logout_pending", False):
+                self.logout_pending = True
+                self.operation_finished.connect(self.finish_pending_logout)
+            return
+        service = self.service
+        self.service = None
         self.awaiting_sign_in_snapshot = False
         self.session_closed.emit()
         self.clear_connected()
@@ -996,11 +1003,27 @@ class AccountDialog(AppDialog):
         self.pending_intent = None
 
         def completed(_):
-            self.service = None
             self.pages.setCurrentIndex(0)
             self.status.setText("Signed out. Your session has been removed from this app.")
+            if self.parent():
+                self.parent().update_profile_button()
 
-        self.run(self.service.sign_out, completed)
+        def revoke():
+            if service is None:
+                return
+            try:
+                service.sign_out()
+            except Exception:
+                # Local credentials are discarded even if Auth is unreachable.
+                # Remote sessions retain their normal expiry; do not claim revocation.
+                return
+
+        self.run(revoke, completed)
+
+    def finish_pending_logout(self):
+        self.operation_finished.disconnect(self.finish_pending_logout)
+        self.logout_pending = False
+        self.sign_out()
 
     def done(self, result):
         if self.busy:

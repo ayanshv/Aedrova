@@ -338,3 +338,20 @@ def test_managed_search_uses_topic_only_without_tokens_or_browser(gallery, monke
     assert sent[0][0] == "/api/buds/connections/search"
     assert set(sent[0][1]) == {"workspace", "dot", "topic", "hours"}
     assert sent[0][1]["topic"] == "launch research"
+
+
+def test_success_content_never_overlaps_when_height_is_constrained(gallery, qtbot):
+    dialog, _, _, providers = gallery
+    dialog.setMinimumSize(0, 0)
+    dialog.resize(900, 460)
+    dialog.show_confirmation(providers[0], "bud-1")
+    qtbot.wait(50)
+    bud = dialog.success_bud.geometry()
+    heading = dialog.success_heading.geometry()
+    copy = dialog.success_copy.geometry()
+    assert bud.bottom() < heading.top()
+    assert heading.bottom() < copy.top()
+    assert dialog.success_scroll.verticalScrollBar().maximum() > 0
+    dialog.resize(900, 800)
+    qtbot.wait(50)
+    dialog.grab().save("work/connector-confirmation-fixed.png")

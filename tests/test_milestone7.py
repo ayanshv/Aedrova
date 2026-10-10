@@ -203,3 +203,49 @@ def test_new_mention_respects_updated_project_binding(qtbot, tmp_path):
     save_binding(window, {"folder": str(tmp_path / "second")})
     open_build(window, "New task")
     assert window.build_dialog.repository.text() == str(tmp_path / "second")
+
+
+def test_logout_completes_locally_when_remote_auth_fails(qtbot, tmp_path):
+    window, source = setup(qtbot, tmp_path)
+    qtbot.waitUntil(lambda: not window.account_dialog.busy)
+
+    def offline():
+        raise OSError("offline")
+
+    source.sign_out = offline
+    window.log_out()
+    qtbot.waitUntil(lambda: not window.account_dialog.busy)
+    assert window.current_user() is None
+    assert not window.connected.active
+    assert not window.account_dialog.snapshot["workspaces"]
+    assert window.account_dialog.pages.currentIndex() == 0
+    assert "Signed out" in window.account_dialog.status.text()
+
+
+def test_logout_waits_for_current_request_once(qtbot, tmp_path):
+    window, source = setup(qtbot, tmp_path)
+    qtbot.waitUntil(lambda: not window.account_dialog.busy)
+    calls = []
+    source.sign_out = lambda: calls.append("revoked")
+    account = window.account_dialog
+    account.busy = True
+    window.log_out()
+    account.sign_out()
+    assert account.logout_pending and window.current_user() is not None
+    account.busy = False
+    account.operation_finished.emit()
+    qtbot.waitUntil(lambda: not account.busy)
+    assert calls == ["revoked"]
+    assert window.current_user() is None
+
+
+def test_automatic_planning_defaults_on_but_preserves_opt_out(qtbot, tmp_path):
+    window, source = setup(qtbot, tmp_path)
+    qtbot.waitUntil(lambda: not window.account_dialog.busy)
+    dialog = ProjectDialog(window)
+    qtbot.addWidget(dialog)
+    assert dialog.auto_plan.isChecked()
+    save_binding(window, {"background_build": False, "auto_plan": False})
+    opted_out = ProjectDialog(window)
+    qtbot.addWidget(opted_out)
+    assert not opted_out.auto_plan.isChecked()

@@ -1776,9 +1776,6 @@ class AedrovaWindow(QMainWindow):
         if not self.current_user():
             self.show_account()
             return
-        if account.busy:
-            self.notify("Finishing the current request. Try Log out again in a moment.")
-            return
         build = getattr(self, "build_dialog", None)
         drafts = self.composer.editor.toPlainText() or self.thread_composer.editor.toPlainText()
         if (build and build.pending) or drafts or any(self.store.drafts.values()):

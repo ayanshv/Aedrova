@@ -1292,3 +1292,25 @@ review, live token renewal/revocation and fresh customer grants remain blockers.
 Exact setup: ../Aedrova_site/docs/account-connector-setup.md. First owner action is
 Stripe passkey verification in the prepared login tab; never send credentials in
 chat. M14 and public billing/release gates remain deferred.
+
+### Immediate connector/UI fixes and final launch roadmap — October 10
+
+Connector service 60d532d deployed Live on Render (dep-db4v3pqd0e5s73djuas0).
+Readiness returned 200; Stripe/Instagram/Vercel callbacks without OAuth state were
+rejected with 403; unrelated /plans remained 404. Malformed unauthenticated Search
+POST was rejected with 422 before any grant. This is deployment smoke evidence,
+not provider/customer acceptance. Existing owner setup gates remain.
+
+Fixed native connector confirmation compression with a scroll-safe minimum-sized
+layout, separate Bud/check/text/button spacing and quieter embedded secondary
+action. Logout queues once behind a current request and discards local identity
+even if remote logout fails. New project/onboarding automatic planning defaults
+on; explicit saved opt-outs and original-folder/publishing approvals remain.
+
+Saved every owner release requirement in docs/final-beta-launch-plan.md with
+traceability and gates; source phase proposal in docs/release-plan-source.md.
+These phases are PLANNING ONLY. Pulse removal, billing launch, installer publication
+and broad feature/security work have NOT started. M14 remains deferred.
+First personal connector setup action remains Stripe passkey/Touch ID/2FA in the
+prepared tab; registration/review/key/live validation gates prevent claiming all
+connectors complete. No new SQL required. Ask approval before Phase 1.

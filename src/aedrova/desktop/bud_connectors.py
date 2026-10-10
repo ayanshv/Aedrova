@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
     QHBoxLayout,
+    QLayout,
     QLineEdit,
     QScrollArea,
     QSpinBox,
@@ -219,6 +220,14 @@ class ConnectorsDialog(AppDialog):
         main.addLayout(controls)
         self.bud.setVisible(embedded_owner is None)
         self.pages = QStackedWidget(self)
+        self.pages.currentChanged.connect(
+            lambda index: (
+                self.filter.setVisible(index == 0),
+                self.search.setVisible(index == 0),
+                self.bud.setVisible(index == 0 and embedded_owner is None),
+                refresh.setVisible(index != 2),
+            )
+        )
         main.addWidget(self.pages, 1)
         self.gallery = QScrollArea(self)
         self.gallery.setWidgetResizable(True)
@@ -302,6 +311,8 @@ class ConnectorsDialog(AppDialog):
         success = QWidget(self)
         success_layout = QVBoxLayout(success)
         success_layout.setContentsMargins(24, 24, 24, 24)
+        success_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
+        success_layout.setSpacing(12)
         success_layout.addStretch()
         self.success_bud = Character(parent=success, reduced_motion=window.reduced_motion)
         self.success_bud.setFixedSize(160, 160)
@@ -309,10 +320,13 @@ class ConnectorsDialog(AppDialog):
         success_layout.addSpacing(12)
         check = label("✓", "subheading")
         check.setAccessibleName("Connection verified")
+        check.setMinimumHeight(28)
         success_layout.addWidget(check, alignment=Qt.AlignmentFlag.AlignHCenter)
         success_layout.addSpacing(26)
         self.success_heading = label("", "heading")
+        self.success_heading.setMinimumHeight(40)
         self.success_copy = label("", "muted", wrap=True)
+        self.success_copy.setMinimumHeight(72)
         for item in (self.success_heading, self.success_copy):
             item.setAlignment(Qt.AlignmentFlag.AlignCenter)
             item.setTextFormat(Qt.TextFormat.PlainText)
@@ -321,7 +335,10 @@ class ConnectorsDialog(AppDialog):
         success_layout.addWidget(
             label("Verified access · Read-only", "muted"), alignment=Qt.AlignmentFlag.AlignHCenter
         )
-        back_connected = button("Connect another tool", role="primary")
+        back_connected = button(
+            "Connect another tool", role="outline" if embedded_owner else "primary"
+        )
+        back_connected.setMinimumSize(220, 44)
         back_connected.clicked.connect(lambda: self.pages.setCurrentIndex(0))
         success_layout.addSpacing(24)
         success_layout.addWidget(back_connected, alignment=Qt.AlignmentFlag.AlignHCenter)
@@ -330,7 +347,12 @@ class ConnectorsDialog(AppDialog):
             alignment=Qt.AlignmentFlag.AlignHCenter,
         )
         success_layout.addStretch()
-        self.pages.addWidget(success)
+        self.success_scroll = QScrollArea(self)
+        self.success_scroll.setWidgetResizable(True)
+        self.success_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.success_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.success_scroll.setWidget(success)
+        self.pages.addWidget(self.success_scroll)
         selection = QWidget(self)
         selection_layout = QVBoxLayout(selection)
         selection_layout.setContentsMargins(28, 28, 28, 28)

@@ -68,6 +68,8 @@ def test_full_sequence_timing_keyboard_and_dashboard_handoff(flow, qtbot, monkey
     monkeypatch.setattr(dialog.setup, "advance_profile", lambda: dialog.show_stage(6))
     for stage in range(4, LAST_STAGE):
         assert dialog.stage == stage
+        if stage == 7:
+            dialog.setup.automatic.setChecked(False)  # Intro-only journey has no project.
         dialog.activate()
     assert dialog.stage == LAST_STAGE
     dialog.bud_setup_completed = True  # Connected Bud walkthrough completed before handoff.
@@ -171,7 +173,7 @@ def test_explicit_configuration_saves_account_scoped_project_not_a_build(
     dialog.setup.provider.setCurrentIndex(1)
     dialog.activate()
     assert dialog.stage == 7
-    assert not dialog.setup.automatic.isChecked()
+    assert dialog.setup.automatic.isChecked()
     dialog.setup.automatic.setChecked(True)
     dialog.activate()
     dialog.setup.repository.setText("ayanshv/Aedrova")

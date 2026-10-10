@@ -237,7 +237,9 @@ class SetupPages(QScrollArea):
             )
         elif stage == 7:
             self.automatic = QCheckBox("Let my agent plan and execute automatically")
-            self.automatic.setChecked(self.draft.get("background_build", False))
+            self.automatic.setChecked(
+                self.draft.get("background_build", self.draft.get("auto_plan", True))
+            )
             self.column.addWidget(
                 SetupVisual(self.flow, "workflow", enabled=self.automatic.isChecked)
             )
