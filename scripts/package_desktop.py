@@ -113,6 +113,8 @@ asset_args.extend(
         f"{ROOT / 'src/aedrova/desktop/assets/onboarding'}:aedrova/desktop/assets/onboarding",
         "--add-data",
         f"{ROOT / 'src/aedrova/desktop/assets/buds'}:aedrova/desktop/assets/buds",
+        "--add-data",
+        f"{ROOT / 'src/aedrova/desktop/assets/connectors'}:aedrova/desktop/assets/connectors",
     ]
 )
 connection = Connection.from_environment() or Connection.from_bundle()

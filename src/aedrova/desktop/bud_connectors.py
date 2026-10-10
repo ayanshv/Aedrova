@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from aedrova.agents.managed import connector_origin
 from aedrova.desktop.ai_teammates import Character
+from aedrova.desktop.connector_icons import connector_pixmap
 from aedrova.desktop.controls import AppDialog, ChoiceBox
 from aedrova.desktop.dialogs import button, label
 from aedrova.desktop.dots import DotDialog
@@ -84,7 +85,8 @@ RESOURCE_HELP = {
     ),
     "instagram": "Use the Instagram user ID returned by your authorized professional account’s "
     "profile API. This is a numeric ID, not your @handle.",
-    "tiktok": "Use open_id from TikTok’s authorization token response for this account. "
+    "tiktok": "For browser sign-in, enter me to select the authorized TikTok account. "
+    "For a scoped token, use open_id from TikTok’s authorization token response. "
     "This is not your username.",
     "search": (
         "Enter the topic your Bud should research, such as competitor pricing. "
@@ -485,6 +487,10 @@ class ConnectorsDialog(AppDialog):
                 glyph.setObjectName("ConnectorGlyph")
                 glyph.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 glyph.setFixedSize(36, 36)
+                mark = connector_pixmap(provider["id"])
+                if not mark.isNull():
+                    glyph.setPixmap(mark)
+                glyph.setAccessibleName(provider["name"] + " app icon")
                 heading.addWidget(glyph)
                 heading.addWidget(label(provider["name"], "subheading"), 1)
                 column.addLayout(heading)

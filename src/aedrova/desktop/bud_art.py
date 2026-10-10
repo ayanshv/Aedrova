@@ -32,6 +32,8 @@ def appearance(config):
 
 @lru_cache(maxsize=48)
 def sprite(look, color=""):
+    if look == "research" and color.upper() in {"", "#4388F5", "#9CCCE6"}:
+        color = "#70C8B7"
     atlas = QImage(str(Path(__file__).parent / "assets/buds/reference-atlas.png"))
     if atlas.isNull():
         return QPixmap()
