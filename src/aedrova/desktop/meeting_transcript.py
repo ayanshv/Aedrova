@@ -119,6 +119,7 @@ class TranscriptReview(AppDialog):
         if self.busy or self.closed:
             return
         self.busy = True
+        self.set_loading(self.sources, True, "feed")
         self.enable_save()
         for control in (self.refresh, self.previous, self.next, self.meetings):
             control.setEnabled(False)
@@ -130,6 +131,7 @@ class TranscriptReview(AppDialog):
             if self.closed:
                 return
             self.busy = False
+            self.set_loading(self.sources, False)
             self.refresh.setEnabled(True)
             self.meetings.setEnabled(True)
             if 'error' in result:

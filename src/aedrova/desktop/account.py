@@ -192,6 +192,7 @@ class AccountDialog(AppDialog):
             return google_sign_in(self.service, self.oauth_cancel)
 
         self.run(operation, self.authenticated)
+        self.status.show()
         self.status.setText(
             "Continue with Google in your browser. We’ll bring your workspace here."
         )
@@ -712,7 +713,7 @@ class AccountDialog(AppDialog):
             return
         self.busy = True
         self.pages.setEnabled(False)
-        self.status.setText("Connecting securely…")
+        self.set_loading(self.pages, True)
         self.success = success
         self.job = AccountJob(operation)
         self.job.signals.finished.connect(self.finished_job)
@@ -725,6 +726,7 @@ class AccountDialog(AppDialog):
         self.cancel_login.hide()
         self.busy = False
         self.pages.setEnabled(True)
+        self.set_loading(self.pages, False)
         if ok:
             self.success(result)
         else:

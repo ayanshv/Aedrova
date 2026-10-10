@@ -81,13 +81,18 @@ class DotDialog(AppDialog):
             or str(self.window.current_user().id) != self.user
         ):
             return
+        # Authorization polling keeps the browser instructions visible.
+        loading = not bool(getattr(self, "oauth_state", None))
         self.pending = True
         self.update_controls()
-        self.status.setText("Connecting securely…")
+        if loading:
+            self.set_loading(self.pages, True, "gallery" if hasattr(self, "cards") else "form")
 
         def ready(value):
             if "error" in value:
                 self.pending = False
+                if loading:
+                    self.set_loading(self.pages, False)
                 self.status.setText(value["error"])
                 self.update_controls()
                 return
@@ -106,6 +111,8 @@ class DotDialog(AppDialog):
             def finished(result):
                 self.job = None
                 self.pending = False
+                if loading:
+                    self.set_loading(self.pages, False)
                 if (
                     not self.window.current_user()
                     or str(self.window.current_user().id) != self.user
@@ -135,6 +142,8 @@ class DotDialog(AppDialog):
         )
         if not accepted:
             self.pending = False
+            if loading:
+                self.set_loading(self.pages, False)
             self.status.setText("Reconnect the workspace before managing Buds.")
             self.update_controls()
 

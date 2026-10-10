@@ -54,6 +54,11 @@ class AppDialog(QDialog):
         if parent is not None:
             self.setFont(parent.font())
 
+    def set_loading(self, target, active, kind="form"):
+        from aedrova.desktop.loading import set_loading
+
+        set_loading(self, target, active, kind)
+
 
 class ChoiceBox(QComboBox):
     def __init__(self, parent=None):

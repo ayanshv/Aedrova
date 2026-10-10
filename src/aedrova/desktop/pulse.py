@@ -22,6 +22,7 @@ from aedrova.desktop.controls import AppDialog, ChoiceBox
 from aedrova.desktop.design_system import FlowActions
 from aedrova.desktop.dialogs import button, label
 from aedrova.desktop.dots import open_dots
+from aedrova.desktop.loading import set_loading
 from aedrova.desktop.projects import Job
 from aedrova.dots.client import client
 
@@ -299,6 +300,7 @@ class PulsePage(QWidget):
     def reset(self):
         self.generation += 1
         self.pending = False
+        set_loading(self, self.scroll.viewport(), False)
         self.job = None
         self.data = {}
         if self.detail:
@@ -362,7 +364,7 @@ class PulsePage(QWidget):
         self.pending = True
         self.generation += 1
         generation, period = self.generation, self.period.currentData()
-        self.status.setText("Refreshing this source…" if dot_id else "Checking authorized sources…")
+        set_loading(self, self.scroll.viewport(), True, "gallery")
         self.workspace_label.setText(self.window.workspace.name.upper())
 
         def fork():
@@ -382,6 +384,7 @@ class PulsePage(QWidget):
                 if self.detail:
                     self.detail.reject()
                 self.pending = False
+                set_loading(self, self.scroll.viewport(), False)
                 self.status.setText(value["error"])
                 return
             service = value["service"]
@@ -410,6 +413,7 @@ class PulsePage(QWidget):
                 if generation != self.generation or not self.valid():
                     return
                 self.pending, self.job = False, None
+                set_loading(self, self.scroll.viewport(), False)
                 if "error" in result:
                     # Never leave old privileged data visible after an access error.
                     self.data = {}
@@ -447,6 +451,7 @@ class PulsePage(QWidget):
         accepted = self.window.connected.enqueue("pulse-" + str(uuid4()), fork, ready)
         if not accepted:
             self.pending = False
+            set_loading(self, self.scroll.viewport(), False)
             self.status.setText("Reconnect your workspace to check Pulse.")
 
     def change_period(self):

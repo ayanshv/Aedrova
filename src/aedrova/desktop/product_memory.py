@@ -190,13 +190,14 @@ class ProductMemory(AppDialog):
         self.list.setEnabled(False)
         self.form.setEnabled(False)
         self.save.setEnabled(False)
-        self.status.setText("Checking access and current evidence…")
+        self.set_loading(self.master_detail, True, "feed")
 
         def completed(result):
             if not self.scoped():
                 self.reject()
                 return
             self.busy = False
+            self.set_loading(self.master_detail, False)
             self.list.setEnabled(True)
             self.form.setEnabled(True)
             self.save.setEnabled(True)
@@ -230,6 +231,7 @@ class ProductMemory(AppDialog):
 
         if not self.window.connected.enqueue(("memory", id(self), name), operation, completed):
             self.busy = False
+            self.set_loading(self.master_detail, False)
             self.list.setEnabled(True)
             self.form.setEnabled(True)
             self.save.setEnabled(True)

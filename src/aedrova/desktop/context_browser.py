@@ -93,7 +93,7 @@ class ContextBrowser(AppDialog):
         self.refresh_button.setEnabled(False)
         self.generation += 1
         generation = self.generation
-        self.status.setText("Checking access and reading current workspace sources…")
+        self.set_loading(self.results, True, "feed")
 
         def connect():
             return {"service": self.studio.account.service.fork_for_context()}
@@ -127,6 +127,7 @@ class ContextBrowser(AppDialog):
 
     def finish_error(self, message):
         self.busy = False
+        self.set_loading(self.results, False)
         self.refresh_button.setEnabled(True)
         self.status.setText(message)
 
@@ -152,6 +153,7 @@ class ContextBrowser(AppDialog):
             return
         self.channels = context.channel_ids
         self.busy = False
+        self.set_loading(self.results, False)
         self.refresh_button.setEnabled(True)
         self.search()
 
@@ -228,7 +230,7 @@ class ContextBrowser(AppDialog):
         self.busy = True
         self.selected()
         self.refresh_button.setEnabled(False)
-        self.status.setText("Saving decision…")
+        self.set_loading(self.results, True, "feed")
 
         def action():
             self.studio.account.service.set_context_decision(
@@ -240,6 +242,7 @@ class ContextBrowser(AppDialog):
             if self.closed:
                 return
             self.busy = False
+            self.set_loading(self.results, False)
             self.refresh_button.setEnabled(True)
             if "error" in result:
                 self.clear_index()

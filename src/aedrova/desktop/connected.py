@@ -174,6 +174,9 @@ class ConnectedDashboard(QObject):
             self.window._reset_notice()
 
     def stop_realtime(self):
+        from aedrova.desktop.loading import set_loading
+
+        set_loading(self, self.window.message_stack, False)
         if self.realtime:
             self.realtime.stop()
             self.realtime = None
@@ -259,6 +262,9 @@ class ConnectedDashboard(QObject):
         self.window.hide()
 
     def failed(self):
+        from aedrova.desktop.loading import set_loading
+
+        set_loading(self, self.window.message_stack, False)
         if not self.active:
             return
         build = getattr(self.window, "build_dialog", None)
@@ -364,6 +370,10 @@ class ConnectedDashboard(QObject):
         w, service = self.window, self.account.service
         workspace_id, channel_id, parent = w.workspace_id, w.channel_id, w.thread_id or None
         cached = dict(self.cache.get(channel_id, {}))
+        from aedrova.desktop.loading import set_loading
+
+        if channel_id and channel_id not in self.cache:
+            set_loading(self, w.message_stack, True, "feed")
         reload_metadata = self.last_view is None
 
         def operation():
@@ -404,6 +414,7 @@ class ConnectedDashboard(QObject):
             return snapshot, incoming, files, credentials, interactions
 
         def loaded(result):
+            set_loading(self, w.message_stack, False)
             if not self.active:
                 return
             snapshot, incoming, files, credentials, interactions = result
