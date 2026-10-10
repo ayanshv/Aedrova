@@ -146,3 +146,25 @@ Staging backend credential handoff completed by owner; actual restricted databas
 login verified, public workspace read denied. Server environment validated locally.
 Next gate: free Render staging service with staging-only credentials, then separate
 Google OAuth setup and end-to-end isolation validation. Phase 1 remains in progress.
+
+## Staging HTTPS service — October 10
+
+Owner explicitly approved uploading staging-only database/encryption credentials to
+Render and deploying the free service. Created aedrova-beta-staging,
+service srv-db58sn8473hc73a9n3qg, deploy dep-db58sn8473hc73a9n580, commit e3da1d7.
+Render reports Deploy succeeded | Live. Origin:
+https://aedrova-beta-staging.onrender.com. Auto-deploy off; free $0/month compute.
+Fresh external GET / and /health/ready return 200 (readiness reports ready).
+/auth/google returns 303 to scvmvqlzcqhwrrsiahpj.supabase.co with redirect_to
+https://aedrova-beta-staging.onrender.com/auth/callback. /api/pulse remains 404.
+Credentials are stored only in Render environment and ignored restricted local files.
+Public staging desktop profile saved in work/staging/public-config.json; check-only
+validation passed. Production origin/database credentials were not used.
+
+Google provider is disabled in Aedrova Staging. Exact provider callback verified:
+https://scvmvqlzcqhwrrsiahpj.supabase.co/auth/v1/callback.
+Next owner requirement: create a separate Google Cloud project named Aedrova Staging
+(Google Cloud project selector > New project > name > Create); do not enable billing.
+Then configure a testing consent screen/client, test users and staging redirect URLs.
+This blocks staging end-to-end login; Phase 1 remains in progress.
+No Phase 2/M14/public billing/download activation. Windows fcntl remains a release gate.
