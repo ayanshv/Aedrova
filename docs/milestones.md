@@ -1314,3 +1314,10 @@ and broad feature/security work have NOT started. M14 remains deferred.
 First personal connector setup action remains Stripe passkey/Touch ID/2FA in the
 prepared tab; registration/review/key/live validation gates prevent claiming all
 connectors complete. No new SQL required. Ask approval before Phase 1.
+
+Immediate-fix validation: 90 focused native tests passed; the final confirmation
+subset passed all 25 checks after the visual refinement. Ruff and diff checks
+passed. Rebuilt dist/Aedrova.app and verified its deep code signature. UI proof:
+work/connector-confirmation-fixed.png. Source fixes/roadmap pushed as 2ae2c8f;
+connector deployment evidence pushed as 8a77e33 on the website branch. The currently
+running application must be quit/reopened to load these changes; no forced restart.
