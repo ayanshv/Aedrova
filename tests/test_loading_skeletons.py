@@ -2,12 +2,11 @@
 
 from threading import Event
 
-from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 from test_account import dialog
 
 from aedrova.desktop.loading import set_loading
-from aedrova.desktop.theme import DARK, LIGHT, palette
+from aedrova.desktop.theme import DARK, LIGHT, palette, stylesheet
 
 
 def test_loading_success_and_failure_restore_content(qtbot, tmp_path):
@@ -49,13 +48,15 @@ def test_skeleton_theme_reduced_motion_and_close(qtbot):
     owner.resize(640, 520)
     owner.show()
     for theme in (LIGHT, DARK):
+        owner.theme = theme
         owner.setPalette(palette(theme))
+        owner.setStyleSheet(stylesheet(theme))
         set_loading(owner, target, True, "gallery")
         skeleton = owner._loading_skeleton
         assert skeleton.isVisible()
         assert not skeleton.timer.isActive()
-        assert skeleton.palette().color(QPalette.ColorRole.Base).name() == theme.bg.lower()
         frame = skeleton.grab().toImage()
+        assert frame.pixelColor(1, 1).name() == theme.bg.lower()
         assert frame.pixelColor(30, 35) != frame.pixelColor(1, 1)
         set_loading(owner, target, False)
     owner.reduced_motion = False

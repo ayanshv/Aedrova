@@ -46,10 +46,22 @@ class Skeleton(QWidget):
     def paintEvent(self, event):  # noqa: N802
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.fillRect(self.rect(), self.palette().color(QPalette.ColorRole.Base))
+        # Stylesheet-polished intermediate containers can inherit the platform's
+        # default Base color. Resolve the window palette, which owns the theme.
+        colors = self.window().palette()
+        parent = self.parentWidget()
+        while parent is not None:
+            theme = getattr(parent, "theme", None)
+            if theme is not None:
+                from aedrova.desktop.theme import palette
+
+                colors = palette(theme)
+                break
+            parent = parent.parentWidget()
+        painter.fillRect(self.rect(), colors.color(QPalette.ColorRole.Base))
         painter.setPen(Qt.PenStyle.NoPen)
-        base = self.palette().color(QPalette.ColorRole.AlternateBase)
-        highlight = self.palette().color(QPalette.ColorRole.Midlight)
+        base = colors.color(QPalette.ColorRole.AlternateBase)
+        highlight = colors.color(QPalette.ColorRole.Midlight)
         highlight.setAlpha(75)
         brush = base
         if not self.reduced_motion():
