@@ -206,7 +206,6 @@ class ConnectedDashboard(QObject):
         QTimer.singleShot(0, self.refresh)
 
     def account_changed(self):
-        self.window.pulse_page.reset()
         if self.active:
             self.cache.clear()
             self.files.clear()
@@ -214,7 +213,6 @@ class ConnectedDashboard(QObject):
             self.apply(self.account.snapshot, [], self.window.workspace_id, self.window.channel_id)
 
     def disconnect(self):
-        self.window.pulse_page.reset()
         teammate_dialog = getattr(self.window, "teammates_dialog", None)
         if teammate_dialog and not teammate_dialog.closed:
             teammate_dialog.reject()
@@ -575,7 +573,6 @@ class ConnectedDashboard(QObject):
                     item.setText(item.text() + f"  ({count})")
                 item.setToolTip(f"{count} unread messages")
         w._load_channel()
-        w.pulse_page.sync_access()
         if old_workspace != w.workspace_id or not getattr(self, "pages_ready", False):
             w._render_pages()
             self.pages_ready = True

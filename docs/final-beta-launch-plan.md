@@ -1,11 +1,10 @@
 # Final Beta and public launch plan
 
-Status: PLANNED ONLY — October 10, 2026. No phase below is authorized for execution
-by the request to document this plan. M14 remains deferred until product completion.
-The immediate approved work is connector deployment verification, the connector
-confirmation layout, reliable logout, and default automatic planning. The waitlist,
-prices, checkout availability, Pulse and installer distribution are unchanged here.
-The owner-supplied phase proposal is preserved in release-plan-source.md.
+Status: Phase 1 authorized and in progress — October 10, 2026. Later phases
+remain planned and require separate approval. M14 remains deferred until product
+completion. Current evidence, frozen scope and exact staging handoffs are saved in
+[Phase 1 baseline](final-beta-phase-1.md). Waitlist and public billing/download gates
+remain unchanged. The owner-supplied proposal is preserved in release-plan-source.md.
 
 ## Phase 1 — Establish the release baseline
 

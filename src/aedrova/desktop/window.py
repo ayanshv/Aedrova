@@ -193,11 +193,6 @@ class AedrovaWindow(QMainWindow):
         self.invite_teammates_button = button("Invite teammates…", "Invite teammates")
         self.invite_teammates_button.clicked.connect(lambda: self.show_account("invite"))
         side.addWidget(self.invite_teammates_button)
-        self.pulse_button = button("Pulse", "Open startup command center", "tab")
-        self.pulse_button.setCheckable(True)
-        self.pulse_button.setToolTip("Your startup’s connected context and recent changes")
-        self.pulse_button.clicked.connect(self.open_pulse)
-        side.addWidget(self.pulse_button)
         from aedrova.desktop.dots import DotSection
 
         self.ai_team_section = DotSection(self)
@@ -327,10 +322,6 @@ class AedrovaWindow(QMainWindow):
         self._build_chat()
         for _ in range(3):
             self.pages.addWidget(QWidget())
-        from aedrova.desktop.pulse import PulsePage
-
-        self.pulse_page = PulsePage(self)
-        self.pages.addWidget(self.pulse_page)
         self.select_tab(0)
         self.notice = label(
             "Local preview · messages and new spaces reset when the app closes.", "muted"
@@ -485,8 +476,6 @@ class AedrovaWindow(QMainWindow):
         jump = view.addAction("Jump to conversation…", self.open_switcher)
         jump.setShortcut(QKeySequence("Ctrl+K"))
         view.addAction("Toggle sidebar", self.toggle_sidebar)
-        pulse_action = view.addAction("Startup Pulse", self.open_pulse)
-        pulse_action.setShortcut(QKeySequence("Ctrl+5"))
         appearance = view.addMenu("Appearance")
         group = QActionGroup(self)
         self.appearance_actions = {}
@@ -1113,7 +1102,6 @@ class AedrovaWindow(QMainWindow):
         if not 0 <= index < len(self.tab_buttons):
             return
         self.pages.setCurrentIndex(index)
-        self.pulse_button.setChecked(False)
         self.header.show()
         self.primary_navigation.show()
         if hasattr(self, "space_symbol"):
@@ -1122,14 +1110,6 @@ class AedrovaWindow(QMainWindow):
             tab.setChecked(i == index)
         if index == 0 and hasattr(self, "thread_panel"):
             self._adapt_thread()
-
-    def open_pulse(self):
-        self.pages.setCurrentWidget(self.pulse_page)
-        self.header.hide()
-        self.primary_navigation.hide()
-        self.pulse_button.setChecked(True)
-        for tab in self.tab_buttons:
-            tab.setChecked(False)
 
     def toggle_sidebar(self):
         self.sidebar.setVisible(not self.sidebar.isVisible())
@@ -1150,8 +1130,6 @@ class AedrovaWindow(QMainWindow):
             dialog.setPalette(palette(self.theme))
         self.setStyleSheet(stylesheet(self.theme, reduced_transparency=self.reduced_transparency))
         self.build_activity.configure(self.theme, self.reduced_motion, self.build_activity.active)
-        if hasattr(self, "pulse_page"):
-            self.pulse_page.apply_theme()
         self.messages.set_theme(self.theme)
         self.thread_messages.set_theme(self.theme)
         self._apply_materials()

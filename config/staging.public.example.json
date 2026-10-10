@@ -1,0 +1,7 @@
+{
+  "environment": "staging",
+  "supabase_url": "https://YOUR-STAGING-PROJECT.supabase.co",
+  "supabase_publishable_key": "sb_publishable_REPLACE_WITH_STAGING_PUBLIC_KEY",
+  "managed_origin": "https://YOUR-STAGING-SERVICE",
+  "connector_origin": "https://YOUR-STAGING-CONNECTOR-SERVICE"
+}

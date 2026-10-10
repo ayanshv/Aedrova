@@ -1335,3 +1335,20 @@ Aedrova developer verification, external testing, server credentials and public 
 review remain gates; a verified customer account cannot bypass them. This preparation
 does not activate billing or public installation. Final-Beta Phase 1 is next and still
 requires explicit owner approval. No Final-Beta phase was started in this task.
+
+## Final-Beta Phase 1 — October 10 (authorized, in progress)
+
+Owner approved Phase 1 and created Aedrova Staging (scvmvqlzcqhwrrsiahpj).
+Hosted dashboard verified healthy and initially unmigrated; production/waitlist data
+not copied or changed. Frozen inventory and all setup/acceptance gates saved in
+`docs/final-beta-phase-1.md`. Pulse removed from app navigation/menu/module and service
+routes; meeting heartbeats and stored data preserved. Native release CI added across
+Linux/macOS/Windows plus real PostgreSQL migration/RLS tests. Service CI expanded to
+tracked-secret, private-schema, regression and image readiness checks. Explicit staging
+profiles/server guards reject known production targets and live billing/release flags.
+Both GitHub repositories have secret/push protection enabled, 0 collaborators and no
+branch protection/rulesets. Vendor node_modules removed from Git tracking, kept locally.
+Next owner action: run work/staging/schema.sql ONLY in the new staging SQL Editor.
+Private role credentials, HTTPS staging server and Google staging auth remain subsequent
+setup gates. Source/local test results do not certify all connectors or launch readiness.
+Phase 2/public billing/downloads/M14 not started. No staging payment/upgrade requested.
