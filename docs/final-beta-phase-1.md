@@ -47,7 +47,7 @@ No real connector is called complete based on mocked HTTP tests.
 | Environment | Database/data | App/service configuration |
 | --- | --- | --- |
 | Development | Disposable test SQLite/PGlite; fixtures only | Source/local HTTP; no implicit production acceptance |
-| Staging | Owner-created `scvmvqlzcqhwrrsiahpj` (Aedrova Staging, healthy, Canada Central, free/NANO); dashboard currently has no migrations | Explicit public profile + separate `work/staging/app.ini`; separate HTTPS server/OAuth/provider credentials still needed |
+| Staging | Owner-created `scvmvqlzcqhwrrsiahpj` (Aedrova Staging, healthy, Canada Central, free/NANO); 23 app migrations now installed; tables verified in the hosted Table Editor | Explicit public profile + separate `work/staging/app.ini`; separate HTTPS server/OAuth/provider credentials still needed |
 | Production | Existing `cpelagtufyocepnqcqqd`; customer/waitlist data not copied or migrated | Existing aedrova.com and connector origin; checkout/download gates unchanged |
 
 `scripts/run_staging.py` rejects known production endpoints and secret keys in
@@ -115,3 +115,29 @@ must not be inferred from source checks. No server deploy was performed in this 
 Phase 1 cannot pass until real staging setup/isolation and remote CI are verified.
 Phase 2 needs a new owner approval after this phase's report. No payment or upgrade
 is currently required by this setup handoff.
+
+## Pushed revisions and remote CI — October 10
+
+Desktop baseline pushed as a7efded on milestone-3-identity; service baseline a2b1423
+on codex/bud-connectors-https. These are branch pushes, not default-branch merges or
+production deployments. Service CI run 38078223509 passed all steps, including image
+startup and private PostgreSQL checks. Desktop run 38078225013 PostgreSQL job passed;
+Windows failed test collection because ledger.py and retention.py import Unix-only
+fcntl. Keep the Windows job failing visibly; do not skip it or certify an installer.
+This existing portability defect is a release blocker for Phase 8; macOS/Linux job
+results are pending at this entry. No Windows runtime port performed in Phase 1.
+Local macOS preview rebuilt, deep/strict signature and bundled-secret scan passed;
+packaged offscreen smoke confirms four navigation pages and screenshot success.
+Quit/reopen the app to load the new preview. This is not a notarized public DMG.
+Owner reported staging SQL Success; hosted Table Editor confirms chat, meeting
+transcript, product-memory and AI-teammate tables now exist. Separate private backend role/server/Google auth setup still pending.
+
+Owner reported restricted private role/schema SQL Success. Next private handoff:
+work/staging/enable-backend-role.private.sql (ignored, mode 0600) enables only the
+staging restricted role with a unique generated password. Matching password and
+separate encryption key stored in ignored mode-0600 work/staging/secrets.json.
+Owner must personally run credential-changing SQL; no password appears in chat/Git.
+No role password has been submitted by the agent. Staging service is not configured.
+Linux CI finished with 724 passing tests and one failure: provider mismatch validation
+ran after looking up an installed Codex executable. Fixed the ordering and tightened
+the test to forbid runtime lookup. Focused managed tests: 16 passed. Rerun pending.

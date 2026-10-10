@@ -93,7 +93,12 @@ print(json.dumps({'type':'turn.completed'}),flush=True)
     assert runner.run("codex", tmp_path, "request", plan=True) == "Done"
 
 
-def test_provider_mismatch_stops_before_spawn(tmp_path):
+def test_provider_mismatch_stops_before_spawn(tmp_path, monkeypatch):
+    import aedrova.agents.runtime as runtime
+
+    monkeypatch.setattr(
+        runtime, "executable", lambda _: pytest.fail("No runtime lookup for a wrong provider")
+    )
     runner = LocalRunner(lambda _: None)
     runner.managed = BuildAccess(
         "run",

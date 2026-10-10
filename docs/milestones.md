@@ -1352,3 +1352,14 @@ Next owner action: run work/staging/schema.sql ONLY in the new staging SQL Edito
 Private role credentials, HTTPS staging server and Google staging auth remain subsequent
 setup gates. Source/local test results do not certify all connectors or launch readiness.
 Phase 2/public billing/downloads/M14 not started. No staging payment/upgrade requested.
+
+Phase 1 execution evidence: desktop a7efded and service a2b1423 pushed to their
+existing feature branches. Local 725 native/409 service tests passed; both SQL suites
+passed. Service GitHub CI 38078223509 passed all steps. Native CI PostgreSQL passed;
+Windows test collection exposed existing Unix-only fcntl imports in ledger/retention.
+Windows remains an explicit release blocker, not skipped or certified. Local macOS
+preview rebuilt, signature/resource scan passed, packaged smoke confirms four pages.
+Owner ran the 23-migration staging bundle successfully; hosted Table Editor verified
+new app tables. Next required owner step: run the service sql/supabase-website.sql
+in Aedrova Staging to create the restricted NOLOGIN role/private backend schema.
+Private password, service origin and Google staging OAuth remain subsequent steps.

@@ -284,6 +284,8 @@ class LocalRunner:
         return self._codex(project, prompt, plan=plan)
 
     def _codex(self, project, prompt, *, plan, managed_home=None):
+        if self.managed and self.managed.provider != "codex":
+            raise ValueError("Managed provider does not match this build.")
         command = [
             str(Path(executable("codex")).resolve()),
             "exec",
@@ -314,8 +316,6 @@ class LocalRunner:
         provider_env = environment()
         if self.managed:
             access = self.managed
-            if access.provider != "codex":
-                raise ValueError("Managed provider does not match this build.")
             overrides = {
                 "model_provider": "aedrova_managed",
                 "model": access.model,
