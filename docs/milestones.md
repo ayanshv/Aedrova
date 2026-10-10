@@ -1272,3 +1272,23 @@ Owner required now: quit Aedrova (⌘Q) and reopen the rebuilt preview at
 Stripe, Instagram, Vercel and Search still need outstanding provider support /
 setup before login-only connections can be offered. M14 remains deferred;
 request owner approval before the next feature milestone.
+
+### All-provider sign-in workflow — October 10
+
+Owner requested completing the login-first experience for every existing connector.
+Added Stripe Apps OAuth and Instagram Login with automatic account binding, plus
+Vercel integration OAuth with a named project picker and team-scoped reads. Existing
+five OAuth connectors remain intact. Search uses an authenticated Enable web search
+flow, an owner-funded server key and durable global/workspace daily caps; there is
+no fabricated Search OAuth. Personal token paths remain an advanced fallback.
+Confidential exchanges, grant lifetimes, read verification and inline confirmations
+are preserved. Managed grants store no shared key. No new SQL migration.
+
+Local validation: 411 service tests; 57 focused native tests; rebuilt desktop and
+verified its deep code signature. Live account acceptance is NOT complete: Stripe
+stops at owner passkey/2FA, Meta requires developer registration, Vercel requires
+new app registration/terms, and Brave Search requires a funded key. Registration,
+review, live token renewal/revocation and fresh customer grants remain blockers.
+Exact setup: ../Aedrova_site/docs/account-connector-setup.md. First owner action is
+Stripe passkey verification in the prepared login tab; never send credentials in
+chat. M14 and public billing/release gates remain deferred.

@@ -378,7 +378,13 @@ class ConnectorsDialog(AppDialog):
         self.oauth.setEnabled(
             can_connect
             and not busy
-            and bool(self.selected_provider and self.selected_provider.get("oauth_available"))
+            and bool(
+                self.selected_provider
+                and (
+                    self.selected_provider.get("oauth_available")
+                    or self.selected_provider.get("managed_available")
+                )
+            )
         )
         self.resource.setEnabled(not busy)
         self.credential.setEnabled(not busy)
@@ -646,16 +652,23 @@ class ConnectorsDialog(AppDialog):
             control.setVisible(visible)
 
     def auth_details(self, provider):
+        managed = bool(provider.get("managed_available"))
+        self.oauth.setText("Enable web search" if managed else "Connect account")
         self.detail_copy.setText(
-            provider["permissions"]
+            "Search the web through Aedrova. No extra account or API key is needed. "
+            "Daily usage limits apply."
+            if managed
+            else provider["permissions"]
             if provider.get("oauth_available")
             else "Account sign-in is not available for this service yet. "
             "Advanced token setup is optional below."
         )
-        self.oauth.setVisible(bool(provider.get("oauth_supported")))
-        self.oauth_hint.setVisible(bool(provider.get("oauth_supported")))
+        self.oauth.setVisible(bool(provider.get("oauth_supported") or managed))
+        self.oauth_hint.setVisible(bool(provider.get("oauth_supported") or managed))
         self.oauth_hint.setText(
-            "Sign in and approve read-only access. Finish here without copying codes or IDs."
+            "Choose a research topic for your Bud. No codes or keys to copy."
+            if managed
+            else "Sign in and approve read-only access. Finish here without copying codes or IDs."
             if provider.get("oauth_available")
             else provider.get("oauth_setup_hint")
             or "Account sign-in needs Aedrova’s provider app setup. A scoped token works below."
@@ -690,7 +703,9 @@ class ConnectorsDialog(AppDialog):
     def connect_oauth(self):
         provider = self.selected_provider
         resource = "me" if provider and provider["id"] == "tiktok" else ""
-        if not provider or not provider.get("oauth_available"):
+        if not provider or not (
+            provider.get("oauth_available") or provider.get("managed_available")
+        ):
             self.status.setText("Provider account sign-in needs owner setup first.")
             return
         if self.embedded_owner and self.embedded_owner.has_changes():
@@ -717,6 +732,18 @@ class ConnectorsDialog(AppDialog):
         if not self.bud.currentData():
             self.status.setText("Choose a Bud first.")
             return
+        if provider.get("managed_available"):
+            self.pages.setCurrentIndex(3)
+            self.resource_picker.setVisible(False)
+            self.selection_link.setVisible(True)
+            self.selection_link.setPlaceholderText("What should your Bud research?")
+            self.selection_copy.setText(
+                "Choose a research topic. Aedrova handles the connection; daily usage limits apply."
+            )
+            self.selection_submit.setText("Enable web search")
+            return
+        self.selection_submit.setText("Connect selected resource")
+        self.selection_link.setPlaceholderText("Paste a Figma file link")
         self.stop_oauth()
         body = {
             "workspace": self.workspace,
@@ -795,6 +822,25 @@ class ConnectorsDialog(AppDialog):
         )
 
     def select_oauth_resource(self):
+        if self.selected_provider and self.selected_provider.get("managed_available"):
+            topic = self.selection_link.text().strip()
+            if not 3 <= len(topic) <= 200:
+                self.status.setText("Enter a research topic of 3–200 characters.")
+                return
+            body = {
+                "workspace": self.workspace,
+                "dot": self.bud.currentData(),
+                "topic": topic,
+                "hours": self.hours.value(),
+            }
+            provider, bud_id = dict(self.selected_provider), self.bud.currentData()
+            self.run(
+                lambda service: client(service).request("/api/buds/connections/search", body),
+                lambda _value: self.refresh(
+                    on_loaded=lambda: self.show_confirmation(provider, bud_id)
+                ),
+            )
+            return
         if not self.oauth_state or not self.selected_provider:
             return
         if time.monotonic() >= self.oauth_deadline:

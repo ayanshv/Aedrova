@@ -306,3 +306,35 @@ def test_authorized_account_picker_connects_only_selected_resource(gallery, monk
     dialog.select_oauth_resource()
     assert calls[-1][1] == {"state": "a" * 43, "resource": "team/app"}
     assert not dialog.oauth_state and confirmed
+
+
+def test_managed_search_uses_topic_only_without_tokens_or_browser(gallery, monkeypatch):
+    dialog, _, rows, providers = gallery
+    provider = next(p for p in providers if p["id"] == "search")
+    provider.update(managed_available=True, oauth_supported=False, oauth_available=False)
+    dialog.open_provider(provider)
+    assert dialog.oauth.isVisible() and dialog.oauth.isEnabled()
+    assert dialog.oauth.text() == "Enable web search"
+    assert not dialog.credential.isVisible()
+    monkeypatch.setattr(
+        "aedrova.desktop.bud_connectors.QDesktopServices.openUrl",
+        lambda *_: pytest.fail("Managed search must not open external login"),
+    )
+    dialog.connect_oauth()
+    assert dialog.pages.currentIndex() == 3
+    assert not dialog.resource_picker.isVisible()
+    assert dialog.selection_link.isVisible()
+    sent = []
+
+    class API:
+        def request(self, path, body):
+            sent.append((path, body))
+            return {"connected": True}
+
+    monkeypatch.setattr("aedrova.desktop.bud_connectors.client", lambda *_: API())
+    monkeypatch.setattr(dialog, "refresh", lambda **kwargs: None)
+    dialog.selection_link.setText("launch research")
+    dialog.select_oauth_resource()
+    assert sent[0][0] == "/api/buds/connections/search"
+    assert set(sent[0][1]) == {"workspace", "dot", "topic", "hours"}
+    assert sent[0][1]["topic"] == "launch research"
