@@ -13,6 +13,12 @@ LABELS = ("Builder", "Designer", "Marketing", "Finance", "Research", "Product")
 BASE_COLORS = ("#9BC8ED", "#BAA1EA", "#F4CD68", "#BAD28B", "#9CCCE6", "#F3B59E")
 
 
+def original_color(config):
+    """The visible original body color, including Research's distinct mint tint."""
+    look = appearance(config)
+    return "#70C8B7" if look == "research" else BASE_COLORS[LOOKS.index(look)]
+
+
 def appearance(config):
     chosen = config.get("appearance", "auto")
     if chosen in LOOKS:

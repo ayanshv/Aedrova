@@ -6,6 +6,7 @@ from uuid import uuid4
 from PySide6.QtCore import Qt, QThreadPool, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
 
+from aedrova.desktop.bud_art import original_color
 from aedrova.desktop.controls import AppDialog
 from aedrova.desktop.projects import Job
 from aedrova.desktop.teammate_habitat import TeamSection
@@ -440,9 +441,10 @@ class DotDialog(AppDialog):
             tile.setEnabled(self.admin())
         for tile, value in self.swatch_buttons:
             selected = self.color.currentData() == value
+            display_color = original_color(self.character.config) if value == "#4388F5" else value
             tile.setStyleSheet(
                 "QPushButton {background:"
-                + value
+                + display_color
                 + ";border-radius:14px;border:"
                 + ("3px solid #FFFFFF" if selected else "2px solid transparent")
                 + ";}"

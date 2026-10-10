@@ -217,11 +217,18 @@ def test_back_navigation_preserves_configuration_and_reduced_motion(editor):
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
-def test_color_controls_render_after_transition_and_change_preview(editor, qtbot, theme):
+@pytest.mark.parametrize(
+    "look", ["builder", "designer", "marketing", "finance", "research", "product"]
+)
+def test_color_controls_render_after_transition_and_change_preview(editor, qtbot, theme, look):
     from PySide6.QtGui import QColor
+
+    from aedrova.desktop.bud_art import original_color
+    from aedrova.desktop.bud_setup import choose_look
 
     dialog, _, _, window = editor
     window.set_theme(theme)
+    choose_look(dialog, look)
     dialog.show_step(1)
     dialog.show_step(2)
     qtbot.wait(220)
@@ -232,7 +239,7 @@ def test_color_controls_render_after_transition_and_change_preview(editor, qtbot
         # Render the real widget; an empty control fails even when its hit area exists.
         drawn = tile.grab().toImage()
         sample = drawn.pixelColor(drawn.width() // 2, drawn.height() // 2)
-        expected = QColor(value)
+        expected = QColor(original_color(dialog.character.config) if value == "#4388F5" else value)
         assert abs(sample.red() - expected.red()) < 15
         assert abs(sample.green() - expected.green()) < 15
         assert abs(sample.blue() - expected.blue()) < 15
