@@ -1625,3 +1625,39 @@ blocked client-selected premium inference modes outside metering. Service430 tes
 pass locally. Stripe external testing remains business-verification blocked. Open
 owner form: Settings→Business→Business details→Edit. First step is completing
 industry, website and product description privately. Full evidence in Phase2 doc.
+
+### Stripe business information saved — service agreement handoff
+
+Owner reported saved; dashboard independently confirms business website
+https://aedrova.com, public name Aedrova, and industry/product description provided.
+Business information no longer shows Incomplete. Opened Service agreement → Review
+without submitting. Next owner requirement: review the Stripe Services Agreement
+and Acquirer Disclosure in the open Terms of service modal; click Continue personally
+only if authorized and in agreement. The modal also includes consent to Stripe text
+messages and a representation that business information is complete/correct. No
+agreement accepted by the agent. Representative/public details/descriptor still
+incomplete; full verification and Stripe external testing remain blocked. Phase2
+is active; no later phase or live billing enabled.
+
+### Stripe agreement completed — public support details handoff
+
+Owner reports agreement done; independent dashboard observation shows Service
+agreement no longer listed as Incomplete. Opened Public details → Edit public
+details → Add customer support details without entering/submitting fields. Next
+owner requirement is to complete truthful support phone/address/email/URL and
+applicable published privacy/terms URLs, then Save personally. Business name and
+website already show Aedrova/https://aedrova.com. The form defaults to showing the
+support phone on receipts/invoices; owner must choose the appropriate public
+contact information. Representative and descriptor remain Incomplete. Full Stripe
+verification/external testing and Phase2 acceptance remain open; no billing enabled.
+
+### October 11 — public policies/support update authorized
+
+Owner authorized replacing website Privacy/Terms, adding Customer support with
+(408) 634-5254, pushing/merging the website update as needed, and entering/saving
+https://aedrova.com/privacy, /terms and /support in Stripe. Isolated website PR4
+uses codex/legal-support-refresh from main to avoid publishing unfinished connector
+changes. Local website suite392 passed. Documents describe conditional Beta features
+and actual privacy/connector limits; no legal-compliance guarantee or fabricated
+company identity/address. Paid-launch legal/business review remains a gate.
+Publication and Stripe Save verification will be recorded after checks complete.
