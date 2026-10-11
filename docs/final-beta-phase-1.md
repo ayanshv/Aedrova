@@ -184,3 +184,11 @@ Set app name Aedrova Staging, a support email available in dropdown, External au
 in Testing, contact aedrovaai@gmail.com. Owner must personally review/accept any policy
 agreement on creation. OAuth client/secret/allowlist and sign-in validation follow.
 Do not reuse amillum/production OAuth credentials. Phase 1 remains in progress.
+
+Owner reports staging Google consent-screen initialization completed. Next owner
+requirement in project aedrova-staging: Google Auth Platform > Clients > Create client,
+Web application, name Aedrova Staging Web, authorized redirect URI exactly
+https://scvmvqlzcqhwrrsiahpj.supabase.co/auth/v1/callback. Keep client secret/private
+JSON outside Git/chat; install directly into staging Supabase provider in a later step.
+OAuth client creation, test-user enrollment, Supabase provider/URL configuration and
+end-to-end login still pending; Phase 1 remains in progress.
