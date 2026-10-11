@@ -1371,7 +1371,7 @@ class AedrovaWindow(QMainWindow):
         hero_layout.setContentsMargins(30, 30, 30, 30)
         hero_layout.setSpacing(16)
         hero_layout.addWidget(label(f"{self.workspace.name.upper()}  /  SAMPLE PROJECT", "section"))
-        hero_layout.addWidget(label("Less setup.\nMore possibility.", "display"))
+        hero_layout.addWidget(label("Less setup.\nMore possibility.", "display", wrap=True))
         hero_layout.addWidget(
             label(
                 "A simpler first five minutes. Three thoughtful steps from an idea to a workspace.",
