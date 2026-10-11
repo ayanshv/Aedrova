@@ -41,7 +41,7 @@ is not proof of provider registration, public review or fresh-customer acceptanc
 | Vercel | Pair absent locally | Integration registration, authorized team/project discovery, scoped deployment reads, uninstall/reconnect |
 | Managed Search | Key absent locally | Owner funding/billing cap, service/workspace limits, key rotation, membership/reconnect; no customer OAuth fiction |
 | OpenAI | Fresh model metadata lookup passed | Staging run-token authorization, hard budget, bounded real request and reconciliation, interrupted/revoked runs |
-| Anthropic | Private setup implemented; key absent locally | Private key/model lookup, verified pricing, bounded real request/cache accounting and runtime acceptance |
+| Anthropic | Private 0600 key and claude-sonnet-5-5 model lookup verified | Bounded real request/cache accounting, staging gateway and runtime acceptance |
 
 Local credential presence was checked without printing any value. Hosted service
 configuration was not overwritten or inferred from those local files.
@@ -66,13 +66,38 @@ link because the implemented read scope has no account-wide file enumeration.
 
 ## Owner setup sequence
 
-First: install the Anthropic key privately using the companion website repository's
-scripts/setup_anthropic.py. This performs only a read-only model metadata lookup;
-no inference, billing activation, deployment or checkout is started. Missing
-credentials block Anthropic live acceptance, not the existing connector regression work.
+Anthropic private setup is complete and independently verified. Next owner step:
+in the open Stripe Business details form, complete the actual business industry,
+website and product description, then Save. No identity/financial information is
+entered by the agent. Remaining representative/service-agreement verification
+stays owner-only; Stripe external testing remains blocked until verification.
 
 Subsequent requirements remain in the website docs/account-connector-setup.md:
 Stripe business verification/external testing, Meta/Instagram registration/review,
 Vercel integration registration and managed Search funding. Walk through one owner
 requirement at a time. Do not paste secrets into chat. Do not mark Phase 2 complete
 until every offered connector/provider passes its actual acceptance gates.
+
+## Anthropic saved — verified follow-up
+
+Owner reported saved. Independent metadata lookup verified claude-sonnet-5-5, with
+a regular private file at0600; no inference. Initial Phase2 CI is green: native
+7ef060e/run38114515076 and website e21a16c/run38114515669.
+
+Rechecked official standard model prices. Sonnet5.5 cached input is now $0.10 per
+million; corrected both configuration files from the older $0.20 value. Base input
+$2, output$10 and cache writes$2.50/$4 unchanged. Added tests for actual configured
+cache accounting and rejecting unpriced premium speed/region requests before any
+reservation/upstream call. Latest service suite:430 passed; Ruff/secret checks pass.
+Sources: https://platform.claude.com/docs/en/about-claude/pricing and
+https://developers.openai.com/api/docs/models/gpt-5.3-codex .
+The OpenAI model page marks the current configured model deprecated; metadata access
+still passed. Provider lifecycle/migration review remains a release gate; no silent
+model switch or new model/pricing promises.
+
+Stripe current signed-in app page still explicitly blocks external testing with
+"Verify your business to get started with external testing." Navigated to Settings
+→ Business → Business details → Edit business details; owner form open, no submitted
+fields or account activation. First owner action is the industry, website and
+product description form. Further verification remains required. No new paid
+requests, secret upload, deployment, production merge or Phase3 activation.

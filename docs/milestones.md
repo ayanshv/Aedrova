@@ -1616,3 +1616,12 @@ passed. OpenAI metadata access verified without inference. Anthropic private set
 and explicit local opt-in implemented; its actual key/model/inference acceptance
 and fresh-customer connector lifecycle/provider registration gates remain open.
 Next owner requirement: private Anthropic setup. Later phases remain gated.
+
+### Phase2: Anthropic verified; Stripe owner form prepared
+
+Anthropic private setup/model access verified (metadata only, no inference). Initial
+Phase2 native and website CI green. Corrected Sonnet5.5 cache-read pricing and
+blocked client-selected premium inference modes outside metering. Service430 tests
+pass locally. Stripe external testing remains business-verification blocked. Open
+owner form: Settings→Business→Business details→Edit. First step is completing
+industry, website and product description privately. Full evidence in Phase2 doc.
