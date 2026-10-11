@@ -192,3 +192,11 @@ https://scvmvqlzcqhwrrsiahpj.supabase.co/auth/v1/callback. Keep client secret/pr
 JSON outside Git/chat; install directly into staging Supabase provider in a later step.
 OAuth client creation, test-user enrollment, Supabase provider/URL configuration and
 end-to-end login still pending; Phase 1 remains in progress.
+
+Owner reports Aedrova Staging Web OAuth client created and staging Supabase Google
+provider credentials saved. Secrets supplied directly by owner, not received in chat.
+Next requirement: in Google Cloud project aedrova-staging > Google Auth Platform >
+Audience > Test users > Add users, add the Google account used to test desktop login
+and Save. Keep publishing status Testing. A second independently controlled tester
+account will be needed for multi-user isolation acceptance. Redirect allowlist and
+end-to-end login remain subsequent gates; Phase 1 is not complete.
