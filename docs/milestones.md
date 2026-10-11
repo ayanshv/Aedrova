@@ -1397,3 +1397,13 @@ agent browser project selector (amillum account context) returns no Aedrova matc
 Requested public Google Project ID to select the correct project/account before OAuth
 configuration. Do not infer that creation failed or configure amillum as staging.
 Staging Render service is live; Google sign-in acceptance remains blocked.
+
+Owner supplied Google staging Project ID aedrova-staging, number 7280065225.
+Direct in-app browser project URL opens only a partially loaded Google welcome page;
+API navigation aborts, so project access/consent setup not yet independently verified.
+Next owner requirement: in the owner's working browser, select aedrova-staging >
+APIs & Services > OAuth consent screen (Google Auth Platform) > Get started.
+Set app name Aedrova Staging, a support email available in dropdown, External audience
+in Testing, contact aedrovaai@gmail.com. Owner must personally review/accept any policy
+agreement on creation. OAuth client/secret/allowlist and sign-in validation follow.
+Do not reuse amillum/production OAuth credentials. Phase 1 remains in progress.
