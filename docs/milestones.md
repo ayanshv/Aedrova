@@ -1423,3 +1423,12 @@ Audience > Test users > Add users, add the Google account used to test desktop l
 and Save. Keep publishing status Testing. A second independently controlled tester
 account will be needed for multi-user isolation acceptance. Redirect allowlist and
 end-to-end login remain subsequent gates; Phase 1 is not complete.
+
+Owner reports Google staging test user added. Next requirement: Supabase project
+Aedrova Staging > Authentication > URL Configuration: Site URL
+https://aedrova-beta-staging.onrender.com; redirect URLs exactly
+https://aedrova-beta-staging.onrender.com/auth/callback and
+http://127.0.0.1:43827/auth/**. Native code uses random PKCE callback paths under
+/auth/ on the fixed loopback port; narrow path wildcard is required. Do not add
+production URLs or broad domain wildcards. Owner saves this configuration.
+Staging login/end-to-end isolation acceptance still pending; Phase 1 remains open.
