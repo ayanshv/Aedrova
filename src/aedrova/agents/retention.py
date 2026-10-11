@@ -1,6 +1,5 @@
 """Conservative local retention: never expire edited work or recovery receipts."""
 
-import fcntl
 import hashlib
 import json
 import os
@@ -8,6 +7,8 @@ import shutil
 import time
 from pathlib import Path
 from uuid import UUID, uuid4
+
+from aedrova.agents.file_lock import lock_exclusive, open_private_file
 
 CONTEXT_AGE = 24 * 60 * 60
 SNAPSHOT_AGE = 30 * 24 * 60 * 60
@@ -61,13 +62,15 @@ def protect(project):
     parent = Path(project).parent
     if parent.is_symlink() or not parent.is_dir():
         raise ValueError("Build retention directory is unavailable.")
-    fd = os.open(parent / ".retention.lock", os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
-    lease = os.fdopen(fd, "w")
+    lease = open_private_file(parent / ".retention.lock")
     try:
-        fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        lock_exclusive(lease)
     except BlockingIOError:
         lease.close()
         raise ValueError("This build is active or being cleaned. Retry later.") from None
+    except BaseException:
+        lease.close()
+        raise
     return lease
 
 
@@ -165,9 +168,8 @@ def maintain(directory, *, now=None, dry_run=False, max_snapshots=3, protected=(
             continue
     if candidates and not dry_run:
         try:
-            fd = os.open(cursor, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
-            with os.fdopen(fd, "w") as stream:
-                stream.write(candidates[-1].name[:36])
+            with open_private_file(cursor, truncate=True) as stream:
+                stream.write(candidates[-1].name[:36].encode())
         except OSError:
             pass
     return result

@@ -47,7 +47,7 @@ No real connector is called complete based on mocked HTTP tests.
 | Environment | Database/data | App/service configuration |
 | --- | --- | --- |
 | Development | Disposable test SQLite/PGlite; fixtures only | Source/local HTTP; no implicit production acceptance |
-| Staging | Owner-created `scvmvqlzcqhwrrsiahpj` (Aedrova Staging, healthy, Canada Central, free/NANO); 23 app migrations now installed; tables verified in the hosted Table Editor | Explicit public profile + separate `work/staging/app.ini`; separate HTTPS server/OAuth/provider credentials still needed |
+| Staging | Owner-created `scvmvqlzcqhwrrsiahpj` (Aedrova Staging, healthy, Canada Central, free/NANO); 23 app migrations now installed; tables verified in the hosted Table Editor | Explicit public profile + separate `work/staging/app.ini`; Separate staging HTTPS server live; Google provider enabled and two-account native OAuth verified |
 | Production | Existing `cpelagtufyocepnqcqqd`; customer/waitlist data not copied or migrated | Existing aedrova.com and connector origin; checkout/download gates unchanged |
 
 `scripts/run_staging.py` rejects known production endpoints and secret keys in
@@ -56,7 +56,7 @@ Supabase database, rejects production origin/project, live Stripe secrets and
 checkout/download/development-AI bypass. The restricted database username is
 validated against the chosen Supabase project rather than hardcoded to production.
 Local secret files remain ignored; inspected files have mode 0600. No values are
-recorded here. No staging secret or provider credential has been configured yet.
+recorded here. Staging backend credentials and Google provider are configured separately; values are never recorded here.
 Do not point a profile at production merely to make a staging screen load.
 
 ## GitHub review
@@ -225,3 +225,69 @@ on Render interstitial; fresh login tab redirect blocked by client. Owner handof
 open https://aedrova-beta-staging.onrender.com/auth/google in Safari/normal browser,
 select registered Google test user and complete consent; report signed in or error.
 No authenticated login acceptance claimed. Native and multi-user tests still pending.
+
+Owner login returned validation_failed / Unsupported provider: provider is not enabled.
+Independent staging Supabase /auth/v1/settings check confirms external.google=false
+for scvmvqlzcqhwrrsiahpj. Provider credentials were owner-reported saved, but enabling
+Google was not persisted. Required now: staging Authentication > Sign In / Providers >
+Google > Enable Sign in with Google > Save. Do not modify production. Staging login
+and Phase 1 acceptance remain blocked until provider enablement and login validation.
+
+## Staging Google login — owner confirmation
+
+Owner enabled the staging Google provider and reports successfully signing in with
+the registered test user. Independent /auth/v1/settings verification confirms
+external.google=true for scvmvqlzcqhwrrsiahpj. Browser session/desktop handoff has
+not been independently inspected; multi-user workspace isolation remains pending.
+Next owner requirement: Google Cloud project aedrova-staging > Google Auth Platform
+> Audience > Test users > Add users: add a second Google account under the owner's
+control and Save. This enables two-user staging isolation validation. Do not send
+credentials or use a production workspace. Phase 1 remains in progress; later phases
+and public billing/download activation remain gated.
+
+Owner reports second Google staging test user added. Started a staging-only hosted
+isolation probe using existing native PKCE/loopback OAuth code (no production
+endpoints, session tokens kept in memory). First browser login is awaiting owner
+account selection. Subsequent second distinct login is explicitly paused. Probe
+will create two disposable staging workspaces/messages, verify own reads and
+bidirectional foreign workspace/channel/message/member reads and message writes
+are denied, then unsend probe messages and archive workspaces. This does not
+certify meeting media, AI context isolation or desktop UI handoff. Phase 1 remains
+in progress until actual results and other release gates are recorded.
+
+First real staging native OAuth callback succeeded (ACCOUNT_1_SIGNED_IN). The
+probe then exited with EOFError because the background command has no interactive
+stdin; local test session was signed out by cleanup. Replaced stdin pause with a
+bounded local signal-file wait and restarted first login. Owner must sign in again
+with the original test account before the second distinct account handoff. No
+isolation tests have run yet; do not treat this runner issue as a Google failure.
+
+Restarted first staging OAuth session verified successful and retained in memory.
+Released bounded signal-file pause; second staging Google sign-in opened. Owner
+must choose the second distinct registered test account (Use another account if
+Google selects the original). Two-user isolation probes run after that callback;
+results are not yet available. Phase 1 remains in progress.
+
+## Hosted two-account isolation result
+
+Both real staging Google OAuth sessions succeeded and authenticated distinct users.
+Created two disposable staging workspaces with one probe message each. In both
+directions, each account could read its own message, and reads of the other
+workspace, channel, message and membership rows returned no data. Sending a message
+into the other account's channel was rejected with PostgreSQL 42501. These
+specific hosted isolation checks PASSED; this is not full AI-context/security
+certification or desktop UI acceptance.
+
+Cleanup failed because the local probe sent p_id rather than p_message to
+unsend_message. Helper corrected; sessions were signed out. Two disposable staging
+workspaces/messages remain (no production mutations); cleanup is outstanding.
+Evidence: ignored work/staging/isolation-report.json, status
+isolation_passed_cleanup_failed. Do not require repeated sign-ins solely to hide
+this test-runner issue.
+
+Remote CI run 38078880708 independently verified: PostgreSQL RLS, macOS desktop
+and Ubuntu desktop passed; Windows desktop failed. Existing Unix-only fcntl
+imports in agents/ledger.py and agents/retention.py remain the next baseline
+engineering blocker. Phase 1 is still in progress; hosted merge protections,
+Windows CI and desktop UI acceptance remain gates. No owner setup action is
+required immediately while engineering addresses the Windows blocker.

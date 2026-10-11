@@ -1448,3 +1448,62 @@ on Render interstitial; fresh login tab redirect blocked by client. Owner handof
 open https://aedrova-beta-staging.onrender.com/auth/google in Safari/normal browser,
 select registered Google test user and complete consent; report signed in or error.
 No authenticated login acceptance claimed. Native and multi-user tests still pending.
+
+## Staging Google login — owner confirmation
+
+Owner enabled the staging Google provider and reports successfully signing in with
+the registered test user. Independent /auth/v1/settings verification confirms
+external.google=true for scvmvqlzcqhwrrsiahpj. Browser session/desktop handoff has
+not been independently inspected; multi-user workspace isolation remains pending.
+Next owner requirement: Google Cloud project aedrova-staging > Google Auth Platform
+> Audience > Test users > Add users: add a second Google account under the owner's
+control and Save. This enables two-user staging isolation validation. Do not send
+credentials or use a production workspace. Phase 1 remains in progress; later phases
+and public billing/download activation remain gated.
+
+Owner reports second Google staging test user added. Started a staging-only hosted
+isolation probe using existing native PKCE/loopback OAuth code (no production
+endpoints, session tokens kept in memory). First browser login is awaiting owner
+account selection. Subsequent second distinct login is explicitly paused. Probe
+will create two disposable staging workspaces/messages, verify own reads and
+bidirectional foreign workspace/channel/message/member reads and message writes
+are denied, then unsend probe messages and archive workspaces. This does not
+certify meeting media, AI context isolation or desktop UI handoff. Phase 1 remains
+in progress until actual results and other release gates are recorded.
+
+First real staging native OAuth callback succeeded (ACCOUNT_1_SIGNED_IN). The
+probe then exited with EOFError because the background command has no interactive
+stdin; local test session was signed out by cleanup. Replaced stdin pause with a
+bounded local signal-file wait and restarted first login. Owner must sign in again
+with the original test account before the second distinct account handoff. No
+isolation tests have run yet; do not treat this runner issue as a Google failure.
+
+Restarted first staging OAuth session verified successful and retained in memory.
+Released bounded signal-file pause; second staging Google sign-in opened. Owner
+must choose the second distinct registered test account (Use another account if
+Google selects the original). Two-user isolation probes run after that callback;
+results are not yet available. Phase 1 remains in progress.
+
+## Hosted two-account isolation result
+
+Both real staging Google OAuth sessions succeeded and authenticated distinct users.
+Created two disposable staging workspaces with one probe message each. In both
+directions, each account could read its own message, and reads of the other
+workspace, channel, message and membership rows returned no data. Sending a message
+into the other account's channel was rejected with PostgreSQL 42501. These
+specific hosted isolation checks PASSED; this is not full AI-context/security
+certification or desktop UI acceptance.
+
+Cleanup failed because the local probe sent p_id rather than p_message to
+unsend_message. Helper corrected; sessions were signed out. Two disposable staging
+workspaces/messages remain (no production mutations); cleanup is outstanding.
+Evidence: ignored work/staging/isolation-report.json, status
+isolation_passed_cleanup_failed. Do not require repeated sign-ins solely to hide
+this test-runner issue.
+
+Remote CI run 38078880708 independently verified: PostgreSQL RLS, macOS desktop
+and Ubuntu desktop passed; Windows desktop failed. Existing Unix-only fcntl
+imports in agents/ledger.py and agents/retention.py remain the next baseline
+engineering blocker. Phase 1 is still in progress; hosted merge protections,
+Windows CI and desktop UI acceptance remain gates. No owner setup action is
+required immediately while engineering addresses the Windows blocker.
