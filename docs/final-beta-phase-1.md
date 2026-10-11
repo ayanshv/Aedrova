@@ -291,3 +291,35 @@ imports in agents/ledger.py and agents/retention.py remain the next baseline
 engineering blocker. Phase 1 is still in progress; hosted merge protections,
 Windows CI and desktop UI acceptance remain gates. No owner setup action is
 required immediately while engineering addresses the Windows blocker.
+
+## October 10 — portability fixes and deferred handoff
+
+Owner requested independent completion without setup interruptions, with owner
+actions saved for the end. Added `docs/phase-1-owner-handoff.md`.
+
+Implemented native nonblocking Windows CRT byte-range leases alongside POSIX
+flock; secure final-component opening rejects Windows reparse points and POSIX
+symlinks before truncation. Locks are released when streams close and descriptors
+are not inherited implicitly. Execution and retention no longer import fcntl on
+Windows. Build-check receipts use the same safe file opener. Added real second-
+process exclusion/reacquisition, symlink target-preservation, and error-classification
+tests; all six new lease tests passed in the first actual Windows runner (the full
+Windows job reached 675 passing tests rather than failing collection).
+
+Remote run 38109927599 at e5d1499: PostgreSQL and macOS passed; Linux reported
+one existing agent-feed visibility bug (730 passed); Windows reported 53 failures,
+675 passed and six teardown errors. These are not silently skipped. Fixed the
+agent-event stack switch so the transcript is visible when it contains rows, and
+strengthened its existing layout regression to assert visibility. Also fixed Windows
+agent timestamps (unsupported %- modifiers), explicit UTF-8 emoji catalog loading,
+and GitHub login's synchronous FailedToStart race. The updated focused suites
+passed 77 tests locally; full local baseline passed 731 tests before these follow-ups.
+Source/secret checks and ordered SQL/RLS/optional-meeting checks passed.
+
+Remaining Windows failures include Unix-only synthetic executable fixtures/runtime
+pipe/process handling, POSIX permission assertions versus Windows ACL semantics,
+conservative retention behavior on platforms without safe rmtree, and font/layout
+differences. Windows distribution and full Phase 1 sign-off remain blocked; no
+Windows installer or universal cross-platform readiness is claimed. Follow-up remote
+CI is required for the final revision. Owner interventions stay deferred as requested.
+No production merge/deployment, Phase 2, M14 or paid download activation performed.

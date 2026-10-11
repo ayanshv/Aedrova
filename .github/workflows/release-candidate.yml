@@ -36,6 +36,8 @@ jobs:
           uv run ruff check src scripts tests
           uv run python scripts/check_release_secrets.py --tracked
           uv run python -m compileall -q src scripts
+      - name: Native process lease safety
+        run: uv run pytest -q tests/test_file_lock.py
       - name: Account, chat, AI, connectors and desktop regressions
         run: uv run pytest -q --junitxml=work/desktop-tests.xml
       - uses: actions/upload-artifact@v4

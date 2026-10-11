@@ -1,7 +1,6 @@
 """Private local build studio using real provider runtimes."""
 
 import json
-import os
 import threading
 import time
 from dataclasses import replace
@@ -22,6 +21,7 @@ from PySide6.QtWidgets import (
 
 from aedrova.agents.checkout import changes, git, prepare
 from aedrova.agents.context import authorize, gather
+from aedrova.agents.file_lock import open_private_file
 from aedrova.agents.managed import ManagedClient, ai_access_mode, application_ai_origin
 from aedrova.agents.retrieval import retrieval_record, validate_citations
 from aedrova.agents.runtime import BuildCancelled, LocalRunner, instructions
@@ -313,9 +313,8 @@ class BuildJob(QRunnable):
         if not self.plan and self.project:
             try:
                 path = self.project.parent / "observed-checks.json"
-                fd = os.open(path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
-                with os.fdopen(fd, "w") as stream:
-                    json.dump(self.runner.command_results, stream)
+                with open_private_file(path, truncate=True) as stream:
+                    stream.write(json.dumps(self.runner.command_results).encode("utf-8"))
             except OSError:
                 self.signals.progress.emit(
                     "Observed checks could not be saved locally; "

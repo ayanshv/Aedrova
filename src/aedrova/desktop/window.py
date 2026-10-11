@@ -834,8 +834,7 @@ class AedrovaWindow(QMainWindow):
             self.agent_feed.author_name = bud["name"]
         self.agent_feed.add_event(text)
         self.messages.set_agent_visible(self.activity_channel == self.channel_id)
-        if self.messages.model().rowCount() == 0:
-            self.message_stack.setCurrentIndex(0)
+        self.message_stack.setCurrentIndex(0 if self.messages.model().rowCount() else 1)
         if update_activity and getattr(self, "build_dialog", None) and self.build_dialog.job:
             phase = "Working · latest update below"
             if text.startswith("Running:"):

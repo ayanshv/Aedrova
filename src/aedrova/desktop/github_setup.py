@@ -196,8 +196,10 @@ class GitHubSetup(AppDialog):
                 "--skip-ssh-key",
             ],
         )
-        self.process.closeWriteChannel()
-        self.timeout.start(10 * 60 * 1000)
+        # FailedToStart may synchronously clear self.process during start().
+        if self.process is not None:
+            self.process.closeWriteChannel()
+            self.timeout.start(10 * 60 * 1000)
 
     def open_browser(self):
         if self.code.text() and not self.cancelled.is_set():

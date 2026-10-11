@@ -61,7 +61,7 @@ def _open_windows(path):
             raise ctypes.WinError(ctypes.get_last_error())
         if attributes[0] & 0x400:
             raise OSError("Linked lease files are forbidden")
-        fd = msvcrt.open_osfhandle(handle, os.O_RDWR | os.O_BINARY)
+        fd = msvcrt.open_osfhandle(handle, os.O_RDWR | os.O_BINARY | os.O_NOINHERIT)
     except BaseException:
         kernel.CloseHandle(handle)
         raise
