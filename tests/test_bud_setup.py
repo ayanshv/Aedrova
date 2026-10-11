@@ -477,6 +477,16 @@ def test_required_bud_setup_cannot_be_accepted_without_verified_connection(edito
     assert not rows
 
 
+def test_finish_later_closes_required_setup_without_completing_it(editor):
+    dialog, rows, saved, _ = editor
+    dialog.required = True
+    assert dialog.exit_button.text() == "Finish later"
+    dialog.exit_button.click()
+    assert not dialog.isVisible()
+    assert dialog.result() == dialog.DialogCode.Rejected
+    assert not rows and not saved
+
+
 def test_required_setup_finishes_only_after_verified_tool_and_final_stage(editor):
     dialog, rows, _, _ = editor
     dialog.required = True

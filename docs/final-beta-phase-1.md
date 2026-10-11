@@ -381,3 +381,13 @@ commands, check names and locations: docs/phase-1-owner-handoff.md. Staging fixt
 cleanup is optional housekeeping. No new payment, production secret, production
 merge/deploy, public billing/download activation or Phase 2 execution is required
 or authorized by this result. Phase 2 remains permission-gated after this handoff.
+
+## Owner confirmation and Phase 2 authorization
+
+October 10, 2026: owner reports both required actions completed (staging desktop
+acceptance and GitHub main-branch rulesets) and explicitly approves starting Phase 2.
+Phase 1 is closed on that owner acceptance; this is not a separate automated
+re-inspection of the desktop journey or hosted rulesets. Phase 2 connector/provider
+validation is now authorized. Public launch, production merges, billing/downloads
+and later phases remain gated. The subsequent Finish later fix passed 55 focused
+Bud/onboarding tests and is included in the source handoff.
