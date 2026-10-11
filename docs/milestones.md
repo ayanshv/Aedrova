@@ -1432,3 +1432,19 @@ http://127.0.0.1:43827/auth/**. Native code uses random PKCE callback paths unde
 /auth/ on the fixed loopback port; narrow path wildcard is required. Do not add
 production URLs or broad domain wildcards. Owner saves this configuration.
 Staging login/end-to-end isolation acceptance still pending; Phase 1 remains open.
+
+Owner reports staging Site URL and exact web/native redirect allowlist saved.
+Started isolated source staging launcher successfully (separate public-config.json and
+app.ini). Existing production app shares a display name; source process was stopped
+without closing the user's packaged app, avoiding accidental production sign-in.
+Opened web staging /auth/google for initial OAuth return validation. Free Render
+instance cold-start pending; next owner action is Google account selection/consent
+in staging web login. Browser/native session and multi-user isolation not yet verified.
+Phase 1 remains in progress.
+
+Fresh staging readiness HTTP 200 confirmed after cold start. /auth/google returns
+303 to staging Supabase with correct staging /auth/callback. In-app browser remains
+on Render interstitial; fresh login tab redirect blocked by client. Owner handoff:
+open https://aedrova-beta-staging.onrender.com/auth/google in Safari/normal browser,
+select registered Google test user and complete consent; report signed in or error.
+No authenticated login acceptance claimed. Native and multi-user tests still pending.
