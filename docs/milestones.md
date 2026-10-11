@@ -1565,3 +1565,34 @@ optional cleanup, not a failing isolation check. Windows CI is regression eviden
 not certification of installer signing, Windows ACL privacy or live provider sandbox
 behavior; those remain later-phase gates. Obtain new approval for Phase 2 only after
 reporting these results and outstanding owner actions.
+
+
+## Final verified result — October 10, 2026
+
+**Independent Phase 1 engineering complete; owner sign-off pending.** Frozen
+native code revision **8a98c27**, [Release candidate run 38111786891](https://github.com/ayanshv/Aedrova/actions/runs/38111786891):
+all four jobs **passed**. Ubuntu **732 passed** (304.70s), macOS **732 passed**
+(334.33s), Windows **732 passed** (391.76s), plus PostgreSQL migration/RLS checks.
+The Windows run includes native cross-process leases, bounded pipe handling,
+process cancellation including spawned commands, and compact layout checks. No
+Windows tests were excluded to achieve this result. Local final suite **732 passed**
+(103.65s); source/secret-pattern/compile checks and ordered SQL/RLS/optional-meeting
+checks passed. CI evidence is retained in job artifacts; local copies/report are
+ignored under work/staging.
+
+Service companion revision **1a183ff**, [Website checks run 38111715356](https://github.com/ayanshv/Aedrova-website/actions/runs/38111715356):
+**passed**, including backend regressions, private PostgreSQL access/lease checks,
+container build and startup/readiness. Only documentation differs from deployed
+staging service **e3da1d7**; auto-deploy is off. Production remains unchanged.
+
+The final evidence/documentation commit changes no runtime or test code and does
+not rerun the unchanged tested baseline. These are baseline regression results,
+not live connector/model/meeting or signed-installer certification.
+
+To fully close Phase 1, the owner must confirm (1) source staging desktop Google
+return, workspace entry and sign-out acceptance, and (2) active main-branch PR /
+required CI / no force-push / no deletion protections in both repositories. Exact
+commands, check names and locations: docs/phase-1-owner-handoff.md. Staging fixture
+cleanup is optional housekeeping. No new payment, production secret, production
+merge/deploy, public billing/download activation or Phase 2 execution is required
+or authorized by this result. Phase 2 remains permission-gated after this handoff.

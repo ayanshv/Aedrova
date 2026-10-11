@@ -1,6 +1,7 @@
 # Final Beta and public launch plan
 
-Status: Phase 1 authorized and in progress — October 10, 2026. Later phases
+Status: Phase 1 engineering complete; owner acceptance and merge protections
+pending — October 10, 2026. Later phases
 remain planned and require separate approval. M14 remains deferred until product
 completion. Current evidence, frozen scope and exact staging handoffs are saved in
 [Phase 1 baseline](final-beta-phase-1.md). Waitlist and public billing/download gates
