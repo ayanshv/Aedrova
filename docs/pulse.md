@@ -1,3 +1,7 @@
+> Deferred from the first Beta release on October 10, 2026. Native Pulse UI and
+> service routes were removed in Final-Beta Phase 1. Historical design below is
+> not current functionality. Shared Bud evidence and meeting heartbeats remain.
+
 # Pulse — startup command center
 
 Pulse is a first-class workspace view (sidebar → Pulse, or ⌘5). It uses the existing

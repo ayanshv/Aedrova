@@ -14,7 +14,7 @@ QUICK_EMOJI = ("👍", "❤️", "😂", "🎉", "👀")
 
 @lru_cache(maxsize=1)
 def catalog():
-    return json.loads((Path(__file__).parent / "assets/emoji.json").read_text())
+    return json.loads((Path(__file__).parent / "assets/emoji.json").read_text(encoding="utf-8"))
 
 
 class EmojiPicker(AppDialog):

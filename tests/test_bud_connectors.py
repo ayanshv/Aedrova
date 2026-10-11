@@ -4,6 +4,7 @@ from copy import deepcopy
 from types import SimpleNamespace
 
 import pytest
+from layout_checks import no_horizontal_overflow
 from test_connected import setup
 
 from aedrova.desktop.bud_connectors import ConnectorsDialog
@@ -72,7 +73,9 @@ def gallery(qtbot, tmp_path, monkeypatch):
 
     monkeypatch.setattr("aedrova.desktop.bud_connectors.client", lambda service: API())
     monkeypatch.setattr(
-        ConnectorsDialog, "run", lambda self, operation, completed: completed(operation(service))
+        ConnectorsDialog,
+        "run",
+        lambda self, operation, completed, **kwargs: completed(operation(service)),
     )
     dialog = ConnectorsDialog(window, "bud-1")
     qtbot.addWidget(dialog)
@@ -97,7 +100,7 @@ def test_gallery_hierarchy_filters_and_native_themes(gallery, qtbot):
         qtbot.wait(30)
         assert dialog.columns == 2
         assert not dialog.grab().isNull()
-        assert dialog.gallery.horizontalScrollBar().maximum() == 0
+        no_horizontal_overflow(qtbot, dialog.gallery)
 
 
 def test_verify_flow_clears_password_and_reloads_real_connection(gallery):
@@ -189,7 +192,12 @@ def test_resource_lookup_help_covers_every_supported_connector(gallery):
     dialog, _, _, providers = gallery
     for provider in providers:
         dialog.open_provider(provider)
-        assert dialog.resource_help.text() == RESOURCE_HELP[provider["id"]]
+        assert dialog.resource_help.text()
+        assert (
+            "Paste" in dialog.resource_help.text()
+            if provider["id"] in {"github", "figma", "notion"}
+            else dialog.resource_help.text() == RESOURCE_HELP[provider["id"]]
+        )
     supabase = {
         **providers[0],
         "id": "supabase",
@@ -199,6 +207,152 @@ def test_resource_lookup_help_covers_every_supported_connector(gallery):
         "oauth_setup_hint": "Supabase requires an HTTPS callback.",
     }
     dialog.open_provider(supabase)
-    assert "Project Settings → General → Reference ID" in dialog.resource_help.text()
+    assert "Paste your Supabase dashboard project link" in dialog.resource_help.text()
     assert "HTTPS" in dialog.oauth_hint.text()
     assert not dialog.oauth.isEnabled()
+
+
+@pytest.mark.parametrize(
+    "provider,url,expected",
+    [
+        ("github", "https://github.com/team/project/tree/main", "team/project"),
+        ("figma", "https://www.figma.com/design/abc123/My-file", "abc123"),
+        ("supabase", "https://supabase.com/dashboard/project/abcdefgh/settings", "abcdefgh"),
+        (
+            "notion",
+            "https://www.notion.so/My-page-0123456789abcdef0123456789abcdef?source=copy",
+            "0123456789abcdef0123456789abcdef",
+        ),
+    ],
+)
+def test_resource_links_preserve_exact_scope(provider, url, expected):
+    from aedrova.desktop.bud_connectors import normalize_resource
+
+    assert normalize_resource(provider, url) == expected
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://github.com.evil.test/team/project",
+        "http://github.com/team/project",
+        "https://token@github.com/team/project",
+    ],
+)
+def test_resource_links_reject_foreign_hosts_and_credentials(url):
+    from aedrova.desktop.bud_connectors import normalize_resource
+
+    with pytest.raises(ValueError):
+        normalize_resource("github", url)
+
+
+@pytest.mark.parametrize("provider_id", ["github", "notion", "figma", "tiktok"])
+def test_account_sign_in_requires_no_id_or_token(gallery, monkeypatch, provider_id):
+    dialog, _, _, providers = gallery
+    provider = next(p for p in providers if p["id"] == provider_id)
+    provider.update(oauth_available=True, oauth_supported=True, permissions="Read-only")
+    dialog.open_provider(provider)
+    assert not dialog.resource.isVisible() and not dialog.credential.isVisible()
+    calls = []
+    state, origin = "a" * 43, "https://connections.test"
+    monkeypatch.setattr("aedrova.desktop.bud_connectors.connector_origin", lambda: origin)
+    monkeypatch.setattr("aedrova.desktop.bud_connectors.QDesktopServices.openUrl", lambda url: True)
+
+    class API:
+        def request(self, path, body=None):
+            calls.append((path, body))
+            return {"state": state, "url": origin + "/buds/authorize/" + state}
+
+    monkeypatch.setattr("aedrova.desktop.bud_connectors.client", lambda _: API())
+    dialog.connect_oauth()
+    assert calls[0][1]["resource"] == ("me" if provider_id == "tiktok" else "")
+    assert "credential" not in calls[0][1]
+
+
+def test_authorized_account_picker_connects_only_selected_resource(gallery, monkeypatch):
+    dialog, _, _, providers = gallery
+    provider = {
+        **providers[0],
+        "oauth_available": True,
+        "oauth_supported": True,
+        "permissions": "Read-only",
+    }
+    dialog.open_provider(provider)
+    dialog.oauth_state = "a" * 43
+    import time
+
+    dialog.oauth_deadline = time.monotonic() + 600
+    calls = []
+
+    class API:
+        def request(self, path, body=None):
+            calls.append((path, body))
+            if path.startswith("/api/buds/oauth/status"):
+                return {
+                    "status": "choose_resource",
+                    "resources": [{"id": "team/app", "name": "Team app"}],
+                    "requires_link": False,
+                }
+            return {"id": "verified"}
+
+    monkeypatch.setattr("aedrova.desktop.bud_connectors.client", lambda _: API())
+    dialog.poll_oauth()
+    assert dialog.pages.currentIndex() == 3
+    assert dialog.resource_picker.itemText(1) == "Team app"
+    dialog.select_oauth_resource()
+    assert len(calls) == 1
+    dialog.resource_picker.setCurrentIndex(1)
+    confirmed = []
+    monkeypatch.setattr(dialog, "refresh", lambda *, on_loaded: confirmed.append(True))
+    dialog.select_oauth_resource()
+    assert calls[-1][1] == {"state": "a" * 43, "resource": "team/app"}
+    assert not dialog.oauth_state and confirmed
+
+
+def test_managed_search_uses_topic_only_without_tokens_or_browser(gallery, monkeypatch):
+    dialog, _, rows, providers = gallery
+    provider = next(p for p in providers if p["id"] == "search")
+    provider.update(managed_available=True, oauth_supported=False, oauth_available=False)
+    dialog.open_provider(provider)
+    assert dialog.oauth.isVisible() and dialog.oauth.isEnabled()
+    assert dialog.oauth.text() == "Enable web search"
+    assert not dialog.credential.isVisible()
+    monkeypatch.setattr(
+        "aedrova.desktop.bud_connectors.QDesktopServices.openUrl",
+        lambda *_: pytest.fail("Managed search must not open external login"),
+    )
+    dialog.connect_oauth()
+    assert dialog.pages.currentIndex() == 3
+    assert not dialog.resource_picker.isVisible()
+    assert dialog.selection_link.isVisible()
+    sent = []
+
+    class API:
+        def request(self, path, body):
+            sent.append((path, body))
+            return {"connected": True}
+
+    monkeypatch.setattr("aedrova.desktop.bud_connectors.client", lambda *_: API())
+    monkeypatch.setattr(dialog, "refresh", lambda **kwargs: None)
+    dialog.selection_link.setText("launch research")
+    dialog.select_oauth_resource()
+    assert sent[0][0] == "/api/buds/connections/search"
+    assert set(sent[0][1]) == {"workspace", "dot", "topic", "hours"}
+    assert sent[0][1]["topic"] == "launch research"
+
+
+def test_success_content_never_overlaps_when_height_is_constrained(gallery, qtbot):
+    dialog, _, _, providers = gallery
+    dialog.setMinimumSize(0, 0)
+    dialog.resize(900, 460)
+    dialog.show_confirmation(providers[0], "bud-1")
+    qtbot.wait(50)
+    bud = dialog.success_bud.geometry()
+    heading = dialog.success_heading.geometry()
+    copy = dialog.success_copy.geometry()
+    assert bud.bottom() < heading.top()
+    assert heading.bottom() < copy.top()
+    assert dialog.success_scroll.verticalScrollBar().maximum() > 0
+    dialog.resize(900, 800)
+    qtbot.wait(50)
+    dialog.grab().save("work/connector-confirmation-fixed.png")

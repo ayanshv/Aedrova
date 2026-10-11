@@ -1,10 +1,13 @@
 import hashlib
 import io
+import os
 import stat
+import sys
 import zipfile
 from pathlib import Path
 
 import pytest
+from PySide6.QtCore import QProcess
 from test_connected import setup
 
 from aedrova.delivery import installer
@@ -34,7 +37,10 @@ def test_verified_install_only_writes_exact_members(tmp_path, monkeypatch):
     messages = []
     result = installer.install(root=tmp_path, fetch=lambda *a: data, progress=messages.append)
     assert result.read_bytes() == b"verified binary"
-    assert result.stat().st_mode & 0o777 == 0o700
+    if os.name == "nt":
+        assert os.access(result, os.R_OK | os.W_OK)
+    else:
+        assert result.stat().st_mode & 0o777 == 0o700
     assert (result.parent / "LICENSE").exists()
     assert not (tmp_path.parent / "unwanted").exists()
     assert {p.name for p in result.parent.iterdir()} == {"gh", "LICENSE"}
@@ -147,9 +153,20 @@ def test_login_failure_does_not_expose_process_output(qtbot, tmp_path, monkeypat
 def test_login_code_is_parsed_and_signout_cancels(qtbot, tmp_path, monkeypatch, message):
     window, _ = setup(qtbot, tmp_path)
     helper = tmp_path / "fake-gh"
-    helper.write_text(f"#!/bin/sh\nprintf '{message}\\n'\nexec /bin/sleep 20\n")
+    helper.write_text(
+        f"#!{sys.executable}\nimport time\nprint({message!r}, flush=True)\ntime.sleep(20)\n"
+    )
     helper.chmod(0o700)
     monkeypatch.setattr("aedrova.desktop.github_setup.gh_path", lambda: str(helper))
+    if sys.platform == "win32":
+        original = QProcess.start
+
+        def launch(process, program, arguments):
+            if program == str(helper):
+                return original(process, sys.executable, [str(helper), *arguments])
+            return original(process, program, arguments)
+
+        monkeypatch.setattr(QProcess, "start", launch)
     dialog = GitHubSetup(window)
     qtbot.addWidget(dialog)
     dialog.login()

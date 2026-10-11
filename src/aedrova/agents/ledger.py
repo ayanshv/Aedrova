@@ -1,6 +1,5 @@
 """Local durable queue. No provider output, credentials or chat corpus is persisted here."""
 
-import fcntl
 import hashlib
 import json
 import os
@@ -9,6 +8,8 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 from uuid import uuid4
+
+from aedrova.agents.file_lock import lock_exclusive, open_private_file
 
 
 class RunLedger:
@@ -51,13 +52,15 @@ class RunLedger:
             db.close()
 
     def lock(self):
-        fd = os.open(self.directory / "execution.lock", os.O_CREAT | os.O_RDWR, 0o600)
-        stream = os.fdopen(fd, "w")
+        stream = open_private_file(self.directory / "execution.lock")
         try:
-            fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            lock_exclusive(stream)
         except BlockingIOError:
             stream.close()
             return None
+        except BaseException:
+            stream.close()
+            raise
         return stream
 
     def recover(self):

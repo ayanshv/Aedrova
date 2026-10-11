@@ -1,4 +1,5 @@
 import os
+import shutil
 import time
 
 from aedrova.agents.checkout import prepare
@@ -20,10 +21,13 @@ def snapshot(tmp_path):
 def test_only_redundant_idle_snapshot_expires(tmp_path):
     source, project, root = snapshot(tmp_path)
     preview = maintain(root, dry_run=True)
-    assert preview["snapshots"] and project.exists()
+    safe_delete = shutil.rmtree.avoids_symlink_attacks
+    assert bool(preview["snapshots"]) == safe_delete
+    assert project.exists()
     result = maintain(root)
-    assert result["contexts"] and result["snapshots"]
-    assert not project.parent.exists()
+    assert result["contexts"]
+    assert bool(result["snapshots"]) == safe_delete
+    assert project.parent.exists() != safe_delete
     assert (source / "main.py").read_text() == "print('original')"
 
 

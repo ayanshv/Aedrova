@@ -68,8 +68,11 @@ def test_full_sequence_timing_keyboard_and_dashboard_handoff(flow, qtbot, monkey
     monkeypatch.setattr(dialog.setup, "advance_profile", lambda: dialog.show_stage(6))
     for stage in range(4, LAST_STAGE):
         assert dialog.stage == stage
+        if stage == 7:
+            dialog.setup.automatic.setChecked(False)  # Intro-only journey has no project.
         dialog.activate()
     assert dialog.stage == LAST_STAGE
+    dialog.bud_setup_completed = True  # Connected Bud walkthrough completed before handoff.
     advance_time(dialog, 1)
     assert not dialog.isVisible() and not dialog.timer.isActive()
     key = account_key(window)
@@ -170,7 +173,7 @@ def test_explicit_configuration_saves_account_scoped_project_not_a_build(
     dialog.setup.provider.setCurrentIndex(1)
     dialog.activate()
     assert dialog.stage == 7
-    assert not dialog.setup.automatic.isChecked()
+    assert dialog.setup.automatic.isChecked()
     dialog.setup.automatic.setChecked(True)
     dialog.activate()
     dialog.setup.repository.setText("ayanshv/Aedrova")
@@ -470,3 +473,42 @@ def test_required_profile_failure_keeps_step_and_retry_controls(qtbot, tmp_path)
     assert dialog.primary.isEnabled() and dialog.back.isEnabled()
     assert form.name.text() == "Maya" and form.username.text() == "maya_chen"
     assert not window.settings.value(account_key(window) + "/setup", False, type=bool)
+
+
+def test_handoff_cannot_complete_without_required_bud_setup(flow):
+    window, dialog = flow
+    dialog.show_stage(LAST_STAGE)
+    dialog.complete()
+    assert dialog.stage == 5
+    assert not window.settings.value(
+        account_key(window) + "/hasCompletedOnboarding", False, type=bool
+    )
+    assert not dialog.finished_once
+
+
+def test_required_bud_walkthrough_returns_on_cancel_and_hands_off_on_finish(flow, monkeypatch):
+    from PySide6.QtWidgets import QDialog
+
+    window, dialog = flow
+    window.current_user = lambda: SimpleNamespace(id="bud-onboarding-account")
+    dialog.prefix = account_key(window)
+
+    class BudWalkthrough(QDialog):
+        def __init__(self, parent, *, required):
+            super().__init__(parent)
+            assert required
+
+    monkeypatch.setattr("aedrova.desktop.dots.DotDialog", BudWalkthrough)
+    dialog.show_stage(LAST_STAGE)
+    dialog.complete()
+    first = dialog.buds_dialog
+    dialog.complete()
+    assert dialog.buds_dialog is first and not dialog.finished_once
+    first.reject()
+    assert dialog.isVisible() and dialog.stage == LAST_STAGE - 1
+    assert not window.settings.value(dialog.prefix + "/hasCompletedOnboarding", False, type=bool)
+    dialog.show_stage(LAST_STAGE)
+    dialog.complete()
+    dialog.buds_dialog.accept()
+    assert dialog.finished_once
+    assert window.settings.value(dialog.prefix + "/hasCompletedOnboarding", False, type=bool)

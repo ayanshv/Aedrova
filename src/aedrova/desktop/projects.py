@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from aedrova.delivery.github import GitHub, repository_name
-from aedrova.desktop.controls import AppDialog, ChoiceBox, choose_project
+from aedrova.desktop.controls import AppDialog, CodingProviderChoice, choose_project
 from aedrova.desktop.design_system import FlowActions
 from aedrova.desktop.dialogs import button, label
 
@@ -158,10 +158,8 @@ class ProjectDialog(AppDialog):
             )
         )
         layout.addWidget(label("Coding provider", "title"))
-        self.provider = ChoiceBox()
+        self.provider = CodingProviderChoice()
         self.provider.setAccessibleName("Coding provider")
-        self.provider.addItem("Codex", "codex")
-        self.provider.addItem("Claude Agent", "claude_code")
         preferences = window.account_dialog.snapshot.get("agent_preferences", [])
         default = next(
             (
@@ -174,7 +172,7 @@ class ProjectDialog(AppDialog):
         self.provider.setCurrentIndex(self.provider.findData(data.get("provider", default)))
         layout.addWidget(self.provider)
         self.auto_plan = QCheckBox("Let my agent plan and execute automatically")
-        self.auto_plan.setChecked(data.get("background_build", False))
+        self.auto_plan.setChecked(data.get("background_build", data.get("auto_plan", True)))
         layout.addWidget(self.auto_plan)
         layout.addWidget(
             label(

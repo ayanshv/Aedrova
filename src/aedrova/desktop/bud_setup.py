@@ -98,7 +98,7 @@ def build_setup(d, window):
     navigation.addWidget(d.progress)
     navigation.addStretch()
     d.exit_button = button("Finish later")
-    d.exit_button.clicked.connect(d.accept)
+    d.exit_button.clicked.connect(d.reject)
     navigation.addWidget(d.exit_button)
     column.addLayout(navigation)
     d.back = button("‹  Back")

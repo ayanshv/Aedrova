@@ -1177,3 +1177,528 @@ are preserved. Next owner action is approval/configuration of an isolated HTTPS
 connector service, then registering its exact Supabase callback. The public
 waitlist website remains unchanged. Focused validation: 29 desktop and 69
 service tests passed; changed-file lint passed. Live Supabase remains pending.
+
+
+### Bud-led onboarding and simpler connector setup — October 9
+
+Research now defaults to teal in the app, matching the website. Website Buds are
+immediately below the hero and appear above inner-page content. Control tours
+illuminate actual controls without an external outline. Completing first-run
+onboarding opens the six-step Bud configuration and requires a saved Bud with
+one verified connected tool before workspace handoff. Cancelling returns to setup;
+existing completed accounts retain access.
+
+Configured OAuth is the primary connector path, advanced tokens are collapsible,
+TikTok selects the authorized account automatically, and GitHub/Figma/Notion/
+Supabase resource links are parsed locally. Provider consent and selecting a
+specific authorized resource remain intentional. Token-only adapters still need
+the provider’s scoped key; unconfigured OAuth requires developer registration.
+The account-mismatch browser page is branded; API authorization remains strict.
+
+### Planned: Marketing Bud media studio (after connector acceptance)
+
+Build image generation with OpenAI and a separately evaluated video provider.
+Use brand references, platform aspect-ratio presets and explicit drafts; show
+progress, cancellation and preview before download or publishing. Enforce plan
+budgets, reserve estimated costs, cap video duration/quality and concurrency,
+and never promise unlimited media. Separate read-only social connectors from
+publishing grants. Require approval for every external post. Validate failed
+jobs, refunds of unused reservations, retention/deletion and content safety.
+Advertise only capabilities delivered and tested. No media generation added yet.
+
+### Planned: final Beta completion and M14 release gate
+
+Finish connector consent/refresh/revocation and role acceptance; then run a
+full regression, permissions/privacy audit, onboarding light/dark/responsive
+checks, multi-account collaboration and two-device meeting acceptance.
+Create signed/notarized macOS DMG with clean-machine install/update/rollback
+checks. Add Windows packaging on Windows CI, signed installer, clean-machine
+acceptance, microphone/camera/screen-share and updater checks. Resolve platform
+incompatibilities before advertising Windows availability. Archive reproducible
+artifacts and release notes; maintain waitlist until release approval.
+
+Owner actions later: Apple Developer membership and Developer ID signing setup;
+Windows signing provider enrollment; Render always-on paid hosting; live Stripe
+business verification and billing configuration; second device for meetings.
+Walk through one requirement per response at release time. These gates block
+public Beta distribution, not current UI work. Codebase walkthrough stays after
+complete deployment. M14 remains deferred until feature completion.
+
+### Connector and required Bud onboarding validation — October 10
+
+Owner approved this validation task. Full desktop suite: 701 passed. Full website /
+service suite: 391 passed. After routing fixes and additional onboarding coverage,
+71 focused desktop tests passed; lint and whitespace checks passed.
+
+Fixed addressed Bud routing for names matching Aedrova / the central agent nickname,
+and for a short recipient name followed by a longer Bud name in the request. Explicit
+Bud tokens retain identity. Central-agent requests with incidental Bud mentions keep
+their existing routing. Added verified-tool onboarding acceptance tests: final-stage
+handoff required, disconnected/error/revoked grants rejected, edited Bud settings rejected.
+
+Live UI acceptance confirmed existing Google sign-in returned to the desktop and
+hosted Bud setup loaded. Earlier GitHub, Supabase, Figma, Notion and TikTok sandbox
+reads remain recorded evidence, not fresh refresh/disconnect acceptance. Existing
+Pebble/Orbit grants were not located in the inspected signed-in workspaces. Fresh
+Google-account onboarding and live source-backed Bud responses remain pending.
+No production grant was forcibly expired or disconnected for this test pass.
+
+Owner required now: reopen the rebuilt preview, sign in with the Google account
+owning Pebble/Orbit, select the workspace containing those Buds, and leave it open.
+This identifies the existing grants for live read/refresh validation without broader
+permissions. A new provider consent requires explicit approval at the consent step.
+No new SQL is required. Stripe/Instagram/Brave/Vercel credential and consent gates
+remain as detailed in docs/bud-connectors.md. Do not claim connector acceptance or
+fresh-account acceptance complete until their live checks pass.
+
+Marketing media studio and final Beta/DMG/Windows work remain planned, not started.
+M14 remains deferred. Continue this acceptance task after the account/workspace is
+identified, then report and request permission before the next feature milestone.
+
+### Sign-in-first Bud connections — October 10
+
+Owner authorized simplifying the connector experience. GitHub, Supabase and
+Notion now offer named resource choices after browser OAuth; TikTok selects
+its authorized account. Figma uses sign-in followed by a file link. Tokens/IDs
+are removed from the normal pre-login flow, with token setup available only
+under an explicit advanced option. No broader provider scopes or SQL changes.
+
+398 website/service tests and 56 focused desktop checks passed. Connector
+service branch contains the selection API and private temporary-token handling.
+Real post-consent discovery/selection remains a live acceptance gate; these
+checks do not certify all provider registrations for public customers.
+Owner required now: quit Aedrova (⌘Q) and reopen the rebuilt preview at
+`/Users/ayanshvarma/Documents/Aedrova/dist/Aedrova.app` to use the new flow.
+Stripe, Instagram, Vercel and Search still need outstanding provider support /
+setup before login-only connections can be offered. M14 remains deferred;
+request owner approval before the next feature milestone.
+
+### All-provider sign-in workflow — October 10
+
+Owner requested completing the login-first experience for every existing connector.
+Added Stripe Apps OAuth and Instagram Login with automatic account binding, plus
+Vercel integration OAuth with a named project picker and team-scoped reads. Existing
+five OAuth connectors remain intact. Search uses an authenticated Enable web search
+flow, an owner-funded server key and durable global/workspace daily caps; there is
+no fabricated Search OAuth. Personal token paths remain an advanced fallback.
+Confidential exchanges, grant lifetimes, read verification and inline confirmations
+are preserved. Managed grants store no shared key. No new SQL migration.
+
+Local validation: 411 service tests; 57 focused native tests; rebuilt desktop and
+verified its deep code signature. Live account acceptance is NOT complete: Stripe
+stops at owner passkey/2FA, Meta requires developer registration, Vercel requires
+new app registration/terms, and Brave Search requires a funded key. Registration,
+review, live token renewal/revocation and fresh customer grants remain blockers.
+Exact setup: ../Aedrova_site/docs/account-connector-setup.md. First owner action is
+Stripe passkey verification in the prepared login tab; never send credentials in
+chat. M14 and public billing/release gates remain deferred.
+
+### Immediate connector/UI fixes and final launch roadmap — October 10
+
+Connector service 60d532d deployed Live on Render (dep-db4v3pqd0e5s73djuas0).
+Readiness returned 200; Stripe/Instagram/Vercel callbacks without OAuth state were
+rejected with 403; unrelated /plans remained 404. Malformed unauthenticated Search
+POST was rejected with 422 before any grant. This is deployment smoke evidence,
+not provider/customer acceptance. Existing owner setup gates remain.
+
+Fixed native connector confirmation compression with a scroll-safe minimum-sized
+layout, separate Bud/check/text/button spacing and quieter embedded secondary
+action. Logout queues once behind a current request and discards local identity
+even if remote logout fails. New project/onboarding automatic planning defaults
+on; explicit saved opt-outs and original-folder/publishing approvals remain.
+
+Saved every owner release requirement in docs/final-beta-launch-plan.md with
+traceability and gates; source phase proposal in docs/release-plan-source.md.
+These phases are PLANNING ONLY. Pulse removal, billing launch, installer publication
+and broad feature/security work have NOT started. M14 remains deferred.
+First personal connector setup action remains Stripe passkey/Touch ID/2FA in the
+prepared tab; registration/review/key/live validation gates prevent claiming all
+connectors complete. No new SQL required. Ask approval before Phase 1.
+
+Immediate-fix validation: 90 focused native tests passed; the final confirmation
+subset passed all 25 checks after the visual refinement. Ruff and diff checks
+passed. Rebuilt dist/Aedrova.app and verified its deep code signature. UI proof:
+work/connector-confirmation-fixed.png. Source fixes/roadmap pushed as 2ae2c8f;
+connector deployment evidence pushed as 8a77e33 on the website branch. The currently
+running application must be quit/reopened to load these changes; no forced restart.
+
+
+## Stripe customer workflow preparation — October 10
+
+Owner deferred developer business verification and requested readiness for customer
+login/account selection. Stripe App v0.1.0 is registered and approved for testing.
+OAuth code binds the Stripe-selected account, verifies read access before Connected,
+and returns to the Bud confirmation without customer keys or manual codes. Focused
+HTTP regression tests cover successful binding, account mismatch and denied balance
+access. These are local tests, not fresh-customer/live acceptance.
+Aedrova developer verification, external testing, server credentials and public Stripe
+review remain gates; a verified customer account cannot bypass them. This preparation
+does not activate billing or public installation. Final-Beta Phase 1 is next and still
+requires explicit owner approval. No Final-Beta phase was started in this task.
+
+## Final-Beta Phase 1 — October 10 (authorized, in progress)
+
+Owner approved Phase 1 and created Aedrova Staging (scvmvqlzcqhwrrsiahpj).
+Hosted dashboard verified healthy and initially unmigrated; production/waitlist data
+not copied or changed. Frozen inventory and all setup/acceptance gates saved in
+`docs/final-beta-phase-1.md`. Pulse removed from app navigation/menu/module and service
+routes; meeting heartbeats and stored data preserved. Native release CI added across
+Linux/macOS/Windows plus real PostgreSQL migration/RLS tests. Service CI expanded to
+tracked-secret, private-schema, regression and image readiness checks. Explicit staging
+profiles/server guards reject known production targets and live billing/release flags.
+Both GitHub repositories have secret/push protection enabled, 0 collaborators and no
+branch protection/rulesets. Vendor node_modules removed from Git tracking, kept locally.
+Next owner action: run work/staging/schema.sql ONLY in the new staging SQL Editor.
+Private role credentials, HTTPS staging server and Google staging auth remain subsequent
+setup gates. Source/local test results do not certify all connectors or launch readiness.
+Phase 2/public billing/downloads/M14 not started. No staging payment/upgrade requested.
+
+Phase 1 execution evidence: desktop a7efded and service a2b1423 pushed to their
+existing feature branches. Local 725 native/409 service tests passed; both SQL suites
+passed. Service GitHub CI 38078223509 passed all steps. Native CI PostgreSQL passed;
+Windows test collection exposed existing Unix-only fcntl imports in ledger/retention.
+Windows remains an explicit release blocker, not skipped or certified. Local macOS
+preview rebuilt, signature/resource scan passed, packaged smoke confirms four pages.
+Owner ran the 23-migration staging bundle successfully; hosted Table Editor verified
+new app tables. Next required owner step: run the service sql/supabase-website.sql
+in Aedrova Staging to create the restricted NOLOGIN role/private backend schema.
+Private password, service origin and Google staging OAuth remain subsequent steps.
+
+Owner completed the private staging role LOGIN/password SQL successfully. Actual
+staging pooler login verified as aedrova_website with aedrova_billing search_path;
+public.workspaces SELECT denied (42501). Separate staging encryption key and private
+Render environment prepared locally, configuration validation passed. Free HTTPS
+service creation and staging Google OAuth remain required; no cloud secrets uploaded.
+
+## Staging HTTPS service — October 10
+
+Owner explicitly approved uploading staging-only database/encryption credentials to
+Render and deploying the free service. Created aedrova-beta-staging,
+service srv-db58sn8473hc73a9n3qg, deploy dep-db58sn8473hc73a9n580, commit e3da1d7.
+Render reports Deploy succeeded | Live. Origin:
+https://aedrova-beta-staging.onrender.com. Auto-deploy off; free $0/month compute.
+Fresh external GET / and /health/ready return 200 (readiness reports ready).
+/auth/google returns 303 to scvmvqlzcqhwrrsiahpj.supabase.co with redirect_to
+https://aedrova-beta-staging.onrender.com/auth/callback. /api/pulse remains 404.
+Credentials are stored only in Render environment and ignored restricted local files.
+Public staging desktop profile saved in work/staging/public-config.json; check-only
+validation passed. Production origin/database credentials were not used.
+
+Google provider is disabled in Aedrova Staging. Exact provider callback verified:
+https://scvmvqlzcqhwrrsiahpj.supabase.co/auth/v1/callback.
+Next owner requirement: create a separate Google Cloud project named Aedrova Staging
+(Google Cloud project selector > New project > name > Create); do not enable billing.
+Then configure a testing consent screen/client, test users and staging redirect URLs.
+This blocks staging end-to-end login; Phase 1 remains in progress.
+No Phase 2/M14/public billing/download activation. Windows fcntl remains a release gate.
+
+Owner reports creating the separate Aedrova Staging Google Cloud project. Current
+agent browser project selector (amillum account context) returns no Aedrova matches.
+Requested public Google Project ID to select the correct project/account before OAuth
+configuration. Do not infer that creation failed or configure amillum as staging.
+Staging Render service is live; Google sign-in acceptance remains blocked.
+
+Owner supplied Google staging Project ID aedrova-staging, number 7280065225.
+Direct in-app browser project URL opens only a partially loaded Google welcome page;
+API navigation aborts, so project access/consent setup not yet independently verified.
+Next owner requirement: in the owner's working browser, select aedrova-staging >
+APIs & Services > OAuth consent screen (Google Auth Platform) > Get started.
+Set app name Aedrova Staging, a support email available in dropdown, External audience
+in Testing, contact aedrovaai@gmail.com. Owner must personally review/accept any policy
+agreement on creation. OAuth client/secret/allowlist and sign-in validation follow.
+Do not reuse amillum/production OAuth credentials. Phase 1 remains in progress.
+
+Owner reports staging Google consent-screen initialization completed. Next owner
+requirement in project aedrova-staging: Google Auth Platform > Clients > Create client,
+Web application, name Aedrova Staging Web, authorized redirect URI exactly
+https://scvmvqlzcqhwrrsiahpj.supabase.co/auth/v1/callback. Keep client secret/private
+JSON outside Git/chat; install directly into staging Supabase provider in a later step.
+OAuth client creation, test-user enrollment, Supabase provider/URL configuration and
+end-to-end login still pending; Phase 1 remains in progress.
+
+Owner reports Aedrova Staging Web OAuth client created and staging Supabase Google
+provider credentials saved. Secrets supplied directly by owner, not received in chat.
+Next requirement: in Google Cloud project aedrova-staging > Google Auth Platform >
+Audience > Test users > Add users, add the Google account used to test desktop login
+and Save. Keep publishing status Testing. A second independently controlled tester
+account will be needed for multi-user isolation acceptance. Redirect allowlist and
+end-to-end login remain subsequent gates; Phase 1 is not complete.
+
+Owner reports Google staging test user added. Next requirement: Supabase project
+Aedrova Staging > Authentication > URL Configuration: Site URL
+https://aedrova-beta-staging.onrender.com; redirect URLs exactly
+https://aedrova-beta-staging.onrender.com/auth/callback and
+http://127.0.0.1:43827/auth/**. Native code uses random PKCE callback paths under
+/auth/ on the fixed loopback port; narrow path wildcard is required. Do not add
+production URLs or broad domain wildcards. Owner saves this configuration.
+Staging login/end-to-end isolation acceptance still pending; Phase 1 remains open.
+
+Owner reports staging Site URL and exact web/native redirect allowlist saved.
+Started isolated source staging launcher successfully (separate public-config.json and
+app.ini). Existing production app shares a display name; source process was stopped
+without closing the user's packaged app, avoiding accidental production sign-in.
+Opened web staging /auth/google for initial OAuth return validation. Free Render
+instance cold-start pending; next owner action is Google account selection/consent
+in staging web login. Browser/native session and multi-user isolation not yet verified.
+Phase 1 remains in progress.
+
+Fresh staging readiness HTTP 200 confirmed after cold start. /auth/google returns
+303 to staging Supabase with correct staging /auth/callback. In-app browser remains
+on Render interstitial; fresh login tab redirect blocked by client. Owner handoff:
+open https://aedrova-beta-staging.onrender.com/auth/google in Safari/normal browser,
+select registered Google test user and complete consent; report signed in or error.
+No authenticated login acceptance claimed. Native and multi-user tests still pending.
+
+## Staging Google login — owner confirmation
+
+Owner enabled the staging Google provider and reports successfully signing in with
+the registered test user. Independent /auth/v1/settings verification confirms
+external.google=true for scvmvqlzcqhwrrsiahpj. Browser session/desktop handoff has
+not been independently inspected; multi-user workspace isolation remains pending.
+Next owner requirement: Google Cloud project aedrova-staging > Google Auth Platform
+> Audience > Test users > Add users: add a second Google account under the owner's
+control and Save. This enables two-user staging isolation validation. Do not send
+credentials or use a production workspace. Phase 1 remains in progress; later phases
+and public billing/download activation remain gated.
+
+Owner reports second Google staging test user added. Started a staging-only hosted
+isolation probe using existing native PKCE/loopback OAuth code (no production
+endpoints, session tokens kept in memory). First browser login is awaiting owner
+account selection. Subsequent second distinct login is explicitly paused. Probe
+will create two disposable staging workspaces/messages, verify own reads and
+bidirectional foreign workspace/channel/message/member reads and message writes
+are denied, then unsend probe messages and archive workspaces. This does not
+certify meeting media, AI context isolation or desktop UI handoff. Phase 1 remains
+in progress until actual results and other release gates are recorded.
+
+First real staging native OAuth callback succeeded (ACCOUNT_1_SIGNED_IN). The
+probe then exited with EOFError because the background command has no interactive
+stdin; local test session was signed out by cleanup. Replaced stdin pause with a
+bounded local signal-file wait and restarted first login. Owner must sign in again
+with the original test account before the second distinct account handoff. No
+isolation tests have run yet; do not treat this runner issue as a Google failure.
+
+Restarted first staging OAuth session verified successful and retained in memory.
+Released bounded signal-file pause; second staging Google sign-in opened. Owner
+must choose the second distinct registered test account (Use another account if
+Google selects the original). Two-user isolation probes run after that callback;
+results are not yet available. Phase 1 remains in progress.
+
+## Hosted two-account isolation result
+
+Both real staging Google OAuth sessions succeeded and authenticated distinct users.
+Created two disposable staging workspaces with one probe message each. In both
+directions, each account could read its own message, and reads of the other
+workspace, channel, message and membership rows returned no data. Sending a message
+into the other account's channel was rejected with PostgreSQL 42501. These
+specific hosted isolation checks PASSED; this is not full AI-context/security
+certification or desktop UI acceptance.
+
+Cleanup failed because the local probe sent p_id rather than p_message to
+unsend_message. Helper corrected; sessions were signed out. Two disposable staging
+workspaces/messages remain (no production mutations); cleanup is outstanding.
+Evidence: ignored work/staging/isolation-report.json, status
+isolation_passed_cleanup_failed. Do not require repeated sign-ins solely to hide
+this test-runner issue.
+
+Remote CI run 38078880708 independently verified: PostgreSQL RLS, macOS desktop
+and Ubuntu desktop passed; Windows desktop failed. Existing Unix-only fcntl
+imports in agents/ledger.py and agents/retention.py remain the next baseline
+engineering blocker. Phase 1 is still in progress; hosted merge protections,
+Windows CI and desktop UI acceptance remain gates. No owner setup action is
+required immediately while engineering addresses the Windows blocker.
+
+## October 10 — portability fixes and deferred handoff
+
+Owner requested independent completion without setup interruptions, with owner
+actions saved for the end. Added `docs/phase-1-owner-handoff.md`.
+
+Implemented native nonblocking Windows CRT byte-range leases alongside POSIX
+flock; secure final-component opening rejects Windows reparse points and POSIX
+symlinks before truncation. Locks are released when streams close and descriptors
+are not inherited implicitly. Execution and retention no longer import fcntl on
+Windows. Build-check receipts use the same safe file opener. Added real second-
+process exclusion/reacquisition, symlink target-preservation, and error-classification
+tests; all six new lease tests passed in the first actual Windows runner (the full
+Windows job reached 675 passing tests rather than failing collection).
+
+Remote run 38109927599 at e5d1499: PostgreSQL and macOS passed; Linux reported
+one existing agent-feed visibility bug (730 passed); Windows reported 53 failures,
+675 passed and six teardown errors. These are not silently skipped. Fixed the
+agent-event stack switch so the transcript is visible when it contains rows, and
+strengthened its existing layout regression to assert visibility. Also fixed Windows
+agent timestamps (unsupported %- modifiers), explicit UTF-8 emoji catalog loading,
+and GitHub login's synchronous FailedToStart race. The updated focused suites
+passed 77 tests locally; full local baseline passed 731 tests before these follow-ups.
+Source/secret checks and ordered SQL/RLS/optional-meeting checks passed.
+
+Remaining Windows failures include Unix-only synthetic executable fixtures/runtime
+pipe/process handling, POSIX permission assertions versus Windows ACL semantics,
+conservative retention behavior on platforms without safe rmtree, and font/layout
+differences. Windows distribution and full Phase 1 sign-off remain blocked; no
+Windows installer or universal cross-platform readiness is claimed. Follow-up remote
+CI is required for the final revision. Owner interventions stay deferred as requested.
+No production merge/deployment, Phase 2, M14 or paid download activation performed.
+
+
+## October 10 — final Phase 1 baseline verification
+
+Hosted staging setup, separate Google OAuth and bidirectional two-account row
+isolation are verified. Staging readiness returned 200, Google provider enabled,
+and the removed Pulse route returned 404 during this final pass. Production and
+public release/billing gates remain unchanged.
+
+Native revision 2d93e52 fixes Windows bounded provider pipe reads, process-tree
+lifetime containment with a kill-on-close job, portable synthetic subprocess helpers,
+filesystem-specific permission preservation assertions, conservative retention
+expectations and responsive connector/account/project layouts. No tests are skipped
+to claim Windows readiness. Follow-up wraps the connector gallery banner and adds a
+real spawned-command cancellation regression. Full updated local suite: 732 passed;
+Ruff, tracked secret-pattern and compile checks passed. Ordered migration/RLS and
+optional-meeting-order checks passed. Final remote evidence is recorded below when
+complete; independent code completion does not waive the owner acceptance gates.
+
+Owner handoff: docs/phase-1-owner-handoff.md. Required to close Phase 1: source
+staging desktop login/workspace/sign-out acceptance and active main-branch PR/check
+protections in both repositories. Two disposable isolation workspaces remain as
+optional cleanup, not a failing isolation check. Windows CI is regression evidence,
+not certification of installer signing, Windows ACL privacy or live provider sandbox
+behavior; those remain later-phase gates. Obtain new approval for Phase 2 only after
+reporting these results and outstanding owner actions.
+
+
+## Final verified result — October 10, 2026
+
+**Independent Phase 1 engineering complete; owner sign-off pending.** Frozen
+native code revision **8a98c27**, [Release candidate run 38111786891](https://github.com/ayanshv/Aedrova/actions/runs/38111786891):
+all four jobs **passed**. Ubuntu **732 passed** (304.70s), macOS **732 passed**
+(334.33s), Windows **732 passed** (391.76s), plus PostgreSQL migration/RLS checks.
+The Windows run includes native cross-process leases, bounded pipe handling,
+process cancellation including spawned commands, and compact layout checks. No
+Windows tests were excluded to achieve this result. Local final suite **732 passed**
+(103.65s); source/secret-pattern/compile checks and ordered SQL/RLS/optional-meeting
+checks passed. CI evidence is retained in job artifacts; local copies/report are
+ignored under work/staging.
+
+Service companion revision **1a183ff**, [Website checks run 38111715356](https://github.com/ayanshv/Aedrova-website/actions/runs/38111715356):
+**passed**, including backend regressions, private PostgreSQL access/lease checks,
+container build and startup/readiness. Only documentation differs from deployed
+staging service **e3da1d7**; auto-deploy is off. Production remains unchanged.
+
+The final evidence/documentation commit changes no runtime or test code and does
+not rerun the unchanged tested baseline. These are baseline regression results,
+not live connector/model/meeting or signed-installer certification.
+
+To fully close Phase 1, the owner must confirm (1) source staging desktop Google
+return, workspace entry and sign-out acceptance, and (2) active main-branch PR /
+required CI / no force-push / no deletion protections in both repositories. Exact
+commands, check names and locations: docs/phase-1-owner-handoff.md. Staging fixture
+cleanup is optional housekeeping. No new payment, production secret, production
+merge/deploy, public billing/download activation or Phase 2 execution is required
+or authorized by this result. Phase 2 remains permission-gated after this handoff.
+
+## Owner confirmation and Phase 2 authorization
+
+October 10, 2026: owner reports both required actions completed (staging desktop
+acceptance and GitHub main-branch rulesets) and explicitly approves starting Phase 2.
+Phase 1 is closed on that owner acceptance; this is not a separate automated
+re-inspection of the desktop journey or hosted rulesets. Phase 2 connector/provider
+validation is now authorized. Public launch, production merges, billing/downloads
+and later phases remain gated. The subsequent Finish later fix passed 55 focused
+Bud/onboarding tests and is included in the source handoff.
+
+## Final-Beta Phase 2 — authorized and started
+
+Owner confirmed Phase 1 desktop acceptance and both main-branch protection actions,
+then approved Phase 2. Initial connector/provider audit and implementation evidence
+are in docs/final-beta-phase-2.md. Native connector checks:72 passed; service:426
+passed. OpenAI metadata access verified without inference. Anthropic private setup
+and explicit local opt-in implemented; its actual key/model/inference acceptance
+and fresh-customer connector lifecycle/provider registration gates remain open.
+Next owner requirement: private Anthropic setup. Later phases remain gated.
+
+### Phase2: Anthropic verified; Stripe owner form prepared
+
+Anthropic private setup/model access verified (metadata only, no inference). Initial
+Phase2 native and website CI green. Corrected Sonnet5.5 cache-read pricing and
+blocked client-selected premium inference modes outside metering. Service430 tests
+pass locally. Stripe external testing remains business-verification blocked. Open
+owner form: Settings→Business→Business details→Edit. First step is completing
+industry, website and product description privately. Full evidence in Phase2 doc.
+
+### Stripe business information saved — service agreement handoff
+
+Owner reported saved; dashboard independently confirms business website
+https://aedrova.com, public name Aedrova, and industry/product description provided.
+Business information no longer shows Incomplete. Opened Service agreement → Review
+without submitting. Next owner requirement: review the Stripe Services Agreement
+and Acquirer Disclosure in the open Terms of service modal; click Continue personally
+only if authorized and in agreement. The modal also includes consent to Stripe text
+messages and a representation that business information is complete/correct. No
+agreement accepted by the agent. Representative/public details/descriptor still
+incomplete; full verification and Stripe external testing remain blocked. Phase2
+is active; no later phase or live billing enabled.
+
+### Stripe agreement completed — public support details handoff
+
+Owner reports agreement done; independent dashboard observation shows Service
+agreement no longer listed as Incomplete. Opened Public details → Edit public
+details → Add customer support details without entering/submitting fields. Next
+owner requirement is to complete truthful support phone/address/email/URL and
+applicable published privacy/terms URLs, then Save personally. Business name and
+website already show Aedrova/https://aedrova.com. The form defaults to showing the
+support phone on receipts/invoices; owner must choose the appropriate public
+contact information. Representative and descriptor remain Incomplete. Full Stripe
+verification/external testing and Phase2 acceptance remain open; no billing enabled.
+
+### October 11 — public policies/support update authorized
+
+Owner authorized replacing website Privacy/Terms, adding Customer support with
+(408) 634-5254, pushing/merging the website update as needed, and entering/saving
+https://aedrova.com/privacy, /terms and /support in Stripe. Isolated website PR4
+uses codex/legal-support-refresh from main to avoid publishing unfinished connector
+changes. Local website suite392 passed. Documents describe conditional Beta features
+and actual privacy/connector limits; no legal-compliance guarantee or fabricated
+company identity/address. Paid-launch legal/business review remains a gate.
+Publication and Stripe Save verification will be recorded after checks complete.
+
+### October11 — policies live and Stripe URLs saved
+
+Website PR4 https://github.com/ayanshv/Aedrova-website/pull/4 merged after green
+CI38120908946; main commit8bb942d, mainCI38121001131 also green. Render website
+srv-db0a8o7avr4c73eqcj4g auto-deploymentdep-db5jhsmk1f9s73eeecdg succeeded.
+Live browser verification confirms new Privacy/Terms effectiveOctober11 and Support
+with authorized phone(408)634-5254. Waitlist retained; release/billing gates untouched.
+Current website development branch integrates the same pages:431 tests passed,
+tracked secret check passed.
+
+Entered https://aedrova.com/support, https://aedrova.com/privacy and
+https://aedrova.com/terms into configured Stripe form and clicked Save under explicit
+owner authorization. Modal closed; Customer-facing information no longer Incomplete
+and saved Terms plus other provided URLs appear. No private address guessed/entered.
+Stripe still marks representative/statement descriptor incomplete. Active Account
+status task: Provide an external account; Stripe says no bank account on file.
+Opened task details, no bank information entered. Next owner requirement: click
+Start on this task and provide their valid bank account privately/personally.
+This is Stripe account readiness, not evidence of full connector external-testing
+acceptance. No later milestone started. Legal/business identity and jurisdiction
+review remain required before paid public Beta; policies are not a compliance guarantee.
+
+### October11 — current public contact email
+
+Owner changed public contact/support email to contact@aedrova.com. Website
+Support, Privacy, Terms, footer and setup guidance updated in isolated PR5.
+Historical Phase1 Google registration evidence retains its original account value.
+Stripe already shows contact@aedrova.com; no additional Stripe edit is needed.
+Next owner requirement remains the open Stripe external bank-account task.
+
+### October11 — team pricing / shared Space implementation authorized
+
+Owner is completing Stripe bank setup and authorized unmistakable per-team pricing
+plus attached independent Space/nested subspace requirements, source pushes/merges.
+Implemented within existing architecture; see docs/space-billing.md for exact
+migration, flags, Stripe presentation and activation gates. Paid prices unchanged,
+waitlist retained. New migration needs owner execution in Aedrova Staging before
+root sharing is enabled; no fixture or production reset. Cluely footer/legal-depth
+study explicitly deferred to Phase5 in the launch plan. Stop after this task and
+ask whether the owner finished Stripe bank setup; do not begin another phase.

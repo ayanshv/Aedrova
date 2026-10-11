@@ -102,6 +102,7 @@ def test_agent_stream_never_overlaps_composer_when_resized(qtbot, tmp_path):
         for width, height in ((900, 650), (1440, 940)):
             window.resize(width, height)
             qtbot.wait(30)
+            assert window.messages.isVisible()
             assert window.messages.isAncestorOf(window.agent_feed)
             viewport_bottom = window.messages.mapToGlobal(window.messages.rect().bottomLeft()).y()
             composer_top = window.composer.mapToGlobal(window.composer.rect().topLeft()).y()

@@ -12,7 +12,7 @@ from PySide6.QtCore import (
     QTimer,
     QVariantAnimation,
 )
-from PySide6.QtGui import QColor, QKeySequence, QPainter, QPainterPath, QPen, QRegion, QShortcut
+from PySide6.QtGui import QColor, QKeySequence, QPainter, QPainterPath, QRegion, QShortcut
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -393,9 +393,7 @@ class SpotlightTour(QWidget):
             )
         if target is not None and target.isVisible() and target.isEnabled():
             origin = self.mapFromGlobal(target.mapToGlobal(QPoint(0, 0)))
-            self.target_rect = (
-                QRect(origin, target.size()).adjusted(-5, -5, 5, 5).intersected(self.rect())
-            )
+            self.target_rect = QRect(origin, target.size()).intersected(self.rect())
         else:
             self.target_rect = QRect()  # Never spotlight a hidden or unavailable integration.
         self.card.setFixedWidth(min(420, self.width() - 48))
@@ -431,12 +429,6 @@ class SpotlightTour(QWidget):
             path,
             QColor(0, 0, 0, int((175 if self.window.reduced_transparency else 140) * self.reveal)),
         )
-        if not self.target_rect.isEmpty():
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            accent = QColor(self.window.theme.accent)
-            accent.setAlpha(int(210 * self.reveal))
-            painter.setPen(QPen(accent, 2))
-            painter.drawRoundedRect(self.target_rect, 16, 16)
 
     def finish(self, status):
         self.highlight_animation.stop()

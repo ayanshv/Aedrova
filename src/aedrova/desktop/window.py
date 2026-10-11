@@ -193,11 +193,6 @@ class AedrovaWindow(QMainWindow):
         self.invite_teammates_button = button("Invite teammates…", "Invite teammates")
         self.invite_teammates_button.clicked.connect(lambda: self.show_account("invite"))
         side.addWidget(self.invite_teammates_button)
-        self.pulse_button = button("Pulse", "Open startup command center", "tab")
-        self.pulse_button.setCheckable(True)
-        self.pulse_button.setToolTip("Your startup’s connected context and recent changes")
-        self.pulse_button.clicked.connect(self.open_pulse)
-        side.addWidget(self.pulse_button)
         from aedrova.desktop.dots import DotSection
 
         self.ai_team_section = DotSection(self)
@@ -327,10 +322,6 @@ class AedrovaWindow(QMainWindow):
         self._build_chat()
         for _ in range(3):
             self.pages.addWidget(QWidget())
-        from aedrova.desktop.pulse import PulsePage
-
-        self.pulse_page = PulsePage(self)
-        self.pages.addWidget(self.pulse_page)
         self.select_tab(0)
         self.notice = label(
             "Local preview · messages and new spaces reset when the app closes.", "muted"
@@ -485,8 +476,6 @@ class AedrovaWindow(QMainWindow):
         jump = view.addAction("Jump to conversation…", self.open_switcher)
         jump.setShortcut(QKeySequence("Ctrl+K"))
         view.addAction("Toggle sidebar", self.toggle_sidebar)
-        pulse_action = view.addAction("Startup Pulse", self.open_pulse)
-        pulse_action.setShortcut(QKeySequence("Ctrl+5"))
         appearance = view.addMenu("Appearance")
         group = QActionGroup(self)
         self.appearance_actions = {}
@@ -536,7 +525,27 @@ class AedrovaWindow(QMainWindow):
             item.setFixedSize(44, 44)
             item.setCheckable(True)
             item.setChecked(workspace.id == self.workspace_id)
-            item.setToolTip("Workspace · " + workspace.name)
+            context = (
+                next(
+                    (
+                        s
+                        for s in self.connected.account.snapshot.get("workspaces", [])
+                        if s["id"] == workspace.id
+                    ),
+                    {},
+                )
+                if self.connected and self.connected.active
+                else {}
+            )
+            item.setToolTip(
+                (
+                    "Subspace · shares " + context.get("billing_name", "parent Space")
+                    if context.get("parent_id")
+                    else "Independent Space"
+                )
+                + " · "
+                + workspace.name
+            )
             item.clicked.connect(
                 lambda checked=False, wid=workspace.id: (
                     self.workspace_menu()
@@ -845,8 +854,7 @@ class AedrovaWindow(QMainWindow):
             self.agent_feed.author_name = bud["name"]
         self.agent_feed.add_event(text)
         self.messages.set_agent_visible(self.activity_channel == self.channel_id)
-        if self.messages.model().rowCount() == 0:
-            self.message_stack.setCurrentIndex(0)
+        self.message_stack.setCurrentIndex(0 if self.messages.model().rowCount() else 1)
         if update_activity and getattr(self, "build_dialog", None) and self.build_dialog.job:
             phase = "Working · latest update below"
             if text.startswith("Running:"):
@@ -936,10 +944,16 @@ class AedrovaWindow(QMainWindow):
         ]
         dot = mention(text, rows)
         task = build_command(text, nickname)
-        # A direct Bud mention owns the response, including action-word requests.
-        if dot and task is None:
-            import re
+        import re
 
+        addressed_bud = dot and re.match(
+            r"^(?:@" + re.escape(dot["name"]) + r"(?=[,:\s]|$)|<@dot:[^>]+>)",
+            text.strip(),
+            re.IGNORECASE,
+        )
+        # A direct Bud mention owns the response, including action-word requests.
+        # Explicit Bud tokens also win when its name matches the main agent's nickname.
+        if dot and (task is None or addressed_bud):
             from aedrova.desktop.dot_analysis import start_analysis
 
             request = re.sub(
@@ -1107,7 +1121,6 @@ class AedrovaWindow(QMainWindow):
         if not 0 <= index < len(self.tab_buttons):
             return
         self.pages.setCurrentIndex(index)
-        self.pulse_button.setChecked(False)
         self.header.show()
         self.primary_navigation.show()
         if hasattr(self, "space_symbol"):
@@ -1116,14 +1129,6 @@ class AedrovaWindow(QMainWindow):
             tab.setChecked(i == index)
         if index == 0 and hasattr(self, "thread_panel"):
             self._adapt_thread()
-
-    def open_pulse(self):
-        self.pages.setCurrentWidget(self.pulse_page)
-        self.header.hide()
-        self.primary_navigation.hide()
-        self.pulse_button.setChecked(True)
-        for tab in self.tab_buttons:
-            tab.setChecked(False)
 
     def toggle_sidebar(self):
         self.sidebar.setVisible(not self.sidebar.isVisible())
@@ -1144,8 +1149,6 @@ class AedrovaWindow(QMainWindow):
             dialog.setPalette(palette(self.theme))
         self.setStyleSheet(stylesheet(self.theme, reduced_transparency=self.reduced_transparency))
         self.build_activity.configure(self.theme, self.reduced_motion, self.build_activity.active)
-        if hasattr(self, "pulse_page"):
-            self.pulse_page.apply_theme()
         self.messages.set_theme(self.theme)
         self.thread_messages.set_theme(self.theme)
         self._apply_materials()
@@ -1388,7 +1391,7 @@ class AedrovaWindow(QMainWindow):
         hero_layout.setContentsMargins(30, 30, 30, 30)
         hero_layout.setSpacing(16)
         hero_layout.addWidget(label(f"{self.workspace.name.upper()}  /  SAMPLE PROJECT", "section"))
-        hero_layout.addWidget(label("Less setup.\nMore possibility.", "display"))
+        hero_layout.addWidget(label("Less setup.\nMore possibility.", "display", wrap=True))
         hero_layout.addWidget(
             label(
                 "A simpler first five minutes. Three thoughtful steps from an idea to a workspace.",
@@ -1769,9 +1772,6 @@ class AedrovaWindow(QMainWindow):
         account = getattr(self, "account_dialog", None)
         if not self.current_user():
             self.show_account()
-            return
-        if account.busy:
-            self.notify("Finishing the current request. Try Log out again in a moment.")
             return
         build = getattr(self, "build_dialog", None)
         drafts = self.composer.editor.toPlainText() or self.thread_composer.editor.toPlainText()

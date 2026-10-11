@@ -410,6 +410,8 @@ def test_reduce_motion_and_transparency_are_functional_and_saved(window, qtbot):
 
 
 def test_bento_reflows_and_document_tile_opens(window, qtbot):
+    from layout_checks import no_horizontal_overflow
+
     from aedrova.desktop.materials import AdaptiveBento, DocumentTile
 
     window.select_tab(1)
@@ -418,7 +420,7 @@ def test_bento_reflows_and_document_tile_opens(window, qtbot):
     window.resize(900, 680)
     qtbot.waitUntil(lambda: grid.columns == 1)
     scroll = window.pages.currentWidget()
-    assert scroll.horizontalScrollBar().maximum() == 0
+    no_horizontal_overflow(qtbot, scroll)
     window.resize(1440, 940)
     qtbot.waitUntil(lambda: grid.columns == 2)
     tile = grid.findChild(DocumentTile)

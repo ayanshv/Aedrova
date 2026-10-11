@@ -3,9 +3,10 @@
 from datetime import datetime
 from uuid import uuid4
 
-from PySide6.QtCore import Qt, QThreadPool, QUrl
+from PySide6.QtCore import Qt, QThreadPool, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
 
+from aedrova.desktop.bud_art import original_color
 from aedrova.desktop.controls import AppDialog
 from aedrova.desktop.projects import Job
 from aedrova.desktop.teammate_habitat import TeamSection
@@ -59,12 +60,13 @@ class DotSection(TeamSection):
 
 
 class DotDialog(AppDialog):
-    def __init__(self, window, selected=None):
+    def __init__(self, window, selected=None, *, required=False):
         super().__init__(window)
         self.window, self.workspace = window, window.workspace_id
         self.user = str(window.current_user().id)
         self.rows, self.providers, self.job = [], [], None
         self.pending = False
+        self.required = required
         from aedrova.desktop.bud_setup import build_setup
 
         build_setup(self, window)
@@ -72,7 +74,7 @@ class DotDialog(AppDialog):
         self.preview()
         self.refresh()
 
-    def run(self, operation, completed):
+    def run(self, operation, completed, *, recovery=False):
         if (
             (self.job or self.pending)
             or self.window.workspace_id != self.workspace
@@ -80,15 +82,72 @@ class DotDialog(AppDialog):
             or str(self.window.current_user().id) != self.user
         ):
             return
+        token = object()
+        self._bud_request = token
+        loading = not bool(getattr(self, "oauth_state", None))
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        retry = getattr(self, "_load_retry", None)
+        if recovery and retry is None:
+            from aedrova.desktop.dialogs import button
+
+            retry = button("Retry loading", role="outline")
+            retry.setAccessibleName("Retry loading Bud configuration")
+            retry.clicked.connect(lambda: self.refresh())
+            layout = self.status.parentWidget().layout()
+            layout.insertWidget(layout.indexOf(self.status) + 1, retry)
+            self._load_retry = retry
+        if retry is not None:
+            retry.hide()
         self.pending = True
         self.update_controls()
-        self.status.setText("Connecting securely…")
+        if loading:
+            self.set_loading(self.pages, True, "gallery" if hasattr(self, "cards") else "form")
+
+        def current():
+            return self._bud_request is token
+
+        def release():
+            timer.stop()
+            self.pending = False
+            self.job = None
+            if loading:
+                self.set_loading(self.pages, False)
+
+        def recover(message):
+            if not current():
+                return
+            self._bud_request = None
+            release()
+            self.status.setText(message)
+            if recovery and retry is not None:
+                retry.show()
+            self.update_controls()
+
+        def stalled():
+            recover(
+                "The Bud service is taking longer than expected to wake up. "
+                "Retry loading in a moment. Your configuration has not been changed."
+            )
+
+        def closed(*_):
+            if current():
+                self._bud_request = None
+                timer.stop()
+
+        self.finished.connect(closed)
+        if recovery:
+            # Only read-only loads may be retried. Never retry a timed-out write.
+            timer.timeout.connect(stalled)
+            timer.start(getattr(self, "_load_timeout_ms", 30000))
 
         def ready(value):
+            if not current():
+                if "service" in value:
+                    value["service"].close_context()
+                return
             if "error" in value:
-                self.pending = False
-                self.status.setText(value["error"])
-                self.update_controls()
+                recover(value["error"])
                 return
             service = value["service"]
 
@@ -100,11 +159,19 @@ class DotDialog(AppDialog):
                 finally:
                     service.close_context()
 
-            self.job = Job(work)
+            job = Job(work)
+            self.job = job
+            # Keep timed-out workers alive until they close their service context.
+            jobs = getattr(self, "_bud_jobs", None)
+            if jobs is None:
+                jobs = self._bud_jobs = []
+            jobs.append(job)
 
             def finished(result):
-                self.job = None
-                self.pending = False
+                jobs.remove(job)
+                if not current():
+                    return
+                release()
                 if (
                     not self.window.current_user()
                     or str(self.window.current_user().id) != self.user
@@ -113,13 +180,17 @@ class DotDialog(AppDialog):
                     self.reject()
                     return
                 if "error" in result:
-                    self.status.setText(result["error"])
-                else:
+                    recover(result["error"])
+                    return
+                try:
                     completed(result["value"])
+                except Exception:
+                    recover("Could not display Bud configuration. Retry loading to refresh it.")
+                    return
                 self.update_controls()
 
-            self.job.signals.finished.connect(finished)
-            QThreadPool.globalInstance().start(self.job)
+            job.signals.finished.connect(finished)
+            QThreadPool.globalInstance().start(job)
 
         def fork():
             try:
@@ -133,9 +204,7 @@ class DotDialog(AppDialog):
             ready,
         )
         if not accepted:
-            self.pending = False
-            self.status.setText("Reconnect the workspace before managing Buds.")
-            self.update_controls()
+            recover("Reconnect the workspace before managing Buds.")
 
     def sync_connection_rows(self, rows):
         cache = getattr(self.window, "dot_connection_states", {})
@@ -202,7 +271,7 @@ class DotDialog(AppDialog):
             if callback:
                 callback(self.current())
 
-        self.run(fetch, loaded)
+        self.run(fetch, loaded, recovery=True)
 
     def current(self):
         index = self.list.currentRow()
@@ -372,9 +441,10 @@ class DotDialog(AppDialog):
             tile.setEnabled(self.admin())
         for tile, value in self.swatch_buttons:
             selected = self.color.currentData() == value
+            display_color = original_color(self.character.config) if value == "#4388F5" else value
             tile.setStyleSheet(
                 "QPushButton {background:"
-                + value
+                + display_color
                 + ";border-radius:14px;border:"
                 + ("3px solid #FFFFFF" if selected else "2px solid transparent")
                 + ";}"
@@ -650,6 +720,16 @@ class DotDialog(AppDialog):
             )
 
     def done(self, result):
+        if self.required and result == self.DialogCode.Accepted:
+            row = self.current()
+            if (
+                not row
+                or row.get("status") != "Connected"
+                or self.has_changes()
+                or self.pages.currentIndex() != 5
+            ):
+                self.status.setText("Finish configuring a Bud and connect one tool to continue.")
+                return
         if self.embedded_connectors:
             self.embedded_connectors.stop_oauth()
             self.embedded_connectors.credential.clear()

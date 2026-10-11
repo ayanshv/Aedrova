@@ -282,6 +282,23 @@ class IdentityService:
     def snapshot(self):
         self._authenticated()
         workspaces = self.client.rpc("list_my_workspaces", {"p_archived": False}).execute().data
+        hierarchy_available = True
+        for workspace in workspaces:
+            try:
+                context = (
+                    self.client.rpc("space_billing_context", {"p_workspace": workspace["id"]})
+                    .execute()
+                    .data
+                )
+                workspace.update(context)
+            except Exception as error:
+                if getattr(error, "code", None) == "PGRST202":
+                    hierarchy_available = False
+                    break
+                if getattr(error, "code", None) == "42501":
+                    workspace["billing_unavailable"] = True
+                else:
+                    raise
         archived = self.client.rpc("list_my_workspaces", {"p_archived": True}).execute().data
         memberships = self.client.rpc("list_members", {}).execute().data
         channels = (
@@ -308,6 +325,7 @@ class IdentityService:
             .select("workspace_id,nickname,provider")
             .execute()
             .data,
+            "space_hierarchy_available": hierarchy_available,
             "workspaces": workspaces,
             "archived_workspaces": archived,
             "members": memberships,
@@ -337,6 +355,8 @@ class IdentityService:
             "unsend_message",
             "set_message_reaction",
             "create_workspace",
+            "create_subspace",
+            "move_subspace",
             "onboard_workspace",
             "set_agent_preferences",
             "create_channel",

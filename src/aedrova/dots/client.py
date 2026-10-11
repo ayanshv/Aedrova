@@ -34,14 +34,18 @@ def client(service):
 
 
 def mention(text, rows):
+    matches = []
     for row in sorted(rows, key=lambda r: len(r["name"]), reverse=True):
         escaped = re.escape(row["name"])
         pattern = (
             r"(?<!\w)(?:@" + escaped + r"(?![\w-])|<@dot:" + re.escape(row["id"]) + r"\|[^>]+>)"
         )
-        if re.search(pattern, text, re.IGNORECASE):
-            return row
-    return None
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            if not text[: match.start()].strip():
+                return row  # The recipient wins over longer names mentioned in the request.
+            matches.append(row)
+    return matches[0] if matches else None
 
 
 def calls_from_model(output, rows):

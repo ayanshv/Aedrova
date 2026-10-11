@@ -102,10 +102,12 @@ def editor(qtbot, tmp_path, monkeypatch):
     from aedrova.desktop.bud_connectors import ConnectorsDialog
 
     monkeypatch.setattr(
-        ConnectorsDialog, "run", lambda self, operation, completed: completed(operation(service))
+        ConnectorsDialog,
+        "run",
+        lambda self, operation, completed, **kwargs: completed(operation(service)),
     )
     monkeypatch.setattr(
-        DotDialog, "run", lambda self, operation, completed: completed(operation(service))
+        DotDialog, "run", lambda self, operation, completed, **kwargs: completed(operation(service))
     )
     dialog = DotDialog(window)
     qtbot.addWidget(dialog)
@@ -215,11 +217,18 @@ def test_back_navigation_preserves_configuration_and_reduced_motion(editor):
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
-def test_color_controls_render_after_transition_and_change_preview(editor, qtbot, theme):
+@pytest.mark.parametrize(
+    "look", ["builder", "designer", "marketing", "finance", "research", "product"]
+)
+def test_color_controls_render_after_transition_and_change_preview(editor, qtbot, theme, look):
     from PySide6.QtGui import QColor
+
+    from aedrova.desktop.bud_art import original_color
+    from aedrova.desktop.bud_setup import choose_look
 
     dialog, _, _, window = editor
     window.set_theme(theme)
+    choose_look(dialog, look)
     dialog.show_step(1)
     dialog.show_step(2)
     qtbot.wait(220)
@@ -230,7 +239,7 @@ def test_color_controls_render_after_transition_and_change_preview(editor, qtbot
         # Render the real widget; an empty control fails even when its hit area exists.
         drawn = tile.grab().toImage()
         sample = drawn.pixelColor(drawn.width() // 2, drawn.height() // 2)
-        expected = QColor(value)
+        expected = QColor(original_color(dialog.character.config) if value == "#4388F5" else value)
         assert abs(sample.red() - expected.red()) < 15
         assert abs(sample.green() - expected.green()) < 15
         assert abs(sample.blue() - expected.blue()) < 15
@@ -457,3 +466,50 @@ def test_look_selection_sets_specialty_and_recommendations(editor):
         assert dialog.job_role.currentData() == specialty
         assert dialog.recommendations.text().startswith(specialty.title() + " tools")
     assert not any("Match" in tile.text() for tile, _ in dialog.appearance_buttons)
+
+
+def test_required_bud_setup_cannot_be_accepted_without_verified_connection(editor):
+    dialog, rows, saved, window = editor
+    dialog.required = True
+    dialog.accept()
+    assert dialog.isVisible()
+    assert "connect one tool" in dialog.status.text()
+    assert not rows
+
+
+def test_finish_later_closes_required_setup_without_completing_it(editor):
+    dialog, rows, saved, _ = editor
+    dialog.required = True
+    assert dialog.exit_button.text() == "Finish later"
+    dialog.exit_button.click()
+    assert not dialog.isVisible()
+    assert dialog.result() == dialog.DialogCode.Rejected
+    assert not rows and not saved
+
+
+def test_required_setup_finishes_only_after_verified_tool_and_final_stage(editor):
+    dialog, rows, _, _ = editor
+    dialog.required = True
+    dialog.show_step(4)
+    gallery = dialog.embedded_connectors
+    gallery.open_provider(gallery.providers[0])
+    gallery.resource.setText("team/project")
+    gallery.credential.setText("private-fixture-token")
+    gallery.connect_tool()
+    assert rows[0]["status"] == "Connected"
+    dialog.accept()
+    assert dialog.isVisible()  # A connected grant cannot skip the final handoff.
+    dialog.next.click()
+    assert dialog.pages.currentIndex() == 5
+    for status in ("Needs authorization", "Disconnected", "Permission issue", "Error"):
+        dialog.current()["status"] = status
+        dialog.accept()
+        assert dialog.isVisible()
+    dialog.current()["status"] = "Connected"
+    dialog.name.setText("Changed after authorization")
+    dialog.accept()
+    assert dialog.isVisible()  # Old grants cannot authorize changed Bud settings.
+    dialog.name.setText(rows[0]["name"])
+    dialog.accept()
+    assert not dialog.isVisible()
+    assert dialog.result() == dialog.DialogCode.Accepted

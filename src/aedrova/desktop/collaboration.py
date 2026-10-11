@@ -88,14 +88,24 @@ class ChatPanel(AppDialog):
             self.refresh_timer.start()
         self.finished.connect(lambda _: self.timer.stop())
         self.finished.connect(lambda _: self.refresh_timer.stop())
+        account = getattr(owner.window, "account_dialog", None)
+        if account is not None:
+            account.operation_failed.connect(self.load_failed)
         QTimer.singleShot(0, self.load)
+
+    def load_failed(self):
+        skeleton = getattr(self, "_loading_skeleton", None)
+        if skeleton is not None and skeleton.isVisible():
+            self.set_loading(self.results, False)
+            self.notice.setText("Could not load this view. Try searching again.")
 
     def load(self):
         if not self.isVisible():
             return
         self.generation += 1
         generation = self.generation
-        self.notice.setText("Searching…")
+        self.notice.clear()
+        self.set_loading(self.results, True, "feed")
         self.results.clear()
         self.owner.inventory(
             self.search.text(),
@@ -107,6 +117,7 @@ class ChatPanel(AppDialog):
         )
 
     def loaded(self, data):
+        self.set_loading(self.results, False)
         self.results.clear()
         if data.get("setup_required"):
             self.notice.setText(
@@ -1276,6 +1287,7 @@ class Collaboration(QObject):
         def loaded(data):
             if not dialog.isVisible():
                 return
+            dialog.set_loading(description, False)
             title.setText(data["title"])
             description.setText(data["description"])
             metadata.hide()
@@ -1286,9 +1298,18 @@ class Collaboration(QObject):
                 description.setText("Sign in to load page metadata.")
                 return
             metadata.setEnabled(False)
-            metadata.setText("Loading…")
-            connected.enqueue(("preview-link", url), fetch, loaded)
+            dialog.set_loading(description, True, "feed")
+            if not connected.enqueue(("preview-link", url), fetch, loaded):
+                load_failed()
 
+        def load_failed():
+            skeleton = getattr(dialog, "_loading_skeleton", None)
+            if skeleton is not None and skeleton.isVisible():
+                dialog.set_loading(description, False)
+                description.setText("Could not load this preview. Try again.")
+                metadata.setEnabled(True)
+
+        self.window.account_dialog.operation_failed.connect(load_failed)
         metadata.clicked.connect(load)
         self.keep(dialog)
         dialog.show()

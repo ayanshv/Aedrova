@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
 )
 
 from aedrova.desktop.brand import BrandMark
-from aedrova.desktop.controls import AppDialog, ChoiceBox
+from aedrova.desktop.controls import AppDialog, ChoiceBox, CodingProviderChoice
 from aedrova.desktop.dialogs import button, label
 from aedrova.desktop.welcome_surface import WelcomeSurface
 from aedrova.identity.oauth import google_sign_in
@@ -192,6 +192,7 @@ class AccountDialog(AppDialog):
             return google_sign_in(self.service, self.oauth_cancel)
 
         self.run(operation, self.authenticated)
+        self.status.show()
         self.status.setText(
             "Continue with Google in your browser. We’ll bring your workspace here."
         )
@@ -215,7 +216,7 @@ class AccountDialog(AppDialog):
         self.workspaces.currentIndexChanged.connect(self.render_workspace)
         layout.addWidget(self.workspaces)
         layout.addWidget(label("Your team’s agent", "title"))
-        agent_row = QHBoxLayout()
+        agent_row = QVBoxLayout()
         self.agent_name = self.field("Agent nickname")
         self.agent_name.setMaxLength(32)
         self.agent_provider = self.provider_choice()
@@ -350,24 +351,22 @@ class AccountDialog(AppDialog):
         self.invitations.setAccessibleName("Pending invitations")
         self.invitations.setFixedHeight(85)
         layout.addWidget(self.invitations)
-        row = QHBoxLayout()
+        row = QGridLayout()
         revoke = button("Revoke selected invitation")
         revoke.clicked.connect(self.revoke_invitation)
-        row.addWidget(revoke)
+        row.addWidget(revoke, 0, 0, 1, 2)
         refresh = button("Refresh")
         refresh.clicked.connect(self.refresh)
-        row.addWidget(refresh)
+        row.addWidget(refresh, 1, 0)
         signout = button("Sign out")
         signout.clicked.connect(self.sign_out)
-        row.addWidget(signout)
+        row.addWidget(signout, 1, 1)
         layout.addLayout(row)
         self.add_page(page)
 
     def provider_choice(self):
-        choice = ChoiceBox()
+        choice = CodingProviderChoice()
         choice.setAccessibleName("Preferred building agent")
-        choice.addItem("Codex", "codex")
-        choice.addItem("Claude Code", "claude_code")
         return choice
 
     def _onboarding_page(self):
@@ -396,6 +395,18 @@ class AccountDialog(AppDialog):
         self.onboarding_workspace.setMaxLength(80)
         self.onboarding_workspace.setMinimumHeight(48)
         first.addWidget(self.onboarding_workspace)
+        self.space_parent = ChoiceBox()
+        self.space_parent.setAccessibleName("Independent Space or shared subspace")
+        self.space_parent.addItem("Independent Space · separate plan and AI", None)
+        first.addWidget(self.space_parent)
+        first.addWidget(
+            label(
+                "One subscription covers your team. A subspace shares its parent’s plan "
+                "and AI capacity. Creating either never charges your card.",
+                "muted",
+                wrap=True,
+            )
+        )
         self.name_continue = button("Continue", role="primary")
         self.name_continue.setMinimumHeight(48)
         self.name_continue.clicked.connect(self.advance_onboarding)
@@ -695,6 +706,11 @@ class AccountDialog(AppDialog):
                 "Add a workspace name. Nicknames can use letters, numbers, spaces, - or _."
             )
             return
+        if self.space_parent.currentData():
+            self.mutate(
+                "create_subspace", {"p_parent": self.space_parent.currentData(), "p_name": name}
+            )
+            return
         self.mutate(
             "onboard_workspace",
             {
@@ -712,7 +728,7 @@ class AccountDialog(AppDialog):
             return
         self.busy = True
         self.pages.setEnabled(False)
-        self.status.setText("Connecting securely…")
+        self.set_loading(self.pages, True)
         self.success = success
         self.job = AccountJob(operation)
         self.job.signals.finished.connect(self.finished_job)
@@ -725,6 +741,7 @@ class AccountDialog(AppDialog):
         self.cancel_login.hide()
         self.busy = False
         self.pages.setEnabled(True)
+        self.set_loading(self.pages, False)
         if ok:
             self.success(result)
         else:
@@ -761,10 +778,20 @@ class AccountDialog(AppDialog):
         previous = getattr(self, "pending_workspace", None) or self.workspace_id()
         self.pending_workspace = None
         self.snapshot = snapshot
+        self.space_parent.clear()
+        self.space_parent.addItem("Independent Space · separate plan and AI", None)
+        if snapshot.get("space_hierarchy_available"):
+            for space in snapshot["workspaces"]:
+                if space.get("can_manage_billing"):
+                    self.space_parent.addItem(
+                        "Subspace of " + space["name"] + " · shared plan", space["id"]
+                    )
         self.workspaces.blockSignals(True)
         self.workspaces.clear()
         for workspace in snapshot["workspaces"]:
-            self.workspaces.addItem(workspace["name"], workspace["id"])
+            self.workspaces.addItem(
+                ("↳ " if workspace.get("parent_id") else "") + workspace["name"], workspace["id"]
+            )
         index = self.workspaces.findData(previous)
         if index >= 0:
             self.workspaces.setCurrentIndex(index)
@@ -987,6 +1014,13 @@ class AccountDialog(AppDialog):
         self.setup_email.clear()
 
     def sign_out(self):
+        if self.busy:
+            if not getattr(self, "logout_pending", False):
+                self.logout_pending = True
+                self.operation_finished.connect(self.finish_pending_logout)
+            return
+        service = self.service
+        self.service = None
         self.awaiting_sign_in_snapshot = False
         self.session_closed.emit()
         self.clear_connected()
@@ -996,11 +1030,27 @@ class AccountDialog(AppDialog):
         self.pending_intent = None
 
         def completed(_):
-            self.service = None
             self.pages.setCurrentIndex(0)
             self.status.setText("Signed out. Your session has been removed from this app.")
+            if self.parent():
+                self.parent().update_profile_button()
 
-        self.run(self.service.sign_out, completed)
+        def revoke():
+            if service is None:
+                return
+            try:
+                service.sign_out()
+            except Exception:
+                # Local credentials are discarded even if Auth is unreachable.
+                # Remote sessions retain their normal expiry; do not claim revocation.
+                return
+
+        self.run(revoke, completed)
+
+    def finish_pending_logout(self):
+        self.operation_finished.disconnect(self.finish_pending_logout)
+        self.logout_pending = False
+        self.sign_out()
 
     def done(self, result):
         if self.busy:

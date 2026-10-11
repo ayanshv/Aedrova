@@ -110,7 +110,7 @@ class SettingsDialog(AppDialog):
         layout.addWidget(self.editor)
         self.billing_origin = application_origin()
         if self.user:
-            layout = section(root_layout, "Plan & AI access")
+            layout = section(root_layout, "Your team’s plan & AI access")
             if ai_access_mode() == "local":
                 layout.addWidget(
                     label(
@@ -133,7 +133,7 @@ class SettingsDialog(AppDialog):
             layout.addWidget(self.billing_status)
             if self.billing_origin:
                 row = QHBoxLayout()
-                manage = button("Plan & billing", role="outline")
+                manage = button("Team plan & billing", role="outline")
                 manage.clicked.connect(
                     lambda: QDesktopServices.openUrl(
                         QUrl(
@@ -203,13 +203,14 @@ class SettingsDialog(AppDialog):
                     date = datetime.fromtimestamp(result["reset_at"], UTC).strftime("%b %d")
                     reset = f"Resets {date} (UTC). "
                 self.billing_status.setText(
-                    f"{plan} plan · {remaining}% monthly AI capacity remaining. "
+                    f"Your team’s {plan} plan · {remaining}% shared monthly AI capacity remaining. "
                     + reset
-                    + "No automatic overage charges."
+                    + "One subscription covers your team. No automatic overage charges."
                 )
             else:
                 self.billing_status.setText(
-                    "No active Aedrova plan for this workspace. View plans on the website."
+                    "Your workspace has no active plan. Its owner or admin can manage "
+                    "team billing on the website."
                 )
 
         if not self.window.connected.enqueue(

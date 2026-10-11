@@ -131,6 +131,16 @@ def test_dot_completion_retains_source_id_and_click_opens_profile(qtbot, tmp_pat
     assert opened == [row["id"]]
 
 
+@pytest.mark.parametrize("token", [False, True])
+def test_leading_bud_wins_over_longer_names_in_request(token):
+    recipient, other = dot("Bud"), dot("Research Specialist")
+    prefix = "<@dot:" + recipient["id"] + "|Bud>" if token else "@Bud"
+    assert (
+        mention("  " + prefix + " summarize @Research Specialist updates", [other, recipient])
+        == recipient
+    )
+
+
 def test_dot_question_routes_to_central_analysis_and_build_keeps_existing_queue(
     qtbot, tmp_path, monkeypatch
 ):
@@ -348,16 +358,23 @@ def test_dot_working_state_uses_existing_chat_cancel_control(qtbot, tmp_path):
     assert "Source analysis complete." in window.agent_feed.toPlainText()
 
 
-def test_bud_build_keeps_addressed_identity(qtbot, tmp_path, monkeypatch):
+@pytest.mark.parametrize("name", ["GitHub", "Aedrova", "Atlas"])
+@pytest.mark.parametrize("explicit_token", [False, True])
+def test_bud_build_keeps_addressed_identity(qtbot, tmp_path, monkeypatch, name, explicit_token):
     window, _ = setup(qtbot, tmp_path)
     row = dot()
+    row["name"] = name
+    window.account_dialog.snapshot["agent_preferences"] = [
+        {"workspace_id": "w", "nickname": "Atlas"}
+    ]
     window.account_dialog.snapshot["dots"] = [row]
     builds = []
     monkeypatch.setattr(
         "aedrova.desktop.builds.start_background_build",
         lambda w, task, **kw: builds.append((task, kw.get("bud"))) or True,
     )
-    assert window.start_agent_request("@GitHub build a status page")
+    prefix = "<@dot:" + row["id"] + "|" + name + ">" if explicit_token else "@" + name
+    assert window.start_agent_request(prefix + " build a status page")
     assert builds == [("build a status page", row)]
     window.dot_query = SimpleNamespace(workspace="w", bud=row)
     window.agent_feed.character_config = {
@@ -389,6 +406,7 @@ def test_addressed_bud_cannot_select_another_buds_tools(tmp_path):
     class Runner:
         def emit(self, *args):
             pass
+
         command_results = []
 
         def run(self, provider, project, prompt, **kwargs):

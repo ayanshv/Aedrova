@@ -1,5 +1,6 @@
 """Durability, isolation, scheduling and mention interaction acceptance."""
 
+import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
@@ -27,7 +28,10 @@ def test_atomic_duplicate_queue_and_limits(tmp_path):
         ledger.enqueue("u", "w", "Overflow", {})
     assert not ledger.rows("other", "w")
     assert not ledger.rows("u", "other")
-    assert ledger.path.stat().st_mode & 0o777 == 0o600
+    if os.name == "nt":
+        assert os.access(ledger.path, os.R_OK | os.W_OK)
+    else:
+        assert ledger.path.stat().st_mode & 0o777 == 0o600
 
 
 def test_restart_never_replays_and_lock_exclusive(tmp_path):
