@@ -4,6 +4,7 @@ from copy import deepcopy
 from types import SimpleNamespace
 
 import pytest
+from layout_checks import no_horizontal_overflow
 from test_connected import setup
 
 from aedrova.desktop.bud_connectors import ConnectorsDialog
@@ -99,7 +100,7 @@ def test_gallery_hierarchy_filters_and_native_themes(gallery, qtbot):
         qtbot.wait(30)
         assert dialog.columns == 2
         assert not dialog.grab().isNull()
-        assert dialog.gallery.horizontalScrollBar().maximum() == 0
+        no_horizontal_overflow(qtbot, dialog.gallery)
 
 
 def test_verify_flow_clears_password_and_reloads_real_connection(gallery):

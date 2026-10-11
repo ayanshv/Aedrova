@@ -541,7 +541,7 @@ class ConnectorsDialog(AppDialog):
         featured = QVBoxLayout(banner)
         featured.setContentsMargins(20, 12, 20, 12)
         featured.setSpacing(6)
-        featured.addWidget(label("Put your tools in the conversation.", "subheading"))
+        featured.addWidget(label("Put your tools in the conversation.", "subheading", wrap=True))
         featured.addWidget(
             label(
                 "Give your Bud connected context. You choose the resource and keep control of "

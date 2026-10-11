@@ -38,6 +38,12 @@ jobs:
           uv run python -m compileall -q src scripts
       - name: Native process lease safety
         run: uv run pytest -q tests/test_file_lock.py
+      - name: Compact layout safety
+        run: >-
+          uv run pytest -q
+          tests/test_bud_connectors.py::test_gallery_hierarchy_filters_and_native_themes
+          tests/test_visual_polish.py::test_workspace_admin_has_no_horizontal_scrolling_at_minimum_width
+          tests/test_shell.py::test_bento_reflows_and_document_tile_opens
       - name: Account, chat, AI, connectors and desktop regressions
         run: uv run pytest -q --junitxml=work/desktop-tests.xml
       - uses: actions/upload-artifact@v4

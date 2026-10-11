@@ -3,6 +3,7 @@
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -215,6 +216,40 @@ def test_codex_cancellation_kills_process(tmp_path, monkeypatch):
     with pytest.raises(BuildCancelled):
         runner.run("codex", tmp_path, "task", plan=False)
     timer.join()
+    assert runner.process is None
+
+
+def test_codex_cancellation_stops_spawned_commands(tmp_path, monkeypatch):
+    marker = tmp_path / "escaped-command"
+    child = (
+        f"import time,pathlib;time.sleep(0.8);pathlib.Path({str(marker)!r}).write_text('escaped')"
+    )
+    fake_codex(
+        tmp_path,
+        monkeypatch,
+        f"""
+import subprocess
+subprocess.Popen([sys.executable, '-c', {child!r}])
+print(json.dumps({{'type':'item.started','item':{{'type':'command_execution',
+    'command':'Child started'}}}}),flush=True)
+time.sleep(30)
+""",
+    )
+    timers = []
+
+    def received(event):
+        if event == "Running: Child started":
+            timer = threading.Timer(0.1, runner.cancel)
+            timers.append(timer)
+            timer.start()
+
+    runner = LocalRunner(received, timeout=5)
+    with pytest.raises(BuildCancelled):
+        runner.run("codex", tmp_path, "task", plan=False)
+    assert len(timers) == 1
+    timers[0].join()
+    time.sleep(1)
+    assert not marker.exists(), "A cancelled provider left a command running"
     assert runner.process is None
 
 

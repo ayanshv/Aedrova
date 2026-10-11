@@ -1539,3 +1539,29 @@ differences. Windows distribution and full Phase 1 sign-off remain blocked; no
 Windows installer or universal cross-platform readiness is claimed. Follow-up remote
 CI is required for the final revision. Owner interventions stay deferred as requested.
 No production merge/deployment, Phase 2, M14 or paid download activation performed.
+
+
+## October 10 — final Phase 1 baseline verification
+
+Hosted staging setup, separate Google OAuth and bidirectional two-account row
+isolation are verified. Staging readiness returned 200, Google provider enabled,
+and the removed Pulse route returned 404 during this final pass. Production and
+public release/billing gates remain unchanged.
+
+Native revision 2d93e52 fixes Windows bounded provider pipe reads, process-tree
+lifetime containment with a kill-on-close job, portable synthetic subprocess helpers,
+filesystem-specific permission preservation assertions, conservative retention
+expectations and responsive connector/account/project layouts. No tests are skipped
+to claim Windows readiness. Follow-up wraps the connector gallery banner and adds a
+real spawned-command cancellation regression. Full updated local suite: 732 passed;
+Ruff, tracked secret-pattern and compile checks passed. Ordered migration/RLS and
+optional-meeting-order checks passed. Final remote evidence is recorded below when
+complete; independent code completion does not waive the owner acceptance gates.
+
+Owner handoff: docs/phase-1-owner-handoff.md. Required to close Phase 1: source
+staging desktop login/workspace/sign-out acceptance and active main-branch PR/check
+protections in both repositories. Two disposable isolation workspaces remain as
+optional cleanup, not a failing isolation check. Windows CI is regression evidence,
+not certification of installer signing, Windows ACL privacy or live provider sandbox
+behavior; those remain later-phase gates. Obtain new approval for Phase 2 only after
+reporting these results and outstanding owner actions.

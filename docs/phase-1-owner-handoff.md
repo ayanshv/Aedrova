@@ -1,56 +1,88 @@
 # Phase 1 owner handoff
 
-Owner requested that interventions be collected and presented only after independent
-engineering work finishes. No later milestone or public launch is authorized by this
-handoff. Do not ask for passwords, keys or session tokens in chat.
+Independent engineering is being finalized before this handoff is presented.
+Phase 2, M14, production merges/deployment and public billing/downloads remain gated.
+Do not send passwords, provider keys or session tokens in chat.
 
 ## Verified staging checks
 
-- Google provider enabled in `scvmvqlzcqhwrrsiahpj`; two distinct real Google accounts
-  completed native PKCE loopback login.
-- Both users read their own probe message. Foreign workspace, channel, message and
-  membership reads returned no rows. Foreign message writes were denied (42501).
-- Restricted staging backend cannot read public workspace rows.
-- Staging Render service is separate and free; production stays unchanged.
+- Separate Supabase project: Aedrova Staging (`scvmvqlzcqhwrrsiahpj`). Its 23 app
+  migrations and restricted private backend schema are installed.
+- Google provider is enabled; two distinct real Google accounts completed native
+  PKCE loopback login. Both directions passed own-message reads, foreign workspace,
+  channel, message and membership read denial, and foreign-message write denial.
+- Restricted staging backend cannot read public workspace rows (42501).
+- Separate free Render service is live at https://aedrova-beta-staging.onrender.com,
+  deployed from service e3da1d7. Auto-deploy, checkout, releases and funded AI are off.
+- Final source and CI evidence are recorded in final-beta-phase-1.md.
 
 These checks do not certify all AI context, connectors, meeting media or desktop UI.
 
-## Deferred owner interventions, in order
+## Required owner actions to close Phase 1
 
-1. **Clean up staging test fixtures.** In Supabase → **Aedrova Staging**
-   (`scvmvqlzcqhwrrsiahpj`) → Table Editor → workspaces, identify the two workspaces
-   whose names start `Beta isolation 1` and `Beta isolation 2`. Review that they
-   contain only the disposable test content before deleting those exact fixtures.
-   Do not select production or bulk-delete unrelated rows. The test's cleanup helper
-   used an incorrect RPC parameter; it has been corrected, but the sessions ended.
-   Cleanup is housekeeping; it does not invalidate the passing isolation checks.
-2. **Desktop UI acceptance.** Open the source staging app using
-   `uv run python -m scripts.run_staging --config work/staging/public-config.json`
-   from the Aedrova repository. Verify this is the staging source app, not the
-   existing packaged production app. Complete account/workspace onboarding and
-   confirm Google returns focus to the app. Stop if the window/environment cannot
-   be distinguished. This remains a Phase 1 acceptance gate.
-3. **Approve concrete merge protections when prepared.** Repository owner must
-   approve default-branch protection/ruleset changes for both repositories after
-   the required checks are green. Proposed requirements: no deletion/force push,
-   PRs with passing release checks, and no impossible second-reviewer requirement
-   for a solo owner. Do not change these security settings without that approval.
+### 1. Accept the staging desktop account journey
 
-## Later-phase requirements, not required now
+Quit the existing packaged Aedrova app yourself first, to avoid confusing it with
+source staging. In Terminal, run:
+
+```sh
+cd /Users/ayanshvarma/Documents/Aedrova
+uv run python -m scripts.run_staging --config work/staging/public-config.json --check-only
+uv run python -m scripts.run_staging --config work/staging/public-config.json
+```
+
+The first command must pass. The second opens source with separate staging
+preferences, database and service origins. Use a registered Google staging test
+account. Confirm browser sign-in returns to the app, you can select/create a
+staging workspace and reach its conversation, then sign out and confirm the session
+is gone. Do not connect a production project or try paid AI/billing in this check.
+If you cannot distinguish the source app or the return fails, stop and report the
+screen/error. This verifies the real desktop handoff beyond the passing PKCE probe
+and remains a Phase 1 acceptance gate.
+
+### 2. Enable main-branch merge protections in both repositories
+
+Open each repository's **Settings → Rules → Rulesets → New ruleset → New branch
+ruleset**:
+
+- https://github.com/ayanshv/Aedrova/settings/rules
+- https://github.com/ayanshv/Aedrova-website/settings/rules
+
+Name it `Release baseline`, set enforcement to **Active**, and target the default
+branch `main`. Require a pull request before merging, block force pushes, and
+restrict deletions. Require status checks to pass. Use these exact check names:
+
+- Aedrova: `Desktop checks (ubuntu-latest)`, `Desktop checks (macos-latest)`,
+  `Desktop checks (windows-latest)`, and `PostgreSQL RLS checks`.
+- Aedrova-website: `verify` (the Website checks workflow).
+
+Do not require a second person's approval while you are the only repository owner.
+Keep the approval count at zero; the PR and CI checks are still required. Save and
+confirm both rulesets show **Active** targeting `main`. Do not merge the release
+branches or deploy production as part of this action. This establishes the merge
+gate and remains required for Phase 1 sign-off. Security settings require the
+owner's specific approval; this handoff does not silently change them.
+
+## Optional staging housekeeping
+
+In Supabase → **Aedrova Staging** → Table Editor → `workspaces`, review the two
+workspaces whose names start `Beta isolation 1` and `Beta isolation 2`. Delete only
+those disposable probe fixtures if they contain only the synthetic test content.
+Never select production or bulk-delete unrelated rows. The test cleanup initially
+used the wrong RPC parameter; it is corrected, but those sessions were signed out.
+This housekeeping does not invalidate the passing isolation checks or block Phase 1.
+
+## Later-phase gates
 
 Live customer connector grants/revocation, model access, billing lifecycle, meeting
 media/transcription, independent security review, business verification, macOS
-Developer ID/notarization and signed Windows installation tests retain their existing
-release gates. See `docs/final-beta-launch-plan.md` and `docs/milestones.md`.
+Developer ID/notarization, Windows ACL/runtime/installer and update acceptance retain
+their release gates. CI on Windows does not certify a signed Windows installer or
+live Codex/Claude sandbox behavior. See final-beta-launch-plan.md and milestones.md.
 Never switch waitlist to billing/downloads based on Phase 1 checks alone.
 
-## Engineering gates — not tasks for the owner
+## Permission boundary
 
-- Full Windows CI must pass; passing lease tests alone does not certify a Windows
-  app. Remaining categories: provider process/pipe portability and synthetic
-  executable fixtures, permissions/ACL expectations, safe retention behavior and
-  responsive layouts with Windows fonts. Keep the Windows CI job failing visibly
-  until corrected; do not skip unsupported tests to claim release readiness.
-- Confirm final Linux CI after fixing agent-feed visibility, and final macOS/RLS CI.
-- Record final native/service revisions and complete Phase 1 before requesting
-  authorization for the next phase.
+Phase 1 closes after both required owner actions are confirmed. Request approval
+before Phase 2 (complete connectors and AI providers). Approval for Phase 2 does not
+waive missing Phase 1 acceptance or authorize production launch.

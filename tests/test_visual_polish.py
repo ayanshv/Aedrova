@@ -3,6 +3,7 @@
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QColor, QPalette, QTextCursor
 from PySide6.QtWidgets import QLabel, QMessageBox, QScrollArea
+from layout_checks import no_horizontal_overflow
 from test_connected import setup
 from test_meeting_calls import Backend, Worker
 
@@ -45,7 +46,7 @@ def test_workspace_admin_has_no_horizontal_scrolling_at_minimum_width(qtbot, tmp
     widget.show()
     qtbot.wait(10)
     scroll = widget.pages.currentWidget()
-    assert scroll.horizontalScrollBar().maximum() == 0
+    no_horizontal_overflow(qtbot, scroll)
     for control in [widget.agent_name, widget.agent_provider, widget.save_agent, widget.role]:
         assert control.width() >= control.minimumSizeHint().width()
 
