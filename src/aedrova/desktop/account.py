@@ -395,6 +395,18 @@ class AccountDialog(AppDialog):
         self.onboarding_workspace.setMaxLength(80)
         self.onboarding_workspace.setMinimumHeight(48)
         first.addWidget(self.onboarding_workspace)
+        self.space_parent = ChoiceBox()
+        self.space_parent.setAccessibleName("Independent Space or shared subspace")
+        self.space_parent.addItem("Independent Space · separate plan and AI", None)
+        first.addWidget(self.space_parent)
+        first.addWidget(
+            label(
+                "One subscription covers your team. A subspace shares its parent’s plan "
+                "and AI capacity. Creating either never charges your card.",
+                "muted",
+                wrap=True,
+            )
+        )
         self.name_continue = button("Continue", role="primary")
         self.name_continue.setMinimumHeight(48)
         self.name_continue.clicked.connect(self.advance_onboarding)
@@ -694,6 +706,11 @@ class AccountDialog(AppDialog):
                 "Add a workspace name. Nicknames can use letters, numbers, spaces, - or _."
             )
             return
+        if self.space_parent.currentData():
+            self.mutate(
+                "create_subspace", {"p_parent": self.space_parent.currentData(), "p_name": name}
+            )
+            return
         self.mutate(
             "onboard_workspace",
             {
@@ -761,10 +778,20 @@ class AccountDialog(AppDialog):
         previous = getattr(self, "pending_workspace", None) or self.workspace_id()
         self.pending_workspace = None
         self.snapshot = snapshot
+        self.space_parent.clear()
+        self.space_parent.addItem("Independent Space · separate plan and AI", None)
+        if snapshot.get("space_hierarchy_available"):
+            for space in snapshot["workspaces"]:
+                if space.get("can_manage_billing"):
+                    self.space_parent.addItem(
+                        "Subspace of " + space["name"] + " · shared plan", space["id"]
+                    )
         self.workspaces.blockSignals(True)
         self.workspaces.clear()
         for workspace in snapshot["workspaces"]:
-            self.workspaces.addItem(workspace["name"], workspace["id"])
+            self.workspaces.addItem(
+                ("↳ " if workspace.get("parent_id") else "") + workspace["name"], workspace["id"]
+            )
         index = self.workspaces.findData(previous)
         if index >= 0:
             self.workspaces.setCurrentIndex(index)

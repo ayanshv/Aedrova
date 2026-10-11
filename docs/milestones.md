@@ -1691,3 +1691,14 @@ Support, Privacy, Terms, footer and setup guidance updated in isolated PR5.
 Historical Phase1 Google registration evidence retains its original account value.
 Stripe already shows contact@aedrova.com; no additional Stripe edit is needed.
 Next owner requirement remains the open Stripe external bank-account task.
+
+### October11 — team pricing / shared Space implementation authorized
+
+Owner is completing Stripe bank setup and authorized unmistakable per-team pricing
+plus attached independent Space/nested subspace requirements, source pushes/merges.
+Implemented within existing architecture; see docs/space-billing.md for exact
+migration, flags, Stripe presentation and activation gates. Paid prices unchanged,
+waitlist retained. New migration needs owner execution in Aedrova Staging before
+root sharing is enabled; no fixture or production reset. Cluely footer/legal-depth
+study explicitly deferred to Phase5 in the launch plan. Stop after this task and
+ask whether the owner finished Stripe bank setup; do not begin another phase.

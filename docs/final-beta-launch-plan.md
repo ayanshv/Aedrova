@@ -158,3 +158,14 @@ Later required: reviewed legal/business arrangements, real billing/provider keys
 paid always-on hosting approval, signing/notarization and Windows signing setup,
 staging/live test consent and final launch approval. Walk through one requirement
 per response when its phase is approved. Obtain approval before starting Phase 1.
+
+### Saved October 11: Phase 5 Cluely depth review (deferred)
+
+At Phase 5, inspect the actual Cluely website footer and every linked informational
+page: Privacy, Terms, support/contact, and any security, cookies, refund, download,
+business or other footer material present at that time. Independently research its
+current disclosures and depth. Match the completeness and useful length in original
+Aedrova wording, grounded in Aedrova's actual data flows, features, AI providers and
+business details. Do not copy their legal promises or invent business facts. Review
+all corresponding Aedrova footer destinations, coverage, navigation and readability.
+This review is explicitly deferred; do not perform it before Phase 5 approval.

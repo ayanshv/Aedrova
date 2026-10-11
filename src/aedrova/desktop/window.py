@@ -525,7 +525,27 @@ class AedrovaWindow(QMainWindow):
             item.setFixedSize(44, 44)
             item.setCheckable(True)
             item.setChecked(workspace.id == self.workspace_id)
-            item.setToolTip("Workspace · " + workspace.name)
+            context = (
+                next(
+                    (
+                        s
+                        for s in self.connected.account.snapshot.get("workspaces", [])
+                        if s["id"] == workspace.id
+                    ),
+                    {},
+                )
+                if self.connected and self.connected.active
+                else {}
+            )
+            item.setToolTip(
+                (
+                    "Subspace · shares " + context.get("billing_name", "parent Space")
+                    if context.get("parent_id")
+                    else "Independent Space"
+                )
+                + " · "
+                + workspace.name
+            )
             item.clicked.connect(
                 lambda checked=False, wid=workspace.id: (
                     self.workspace_menu()
