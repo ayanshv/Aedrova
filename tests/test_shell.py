@@ -411,6 +411,7 @@ def test_reduce_motion_and_transparency_are_functional_and_saved(window, qtbot):
 
 def test_bento_reflows_and_document_tile_opens(window, qtbot):
     from layout_checks import no_horizontal_overflow
+
     from aedrova.desktop.materials import AdaptiveBento, DocumentTile
 
     window.select_tab(1)

@@ -1,9 +1,9 @@
 """Visual regressions that previously hid controls or content in narrow/dark layouts."""
 
+from layout_checks import no_horizontal_overflow
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QColor, QPalette, QTextCursor
 from PySide6.QtWidgets import QLabel, QMessageBox, QScrollArea
-from layout_checks import no_horizontal_overflow
 from test_connected import setup
 from test_meeting_calls import Backend, Worker
 
