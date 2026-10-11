@@ -1683,3 +1683,11 @@ Start on this task and provide their valid bank account privately/personally.
 This is Stripe account readiness, not evidence of full connector external-testing
 acceptance. No later milestone started. Legal/business identity and jurisdiction
 review remain required before paid public Beta; policies are not a compliance guarantee.
+
+### October11 — current public contact email
+
+Owner changed public contact/support email to contact@aedrova.com. Website
+Support, Privacy, Terms, footer and setup guidance updated in isolated PR5.
+Historical Phase1 Google registration evidence retains its original account value.
+Stripe already shows contact@aedrova.com; no additional Stripe edit is needed.
+Next owner requirement remains the open Stripe external bank-account task.
