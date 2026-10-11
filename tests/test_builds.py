@@ -160,6 +160,15 @@ def fake_codex(tmp_path, monkeypatch, body):
     executable.write_text(f"#!{sys.executable}\nimport sys,json,time\nsys.stdin.read()\n" + body)
     executable.chmod(0o700)
     monkeypatch.setattr("aedrova.agents.runtime.executable", lambda _: str(executable))
+    if sys.platform == "win32":
+        original = subprocess.Popen
+
+        def launch(command, *args, **kwargs):
+            if command[0] == str(executable.resolve()):
+                command = [sys.executable, *command]
+            return original(command, *args, **kwargs)
+
+        monkeypatch.setattr("aedrova.agents.runtime.subprocess.Popen", launch)
 
 
 def test_codex_real_subprocess_stream_and_flags(tmp_path, monkeypatch):

@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QGraphicsEffect,
     QGridLayout,
     QPushButton,
+    QScrollArea,
     QWidget,
 )
 
@@ -235,6 +236,7 @@ class AdaptiveBento(QWidget):
         self.tiles = tiles
         self.asymmetric = asymmetric
         self.columns = None
+        self.viewport = None
         self.grid = QGridLayout(self)
         self.grid.setContentsMargins(0, 0, 0, 0)
         self.grid.setSpacing(16)
@@ -259,6 +261,28 @@ class AdaptiveBento(QWidget):
             for column, tile in enumerate(self.tiles):
                 self.grid.addWidget(tile, 0, column)
 
+    def reflow_available(self):
+        width = self.width()
+        if self.viewport is not None:
+            margins = self.parentWidget().layout().contentsMargins()
+            width = min(width, self.viewport.width() - margins.left() - margins.right())
+        self._reflow(2 if width >= (720 if self.asymmetric else 550) else 1)
+
+    def showEvent(self, event):  # noqa: N802
+        super().showEvent(event)
+        parent = self.parentWidget()
+        while parent is not None and not isinstance(parent, QScrollArea):
+            parent = parent.parentWidget()
+        if parent is not None and self.viewport is None:
+            self.viewport = parent.viewport()
+            self.viewport.installEventFilter(self)
+        self.reflow_available()
+
+    def eventFilter(self, watched, event):  # noqa: N802
+        if watched is self.viewport and event.type() == QEvent.Type.Resize:
+            self.reflow_available()
+        return super().eventFilter(watched, event)
+
     def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
-        self._reflow(2 if self.width() >= (720 if self.asymmetric else 550) else 1)
+        self.reflow_available()

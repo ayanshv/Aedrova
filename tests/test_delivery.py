@@ -237,9 +237,10 @@ def test_local_preview_serves_only_static_snapshot(tmp_path):
 def test_apply_preserves_restrictive_file_permissions(build):
     source, project = build
     (source / "existing.py").chmod(0o600)
+    original_mode = (source / "existing.py").stat().st_mode & 0o777
     receipt = apply_review(make_review(project))
-    assert (source / "existing.py").stat().st_mode & 0o777 == 0o600
-    assert (receipt / "files/existing.py").stat().st_mode & 0o777 == 0o600
+    assert (source / "existing.py").stat().st_mode & 0o777 == original_mode
+    assert (receipt / "files/existing.py").stat().st_mode & 0o777 == original_mode
 
 
 @pytest.mark.parametrize("kind", ["credential", "workflow"])

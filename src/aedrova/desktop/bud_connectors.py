@@ -587,7 +587,7 @@ class ConnectorsDialog(AppDialog):
                     glyph.setPixmap(mark)
                 glyph.setAccessibleName(provider["name"] + " app icon")
                 heading.addWidget(glyph)
-                heading.addWidget(label(provider["name"], "subheading"), 1)
+                heading.addWidget(label(provider["name"], "subheading", wrap=True), 1)
                 column.addLayout(heading)
                 copy = label(provider["description"], "muted", wrap=True)
                 copy.setMinimumHeight(42)
@@ -606,6 +606,7 @@ class ConnectorsDialog(AppDialog):
                         if provider["id"] in recommended
                         else "Available",
                         "muted",
+                        wrap=True,
                     )
                 )
                 action = button("Manage" if connected else "Connect")

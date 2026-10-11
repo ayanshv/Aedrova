@@ -216,7 +216,7 @@ class AccountDialog(AppDialog):
         self.workspaces.currentIndexChanged.connect(self.render_workspace)
         layout.addWidget(self.workspaces)
         layout.addWidget(label("Your team’s agent", "title"))
-        agent_row = QHBoxLayout()
+        agent_row = QVBoxLayout()
         self.agent_name = self.field("Agent nickname")
         self.agent_name.setMaxLength(32)
         self.agent_provider = self.provider_choice()

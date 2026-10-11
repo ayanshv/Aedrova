@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import queue
 import re
 import selectors
 import shutil
@@ -229,11 +230,86 @@ def codex_failure(message):
     )
 
 
+def pipe_events(process):
+    """Bounded pipe reads; Windows selectors support sockets, not subprocess pipes."""
+    if sys.platform != "win32":
+        with selectors.DefaultSelector() as selector:
+            for stream in (process.stdout, process.stderr):
+                selector.register(stream, selectors.EVENT_READ)
+            while selector.get_map():
+                events = selector.select(0.1)
+                if not events:
+                    yield None, b""
+                for key, _ in events:
+                    data = os.read(key.fileobj.fileno(), 65536)
+                    if not data:
+                        selector.unregister(key.fileobj)
+                    else:
+                        yield key.fileobj, data
+        return
+    chunks = queue.Queue(maxsize=8)
+    stopped = threading.Event()
+
+    def read(stream):
+        try:
+            while not stopped.is_set():
+                data = os.read(stream.fileno(), 65536)
+                while not stopped.is_set():
+                    try:
+                        chunks.put((stream, data), timeout=0.1)
+                        break
+                    except queue.Full:
+                        pass
+                if not data:
+                    break
+        except OSError:
+            if not stopped.is_set():
+                # EOF makes the provider completion check fail closed.
+                while not stopped.is_set():
+                    try:
+                        chunks.put((stream, b""), timeout=0.1)
+                        break
+                    except queue.Full:
+                        pass
+
+    for stream in (process.stdout, process.stderr):
+        threading.Thread(target=read, args=(stream,), daemon=True).start()
+    remaining = 2
+    try:
+        while remaining:
+            try:
+                stream, data = chunks.get(timeout=0.1)
+            except queue.Empty:
+                yield None, b""
+                continue
+            if not data:
+                remaining -= 1
+            else:
+                yield stream, data
+    finally:
+        stopped.set()
+
+
+def stop_process(process, *, force=False):
+    if sys.platform == "win32":
+        if process.poll() is None:
+            process.kill()
+        return
+    try:
+        os.killpg(process.pid, signal.SIGKILL if force else signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    except PermissionError:
+        if process.poll() is None:
+            process.kill() if force else process.terminate()
+
+
 class LocalRunner:
     def __init__(self, emit, approve=lambda _tool, _data: False, timeout=1800):
         self.emit, self.approve, self.timeout = emit, approve, timeout
         self.cancelled = threading.Event()
         self.process = None
+        self.job = None
         self.usage = {}
         self.command_results = []
         self.lease_fd = None
@@ -243,13 +319,9 @@ class LocalRunner:
         self.cancelled.set()
         process = self.process
         if process:
-            try:
-                os.killpg(process.pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass
-            except PermissionError:
-                if process.poll() is None:
-                    process.terminate()
+            if self.job is not None:
+                self.job.close()
+            stop_process(process)
 
     def observe_command(self, command, output, exit_code):
         from aedrova.delivery.evidence import MAX_COMMANDS, command_result, project_fingerprint
@@ -347,90 +419,93 @@ class LocalRunner:
             stderr=subprocess.PIPE,
             env=provider_env,
             start_new_session=True,
-            **({"pass_fds": (self.lease_fd,)} if self.lease_fd is not None else {}),
+            **(
+                {"pass_fds": (self.lease_fd,)}
+                if self.lease_fd is not None and sys.platform != "win32"
+                else {}
+            ),
         )
         self.process = process
+        job = None
         try:
+            if sys.platform == "win32":
+                from aedrova.agents.windows_job import WindowsJob
+
+                # Establish lifetime containment before sending any build instructions.
+                job = WindowsJob(process)
+                self.job = job
+            if self.cancelled.is_set():
+                raise BuildCancelled()
             process.stdin.write(prompt.encode())
             process.stdin.close()
-            selector = selectors.DefaultSelector()
-            selector.register(process.stdout, selectors.EVENT_READ)
-            selector.register(process.stderr, selectors.EVENT_READ)
             pending = b""
             diagnostics = b""
             last_error = ""
             tool_count = 0
-            with selector:
-                while True:
+            events = pipe_events(process)
+            try:
+                for stream, data in events:
                     if self.cancelled.is_set():
                         raise BuildCancelled()
                     if time.monotonic() - started > self.timeout:
                         raise TimeoutError("Build exceeded its configured time limit.")
-                    events = selector.select(0.1)
-                    if not events:
+                    if stream is None:
                         continue
-                    for key, _ in events:
-                        data = os.read(key.fileobj.fileno(), 65536)
-                        if not data:
-                            selector.unregister(key.fileobj)
+                    if stream is process.stderr:
+                        diagnostics = (diagnostics + data)[-16384:]
+                        continue
+                    pending += data
+                    if len(pending) > 2 * 1024 * 1024:
+                        raise ValueError("Provider event exceeded its size limit.")
+                    while b"\n" in pending:
+                        line, pending = pending.split(b"\n", 1)
+                        try:
+                            event = json.loads(line)
+                        except ValueError:
                             continue
-                        if key.fileobj is process.stderr:
-                            diagnostics = (diagnostics + data)[-16384:]
-                            continue
-                        pending += data
-                        if len(pending) > 2 * 1024 * 1024:
-                            raise ValueError("Provider event exceeded its size limit.")
-                        while b"\n" in pending:
-                            line, pending = pending.split(b"\n", 1)
-                            try:
-                                event = json.loads(line)
-                            except ValueError:
-                                continue
-                            kind, item = event.get("type"), event.get("item", {})
-                            if kind == "item.started" and item.get("type") in {
-                                "command_execution",
-                                "file_change",
-                                "mcp_tool_call",
-                                "web_search",
-                            }:
-                                tool_count += 1
-                                if self.managed and tool_count > self.managed.limits.get(
-                                    "tool_calls", 200
-                                ):
-                                    raise RuntimeError("This workflow reached its tool limit.")
-                            if kind == "item.completed":
-                                if item.get("type") == "agent_message":
-                                    final = item.get("text", "")
-                                    self.emit(final)
-                                elif item.get("type") == "command_execution":
-                                    self.observe_command(
-                                        item.get("command", ""),
-                                        item.get("aggregated_output", ""),
-                                        item.get("exit_code"),
-                                    )
-                                    self.emit(
-                                        f"$ {item.get('command', '')}\n"
-                                        f"{item.get('aggregated_output', '')[-20000:]}\n"
-                                        f"Exit code: {item.get('exit_code')}"
-                                    )
-                                elif item.get("type") == "file_change":
-                                    self.emit(
-                                        "Files changed: " + json.dumps(item.get("changes", []))
-                                    )
-                            elif kind == "item.started" and item.get("type") == "command_execution":
-                                self.emit("Running: " + item.get("command", ""))
-                            elif kind == "turn.completed":
-                                completed = True
-                                self.usage = event.get("usage") or {}
-                            elif kind == "error":
-                                # The CLI can emit recoverable reconnect errors before success.
-                                # Let its existing retry loop finish; never restart a coding turn.
-                                last_error = str(event.get("message") or event.get("error") or "")
-                                self.emit("Codex is recovering; waiting for its final status…")
-                            elif kind == "turn.failed":
-                                raise self.failure(event.get("error") or last_error)
-                    if not selector.get_map():
-                        break
+                        kind, item = event.get("type"), event.get("item", {})
+                        if kind == "item.started" and item.get("type") in {
+                            "command_execution",
+                            "file_change",
+                            "mcp_tool_call",
+                            "web_search",
+                        }:
+                            tool_count += 1
+                            if self.managed and tool_count > self.managed.limits.get(
+                                "tool_calls", 200
+                            ):
+                                raise RuntimeError("This workflow reached its tool limit.")
+                        if kind == "item.completed":
+                            if item.get("type") == "agent_message":
+                                final = item.get("text", "")
+                                self.emit(final)
+                            elif item.get("type") == "command_execution":
+                                self.observe_command(
+                                    item.get("command", ""),
+                                    item.get("aggregated_output", ""),
+                                    item.get("exit_code"),
+                                )
+                                self.emit(
+                                    f"$ {item.get('command', '')}\n"
+                                    f"{item.get('aggregated_output', '')[-20000:]}\n"
+                                    f"Exit code: {item.get('exit_code')}"
+                                )
+                            elif item.get("type") == "file_change":
+                                self.emit("Files changed: " + json.dumps(item.get("changes", [])))
+                        elif kind == "item.started" and item.get("type") == "command_execution":
+                            self.emit("Running: " + item.get("command", ""))
+                        elif kind == "turn.completed":
+                            completed = True
+                            self.usage = event.get("usage") or {}
+                        elif kind == "error":
+                            # The CLI can emit recoverable reconnect errors before success.
+                            # Let its existing retry loop finish; never restart a coding turn.
+                            last_error = str(event.get("message") or event.get("error") or "")
+                            self.emit("Codex is recovering; waiting for its final status…")
+                        elif kind == "turn.failed":
+                            raise self.failure(event.get("error") or last_error)
+            finally:
+                events.close()
             code = process.wait(timeout=5)
             if self.cancelled.is_set():
                 raise BuildCancelled()
@@ -438,17 +513,16 @@ class LocalRunner:
                 raise self.failure(last_error or diagnostics.decode("utf-8", errors="replace"))
             return final
         finally:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            except PermissionError:
-                if process.poll() is None:
-                    process.kill()
+            if job is not None:
+                job.close()
+            stop_process(process, force=True)
             process.wait(timeout=5)
+            if not process.stdin.closed:
+                process.stdin.close()
             process.stdout.close()
             process.stderr.close()
             self.process = None
+            self.job = None
 
     def failure(self, message):
         if self.managed:
