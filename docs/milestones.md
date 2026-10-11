@@ -1391,3 +1391,9 @@ Next owner requirement: create a separate Google Cloud project named Aedrova Sta
 Then configure a testing consent screen/client, test users and staging redirect URLs.
 This blocks staging end-to-end login; Phase 1 remains in progress.
 No Phase 2/M14/public billing/download activation. Windows fcntl remains a release gate.
+
+Owner reports creating the separate Aedrova Staging Google Cloud project. Current
+agent browser project selector (amillum account context) returns no Aedrova matches.
+Requested public Google Project ID to select the correct project/account before OAuth
+configuration. Do not infer that creation failed or configure amillum as staging.
+Staging Render service is live; Google sign-in acceptance remains blocked.
