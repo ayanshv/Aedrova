@@ -236,6 +236,12 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
         border: 1px solid {t.border}; border-radius: 8px; padding: 12px 17px; font-size: 12px; }}
     QPushButton#Search {{ background: {t.surface}; color: {t.muted}; border: 1px solid {t.border};
         border-radius: 7px; padding: 8px 16px; font-size: 12px; }}
+    QListWidget#MentionPicker {{ background: {t.surface}; border: 1px solid {t.border};
+        border-radius: 10px; outline: none; padding: 4px; }}
+    QListWidget#MentionPicker::item {{ padding: 4px 8px; border-radius: 6px; }}
+    QListWidget#MentionPicker::item:selected {{ background: {t.accent_bg}; color: {t.text}; }}
+    QListWidget#MentionPicker::item:hover {{ background: {t.hover}; }}
+    QListWidget#MentionPicker::item:disabled {{ color: {t.muted}; font-size: 11px; }}
     QListWidget#Navigation {{ border: none; background: transparent; outline: none; }}
     QListWidget#Navigation::item {{ height: 30px; border-radius: 4px; padding-left: 10px; }}
     QListWidget#Navigation::item:selected {{ background: {selected}; color: {t.accent_text};

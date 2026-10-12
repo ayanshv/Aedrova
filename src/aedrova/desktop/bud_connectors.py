@@ -568,7 +568,13 @@ class ConnectorsDialog(AppDialog):
             grid = QGridLayout()
             grid.setSpacing(14)
             self.grid_layouts.append(grid)
-            columns = 3 if self.width() >= (790 if self.embedded_owner else 1080) else 2
+            columns = (
+                3
+                if self.width() >= (790 if self.embedded_owner else 1080)
+                else 2
+                if self.width() >= 560
+                else 1
+            )
             for column_index in range(columns):
                 grid.setColumnStretch(column_index, 1)
             for index, provider in enumerate(providers):
@@ -631,7 +637,13 @@ class ConnectorsDialog(AppDialog):
     def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
         if hasattr(self, "providers") and hasattr(self, "gallery"):
-            columns = 3 if self.width() >= (790 if self.embedded_owner else 1080) else 2
+            columns = (
+                3
+                if self.width() >= (790 if self.embedded_owner else 1080)
+                else 2
+                if self.width() >= 560
+                else 1
+            )
             if getattr(self, "columns", None) != columns:
                 self.columns = columns
                 self.rebuild_gallery()

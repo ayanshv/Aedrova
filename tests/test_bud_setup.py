@@ -324,7 +324,8 @@ def test_connector_step_is_inline_gallery_and_draft_connects_without_extra_windo
     assert gallery.filter.currentData() == "builder"
     assert len(gallery.findChildren(QFrame, "ConnectorCard")) == 1
     qtbot.wait(40)
-    assert gallery.columns == 3
+    assert dialog.minimumWidth() == 600
+    assert gallery.columns in {1, 2}
     assert gallery.gallery.horizontalScrollBar().maximum() == 0
     gallery.open_provider(gallery.providers[0])
     gallery.resource.setText("team/project")

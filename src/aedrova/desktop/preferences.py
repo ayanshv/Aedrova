@@ -152,7 +152,13 @@ class SettingsDialog(AppDialog):
         layout = root_layout
         self.status = label("Preferences are saved on this Mac.", "muted", wrap=True)
         layout.addWidget(self.status)
+        footer = QWidget()
+        footer.setObjectName("SettingsFooter")
+        footer_layout = QVBoxLayout(footer)
+        footer_layout.setContentsMargins(24, 16, 24, 16)
         actions = FlowActions()
+        footer_layout.addLayout(actions)
+        outer.addWidget(footer)
         if self.user:
             workspace = button("Workspace settings", role="outline")
             workspace.clicked.connect(self.workspace_settings)
@@ -164,7 +170,6 @@ class SettingsDialog(AppDialog):
         done = button("Done", role="primary")
         done.clicked.connect(self.accept)
         actions.addWidget(done)
-        layout.addLayout(actions)
 
     def load_balance(self):
         if not self.user or not self.billing_origin or not self.window.connected:

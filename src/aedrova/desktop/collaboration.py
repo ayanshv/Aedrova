@@ -1246,33 +1246,21 @@ class Collaboration(QObject):
 
     def mention_menu(self, composer):
         menu = AppMenu(self.window)
-        choices = (
-            [
-                (composer.agent_name, "@" + composer.agent_name),
-                ("channel", "@channel"),
-                ("everyone", "@everyone"),
-            ]
-            + [(r["name"], "<@dot:" + r["id"] + "|" + r["name"] + ">") for r in composer.dots]
-            + [
-                (r["config"]["name"], "<@ai:" + r["id"] + "|" + r["config"]["name"] + ">")
-                for r in composer.ai_teammates
-                if not r["paused"]
-            ]
-            + [
-                (p["display_name"], "<@" + p["user_id"] + "|" + p["display_name"] + ">")
-                for p in composer.people
-            ]
-            + [
-                (p["username"], "<@" + p["user_id"] + "|" + p["username"] + ">")
-                for p in composer.people
-                if p.get("username")
-            ]
-        )
-        for name, token in choices:
-            menu.addAction(
-                "@" + name + (" · Bud" if token.startswith("<@dot:") else ""),
+        section = None
+        for group, name, token, detail, config in composer.mention_entries():
+            if section != group:
+                menu.addSection(group)
+                section = group
+            action = menu.addAction(
+                "@" + name + " · " + str(detail or "Teammate"),
                 lambda checked=False, t=token, n=name: self.insert_person(composer, n, t),
             )
+            if group == "Buds":
+                from PySide6.QtGui import QIcon
+
+                from aedrova.desktop.bud_art import appearance, sprite
+
+                action.setIcon(QIcon(sprite(appearance(config), str(config.get("color", "")))))
         menu.exec(composer.mention.mapToGlobal(composer.mention.rect().topLeft()))
         composer.editor.setFocus()
 

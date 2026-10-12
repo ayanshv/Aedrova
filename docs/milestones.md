@@ -1879,3 +1879,14 @@ existing autofill completed it. Required owner action: complete that Google sign
 privately (or request a fresh link if expired). Foreign-workspace/private-channel
 isolation, physical playback/quality, required-Bud tour handoff/model behavior and
 meeting hosting acceptance remain open. No Phase 4 execution authorized yet.
+
+## October 12 — Phase 4 approved; grouped mentions and compact UX
+
+Owner approved starting Phase 4 while Phase 3 acceptance remains open. Implemented
+one grouped mention catalog for typed search and the toolbar: Agents, configured
+Buds, People and channel notifications, with keyboard selection and existing routing.
+The inline window-child picker sits above the composer without opening another
+native window or squeezing chat. Bud connector cards now adapt to compact widths
+without forced window enlargement. Settings has a persistent action footer.
+See docs/final-beta-phase-4.md for review coverage, evidence and remaining live gate.
+No SQL, hosting, production activation or customer purchase flow was changed.

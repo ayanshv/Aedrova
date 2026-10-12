@@ -497,12 +497,10 @@ class DotDialog(AppDialog):
 
     def show_step(self, step):
         changed = self.pages.currentIndex() != step
-        self.setup_panel.setMinimumWidth(900 if step == 5 else 500)
+        self.setup_panel.setMinimumWidth(500)
         self.setup_panel.setMaximumWidth(1120 if step == 5 else 560)
         if step == 5:
-            self.setMinimumWidth(960)
-            if self.width() < 1100:
-                self.resize(1100, max(800, self.height()))
+            self.setMinimumWidth(600)
             if self.embedded_connectors is None:
                 from aedrova.desktop.bud_connectors import ConnectorsDialog
 

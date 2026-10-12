@@ -3,7 +3,7 @@
 from layout_checks import no_horizontal_overflow
 from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QColor, QPalette, QTextCursor
-from PySide6.QtWidgets import QLabel, QMessageBox, QScrollArea
+from PySide6.QtWidgets import QLabel, QMessageBox, QScrollArea, QWidget
 from test_connected import setup
 from test_meeting_calls import Backend, Worker
 
@@ -106,6 +106,12 @@ def test_compact_chat_keeps_composer_and_footer_separate_during_activity(qtbot, 
     footer = area.layout().itemAt(area.layout().count() - 1).widget()
     assert footer.isHidden()  # Replaced by the integrated composer cue.
     assert window.composer.command_cue.isVisible()
+    assert window.composer.mention_list.isVisible()
+    assert window.composer.mention_list.parentWidget() is window
+    assert (
+        window.composer.mention_list.geometry().bottom()
+        < window.composer.mapTo(window, window.composer.rect().topLeft()).y()
+    )
     assert window.notice.mapTo(window, window.notice.rect().topLeft()).y() > (
         window.composer.mapTo(window, window.composer.rect().bottomLeft()).y()
     )
@@ -123,3 +129,25 @@ def test_profile_popup_mouse_activation_and_theme(qtbot, tmp_path):
         ) == window.palette().color(QPalette.ColorRole.Window)
         assert any(action.text() == "Settings…" for action in window.profile_menu.actions())
         window.profile_menu.close()
+
+
+def test_settings_actions_remain_visible_when_content_scrolls(qtbot, tmp_path):
+    window, _ = setup(qtbot, tmp_path)
+    dialog = SettingsDialog(window)
+    qtbot.addWidget(dialog)
+    dialog.resize(560, 540)
+    dialog.show()
+    scroll = dialog.findChild(QScrollArea)
+    footer = dialog.findChild(QWidget, "SettingsFooter")
+    qtbot.wait(20)
+    assert not scroll.isAncestorOf(footer)
+    from PySide6.QtWidgets import QPushButton
+
+    done = next(b for b in footer.findChildren(QPushButton) if b.text() == "Done")
+    for position in (0, scroll.verticalScrollBar().maximum()):
+        scroll.verticalScrollBar().setValue(position)
+        qtbot.wait(10)
+        assert dialog.rect().contains(done.mapTo(dialog, done.rect().bottomRight()))
+        assert done.isVisible() and done.isEnabled()
+    qtbot.mouseClick(done, Qt.MouseButton.LeftButton)
+    assert not dialog.isVisible()

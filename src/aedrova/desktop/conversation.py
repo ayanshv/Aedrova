@@ -26,6 +26,7 @@ from PySide6.QtGui import (
     QColor,
     QFont,
     QFontMetrics,
+    QIcon,
     QKeySequence,
     QPainter,
     QPainterPath,
@@ -41,6 +42,8 @@ from PySide6.QtWidgets import (
     QLabel,
     QLayout,
     QListView,
+    QListWidget,
+    QListWidgetItem,
     QPlainTextEdit,
     QStyle,
     QStyledItemDelegate,
@@ -944,6 +947,18 @@ class Composer(QFrame):
         self.suggestion.clicked.connect(self.complete_mention)
         self.editor.completion = self.completion_key
         self.editor.cursorPositionChanged.connect(self.update_suggestion)
+        self.mention_list = QListWidget(self)
+        self.mention_list.setObjectName("MentionPicker")
+        self.mention_list.setAccessibleName(
+            "Mention suggestions. Agents, Buds, people and channel."
+        )
+        self.mention_list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.mention_list.setIconSize(QSize(30, 30))
+        self.mention_list.setTextElideMode(Qt.TextElideMode.ElideRight)
+        self.mention_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.mention_list.hide()
+        self.mention_list.currentItemChanged.connect(self._select_mention)
+        self.mention_list.itemClicked.connect(lambda _: self.complete_mention())
         layout.addWidget(self.suggestion)
         layout.addWidget(self.editor)
         bottom = QHBoxLayout()
@@ -996,12 +1011,38 @@ class Composer(QFrame):
         if hasattr(self, "hint"):
             self.hint.setVisible(self.width() >= 650)
             self.mention.setText("Ask " + self.agent_name if self.width() >= 500 else "")
+            self._position_mentions()
+
+    def moveEvent(self, event):  # noqa: N802
+        super().moveEvent(event)
+        if hasattr(self, "mention_list"):
+            self._position_mentions()
+
+    def hideEvent(self, event):  # noqa: N802
+        if hasattr(self, "mention_list"):
+            self.mention_list.hide()
+            self.suggestion.hide()
+        super().hideEvent(event)
+
+    def _position_mentions(self):
+        if self.mention_list.isHidden():
+            return
+        host = self.window()
+        anchor = self.mapTo(host, QPoint(0, 0))
+        height = self.mention_list.height()
+        self.mention_list.setGeometry(
+            anchor.x(), max(0, anchor.y() - height - 6), self.width(), height
+        )
+        self.mention_list.raise_()
 
     def _focus_changed(self, focused):
         self.setProperty("focused", focused)
         self.style().unpolish(self)
         self.style().polish(self)
         self.update()
+        if not focused:
+            self.mention_list.hide()
+            self.suggestion.hide()
 
     def _resize_editor(self, size):
         # QPlainTextDocumentLayout reports height in visual lines, including wrapping.
@@ -1027,62 +1068,149 @@ class Composer(QFrame):
         self.mention.setToolTip(f"Insert {mention} · ask your agent to build")
         self.update_suggestion()
 
-    def mention_start(self):
+    def mention_entries(self):
+        """One catalog for typed completion and the toolbar; preserve routing tokens."""
+        entries = [("Agents", self.agent_name, "@" + self.agent_name, "Build with your team", None)]
+        entries += [
+            (
+                "Agents",
+                r["config"]["name"],
+                "<@ai:" + r["id"] + "|" + r["config"]["name"] + ">",
+                r["config"].get("role", "AI teammate"),
+                None,
+            )
+            for r in self.ai_teammates
+            if not r["paused"]
+        ]
+        entries += [
+            (
+                "Buds",
+                r["name"],
+                "<@dot:" + r["id"] + "|" + r["name"] + ">",
+                r.get("role", "Your AI teammate"),
+                r,
+            )
+            for r in self.dots
+        ]
+        entries += [
+            (
+                "People",
+                p["display_name"],
+                "<@" + p["user_id"] + "|" + p["display_name"] + ">",
+                p.get("custom_status") or p.get("availability", "Teammate"),
+                p,
+            )
+            for p in self.people
+        ]
+        entries += [
+            ("Notify channel", n, "@" + n, d, None)
+            for n, d in (("channel", "Notify this channel"), ("everyone", "Notify everyone"))
+        ]
+        return entries
+
+    def _mention_match(self):
         cursor = self.editor.textCursor()
         if cursor.hasSelection():
-            return None
+            return None, ""
         prefix = (
             self.editor.toPlainText()
             .encode("utf-16-le")[: cursor.position() * 2]
             .decode("utf-16-le")
         )
         match = re.search(r"(?<!\S)@([^@\n]*)$", prefix)
-        self.mention_choice = None
-        if match:
-            choices = (
-                [
-                    (self.agent_name, "@" + self.agent_name),
-                    ("channel", "@channel"),
-                    ("everyone", "@everyone"),
-                ]
-                + [(r["name"], "<@dot:" + r["id"] + "|" + r["name"] + ">") for r in self.dots]
-                + [
-                    (r["config"]["name"], "<@ai:" + r["id"] + "|" + r["config"]["name"] + ">")
-                    for r in self.ai_teammates
-                    if not r["paused"]
-                ]
-                + [
-                    (p["display_name"], "<@" + p["user_id"] + "|" + p["display_name"] + ">")
-                    for p in self.people
-                ]
-                + [
-                    (p["username"], "<@" + p["user_id"] + "|" + p["username"] + ">")
-                    for p in self.people
-                    if p.get("username")
-                ]
-            )
-            hits = [
-                (name, token)
-                for name, token in choices
-                if name.casefold().startswith(match[1].casefold())
-            ]
-            if hits:
-                self.mention_choice = hits[0]
-        if match and self.mention_choice:
-            return len(prefix[: match.start()].encode("utf-16-le")) // 2
-        return None
+        if not match:
+            return None, ""
+        return len(prefix[: match.start()].encode("utf-16-le")) // 2, match[1].casefold()
+
+    def mention_start(self):
+        start, _ = self._mention_match()
+        return start if self.mention_choice else None
+
+    def _select_mention(self, item, previous=None):
+        choice = item.data(Qt.ItemDataRole.UserRole) if item else None
+        if not choice:
+            return
+        self.mention_choice = choice
+        suffix = " · Bud" if choice[1].startswith("<@dot:") else ""
+        self.suggestion.setText("@" + choice[0] + suffix + "    ·    Tab or ↵")
+        self.suggestion.setAccessibleName("Insert @" + choice[0] + ". Tab or Return.")
 
     def update_suggestion(self):
-        self.suggestion.setVisible(self.mention_start() is not None)
-        if self.mention_choice:
-            suffix = " · Bud" if self.mention_choice[1].startswith("<@dot:") else ""
-            self.suggestion.setText("@" + self.mention_choice[0] + suffix + "    ·    Tab or ↵")
+        start, query = self._mention_match()
+        selected = self.mention_choice
+        self.mention_list.blockSignals(True)
+        self.mention_list.clear()
+        self.mention_choice = None
+        if start is None:
+            self.mention_list.blockSignals(False)
+            self.mention_list.hide()
+            self.suggestion.hide()
+            return
+        first = chosen = None
+        group = None
+        for section, name, token, detail, config in self.mention_entries():
+            aliases = [name, (config or {}).get("username", "")]
+            if query and not any(query in str(alias).casefold() for alias in aliases):
+                continue
+            if section == "People" and query and query not in name.casefold():
+                # Preserve the existing username mention syntax when searching by handle.
+                name = config["username"]
+                token = "<@" + config["user_id"] + "|" + name + ">"
+            if group != section:
+                header = QListWidgetItem(section)
+                header.setFlags(Qt.ItemFlag.NoItemFlags)
+                header.setSizeHint(QSize(0, 24))
+                self.mention_list.addItem(header)
+                group = section
+            item = QListWidgetItem("@" + name + "  ·  " + str(detail or "Teammate"))
+            item.setData(Qt.ItemDataRole.UserRole, (name, token))
+            item.setToolTip("@" + name + " · " + str(detail or "Teammate"))
+            item.setSizeHint(QSize(0, 38))
+            if section == "Buds":
+                from aedrova.desktop.bud_art import appearance, sprite
+
+                item.setIcon(QIcon(sprite(appearance(config), str(config.get("color", "")))))
+            self.mention_list.addItem(item)
+            if first is None:
+                first = item
+            if selected == (name, token):
+                chosen = item
+        self.mention_list.blockSignals(False)
+        visible = start is not None and first is not None
+        if self.mention_list.parentWidget() is not self.window():
+            self.mention_list.setParent(self.window())
+        self.mention_list.setVisible(visible)
+        self.suggestion.setVisible(visible)
+        if visible:
+            self.mention_list.setFixedHeight(
+                min(
+                    224,
+                    sum(
+                        self.mention_list.item(i).sizeHint().height()
+                        for i in range(self.mention_list.count())
+                    )
+                    + 8,
+                )
+            )
+            self._position_mentions()
+            self.mention_list.setCurrentItem(chosen or first)
+            self._select_mention(chosen or first)
 
     def completion_key(self, event):
         if self.suggestion.isHidden():
             return False
         if event.key() == Qt.Key.Key_Escape:
             self.suggestion.hide()
+            self.mention_list.hide()
+        elif event.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down) and not event.modifiers():
+            rows = [
+                i
+                for i in range(self.mention_list.count())
+                if self.mention_list.item(i).data(Qt.ItemDataRole.UserRole)
+            ]
+            current = rows.index(self.mention_list.currentRow())
+            step = 1 if event.key() == Qt.Key.Key_Down else -1
+            self.mention_list.setCurrentRow(rows[(current + step) % len(rows)])
         elif (
             event.key() in (Qt.Key.Key_Tab, Qt.Key.Key_Return, Qt.Key.Key_Enter)
             and not event.modifiers()
@@ -1097,15 +1225,16 @@ class Composer(QFrame):
         start = self.mention_start()
         if start is None:
             return
+        name, token = self.mention_choice
         cursor = self.editor.textCursor()
         cursor.setPosition(start, QTextCursor.MoveMode.KeepAnchor)
-        name, token = self.mention_choice
         if token.startswith("<@"):
             self.mention_tokens[name] = token
         cursor.insertText("@" + name + " ")
         self.editor.setTextCursor(cursor)
         self.editor.setFocus()
         self.suggestion.hide()
+        self.mention_list.hide()
 
     def insert_mention(self):
         cursor = self.editor.textCursor()
