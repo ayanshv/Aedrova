@@ -115,3 +115,8 @@ reported live but still served the old layout). Render deploy
 dep-db68agdckfvc73cgulqg is live at main 59260d7; actual aedrova.com DOM contains all
 seven new corner placements, eleven total. Screenshot:
 work/meeting-wrapup/homepage-buds-live.png. Waitlist calls to action remain intact.
+
+October 12 owner update: Render upgrade cannot be purchased now. Both hosting
+charges are deferred. Keep hosted transcription disabled and retain the prepared
+configuration privately. Existing SQL grants/code checks are complete; real hosted
+capture and two-device acceptance remain pending. No payment action authorized.

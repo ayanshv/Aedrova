@@ -1787,3 +1787,12 @@ transfer, hosted activation and real consent/review acceptance remain pending; d
 not mark transcription or Phase 3 complete. See docs/final-beta-phase-3.md and the
 backend transcription-staging-activation.md. Stripe remains deferred until release.
 Additional scattered homepage Buds merged in website PR #8; waitlist mode retained.
+
+## October 12 — owner cannot upgrade hosting yet
+
+Owner reports they cannot upgrade Render now. Defer the staging API and independent
+meeting-guard charges; do not submit purchases or enable hosted transcription.
+Code, narrow SQL grants and preflight preparation are saved. Actual hosted audio,
+consent/review/withdrawal and two-device acceptance remain blocked; transcription
+and Phase 3 are not complete. Local implementation and non-hosted checks can
+continue without this purchase. Resume hosting setup when owner is ready.
