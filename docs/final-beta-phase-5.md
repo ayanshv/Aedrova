@@ -104,3 +104,19 @@ request has been fulfilled or that all launch risks are resolved.
 Validation: 465 website tests passed before adding the third rollback regression;
 all three trust/removal tests pass afterward. Ruff and diff checks passed. Desktop
 visual/settings suite: 7 passed. Publication branch is tested separately against main.
+
+
+## Publication and final verification — October 12
+
+Website trust changes merged through PR #10:
+https://github.com/ayanshv/Aedrova-website/pull/10
+main merge 232e3564e56611706135847547751869621d8924. Only the scoped trust
+change was cherry-picked onto current production main; 32 staging commits were not
+merged wholesale. Production-based branch: 403 tests, full Ruff checks, hosted CI
+including Docker build/startup passed. Staging branch pushed ae4f5e6; desktop
+5db8618 pushed milestone-3-identity. Native visual/settings checks: 7 passed.
+Desktop/mobile browser review at 1366/390px found no page-width overflow;
+provider table scrolls within its own container. Public content verification was
+blocked: HTTP 403 and browser ERR_BLOCKED_BY_CLIENT on aedrova.com. This does not
+establish that production has deployed the merge; verify hosting deploy and the
+new public URLs before closing the publication gate. No checkout flag changed.
