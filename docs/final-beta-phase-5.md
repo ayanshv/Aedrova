@@ -136,3 +136,13 @@ still needs owner input; do not invent a company, chosen jurisdiction, represent
 DPA or law firm's approval. Before paid launch counsel must review these provisions
 and actual data flows, and Phase 6 must validate acceptance/versioning/notice where
 required. Document length alone does not close the Phase 5 release gate.
+
+Expanded documents merged via website PR #11:
+https://github.com/ayanshv/Aedrova-website/pull/11
+main d480e58d569a5f260658b7b0daff1b49d334976f. All 403 production-based
+tests and full lint passed; GitHub CI additionally passed deployment-image build
+and startup. Staging suite 466 passed. Desktop/mobile contents and anchor navigation
+were inspected at 1280px and 390px without page overflow. Existing unrelated staging
+file_policy.py E501 is excluded from this production-based legal publication.
+No payment, price, legal-ready flag or backend behavior was changed. Live public
+site confirmation remains pending after earlier network/browser access blocks.
