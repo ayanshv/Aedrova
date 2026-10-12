@@ -1927,3 +1927,9 @@ Native onboarding, auth, payments and downloads remain unchanged/gated. Search-c
 ownership/submissions, actual public crawler access and ongoing factual coverage are
 unverified rollout requirements. See docs/ai-discovery-and-attribution.md.
 Phase 6 is not started. Actual legal operator name is still the next required detail.
+
+Discovery publication: website PR #12 merged, production-based suite 407 passed,
+staging 470, lint/JS syntax and CI image smoke passed. Local browser/mobile flow
+verified. Public robots retrieval remains blocked and search-console submissions
+are unverified; no actual LLM citation or recommendation was established. Required
+legal operator detail remains pending; Phase 6 stays unstarted.

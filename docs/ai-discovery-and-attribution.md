@@ -78,3 +78,18 @@ assistants to cite irrelevant claims. No tracking pixels or paid campaigns were 
 
 Required legal detail remains unchanged: owner must supply the actual operator name
 (individual or registered company), then qualified legal review before paid launch.
+
+## Validation and publication
+
+407 tests pass on the isolated production-based branch; 470 on the working staging
+branch. Production lint, diff checks and bundled Node syntax check pass. Browser
+verified introduction → referral → plans → synthetic LOCAL waitlist success; API
+fixtures separately verify encrypted source persistence and export. Mobile 390px
+has no page overflow; Prefer not to say clears/disables detail. No real registration
+or email was sent in testing. GitHub CI passed deployment-image build/startup.
+Merged website PR #12: https://github.com/ayanshv/Aedrova-website/pull/12
+main 4309b2f957d539e86915b45e44bfd3d016754e84.
+A single site:aedrova.com brand query returned no results in this search tool;
+this is not proof about all providers' indexes. Public robots retrieval is still
+blocked in this session. Do not claim live deployment/crawl/index/model visibility
+verified until the public-domain and search-console rollout checks are completed.
