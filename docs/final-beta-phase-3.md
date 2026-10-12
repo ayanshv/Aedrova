@@ -56,3 +56,28 @@ Validate actual owner/admin end-for-everyone and final-leave flows, another-memb
 still-present behavior, explicit confirmation/corrections and consent withdrawal.
 The hosted automatic prompt is blocked until the migration and matching deployment
 are installed. No claim of real speech-provider or two-Mac acceptance is made.
+
+
+## October 11 — wrap-up staging migration and deployment verified
+
+Owner reported success running the new wrap-up migration in Aedrova Staging.
+Read-only public PostgREST probes resolve both `meeting_wrapup_status` and
+`confirm_meeting_transcript`, returning 42501 permission denial to unauthenticated
+callers rather than missing-function errors. This confirms function installation
+and anonymous execution denial, not authenticated hosted behavior.
+
+Manually deployed backend commit `1149e72` on existing free service
+`srv-db58sn8473hc73a9n3qg`; Render deploy `dep-db65s4h42hec73b13mp0` visibly succeeded.
+`/health/ready` returns 200 ready. Matching native source commit `31e2ec8` launched
+through the isolated staging public profile. No production deployment or credentials
+changed, no new paid service, no automatic recording or capability activation.
+
+`/health/meetings` returns 503 unavailable and the new wrap-up endpoint returns the
+configured meeting-text-disabled denial (403). Existing staging meetings, context,
+and speech capability gates remain off. Hosted two-account/end-of-meeting/edit/
+Confirm/withdrawal acceptance is therefore still blocked by the separately deferred
+meeting API/guard/LiveKit and server speech activation requirements. Owner's SQL
+step is complete; no further SQL is requested now. Paid hosting, provider costs and
+physical two-Mac testing remain owner release-preparation actions as already deferred;
+do not enable these gates just to make a smoke test pass. Phase 2 remains open.
+Evidence: `work/meeting-wrapup/staging-deployed.png`.
