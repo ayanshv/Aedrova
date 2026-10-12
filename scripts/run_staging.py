@@ -68,10 +68,15 @@ def main():
             "AEDROVA_MEETING_CONTEXT_ENABLED": "true" if args.meeting_context else "false",
         }
     )
+    interpreter = sys.executable
+    if sys.platform == "darwin":
+        from staging_macos import prepare
+
+        interpreter = str(prepare(ROOT, environment))
     # Separate persisted preferences/project bindings; login sessions stay in memory.
     subprocess.run(
         [
-            sys.executable,
+            interpreter,
             "-m",
             "aedrova.desktop.app",
             "--account",

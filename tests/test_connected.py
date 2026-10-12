@@ -164,3 +164,18 @@ def test_signed_in_meetings_opens_device_setup_and_signout_closes_it(qtbot, tmp_
     window.account_dialog.session_closed.emit()
     assert not window.meeting_setup.isVisible()
     assert window.meeting_setup.check.closed
+
+
+def test_server_snapshot_loads_private_attachment_preview(qtbot, tmp_path):
+    window, service = setup(qtbot, tmp_path)
+    service.attachments_for = lambda _: [
+        {"id": "attachment", "message_id": "m", "channel_id": "c", "filename": "note.txt"}
+    ]
+    service.download_attachment = lambda _: b"Private staging preview"
+    window.connected.last_view = None
+    window.connected.refresh()
+    qtbot.waitUntil(
+        lambda: window.collaboration.previews.cache.get("attachment") == "Private staging preview",
+        timeout=5000,
+    )
+    assert window.messages.attachment_previews["attachment"] == "Private staging preview"

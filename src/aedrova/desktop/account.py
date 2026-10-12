@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shiboken6 import isValid
 
 from aedrova.desktop.brand import BrandMark
 from aedrova.desktop.controls import AppDialog, ChoiceBox, CodingProviderChoice
@@ -50,14 +51,22 @@ class AccountJob(QRunnable):
     def run(self):
         try:
             result = self.operation()
-            self.signals.finished.emit(result, True)
+            success = True
         except Exception as error:
             from aedrova.identity.errors import retryable
 
             # Pass a classification only; never provider text or tokens.
-            self.signals.finished.emit({"retryable": retryable(error)}, False)
+            result, success = {"retryable": retryable(error)}, False
         finally:
             self.operation = None
+        # The window/application may close while this background request runs.
+        # A destroyed Qt receiver must not turn shutdown into a second failure.
+        if isValid(self.signals):
+            try:
+                self.signals.finished.emit(result, success)
+            except RuntimeError:
+                if isValid(self.signals):
+                    raise
 
 
 class AccountDialog(AppDialog):

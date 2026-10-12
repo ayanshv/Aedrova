@@ -7,7 +7,7 @@ import time
 import wave
 from uuid import uuid4
 
-from PySide6.QtCore import QEvent, QObject, Qt, QThreadPool, QTimer
+from PySide6.QtCore import QEvent, QObject, Qt, QThreadPool, QTimer, Slot
 from PySide6.QtGui import QColor, QPainter, QPalette
 from PySide6.QtMultimedia import QAudioFormat, QAudioSource, QMediaDevices
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QSizePolicy, QWidget
@@ -198,7 +198,10 @@ class Dictation(QObject):
             self.pcm.clear()
             self.source = QAudioSource(device, fmt, self)
             self.source.setBufferSize(32000)
-            self.source.stateChanged.connect(lambda _: self.audio_state(epoch))
+            # Qt's native QAudio::State signal cannot reliably cross PySide's
+            # generic callable conversion on macOS. A no-argument Qt slot drops
+            # that unused enum and reads the source's authoritative error state.
+            self.source.stateChanged.connect(self.audio_state)
             stream = self.source.start()
             if stream is None:
                 raise ValueError("Microphone unavailable")
@@ -212,8 +215,9 @@ class Dictation(QObject):
                 "error", "Microphone unavailable. Check your input device and permission."
             )
 
-    def audio_state(self, epoch):
-        if self.valid(epoch) and self.source and self.source.error().value:
+    @Slot()
+    def audio_state(self):
+        if self.valid(self.epoch) and self.source and self.source.error().value:
             self.cancel()
             self.show_state("error", "Microphone stopped. Your message draft is unchanged.")
 

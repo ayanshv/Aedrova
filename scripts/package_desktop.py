@@ -200,7 +200,8 @@ info.update(
             {"CFBundleURLName": "com.aedrova.chat", "CFBundleURLSchemes": ["aedrova"]}
         ],
         "NSMicrophoneUsageDescription": (
-            "Use your microphone when you enable a meeting or local microphone check."
+            "Use your microphone when you dictate a chat draft, enable meeting audio "
+            "or run a local microphone check."
         ),
     }
 )

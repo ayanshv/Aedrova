@@ -190,6 +190,11 @@ class Collaboration(QObject):
         for view in (window.messages, window.thread_messages):
             view.avatar_images = self.avatar_images
             view.avatar_paths = {}
+        from aedrova.desktop.attachment_previews import AttachmentPreviews
+
+        self.previews = AttachmentPreviews(
+            window, self.connected, lambda: self.dictation_scope(window.composer)
+        )
         self.manual_unread = set()
         self.dialogs = []
         self.local_saved = set()
@@ -217,9 +222,22 @@ class Collaboration(QObject):
             view.link_requested.connect(self.preview_link)
             view.files_dropped.connect(lambda paths, v=view: self.drop_files(paths, v))
         for composer in (window.composer, window.thread_composer):
-            from aedrova.desktop.dictation import Dictation
+            from aedrova.desktop.voice_messages import VoiceMessage
 
-            composer.dictation = Dictation(composer, lambda c=composer: self.dictation_scope(c))
+            composer.dictation = VoiceMessage(
+                composer,
+                lambda c=composer: self.dictation_scope(c),
+                lambda name, data, parent, completed, cancelled: bool(
+                    self.connected()
+                    and self.connected().upload(
+                        name,
+                        parent=parent,
+                        voice_data=data,
+                        completed=completed,
+                        cancelled=cancelled,
+                    )
+                ),
+            )
             attach = button("＋", "Attach files or images", "icon")
             attach.setFixedSize(30, 29)
             attach.clicked.connect(lambda checked=False, c=composer: self.attach(c))
@@ -507,6 +525,9 @@ class Collaboration(QObject):
             QTimer.singleShot(0, lambda: self.open_link(link))
 
     def reset(self):
+        self.previews.clear()
+        if hasattr(self, "voice_playback"):
+            self.voice_playback.clear()
         self.avatar_images.clear()
         self.avatar_pending.clear()
         self.avatar_failed.clear()
@@ -846,6 +867,17 @@ class Collaboration(QObject):
             self.window.notify("This sample file has no uploaded content.")
             return
         service = connected.account.service
+        if Path(filename).suffix.lower() == ".wav":
+            from aedrova.desktop.voice_messages import VoicePlayback
+
+            if not hasattr(self, "voice_playback"):
+                self.voice_playback = VoicePlayback(
+                    self.window,
+                    self.connected,
+                    lambda: self.dictation_scope(self.window.composer),
+                )
+            self.voice_playback.toggle(identifier)
+            return
 
         def loaded(data):
             dialog = AppDialog(self.window)

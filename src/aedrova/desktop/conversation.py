@@ -48,6 +48,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from aedrova.desktop.attachment_previews import preview_height
 from aedrova.desktop.controls import AppMenu
 from aedrova.desktop.emojis import QUICK_EMOJI, pick_emoji
 from aedrova.desktop.materials import SpringButton, system_font
@@ -155,6 +156,8 @@ class MessageDelegate(QStyledItemDelegate):
                 lambda m: "@" + m[2],
                 message.body,
             )
+            if message.attachment.lower().endswith(".wav") and text.startswith("Shared a file:"):
+                text = "Voice message"
             document.setMarkdown(escape(text, quote=False))
             previews = ""
             for url in message_urls(message.body):
@@ -248,7 +251,7 @@ class MessageDelegate(QStyledItemDelegate):
         if message.id == getattr(self.view, "agent_message_id", None):
             return QSize(width, self.view.agent_feed.content_height(width))
         document = self.document(message, width - 94)
-        extra = (58 if message.attachment else 0) + (
+        extra = (preview_height(message.attachment) if message.attachment else 0) + (
             26 if message.replies and self.view.allow_threads else 0
         )
         chips = reaction_chips(message, width, 0)
@@ -372,22 +375,70 @@ class MessageDelegate(QStyledItemDelegate):
         x = rect.x() + 74
         bottom = rect.y() + self.body_offset(index) + document.size().height()
         if message.attachment:
+            voice = message.attachment.lower().endswith(".wav")
+            playback = getattr(self.view, "voice_playback", {})
+            active = playback.get("id") == message.attachment_id
             painter.setPen(QColor(t.border))
             painter.setBrush(QColor(t.surface))
             card_width = min(350, rect.width() - 96)
-            painter.drawRoundedRect(QRectF(x, bottom + 10, card_width, 44), 12, 12)
+            height = preview_height(message.attachment)
+            painter.drawRoundedRect(QRectF(x, bottom + 10, card_width, height - 14), 12, 12)
             painter.setPen(QColor(t.accent))
             painter.setFont(font(10, True))
-            painter.drawText(QRectF(x + 12, bottom + 23, 30, 18), "FILE")
+            painter.drawText(
+                QRectF(x + 12, bottom + 23, 30, 18),
+                ("Ⅱ" if active and playback.get("playing") else "▶") if voice else "FILE",
+            )
             painter.setFont(font(11))
             painter.setPen(QColor(t.secondary))
             elided = painter.fontMetrics().elidedText(
-                message.attachment,
+                (
+                    (
+                        "Voice message · "
+                        + (
+                            f"{playback.get('position', 0) // 1000}s / "
+                            f"{playback.get('duration', 0) // 1000}s"
+                            if active
+                            else "Play"
+                        )
+                    )
+                    if voice
+                    else message.attachment
+                ),
                 Qt.TextElideMode.ElideRight,
                 int(card_width - 60),
             )
             painter.drawText(QRectF(x + 48, bottom + 23, card_width - 55, 18), elided)
-            bottom += 58
+            if height > 58:
+                preview = getattr(self.view, "attachment_previews", {}).get(message.attachment_id)
+                area = QRectF(x + 12, bottom + 48, card_width - 24, height - 58)
+                from PySide6.QtGui import QPixmap
+
+                if isinstance(preview, QPixmap):
+                    scaled = preview.scaled(
+                        area.size().toSize(),
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                    painter.drawPixmap(
+                        int(area.x()), int(area.y() + (area.height() - scaled.height()) / 2), scaled
+                    )
+                else:
+                    if preview is None:
+                        placeholder = QColor(t.secondary)
+                        placeholder.setAlpha(30)
+                        painter.setPen(Qt.PenStyle.NoPen)
+                        painter.setBrush(placeholder)
+                        for line, fraction in enumerate((0.88, 0.7, 0.48)):
+                            painter.drawRoundedRect(
+                                QRectF(area.x(), area.y() + line * 16, area.width() * fraction, 7),
+                                3,
+                                3,
+                            )
+                    else:
+                        painter.setFont(font(10))
+                        painter.drawText(area, Qt.TextFlag.TextWordWrap, preview)
+            bottom += height
         if message.replies and self.view.allow_threads:
             painter.setFont(font(11, True))
             painter.setPen(QColor(t.accent))
@@ -499,7 +550,9 @@ class MessageView(QListView):
         rect = self.visualRect(index)
         document = self.delegate.document(message, rect.width() - 94)
         top = rect.top() + self.delegate.body_offset(index)
-        top += document.size().height() + (58 if message.attachment else 0)
+        top += document.size().height() + (
+            preview_height(message.attachment) if message.attachment else 0
+        )
         top += 30 if message.replies and self.allow_threads else 8
         point = getattr(self, "_click_position", QPoint(-1, -1))
         for box, reaction, _ in reaction_chips(message, rect.width(), top):
@@ -515,7 +568,7 @@ class MessageView(QListView):
             message.attachment_id
             and body_top + document.size().height()
             <= point.y()
-            <= body_top + document.size().height() + 58
+            <= body_top + document.size().height() + preview_height(message.attachment)
         ):
             self.action_requested.emit("attachment", message.id)
             return
@@ -616,7 +669,10 @@ class MessageView(QListView):
                 )
             if message.attachment_id:
                 menu.addAction(
-                    "Open attachment…", lambda: self.action_requested.emit("attachment", message.id)
+                    "Play / pause voice message"
+                    if message.attachment.lower().endswith(".wav")
+                    else "Open attachment…",
+                    lambda: self.action_requested.emit("attachment", message.id),
                 )
             if message.mine:
                 menu.addAction(

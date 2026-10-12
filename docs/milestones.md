@@ -1828,3 +1828,32 @@ with reduced-motion support. Explicit Finish later resumes the controls highligh
 rather than leaving the intro blocked; setup is recorded as deferred, not authorized.
 See `docs/bud-personality-and-motion.md` for limits and required source-preview restart.
 Phase 3 live microphone/upload acceptance and earlier deferred hosting gates remain.
+
+### October 12 — live media acceptance and macOS source-launcher fix
+
+Owner signed in. Actual staging native upload publication passed hosted verification;
+malformed PNG and 10 MiB + 1 byte input were rejected without chat publication. New
+session retained the verified attachment. Microphone format is supported. Live start
+exposed missing macOS usage descriptions in the plain Python source launcher. Fixed
+run_staging.py to create a local staging-only source bundle; corrected app launches,
+signs in with existing Google session and reaches microphone permission. Owner's real
+recording/Done handoff is pending. No SQL/payment/key setup required. More live media
+and Bud acceptance remains; do not mark Phase 3 complete. See phase-3-live-acceptance.md.
+
+### October 12 — owner switches chat microphone to voice messages
+
+Owner requests iMessage-style recordings instead of speech-to-text. Default composer microphone
+now records locally, previews, and explicitly sends a bounded private WAV attachment; inline
+playback uses existing verified download/access controls. No transcription/API credits consumed.
+Owner reports staging 202610120002_voice_messages.sql installed. Matching backend deployment
+and actual voice send/playback acceptance remain required. Original optional dictation module
+is retained but not mounted in the composer. No meeting or production activation.
+See docs/voice-messages.md. Fixed macOS source permission bundle, native audio enum callback,
+and background-result delivery after Qt shutdown during live testing.
+
+Voice follow-up: local capture uses the microphone's native format with continuous
+conversion/resampling; duration is five minutes within the existing 10 MiB upload cap.
+Matching staging backend e375bdc is Live. Owner sent revised eight-second recording and
+reports distortion mostly gone; publication/persistence and text preview passed. Residual
+audio quality, other live acceptance cases and Phase 3 remain open. No owner SQL/key/payment
+step is required for this voice update. No production or meeting activation.

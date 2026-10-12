@@ -598,6 +598,13 @@ class ConnectedDashboard(QObject):
                 w.thread_title.setText(f"Thread · {len(parent.replies)} replies")
             else:
                 w.close_thread()
+        if hasattr(w, "collaboration"):
+            preview_messages = list(w.channel.messages)
+            if w.thread_id:
+                parent = next((m for m in w.channel.messages if m.id == w.thread_id), None)
+                if parent:
+                    preview_messages.extend(parent.replies)
+            w.collaboration.previews.load(preview_messages)
         w.composer.setEnabled(bool(w.channel_id))
         if not w.notice_timer.isActive():
             w.notice.setText(
@@ -626,6 +633,8 @@ class ConnectedDashboard(QObject):
             rows, str(self.account.service.user.id), directory=names, attachments=self.files
         )
         w.messages.show_messages(w.channel.messages)
+        if hasattr(w, "collaboration"):
+            w.collaboration.previews.load(w.channel.messages)
         w.message_stack.setCurrentIndex(0 if w.messages.model().rowCount() else 1)
         if w.thread_id:
             parent = next((m for m in w.channel.messages if m.id == w.thread_id), None)
@@ -830,10 +839,10 @@ class ConnectedDashboard(QObject):
 
         self.enqueue(("directory", workspace), service.snapshot, choose)
 
-    def upload(self, path=None, *, parent=None):
+    def upload(self, path=None, *, parent=None, voice_data=None, completed=None, cancelled=None):
         if not self.active or not self.window.channel_id:
             return
-        if not path or isinstance(path, bool):
+        if voice_data is None and (not path or isinstance(path, bool)):
             parent = parent or (
                 self.window.thread_id if self.window.thread_composer.editor.hasFocus() else None
             )
@@ -854,14 +863,23 @@ class ConnectedDashboard(QObject):
         progress = UploadProgress(composer, Path(path).name)
 
         def operation():
+            import tempfile
+
+            temporary = None
             try:
+                source = path
+                if voice_data is not None:
+                    temporary = tempfile.TemporaryDirectory(prefix="aedrova-voice-upload-")
+                    source = Path(temporary.name) / Path(path).name
+                    source.write_bytes(voice_data)
                 result = service.upload_attachment(
                     identifier,
                     channel,
-                    path,
+                    source,
                     parent,
                     cancelled=lambda: (
                         progress.cancelled.is_set()
+                        or bool(cancelled and cancelled())
                         or not self.active
                         or self.account.service is not service
                     ),
@@ -872,6 +890,9 @@ class ConnectedDashboard(QObject):
                 return {"error": str(error)}
             except Exception:
                 return {"error": "Not shared. Check connection, file type or channel access."}
+            finally:
+                if temporary is not None:
+                    temporary.cleanup()
 
         def done(result):
             self.pending.pop(key, None)
@@ -879,9 +900,13 @@ class ConnectedDashboard(QObject):
                 result.get("error")
                 or ("Shared · verified securely" if result.get("shared") else "Upload cancelled")
             )
+            if completed:
+                completed(result)
 
-        if not self.enqueue(key, operation, done):
+        queued = self.enqueue(key, operation, done)
+        if not queued:
             progress.complete("Already queued or unavailable. Your file was not added twice.")
+        return bool(queued)
 
     def download(self):
         if not self.active:
