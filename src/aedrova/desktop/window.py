@@ -1177,6 +1177,10 @@ class AedrovaWindow(QMainWindow):
             tile.update()
         for mark in self.findChildren(BrandMark):
             mark.set_reduced_motion(self.reduced_motion)
+        from aedrova.desktop.ai_teammates import Character
+
+        for character in self.findChildren(Character):
+            character.set_reduced_motion(self.reduced_motion)
         for control in self.findChildren(SpringButton):
             control.motion.set_enabled(not self.reduced_motion)
 

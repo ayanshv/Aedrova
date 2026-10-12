@@ -84,7 +84,9 @@ def sprite(look, color=""):
 
 
 def paint_bud(p, rect, config, *, phase=0, blink=False, look=0, rotation=0):
-    pixmap = sprite(appearance(config), str(config.get("color", "#4388F5")))
+    pixmap = (blinking_sprite if blink else sprite)(
+        appearance(config), str(config.get("color", "#4388F5"))
+    )
     if pixmap.isNull():
         return False
     p.save()
@@ -93,9 +95,38 @@ def paint_bud(p, rect, config, *, phase=0, blink=False, look=0, rotation=0):
     p.rotate(rotation)
     breathing = 1 + math.sin(phase * 1.7) * 0.015
     # A single organic squint preserves the exact rendered eye geometry.
-    p.scale(breathing, breathing * (0.97 if blink else 1))
+    p.scale(breathing, breathing)
     p.translate(max(-1, min(1, look)) * rect.width() * 0.012, math.sin(phase) * 0.4)
     side = min(rect.width(), rect.height())
     p.drawPixmap(QRectF(-side / 2, -side / 2, side, side), pixmap, QRectF(pixmap.rect()))
     p.restore()
     return True
+
+
+# Eye rectangles in the original 512px atlas cells. Accessories stay untouched.
+EYES = {
+    "builder": ((257, 309, 35, 79), (349, 308, 34, 77)),
+    "designer": ((222, 303, 36, 80), (322, 303, 36, 80)),
+    "marketing": ((181, 289, 36, 80), (281, 289, 36, 80)),
+    "finance": ((201, 246, 34, 73), (318, 244, 34, 74)),
+    "research": ((175, 258, 35, 75), (267, 258, 35, 75)),
+    "product": ((149, 269, 34, 70), (231, 269, 34, 71)),
+}
+
+
+@lru_cache(maxsize=48)
+def blinking_sprite(look, color=""):
+    """Close only the eyes using adjacent satin pixels and the original eye texture."""
+    original = sprite(look, color)
+    closed = original.copy()
+    painter = QPainter(closed)
+    painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+    sx, sy = closed.width() / 512, closed.height() / 512
+    for x, y, width, height in EYES[look]:
+        target = QRectF(x * sx, y * sy, width * sx, height * sy)
+        # A nearby clean face strip preserves the artwork's illumination and tint.
+        painter.drawPixmap(target, original, QRectF((x - 9) * sx, y * sy, 4 * sx, height * sy))
+        eye = QRectF(target.x(), target.center().y() - 2 * sy, target.width(), 4 * sy)
+        painter.drawPixmap(eye, original, target)
+    painter.end()
+    return closed

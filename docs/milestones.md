@@ -1817,3 +1817,14 @@ its authenticated owner UI (100% capacity, 0/40 requests). Matching source app
 launched against staging. Owner native sign-in/physical speech and actual hosted
 upload/provider acceptance still pending. No payment, meeting activation or
 production change occurred. Both repositories are pushed; Phase 3 remains open.
+
+### Bud personality, motion and defer handoff — October 12
+
+Seven-step Bud setup now includes continuous working-style controls and custom
+personality text. Existing versioned instructions persist settings; read-only answers
+and Builder prompts apply them. Reporting preferences throttle optional prose during
+active work only. Eye-only blinking covers native Bud surfaces and website placements,
+with reduced-motion support. Explicit Finish later resumes the controls highlights
+rather than leaving the intro blocked; setup is recorded as deferred, not authorized.
+See `docs/bud-personality-and-motion.md` for limits and required source-preview restart.
+Phase 3 live microphone/upload acceptance and earlier deferred hosting gates remain.

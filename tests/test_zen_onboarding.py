@@ -512,3 +512,26 @@ def test_required_bud_walkthrough_returns_on_cancel_and_hands_off_on_finish(flow
     dialog.buds_dialog.accept()
     assert dialog.finished_once
     assert window.settings.value(dialog.prefix + "/hasCompletedOnboarding", False, type=bool)
+
+
+def test_explicit_bud_finish_later_continues_controls_tour(flow, monkeypatch, qtbot):
+    from PySide6.QtWidgets import QDialog
+
+    window, dialog = flow
+    window.current_user = lambda: SimpleNamespace(id="bud-deferred-account")
+    dialog.prefix = account_key(window)
+
+    class BudWalkthrough(QDialog):
+        def __init__(self, parent, *, required):
+            super().__init__(parent)
+            self.deferred_setup = True
+
+    monkeypatch.setattr("aedrova.desktop.dots.DotDialog", BudWalkthrough)
+    calls = []
+    monkeypatch.setattr(dialog, "start_controls_tour", lambda: calls.append("tour"))
+    dialog.show_stage(LAST_STAGE)
+    dialog.complete()
+    dialog.buds_dialog.reject()
+    qtbot.waitUntil(lambda: calls == ["tour"])
+    assert dialog.finished_once
+    assert window.settings.value(dialog.prefix + "/budsDeferred", False, type=bool)

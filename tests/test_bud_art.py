@@ -47,3 +47,13 @@ def test_appearance_rpc_retains_full_configuration():
     params = {"p_appearance": "marketing", "p_role": "Launch updates"}
     s.save_bud(params)
     s.client.rpc.assert_called_once_with("save_workspace_bud_appearance", params)
+
+
+def test_blink_closes_eyes_without_squashing_body(qapp):
+    from aedrova.desktop.bud_art import blinking_sprite
+
+    for look in LOOKS:
+        open_eye, closed_eye = sprite(look).toImage(), blinking_sprite(look).toImage()
+        assert open_eye != closed_eye
+        assert open_eye.size() == closed_eye.size()
+        assert open_eye.pixelColor(100, 100) == closed_eye.pixelColor(100, 100)

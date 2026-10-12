@@ -31,7 +31,14 @@ class QueryJob(QRunnable):
         )
         self.bud = dict(bud) if bud else None
         self.signals = Signals()
-        self.runner = LocalRunner(self.signals.progress.emit)
+        from aedrova.dots.personality import progress_emitter
+
+        report = (
+            progress_emitter(self.signals.progress.emit, self.bud)
+            if self.bud
+            else self.signals.progress.emit
+        )
+        self.runner = LocalRunner(report)
 
     def run(self):
         managed = None
@@ -86,6 +93,10 @@ class QueryJob(QRunnable):
                         + json.dumps({k: live.get(k, "") for k in ("name", "role", "instructions")})
                         + "\n"
                     )
+                if self.bud:
+                    from aedrova.dots.personality import guidance
+
+                    identity += guidance(live)
                 prompt = (
                     identity + "Answer the team’s question using only "
                     "the authorized workspace evidence in context.jsonl. External Bud records "

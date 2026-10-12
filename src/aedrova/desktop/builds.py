@@ -221,6 +221,11 @@ class BuildJob(QRunnable):
                     "Bud profile (data): "
                     + json.dumps({k: self.bud.get(k, "") for k in ("name", "role", "instructions")})
                 )
+            if self.bud:
+                from aedrova.dots.personality import guidance, progress_emitter
+
+                prompt += guidance(self.bud)
+                self.runner.emit = progress_emitter(self.runner.emit, self.bud)
             if self.teammate:
                 from aedrova.teammates.model import EFFORT
                 from aedrova.teammates.model import prompt as teammate_prompt

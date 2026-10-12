@@ -304,7 +304,15 @@ class DotDialog(AppDialog):
         self.job_role.blockSignals(False)
         self.role.setText(purpose_from(row.get("role", "")))
         self.role_changed()
-        self.instructions.setPlainText(row.get("instructions", ""))
+        from aedrova.dots.personality import unpack
+
+        notes, preferences, voice = unpack(row.get("instructions", ""))
+        self.instructions.setPlainText(notes)
+        for key, control in self.personality_sliders.items():
+            control.setValue(preferences[key])
+            control.setEnabled(self.admin())
+        self.personality_voice.setText(voice)
+        self.personality_voice.setEnabled(self.admin())
         self.provider.setEnabled(False)
         self.resource.setEnabled(False)
         for field in (
@@ -339,6 +347,22 @@ class DotDialog(AppDialog):
         self.preview()
         self.show_step(2)
         self.update_controls()
+
+    def finish_later(self):
+        # Explicit defer is different from closing an unfinished required dialog.
+        self.deferred_setup = True
+        self.reject()
+
+    def configured_instructions(self):
+        from aedrova.dots.personality import DEFAULTS, pack
+
+        preferences = {key: control.value() for key, control in self.personality_sliders.items()}
+        voice = self.personality_voice.text().strip()
+        row = self.current()
+        original = row.get("instructions", "") if row else ""
+        if preferences == DEFAULTS and not voice and "[Aedrova personality v1]" not in original:
+            return self.instructions.toPlainText().strip()
+        return pack(self.instructions.toPlainText(), preferences, voice)
 
     def configured_role(self):
         specialty = self.job_role.currentData() or "builder"
@@ -404,6 +428,13 @@ class DotDialog(AppDialog):
         self.role.clear()
         self.role_changed()
         self.instructions.clear()
+        from aedrova.dots.personality import DEFAULTS
+
+        for key, control in self.personality_sliders.items():
+            control.setValue(DEFAULTS[key])
+            control.setEnabled(self.admin())
+        self.personality_voice.clear()
+        self.personality_voice.setEnabled(self.admin())
         self.provider.setEnabled(self.admin())
         self.provider.setCurrentIndex(max(0, self.provider.findData("github")))
         self.resource.clear()
@@ -466,9 +497,9 @@ class DotDialog(AppDialog):
 
     def show_step(self, step):
         changed = self.pages.currentIndex() != step
-        self.setup_panel.setMinimumWidth(900 if step == 4 else 500)
-        self.setup_panel.setMaximumWidth(1120 if step == 4 else 560)
-        if step == 4:
+        self.setup_panel.setMinimumWidth(900 if step == 5 else 500)
+        self.setup_panel.setMaximumWidth(1120 if step == 5 else 560)
+        if step == 5:
             self.setMinimumWidth(960)
             if self.width() < 1100:
                 self.resize(1100, max(800, self.height()))
@@ -484,10 +515,10 @@ class DotDialog(AppDialog):
         else:
             self.setMinimumWidth(600)
         self.pages.setCurrentIndex(step)
-        size = {1: 128, 2: 144, 3: 100, 5: 210}.get(step, 100)
+        size = {1: 128, 2: 144, 3: 100, 6: 210}.get(step, 100)
         self.character.setFixedSize(size, size)
-        self.progress.setText(f"{step + 1} / 6")
-        self.dots.setText("  ".join("●" if i == step else "·" for i in range(6)))
+        self.progress.setText(f"{step + 1} / 7")
+        self.dots.setText("  ".join("●" if i == step else "·" for i in range(7)))
         self.back.setVisible(step > 0)
         layout = self.character_layouts.get(step)
         if layout is not None:
@@ -495,7 +526,7 @@ class DotDialog(AppDialog):
         self.character.setVisible(layout is not None)
         self.next.setText(
             "Start chatting →"
-            if step == 5
+            if step == 6
             else "Let’s set up your Bud →"
             if step == 0
             else "Continue →"
@@ -565,16 +596,16 @@ class DotDialog(AppDialog):
 
     def continue_setup(self):
         step = self.pages.currentIndex()
-        if step < 4:
+        if step < 5:
             if step == 2 and not self.name.text().strip():
                 self.status.setText("Give your Bud a name first.")
                 self.name.setFocus()
                 return
-            if step == 3 and len(self.instructions.toPlainText()) > 2000:
+            if step == 3 and len(self.configured_instructions()) > 2000:
                 self.status.setText("Keep instructions under 2,000 characters.")
                 return
             self.show_step(step + 1)
-        elif step == 4:
+        elif step == 5:
             if (
                 self.current()
                 and self.current().get("status") == "Connected"
@@ -592,7 +623,7 @@ class DotDialog(AppDialog):
                     + " · "
                     + (", ".join(sources) if sources else self.provider.currentText())
                 )
-                self.show_step(5)
+                self.show_step(6)
             elif self.current() and not self.has_changes():
                 self.status.setText("Choose a connector card and authorize a tool to finish setup.")
             else:
@@ -617,7 +648,7 @@ class DotDialog(AppDialog):
                 self.shape.currentData() != row["shape"],
                 self.appearance.currentData() != row.get("appearance", "auto"),
                 self.configured_role() != row.get("role", ""),
-                self.instructions.toPlainText().strip() != row.get("instructions", ""),
+                self.configured_instructions() != row.get("instructions", ""),
             ]
         )
 
@@ -633,7 +664,7 @@ class DotDialog(AppDialog):
             return
         if not self.name.text().strip() or not self.resource.text().strip():
             self.status.setText("Add a Bud name and a tool resource before saving.")
-            self.show_step(4 if self.name.text().strip() else 2)
+            self.show_step(5 if self.name.text().strip() else 2)
             return
         if len(self.configured_role()) > 240:
             self.status.setText(
@@ -641,7 +672,7 @@ class DotDialog(AppDialog):
             )
             self.show_step(3)
             return
-        if len(self.instructions.toPlainText()) > 2000:
+        if len(self.configured_instructions()) > 2000:
             self.status.setText("Keep instructions under 2,000 characters.")
             self.show_step(3)
             return
@@ -669,19 +700,19 @@ class DotDialog(AppDialog):
             "p_shape": self.shape.currentData(),
             "p_appearance": self.appearance.currentData(),
             "p_role": self.configured_role(),
-            "p_instructions": self.instructions.toPlainText().strip(),
+            "p_instructions": self.configured_instructions(),
         }
 
         def saved(value):
             self.selected_id = value["id"]
-            self.after_refresh = 4
+            self.after_refresh = 5
             self.after_save = on_saved
             self.refresh()
 
         self.run(lambda service: service.save_bud(parameters), saved)
 
     def open_connectors(self):
-        self.show_step(4)
+        self.show_step(5)
 
     def authorize(self):
         row = self.current()
@@ -726,7 +757,7 @@ class DotDialog(AppDialog):
                 not row
                 or row.get("status") != "Connected"
                 or self.has_changes()
-                or self.pages.currentIndex() != 5
+                or self.pages.currentIndex() != 6
             ):
                 self.status.setText("Finish configuring a Bud and connect one tool to continue.")
                 return

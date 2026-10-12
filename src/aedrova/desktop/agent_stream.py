@@ -7,6 +7,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
+    QApplication,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -83,7 +84,10 @@ class ActivityRow(QFrame):
             if character_config:
                 from aedrova.desktop.ai_teammates import Character
 
-                avatar = Character(character_config, reduced_motion=True)
+                avatar = Character(
+                    character_config,
+                    reduced_motion=QApplication.instance().property("reduceMotion") is True,
+                )
                 avatar.setFixedSize(34, 32)
             else:
                 avatar = BrandMark(34)
