@@ -46,6 +46,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--check-only", action="store_true")
+    parser.add_argument(
+        "--meeting-context",
+        action="store_true",
+        help="Enable consented meeting history in the internal staging source.",
+    )
     args = parser.parse_args()
     config = validate(json.loads(args.config.read_text()))
     if args.check_only:
@@ -59,6 +64,8 @@ def main():
             "AEDROVA_MANAGED_ORIGIN": config["managed_origin"],
             "AEDROVA_CONNECTOR_ORIGIN": config["connector_origin"],
             "AEDROVA_AI_ACCESS_MODE": "included",
+            "AEDROVA_DEPLOYMENT_ENVIRONMENT": "staging",
+            "AEDROVA_MEETING_CONTEXT_ENABLED": "true" if args.meeting_context else "false",
         }
     )
     # Separate persisted preferences/project bindings; login sessions stay in memory.

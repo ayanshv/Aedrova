@@ -81,3 +81,31 @@ step is complete; no further SQL is requested now. Paid hosting, provider costs 
 physical two-Mac testing remain owner release-preparation actions as already deferred;
 do not enable these gates just to make a smoke test pass. Phase 2 remains open.
 Evidence: `work/meeting-wrapup/staging-deployed.png`.
+
+## October 11 — transcription activation brought forward
+
+Owner explicitly requested complete transcription activation. The restricted staging
+backend lacked EXECUTE on the two speech functions because its role was created
+after the migrations. Owner ran the narrow staging-only grants; both privileges
+and the prepared configuration/database preflight now pass. No table grants added.
+
+Backend `ebd9f25` adds a speech/database preflight and permits the existing bounded
+Free plan with speech alone, retaining shared workspace/funder budgets and server
+limits. An ignored, private staging activation profile is prepared. Matching native
+source supports `scripts/run_staging.py --config work/staging/public-config.json
+--meeting-context`; frozen public builds and production configuration remain gated.
+Full suites passed: 743 native tests and 444 development backend tests. OpenAI
+whisper-1 metadata returned 200; real audio/provider capture has not been tested.
+
+Required now: Render → aedrova-beta-staging → Compute → Save the selected $7/month
+plan personally. This starts a recurring charge. A separate $7/month meeting guard
+is prepared in the backend's deploy/render-beta-meeting-guard.yaml, making base
+hosting about $14/month before provider usage/taxes. No charge submitted by agent.
+Then approve transfer of the existing LiveKit credentials and OpenAI key to that
+staging API, deploy both services, explicitly activate the staging workspace's
+limited Free plan, and validate consent/capture/edit/Confirm/withdrawal with two
+accounts and physical devices. Hosted transcription is not complete until those
+checks pass. Production stays unchanged; Stripe remains deferred until release.
+
+Detailed handoff: ../Aedrova_site/docs/transcription-staging-activation.md.
+Homepage Bud placements merged through website PR #8; publication checked separately.

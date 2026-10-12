@@ -174,3 +174,23 @@ def test_partial_development_configuration_fails_closed(monkeypatch):
     monkeypatch.delenv("AEDROVA_SUPABASE_PUBLISHABLE_KEY", raising=False)
     with pytest.raises(ValueError):
         Connection.from_environment()
+
+
+@pytest.mark.parametrize(
+    "frozen,project,enabled",
+    [
+        (False, "https://stage-example.supabase.co", True),
+        (True, "https://stage-example.supabase.co", False),
+        (False, "https://cpelagtufyocepnqcqqd.supabase.co", False),
+    ],
+)
+def test_source_staging_context_override_cannot_enable_public_build(
+    monkeypatch, frozen, project, enabled
+):
+    import sys
+
+    monkeypatch.setattr(sys, "frozen", frozen, raising=False)
+    monkeypatch.setenv("AEDROVA_DEPLOYMENT_ENVIRONMENT", "staging")
+    monkeypatch.setenv("AEDROVA_MEETING_CONTEXT_ENABLED", "true")
+    service = IdentityService(Connection(project, KEY), client=Mock())
+    assert service.meeting_context_enabled is enabled

@@ -77,6 +77,13 @@ class IdentityService:
             path = Path(__file__).parents[1] / "desktop/assets/public-config.json"
             configuration = json.loads(path.read_text()) if path.exists() else {}
             meeting_context_enabled = configuration.get("meeting_context_enabled", False)
+            # Internal staging source can opt in; public packaged builds use their manifest.
+            if (
+                not getattr(sys, "frozen", False)
+                and os.getenv("AEDROVA_DEPLOYMENT_ENVIRONMENT") == "staging"
+                and "cpelagtufyocepnqcqqd" not in connection.url
+            ):
+                meeting_context_enabled = os.getenv("AEDROVA_MEETING_CONTEXT_ENABLED") == "true"
         self.meeting_context_enabled = meeting_context_enabled is True
         self._transport = (
             httpx.Client(timeout=15, follow_redirects=False) if client is None else None

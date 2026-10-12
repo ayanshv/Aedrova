@@ -1770,3 +1770,20 @@ step is complete; no further SQL is requested now. Paid hosting, provider costs 
 physical two-Mac testing remain owner release-preparation actions as already deferred;
 do not enable these gates just to make a smoke test pass. Phase 2 remains open.
 Evidence: `work/meeting-wrapup/staging-deployed.png`.
+
+## October 11 — speech grant fix verified; activation pending hosting
+
+Owner brought meeting transcription activation forward and ran the staging-only
+speech grants. Both restricted backend EXECUTE privileges and the prepared speech/
+database preflight pass. Backend `ebd9f25` is pushed; source staging can opt into
+meeting context without enabling it in frozen/public builds. Full checks: 743
+native and 444 backend tests passed. Provider metadata access succeeds; actual
+microphone transcription and two-device acceptance are not yet verified.
+
+Required owner action now: Render → aedrova-beta-staging → Compute → Save selected
+$7/month plan. Separate $7/month guard also required (about $14/month base hosting,
+excluding usage/taxes). Agent prepared but did not submit either charge. Credential
+transfer, hosted activation and real consent/review acceptance remain pending; do
+not mark transcription or Phase 3 complete. See docs/final-beta-phase-3.md and the
+backend transcription-staging-activation.md. Stripe remains deferred until release.
+Additional scattered homepage Buds merged in website PR #8; waitlist mode retained.
