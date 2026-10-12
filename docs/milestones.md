@@ -1890,3 +1890,18 @@ native window or squeezing chat. Bud connector cards now adapt to compact widths
 without forced window enlargement. Settings has a persistent action footer.
 See docs/final-beta-phase-4.md for review coverage, evidence and remaining live gate.
 No SQL, hosting, production activation or customer purchase flow was changed.
+
+## October 12 — Phase 5 approved; trust pages and privacy operations
+
+Owner approved Phase 5 and reiterated the Cluely footer/reference. Expanded original
+privacy/terms/support disclosures and four-column public footer; added data controls,
+service providers, cookies/storage, acceptable use and security/availability pages.
+Desktop Settings now links to the public Data & AI guide. Verified waitlist-removal
+operator tooling preserves account sessions and fails closed on damaged encryption.
+No production records were removed, new permissions granted, or payments enabled.
+See docs/final-beta-phase-5.md for the actual data map, reference retrieval limits,
+request runbook and release gates. This is implementation progress, not legal approval
+or completion of full account/workspace export/deletion acceptance. Operator identity,
+counsel/processing contracts/business readiness and earlier live gates remain open.
+Phase 6 still requires separate owner approval; live Stripe setup remains deferred
+until the prelaunch/packaging checkpoint.

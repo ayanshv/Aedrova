@@ -80,6 +80,18 @@ class SettingsDialog(AppDialog):
             connectors = button("Manage connectors…", role="outline")
             connectors.clicked.connect(lambda: open_connectors(window))
             layout.addWidget(connectors)
+        if self.user:
+            layout = section(
+                root_layout,
+                "Data & AI privacy",
+                "Review what reaches AI, disconnect tools, or request a copy or removal.",
+            )
+            privacy = button("Review data controls…", role="outline")
+            privacy.setAccessibleName("Review Aedrova data and AI privacy controls")
+            privacy.clicked.connect(
+                lambda: QDesktopServices.openUrl(QUrl("https://aedrova.com/data-controls"))
+            )
+            layout.addWidget(privacy)
         layout = section(root_layout, "Appearance", "Choose a comfortable way to work.")
         self.appearance = ChoiceBox()
         self.appearance.setAccessibleName("Appearance")
