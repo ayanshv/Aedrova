@@ -12,6 +12,10 @@ the remaining Phase 3 voice/file work has not started. Stripe stays deferred.
 - After transport/device cleanup, the backend determines whether the meeting has
   ended, retained transcript exists, and the current participant is an owner/admin.
   Ordinary members cannot review other speakers through this new confirmation.
+- If an authorized administrator leaves seconds before the rest of the group, a
+  bounded background check waits up to one minute for actual room closure. It never
+  shows an early review or follows the user into another account/workspace/new call.
+  Longer-running meetings remain accessible through existing transcript history.
 - The themed native review asks **Share with Aedrova?**, presents timestamped,
   attributed transcript parts, allows corrections, and has **Confirm** as its
   primary action. **Review later** saves nothing; existing meeting-history review

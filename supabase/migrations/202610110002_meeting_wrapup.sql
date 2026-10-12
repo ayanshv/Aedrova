@@ -20,15 +20,17 @@ end $$;
 create function public.meeting_wrapup_status(p_meeting uuid) returns jsonb
 language plpgsql security definer set search_path='' as $$
 declare m public.meetings; u uuid:=aedrova_private.require_user(); w uuid; n integer;
+ allowed boolean;
 begin
  m:=aedrova_private.lock_meeting(p_meeting);
  select workspace_id into w from public.channels where id=m.channel_id;
+ perform aedrova_private.check_user_budget('meeting-wrapup',30,60);
  select count(*) into n from public.meeting_transcript_segments
  where meeting_id=m.id and expires_at>clock_timestamp();
- return jsonb_build_object('meeting',m.id,'title',m.title,'ready',
-  m.ended_at is not null and n>0
-  and coalesce(aedrova_private.member_role(w),'') in ('owner','admin')
-  and exists(select 1 from public.meeting_participants where meeting_id=m.id and user_id=u));
+ allowed:=n>0 and coalesce(aedrova_private.member_role(w),'') in ('owner','admin')
+  and exists(select 1 from public.meeting_participants where meeting_id=m.id and user_id=u);
+ return jsonb_build_object('meeting',m.id,'title',m.title,'can_review',allowed,
+  'ready',m.ended_at is not null and allowed);
 end $$;
 
 -- One explicit confirmation, one transaction. Stale, missing, duplicated or

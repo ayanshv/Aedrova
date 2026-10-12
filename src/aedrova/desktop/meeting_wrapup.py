@@ -4,8 +4,9 @@ import json
 import threading
 import time
 
-from PySide6.QtCore import Qt, QThreadPool
+from PySide6.QtCore import QObject, Qt, QThreadPool, QTimer
 from PySide6.QtWidgets import QHBoxLayout, QListWidget, QPlainTextEdit, QVBoxLayout
+from shiboken6 import isValid
 
 from aedrova.desktop.brand import BrandMark
 from aedrova.desktop.controls import AppDialog
@@ -202,17 +203,22 @@ class MeetingWrapup(AppDialog):
 
 def offer_wrapup(window, worker, status):
     """A late callback cannot switch accounts, replace a newer call or reopen twice."""
+    if isinstance(window, QObject) and not isValid(window):
+        return
     current = getattr(window, "meeting_call", None)
     account = getattr(window, "account_dialog", None)
     service = getattr(account, "service", None)
     user = getattr(service, "user", None)
-    if (not isinstance(status, dict) or status.get("ready") is not True
-            or status.get("meeting") != worker.meeting or user is None
+    if (not isinstance(status, dict) or status.get("meeting") != worker.meeting or user is None
             or str(user.id) != worker.user or current is None or current.worker is not worker):
         return
     if getattr(current, "wrapup_offered", False):
         return
     if getattr(window, "workspace_id", None) != getattr(worker, "workspace", None):
+        return
+    if status.get("ready") is not True:
+        if status.get("can_review") is True:
+            wait_for_group_leave(window, worker, current)
         return
     current.wrapup_offered = True
     current.accept()
@@ -220,3 +226,56 @@ def offer_wrapup(window, worker, status):
                           title=status.get("title") or "Meeting transcript", names=current.names)
     window.meeting_wrapup = dialog
     dialog.open()
+
+
+def wait_for_group_leave(window, worker, current):
+    """An admin leaving seconds before the last teammate still gets the wrap-up.
+
+    Polls only the server-authorized reviewer for at most a minute, never blocks
+    the GUI, and stops if the user changes account/workspace or starts a new call.
+    """
+    if getattr(current, "wrapup_poll_started", False):
+        return
+    current.wrapup_poll_started = True
+    timer = QTimer(window)
+    timer.setInterval(3000)
+    deadline, jobs = time.monotonic() + 60, []
+
+    def valid():
+        if not isValid(window):
+            return False
+        service = getattr(getattr(window, "account_dialog", None), "service", None)
+        user = getattr(service, "user", None)
+        return (time.monotonic() < deadline and user is not None and str(user.id) == worker.user
+                and getattr(window, "workspace_id", None) == worker.workspace
+                and getattr(window, "meeting_call", None) is current
+                and not getattr(current, "wrapup_offered", False))
+
+    def stop():
+        if isValid(timer):
+            timer.stop()
+            if not jobs:
+                timer.deleteLater()
+
+    def tick():
+        if not valid():
+            stop()
+            return
+        if jobs:
+            return
+        job = ReviewJob(lambda: worker.client.wrapup(worker.meeting))
+        jobs.append(job)
+
+        def received(result):
+            jobs.remove(job)
+            value = result.get("value")
+            if not valid() or not isinstance(value, dict) or value.get("can_review") is not True:
+                stop()
+                return
+            if value.get("ready") is True:
+                stop()
+                offer_wrapup(window, worker, value)
+        job.signals.result.connect(received)
+        QThreadPool.globalInstance().start(job)
+    timer.timeout.connect(tick)
+    timer.start()

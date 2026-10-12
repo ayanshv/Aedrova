@@ -1,6 +1,9 @@
 import asyncio
 from types import SimpleNamespace
 
+from PySide6.QtCore import QTimer
+from PySide6.QtWidgets import QWidget
+
 from aedrova.desktop.meeting_wrapup import MeetingWrapup, offer_wrapup
 from aedrova.meetings.call import CallWorker
 
@@ -121,3 +124,30 @@ def test_authorized_wrapup_replaces_ended_call_once_without_reactivating_window(
     offer_wrapup(window, worker, status)
     offer_wrapup(window, worker, status)
     assert calls == ["call closed", "review created", "review opened"]
+
+
+def test_admin_leaving_just_before_group_gets_review_only_after_server_end(qtbot, monkeypatch):
+    calls = []
+    class FastTimer(QTimer):
+        def setInterval(self, _):  # noqa: N802
+            super().setInterval(10)
+    class Dialog:
+        def __init__(self, *a, **kw):
+            calls.append("review")
+        def open(self):
+            pass
+    monkeypatch.setattr("aedrova.desktop.meeting_wrapup.QTimer", FastTimer)
+    monkeypatch.setattr("aedrova.desktop.meeting_wrapup.MeetingWrapup", Dialog)
+    window = QWidget()
+    qtbot.addWidget(window)
+    window.workspace_id = "w"
+    window.account_dialog = SimpleNamespace(service=SimpleNamespace(user=SimpleNamespace(id="u")))
+    worker = SimpleNamespace(meeting="m", user="u", workspace="w",
+        client=SimpleNamespace(wrapup=lambda _: dict(meeting="m", ready=True, can_review=True)))
+    current = SimpleNamespace(worker=worker, names={}, accept=lambda: calls.append("call closed"))
+    window.meeting_call = current
+    offer_wrapup(window, worker, dict(meeting="m", ready=False, can_review=True))
+    assert not calls
+    qtbot.waitUntil(lambda: calls == ["call closed", "review"])
+    offer_wrapup(window, worker, dict(meeting="m", ready=True, can_review=True))
+    assert calls == ["call closed", "review"]

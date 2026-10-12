@@ -1738,3 +1738,10 @@ Source delivery is to existing development branches only; no production auto-dep
 or hosted migration is initiated by this checkpoint. Owner next action: run
 `supabase/migrations/202610110002_meeting_wrapup.sql` once in Aedrova Staging's SQL
 Editor, then report success for the matching staged deployment/live test.
+
+Final follow-up handles an admin leaving seconds before the last participant:
+bounded, server-authorized background polling (up to 60 seconds), cancelled on
+account/workspace/new-call changes or destroyed windows. The final follow-up passed
+39 focused native call/header/speech/wrap-up checks, lint and a rerun of all actual
+embedded PostgreSQL migration/RLS scripts. The full 739-test run above predates
+this one added polling regression test; it is not claimed as a 740-test full run.
