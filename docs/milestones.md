@@ -1911,3 +1911,19 @@ original policies into 25/27 sections with detailed data handling and commercial
 allocation; accessible full contents and unchanged URLs. Business-only liability and
 covered third-party claims clauses require qualified counsel's review. Actual operator
 identity and existing privacy/live gates remain open; Phase 6 is not yet approved.
+
+## October 12 — public AI discovery and website attribution before Phase 6
+
+Owner requested AI/search discovery and a referral question in WEBSITE introduction,
+then the legal operator detail again. Added factual public product guide, metadata,
+canonical/schema, robots and sitemap; no inclusion/ranking/endorsement guarantee.
+Public search/retrieval is separated from OpenAI/Anthropic training. Google-Extended
+allows public marketing content for its combined Gemini grounding/training purpose.
+Private routes remain protected; non-public deployments exclude indexing.
+Website Plans entry points now use the optional introduction, available in waitlist
+mode, with explicit AI source choices. Optional source/detail accompany later waitlist
+registration in encrypted existing records and private CSV export; no SQL is needed.
+Native onboarding, auth, payments and downloads remain unchanged/gated. Search-console
+ownership/submissions, actual public crawler access and ongoing factual coverage are
+unverified rollout requirements. See docs/ai-discovery-and-attribution.md.
+Phase 6 is not started. Actual legal operator name is still the next required detail.
