@@ -273,7 +273,9 @@ def test_cross_source_query_job_selects_fetches_and_answers_with_citations(
     row = dot()
     from aedrova.dots.personality import DEFAULTS, pack
 
-    row["instructions"] = pack("Use verified changes.", {**DEFAULTS, "warmth": 83}, "Candid, dry wit.")
+    row["instructions"] = pack(
+        "Use verified changes.", {**DEFAULTS, "warmth": 83}, "Candid, dry wit."
+    )
     citation = "dot:" + row["id"] + ":changes"
     context = WorkspaceContext("w", "u", frozenset({"c"}), "", 0, "Aedrova", "codex")
     monkeypatch.setattr("aedrova.desktop.dot_analysis.gather", lambda *a, **k: context)
