@@ -1808,3 +1808,12 @@ automatic send. Dictation has its own server capability and bounded plan account
 it does not require paid meeting hosting. See docs/final-beta-chat-media.md for limits,
 tests and activation/manual gates. Do not mark Phase 3 or physical speech acceptance
 complete; production/public release and meeting gates remain unchanged.
+
+Staging activation follow-up: owner explicitly approved the existing OpenAI key
+transfer and bounded Free chat dictation. Render 36aba62 deployed successfully on
+the existing free service; health ready 200 and unauthenticated capability denial
+403. The existing disposable Beta isolation 1 eb8958 workspace activated Free in
+its authenticated owner UI (100% capacity, 0/40 requests). Matching source app
+launched against staging. Owner native sign-in/physical speech and actual hosted
+upload/provider acceptance still pending. No payment, meeting activation or
+production change occurred. Both repositories are pushed; Phase 3 remains open.

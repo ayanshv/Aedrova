@@ -81,3 +81,21 @@ final waitlist gate checked separately. All embedded PostgreSQL migration/RLS te
 including verified publication, other uploader denial, idempotency and cancellation,
 passed. Light/dark native components inspected at 900 and 360 px using fixture states,
 not a claim of live microphone recording. Secret scans and scoped lint passed.
+
+## Hosted activation update
+
+Owner approved transmission of the existing OpenAI key to Render staging and bounded
+Free dictation activation. Saved only AEDROVA_SPEECH_KEY, CHAT_SPEECH_ENABLED=true and
+FREE_ENABLED=true on the existing free service; no new charge or meeting activation.
+Backend 36aba62 deployed successfully as dep-db693oid0e5s739s1gd0, ready endpoint 200.
+Private matching .env.chat-media-staging profile validated and ignored by Git.
+Owner's upload migration and restricted grant are verified. Workspace Free activation
+and actual user microphone acceptance are still pending at this point.
+
+The existing disposable workspace **Beta isolation 1 eb8958** was selected through
+its authenticated staging account page. Start Free completed and displayed the
+team's Free plan active, 100% capacity and 0/40 requests; no paid checkout occurred.
+Native source 992a1e4 launched with the isolated staging profile. Its Google sign-in
+and physical microphone acceptance remain owner actions. Browser navigation cannot
+render the JSON capability endpoint; no authenticated capability response or real
+provider transcription is claimed. Unauthenticated capability access returned 403.
