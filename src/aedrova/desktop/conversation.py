@@ -935,6 +935,12 @@ class Composer(QFrame):
             self.editor.textCursor().insertText(emoji)
             self.editor.setFocus()
 
+    def resizeEvent(self, event):  # noqa: N802
+        super().resizeEvent(event)
+        if hasattr(self, "hint"):
+            self.hint.setVisible(self.width() >= 650)
+            self.mention.setText("Ask " + self.agent_name if self.width() >= 500 else "")
+
     def _focus_changed(self, focused):
         self.setProperty("focused", focused)
         self.style().unpolish(self)
@@ -1066,6 +1072,8 @@ class Composer(QFrame):
     def _submit(self):
         text = self.editor.toPlainText().strip()
         if text and len(text) <= 10_000:
+            if hasattr(self, "dictation"):
+                self.dictation.cancel()
             for name, token in self.mention_tokens.items():
                 text = re.sub(
                     r"(?<!\S)@" + re.escape(name) + r"(?=$|[\s.,!?])", lambda _, t=token: t, text

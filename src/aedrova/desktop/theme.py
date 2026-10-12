@@ -99,6 +99,12 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     selected = t.accent_bg
     bud_surface = "#FEFDFC" if t.name == "light" else t.surface
     return f"""
+    QFrame#DictationStrip, QFrame#UploadProgress {{ background: {t.canvas};
+        border: none; border-radius: 10px; }}
+    QFrame#DictationStrip QLabel {{ color: {t.text}; font-size: 12px; }}
+    QProgressBar#UploadMeter {{ border: none; background: {t.surface};
+        height: 3px; max-height: 3px; border-radius: 1px; }}
+    QProgressBar#UploadMeter::chunk {{ background: {t.accent}; border-radius: 1px; }}
     QDialog#Connectors {{ background: {t.bg}; }}
     QDialog#EmbeddedConnectors {{ background: transparent; }}
     QFrame#ConnectorRail {{ background: {t.canvas}; border-right: 1px solid {t.border}; }}

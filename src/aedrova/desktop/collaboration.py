@@ -217,6 +217,9 @@ class Collaboration(QObject):
             view.link_requested.connect(self.preview_link)
             view.files_dropped.connect(lambda paths, v=view: self.drop_files(paths, v))
         for composer in (window.composer, window.thread_composer):
+            from aedrova.desktop.dictation import Dictation
+
+            composer.dictation = Dictation(composer, lambda c=composer: self.dictation_scope(c))
             attach = button("＋", "Attach files or images", "icon")
             attach.setFixedSize(30, 29)
             attach.clicked.connect(lambda checked=False, c=composer: self.attach(c))
@@ -804,9 +807,7 @@ class Collaboration(QObject):
     def attach(self, composer=None):
         if self.connected():
             self.connected().upload(
-                parent=self.window.thread_id
-                if self.window.thread_composer.editor.hasFocus()
-                else None
+                parent=self.window.thread_id if composer is self.window.thread_composer else None
             )
         else:
             self.window.notify("Sign in to upload files securely.")
@@ -816,12 +817,28 @@ class Collaboration(QObject):
         if not connected:
             self.window.notify("Sign in to upload files securely.")
             return
-        for path in paths[:10]:
+        if len(paths) > 10:
+            self.window.notify("Drop up to 10 files at a time. Each file can be up to 10 MB.")
+            return
+        for path in paths:
             if Path(path).is_file():
                 connected.upload(
                     path,
                     parent=self.window.thread_id if view is self.window.thread_messages else None,
                 )
+
+    def dictation_scope(self, composer):
+        connected = self.connected()
+        if not connected or not self.window.channel_id:
+            return None
+        service = connected.account.service
+        return (
+            service,
+            str(service.user.id),
+            self.window.workspace_id,
+            self.window.channel_id,
+            self.window.thread_id if composer.thread else None,
+        )
 
     def open_attachment(self, identifier, filename):
         connected = self.connected()

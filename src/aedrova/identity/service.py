@@ -827,10 +827,19 @@ class IdentityService:
             str(self.user.id),
         )
 
-    def upload_attachment(self, identifier, channel_id, path, parent=None):
+    def upload_attachment(
+        self, identifier, channel_id, path, parent=None, *, cancelled=None, progress=None
+    ):
+        from aedrova.agents.managed import application_origin
+        from aedrova.identity.media import MediaClient
         from aedrova.identity.transfers import read_upload
 
+        cancelled = cancelled or (lambda: False)
+        progress = progress or (lambda _: None)
+        progress("Checking file…")
         name, data, digest = read_upload(path)
+        if cancelled():
+            return None
         object_path = self.rpc(
             "reserve_attachment",
             {
@@ -842,14 +851,26 @@ class IdentityService:
             },
         )
         try:
+            if cancelled():
+                self.rpc("abandon_attachment", {"p_id": identifier})
+                return None
+            progress("Uploading securely…")
             self.client.storage.from_("aedrova-files").upload(
                 object_path, data, {"content-type": "application/octet-stream", "upsert": "false"}
             )
+            if cancelled():
+                self.client.storage.from_("aedrova-files").remove([object_path])
+                self.rpc("abandon_attachment", {"p_id": identifier})
+                return None
+            progress("Verifying before sharing…")
+            token = self.client.auth.get_session().access_token
+            return MediaClient(application_origin(), token).request(
+                "/api/files/verify", {"identifier": identifier, "parent": parent}
+            )["message"]
         except Exception:
-            # An upload may have succeeded before its response was lost. The server checks
-            # the reserved immutable path and actual stored size before publishing it.
-            return self.rpc("finish_attachment", {"p_id": identifier, "p_parent": parent})
-        return self.rpc("finish_attachment", {"p_id": identifier, "p_parent": parent})
+            # No automatic publish/retry after ambiguous Storage or verification failures.
+            # Pending bytes are private and use the bounded orphan cleanup lifecycle.
+            raise
 
     def download_attachment(self, identifier):
         from aedrova.identity.transfers import MAX_BYTES

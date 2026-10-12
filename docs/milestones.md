@@ -1796,3 +1796,15 @@ Code, narrow SQL grants and preflight preparation are saved. Actual hosted audio
 consent/review/withdrawal and two-device acceptance remain blocked; transcription
 and Phase 3 are not complete. Local implementation and non-hosted checks can
 continue without this purchase. Resume hosting setup when owner is ready.
+
+## October 12 — Phase 3 verified uploads and composer voice draft
+
+Owner authorized upload safety and chat voice-to-text. Implemented local/server file
+inspection, restricted verification-only publication, cancellable composer progress,
+and existing storage/quota controls. Owner ran 202610120001_verified_uploads.sql in
+Staging; restricted backend EXECUTE verified. New microphone controls in channel/thread
+composers use explicit permission, reactive level feedback, editable results and no
+automatic send. Dictation has its own server capability and bounded plan accounting;
+it does not require paid meeting hosting. See docs/final-beta-chat-media.md for limits,
+tests and activation/manual gates. Do not mark Phase 3 or physical speech acceptance
+complete; production/public release and meeting gates remain unchanged.

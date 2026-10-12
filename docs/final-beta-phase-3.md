@@ -120,3 +120,12 @@ October 12 owner update: Render upgrade cannot be purchased now. Both hosting
 charges are deferred. Keep hosted transcription disabled and retain the prepared
 configuration privately. Existing SQL grants/code checks are complete; real hosted
 capture and two-device acceptance remain pending. No payment action authorized.
+
+## October 12 — upload safety and chat dictation
+
+Implemented server-verified file publication and explicit composer dictation. Details,
+limits, UI behavior, verification and remaining activation steps are in
+[final-beta-chat-media.md](final-beta-chat-media.md). Owner reported the new upload SQL
+success; the restricted staging grant was verified. Paid meeting hosting remains
+separately deferred. Chat dictation does not need a meeting guard, but its server key/
+flag and real microphone/allowance acceptance remain required before claiming it live.

@@ -213,6 +213,13 @@ class ConnectedDashboard(QObject):
             self.apply(self.account.snapshot, [], self.window.workspace_id, self.window.channel_id)
 
     def disconnect(self):
+        from aedrova.desktop.upload_progress import UploadProgress
+
+        for composer in (self.window.composer, self.window.thread_composer):
+            if hasattr(composer, "dictation"):
+                composer.dictation.cancel()
+            for upload in composer.findChildren(UploadProgress):
+                upload.cancel()
         teammate_dialog = getattr(self.window, "teammates_dialog", None)
         if teammate_dialog and not teammate_dialog.closed:
             teammate_dialog.reject()
@@ -833,19 +840,48 @@ class ConnectedDashboard(QObject):
             path, _ = QFileDialog.getOpenFileName(self.window, "Attach a file · up to 10 MB")
         if not path:
             return
+        from aedrova.desktop.upload_progress import UploadProgress
+
+        composer = self.window.thread_composer if parent else self.window.composer
+        if len(composer.findChildren(UploadProgress)) >= 10:
+            self.window.notify("Finish or dismiss uploads before adding more files.")
+            return
         # Capture context before the dialog/worker runs; changing channels never redirects uploads.
         channel = self.window.channel_id
         service = self.account.service
         key = ("upload", channel, parent, str(Path(path).resolve()))
         identifier = self.pending.setdefault(key, str(uuid4()))
+        progress = UploadProgress(composer, Path(path).name)
 
-        def done(_):
+        def operation():
+            try:
+                result = service.upload_attachment(
+                    identifier,
+                    channel,
+                    path,
+                    parent,
+                    cancelled=lambda: (
+                        progress.cancelled.is_set()
+                        or not self.active
+                        or self.account.service is not service
+                    ),
+                    progress=progress.updated.emit,
+                )
+                return {"shared": bool(result)}
+            except ValueError as error:
+                return {"error": str(error)}
+            except Exception:
+                return {"error": "Not shared. Check connection, file type or channel access."}
+
+        def done(result):
             self.pending.pop(key, None)
-            self.window.notify("File shared. Select its message and press ⌘⇧S to save a copy.")
+            progress.complete(
+                result.get("error")
+                or ("Shared · verified securely" if result.get("shared") else "Upload cancelled")
+            )
 
-        self.enqueue(
-            key, lambda: service.upload_attachment(identifier, channel, path, parent), done
-        )
+        if not self.enqueue(key, operation, done):
+            progress.complete("Already queued or unavailable. Your file was not added twice.")
 
     def download(self):
         if not self.active:

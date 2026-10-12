@@ -5,7 +5,7 @@ import os
 import tempfile
 from pathlib import Path
 
-MAX_BYTES = 10 * 1024 * 1024
+from aedrova.identity.file_policy import MAX_BYTES, inspect_file
 
 
 def read_upload(path):
@@ -19,6 +19,7 @@ def read_upload(path):
         data = stream.read(MAX_BYTES + 1)
     if not 1 <= len(data) <= MAX_BYTES:
         raise ValueError("Choose a file between 1 byte and 10 MB.")
+    inspect_file(name, data)
     return name, data, hashlib.sha256(data).hexdigest()
 
 
