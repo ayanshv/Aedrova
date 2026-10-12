@@ -1905,3 +1905,9 @@ or completion of full account/workspace export/deletion acceptance. Operator ide
 counsel/processing contracts/business readiness and earlier live gates remain open.
 Phase 6 still requires separate owner approval; live Stripe setup remains deferred
 until the prelaunch/packaging checkpoint.
+
+Phase 5 follow-up: owner requested substantially deeper Privacy and Terms. Expanded
+original policies into 25/27 sections with detailed data handling and commercial/legal
+allocation; accessible full contents and unchanged URLs. Business-only liability and
+covered third-party claims clauses require qualified counsel's review. Actual operator
+identity and existing privacy/live gates remain open; Phase 6 is not yet approved.

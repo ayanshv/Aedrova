@@ -120,3 +120,19 @@ provider table scrolls within its own container. Public content verification was
 blocked: HTTP 403 and browser ERR_BLOCKED_BY_CLIENT on aedrova.com. This does not
 establish that production has deployed the merge; verify hosting deploy and the
 new public URLs before closing the publication gate. No checkout flag changed.
+
+## Owner requests deeper legal documents — October 12
+
+Privacy expanded to 25 sections and Terms to 27, approximately 4,600 rendered words
+each. Full contents are collapsible and responsive; existing URLs and plan values
+are preserved. Public policy content remains tied to actual conditional functionality,
+not a claim of legal compliance or new automatic deletion controls. Publication uses
+a separate production-based branch; no Phase 6 execution is authorized by this request.
+
+Review new business-only twelve-month fee liability cap and narrowly scoped
+third-party claim reimbursement with qualified counsel. Mandatory rights and
+Aedrova misconduct/breach exceptions remain. Operator/legal contracting identity
+still needs owner input; do not invent a company, chosen jurisdiction, representative,
+DPA or law firm's approval. Before paid launch counsel must review these provisions
+and actual data flows, and Phase 6 must validate acceptance/versioning/notice where
+required. Document length alone does not close the Phase 5 release gate.
