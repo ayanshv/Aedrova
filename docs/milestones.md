@@ -1869,3 +1869,13 @@ scan and diff checks pass. Remaining required-now action: sign in with a second,
 distinct staging Google test account in Safari's explicit chooser to finish file
 isolation acceptance. No production activation, paid hosting or Phase 4 start.
 See docs/phase-3-live-acceptance.md for exact remaining gates and probe instructions.
+
+### Phase 3 acceptance follow-up — second-account credential handoff
+
+Owner reported second-account sign-in, but the old Supabase OAuth state expired.
+Fresh hosted run passed private-thread upload/download and both cancellation checks
+again. Second account is signed out in Safari; Google requires its password and no
+existing autofill completed it. Required owner action: complete that Google sign-in
+privately (or request a fresh link if expired). Foreign-workspace/private-channel
+isolation, physical playback/quality, required-Bud tour handoff/model behavior and
+meeting hosting acceptance remain open. No Phase 4 execution authorized yet.

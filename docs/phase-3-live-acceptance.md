@@ -108,3 +108,23 @@ Residual voice sound quality, revised inline playback acceptance, real model
 personality behavior, full required-Bud → deferred highlight-tour handoff and meeting
 hosting/two-device transcription remain open. A signed-out media check does not
 substitute for hosted expired-token testing. Phase 3 is not complete.
+
+### Follow-up — second-account sign-in did not complete the probe
+
+Owner reported signed in. Inspection showed Supabase `bad_oauth_state` because the
+previous authorization state expired; the runner then timed out. Fresh attempts used
+normal OAuth again. One attempt hit a hosted ReadTimeout and cleaned up its probe
+workspace. After the staging readiness endpoint returned 200, another fresh run
+passed private-thread publication/download and both cancellation boundaries again.
+The second account chooser opened correctly but that account is signed out in Safari;
+Google requests its password and Safari did not supply an existing autofill value.
+No password was read, entered, changed or saved. The two-account tests remain blocked
+by completion of that fresh Google login, not by a passing isolation result.
+
+Owner action at handoff: in Safari → current Google “Hi Ayansh” sign-in, enter the
+second staging account password privately and complete Google sign-in. If that link
+expires, reply ready so a fresh runner authorization can be opened; do not use an old
+callback link. No SQL, provider key, payment or production change is required for this
+check. Remaining Phase 3 gates recorded above still apply. Phase 4 UX may be proposed
+with explicit permission while these release gates remain open; do not silently mark
+Phase 3 complete to advance the checklist.
