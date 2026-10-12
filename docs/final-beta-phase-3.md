@@ -109,3 +109,9 @@ checks pass. Production stays unchanged; Stripe remains deferred until release.
 
 Detailed handoff: ../Aedrova_site/docs/transcription-staging-activation.md.
 Homepage Bud placements merged through website PR #8; publication checked separately.
+
+Public homepage publication verified after a clean rebuild (the first auto deploy
+reported live but still served the old layout). Render deploy
+dep-db68agdckfvc73cgulqg is live at main 59260d7; actual aedrova.com DOM contains all
+seven new corner placements, eleven total. Screenshot:
+work/meeting-wrapup/homepage-buds-live.png. Waitlist calls to action remain intact.
