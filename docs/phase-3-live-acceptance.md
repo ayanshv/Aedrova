@@ -72,3 +72,39 @@ Evidence: `work/live-chat-media/voice-and-image-preview.png` (synthetic blue PNG
 no personal information). Actual revised voice card and original voice card are
 also present. Owner listening describes local preview; automated inspection does
 not establish remaining acoustic quality or clean-machine playback acceptance.
+
+## October 12 — continued hosted media acceptance
+
+Live normal Google OAuth against staging now verifies synthetic text publication in a
+private channel's thread, correct parent ID, authenticated download byte integrity,
+cancellation after reservation and cancellation after Storage upload, and denial
+through the native media boundary after sign-out. Test messages were unsent and
+probe workspaces archived. No personal files, AI calls or production changes.
+
+The cancellation run found a real missing client allowlist entry for
+`abandon_attachment`; the SQL existed but the client rejected the operation before
+calling it. Added the allowed authenticated operation and a regression through the
+actual client RPC wrapper. Both cancellation boundaries then passed live.
+
+Native Bud setup loaded, appearance/name/back navigation, personality text input,
+connector gallery and Finish later returning to chat were inspected. Accessibility
+selection changed the artwork but left the specialty at Builder because macOS toggles
+checkable buttons without their click signal. Changed the handler to the checked-state
+signal; tests cover all six appearances and resulting real specialties. This source
+fix requires the next staging source launch for its live recheck. Full native suite:
+779 passed. Scoped Ruff, secret scan and whitespace checks pass. One existing
+system-theme fallback test was corrected for Retina pixel scaling.
+
+Remaining required-now owner action: Safari's Google account chooser → sign in with
+SECOND staging test account, distinct from ayanshvarma0603@gmail.com. The prepared
+`scripts/check_staging_media.py` uses memory-only OAuth sessions, synthetic files and
+an explicit account chooser. Its live two-account run waits there; foreign-workspace
+and same-workspace/private-channel file denial must not be claimed until it passes.
+If the OAuth callback expires, rerun with the public staging profile and report path.
+No credentials should be pasted in chat. Report: ignored
+`work/staging/media-acceptance.json`.
+
+Residual voice sound quality, revised inline playback acceptance, real model
+personality behavior, full required-Bud → deferred highlight-tour handoff and meeting
+hosting/two-device transcription remain open. A signed-out media check does not
+substitute for hosted expired-token testing. Phase 3 is not complete.

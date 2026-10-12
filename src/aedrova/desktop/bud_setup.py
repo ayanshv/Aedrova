@@ -196,7 +196,10 @@ def build_setup(d, window):
         tile.setIconSize(QSize(52, 52))
         tile.setMinimumHeight(86)
         tile.setAccessibleName("Choose " + title + " appearance")
-        tile.clicked.connect(lambda checked=False, v=value: choose_look(d, v))
+        # Native accessibility activates checkable buttons through their checked
+        # state. Listen to that state so keyboard/assistive selection also updates
+        # the actual specialty and connector recommendations.
+        tile.toggled.connect(lambda checked, v=value: choose_look(d, v) if checked else None)
         grid.addWidget(tile, index // 3, index % 3)
         d.appearance_buttons.append((tile, value))
     if not window.reduced_motion:

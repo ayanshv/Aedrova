@@ -1857,3 +1857,15 @@ Matching staging backend e375bdc is Live. Owner sent revised eight-second record
 reports distortion mostly gone; publication/persistence and text preview passed. Residual
 audio quality, other live acceptance cases and Phase 3 remain open. No owner SQL/key/payment
 step is required for this voice update. No production or meeting activation.
+
+### October 12 — Phase 3 hosted media acceptance continued
+
+Private-channel threaded synthetic upload/download and both cancellation boundaries
+passed live staging. Fixed cancellation RPC missing from client allowlist. Fixed native
+accessible Bud appearance selection so the actual specialty follows its artwork;
+all six role paths covered. Native Finish later returned to chat; full tour handoff
+and model personality acceptance remain open. Native suite 779 passed; lint, secret
+scan and diff checks pass. Remaining required-now action: sign in with a second,
+distinct staging Google test account in Safari's explicit chooser to finish file
+isolation acceptance. No production activation, paid hosting or Phase 4 start.
+See docs/phase-3-live-acceptance.md for exact remaining gates and probe instructions.

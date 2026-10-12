@@ -80,6 +80,16 @@ def test_expired_session_cannot_invoke_rpc():
     assert service.user is None
 
 
+def test_upload_cancellation_can_invoke_authenticated_abandon_rpc():
+    client = Mock()
+    service = IdentityService(Connection(URL, KEY), client=client)
+    service.user = SimpleNamespace(id="user")
+    client.auth.get_user.return_value.user = service.user
+    parameters = {"p_id": "attachment-id"}
+    service.rpc("abandon_attachment", parameters)
+    client.rpc.assert_called_once_with("abandon_attachment", parameters)
+
+
 def test_snapshot_requests_personal_active_and_archived_workspaces(monkeypatch):
     client = Mock()
     client.table.return_value.select.return_value.order.return_value.execute.return_value.data = []

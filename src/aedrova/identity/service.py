@@ -357,6 +357,7 @@ class IdentityService:
             "set_meeting_announcement_channel",
             "mark_channel_read",
             "reserve_attachment",
+            "abandon_attachment",
             "finish_attachment",
             "send_message",
             "unsend_message",

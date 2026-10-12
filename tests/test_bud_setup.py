@@ -175,6 +175,19 @@ def test_choices_preview_and_no_extra_top_level_widgets(editor, qtbot):
     assert not dialog.isVisible()
 
 
+@pytest.mark.parametrize(
+    "specialty", ["builder", "designer", "marketing", "finance", "research", "product"]
+)
+def test_accessible_appearance_selection_updates_real_specialty(editor, specialty):
+    dialog, _, _, _ = editor
+    dialog.show_step(1)
+    tile = next(tile for tile, value in dialog.appearance_buttons if value == specialty)
+    tile.setChecked(True)
+    assert dialog.job_role.currentData() == specialty
+    assert dialog.character.config["appearance"] == specialty
+    assert dialog.configured_role().split(" · ")[0].lower() == specialty
+
+
 @pytest.mark.parametrize("has_notes", [False, True])
 def test_missing_bud_migration_preserves_notes_or_uses_safe_fallback(has_notes):
     from unittest.mock import Mock

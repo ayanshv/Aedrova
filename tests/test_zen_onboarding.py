@@ -265,8 +265,9 @@ def test_system_photo_keeps_both_halves_when_assets_missing(qtbot):
     card.resize(300, 180)
     card.photos = {"light": QPixmap(), "dark": QPixmap()}
     image = card.grab().toImage()
-    assert image.pixelColor(70, 50).lightness() > 200
-    assert image.pixelColor(230, 50).lightness() < 60
+    scale = image.devicePixelRatio()
+    assert image.pixelColor(int(70 * scale), int(50 * scale)).lightness() > 200
+    assert image.pixelColor(int(230 * scale), int(50 * scale)).lightness() < 60
 
 
 def test_small_setup_illustrations_never_overlap_controls(flow, qtbot):
