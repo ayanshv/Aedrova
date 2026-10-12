@@ -159,3 +159,45 @@ Start on this task and provide their valid bank account privately/personally.
 This is Stripe account readiness, not evidence of full connector external-testing
 acceptance. No later milestone started. Legal/business identity and jurisdiction
 review remain required before paid public Beta; policies are not a compliance guarantee.
+
+
+## October 11 — owner defers remaining Stripe setup
+
+Owner explicitly deferred remaining Stripe account/bank configuration until release
+preparation, immediately before packaging and launch. Stop recurring bank-setup
+prompts until that gate. Continue non-Stripe connector/provider work under existing
+Phase 2 authorization; this deferral does not certify their outstanding live
+acceptance or mark Phase 2 complete. Stripe Bud external-customer acceptance remains
+a distinct deferred gate from Aedrova subscription billing. Complete both at the
+release-preparation checkpoint, alongside Phase 6 billing lifecycle acceptance,
+before Phase 8 final packaging/release sign-off or Phase 9 paid launch. Public
+checkout and downloads remain gated and the website stays waitlist-only. Phase 3
+(meetings, voice and file context) remains the next major phase and requires owner
+authorization before implementation starts.
+
+## October 11 — renewed non-Stripe checks and Vercel draft
+
+Owner approved continuing Phase 2 and conditionally starting Phase 3 after checks.
+733 desktop and 439 development backend tests passed. Both installed coding CLIs
+passed the loopback managed protocol/tool-result exercise (no paid inference).
+Private 0600 OpenAI and Anthropic files passed fresh model metadata checks for the
+existing configured models; no model/rate change or shared key exposure occurred.
+Application/backend scoped lint and tracked-secret checks passed; unrelated archived
+motion-design helper scripts have existing broad-repository lint findings and were
+not changed. Hosted gateway inference/accounting acceptance remains outstanding.
+
+The signed-in ayansh Hobby Vercel account had no registered integrations. Prepared
+the Aedrova Buds form, public logo/support/legal URLs, private visibility, mandatory
+Integration Configuration Read plus Projects Read and Deployments Read, all other
+optional scopes None. Redirect is the isolated staging callback:
+https://aedrova-beta-staging.onrender.com/buds/oauth/vercel/callback .
+No agreement accepted, Create submitted, credential issued or grant installed.
+Browser tab19 is kept as the draft handoff. To submit, the owner must approve the
+specific Vercel Integrations Marketplace Agreement and private integration creation
+at action time; browser safety rules require that approval even with broad earlier
+connector setup permission. Instagram registration, managed Search funding and live
+consent/refresh/revoke/isolation acceptance also remain outstanding. Phase 2 is open.
+
+The owner then specifically requested the post-meeting transcript review screen.
+Its independent implementation is recorded in docs/final-beta-phase-3.md; this
+explicit feature request does not certify Phase 2 or other Phase 3 features.

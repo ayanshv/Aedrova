@@ -169,3 +169,18 @@ Aedrova wording, grounded in Aedrova's actual data flows, features, AI providers
 business details. Do not copy their legal promises or invent business facts. Review
 all corresponding Aedrova footer destinations, coverage, navigation and readability.
 This review is explicitly deferred; do not perform it before Phase 5 approval.
+
+
+## October 11 — owner defers remaining Stripe setup
+
+Owner explicitly deferred remaining Stripe account/bank configuration until release
+preparation, immediately before packaging and launch. Stop recurring bank-setup
+prompts until that gate. Continue non-Stripe connector/provider work under existing
+Phase 2 authorization; this deferral does not certify their outstanding live
+acceptance or mark Phase 2 complete. Stripe Bud external-customer acceptance remains
+a distinct deferred gate from Aedrova subscription billing. Complete both at the
+release-preparation checkpoint, alongside Phase 6 billing lifecycle acceptance,
+before Phase 8 final packaging/release sign-off or Phase 9 paid launch. Public
+checkout and downloads remain gated and the website stays waitlist-only. Phase 3
+(meetings, voice and file context) remains the next major phase and requires owner
+authorization before implementation starts.

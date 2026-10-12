@@ -18,6 +18,7 @@ class CallWorker(QObject):
     problem = Signal(str)
     media = Signal(str, bool)
     ended = Signal()
+    review_ready = Signal(object)
     consent_snapshot = Signal(object)
     text_capability = Signal(bool)
     speech_capability = Signal(bool)
@@ -52,6 +53,8 @@ class CallWorker(QObject):
         self.snapshot = None
         self.snapshot_at = 0
         self.call_started = time.monotonic()
+        self.text_available = False
+        self.wrapup_status = None
 
     def start(self):
         if self.thread:
@@ -83,6 +86,7 @@ class CallWorker(QObject):
                 return
             if hasattr(self.client, "capabilities"):
                 capabilities = await asyncio.to_thread(self.client.capabilities)
+                self.text_available = capabilities.get("meeting_text") is True
                 self.text_capability.emit(capabilities.get("meeting_text") is True)
                 self.speech_available = capabilities.get("audio_transcription") is True
                 self.speech_capability.emit(self.speech_available)
@@ -123,6 +127,8 @@ class CallWorker(QObject):
             await self._cleanup()
             self.state.emit(failure or "Call ended · devices are off")
             self.ended.emit()
+            if self.wrapup_status:
+                self.review_ready.emit(self.wrapup_status)
 
     def update_consent(self, snapshot):
         self.snapshot, self.snapshot_at = snapshot, time.monotonic()
@@ -473,6 +479,7 @@ class CallWorker(QObject):
             self.run_task.cancel()
 
     async def _cleanup(self):
+        self.wrapup_status = None
         tasks = list(self.tasks)
         for task in tasks:
             task.cancel()
@@ -502,5 +509,9 @@ class CallWorker(QObject):
         if self.meeting:
             try:
                 await asyncio.wait_for(asyncio.to_thread(self.client.leave, self.meeting), 5)
+                if self.text_available and hasattr(self.client, "wrapup"):
+                    self.wrapup_status = await asyncio.wait_for(
+                        asyncio.to_thread(self.client.wrapup, self.meeting), 8
+                    )
             except Exception:
                 pass  # Durable server lease still expires without heartbeat.

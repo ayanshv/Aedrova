@@ -1702,3 +1702,39 @@ waitlist retained. New migration needs owner execution in Aedrova Staging before
 root sharing is enabled; no fixture or production reset. Cluely footer/legal-depth
 study explicitly deferred to Phase5 in the launch plan. Stop after this task and
 ask whether the owner finished Stripe bank setup; do not begin another phase.
+
+
+## October 11 — owner defers remaining Stripe setup
+
+Owner explicitly deferred remaining Stripe account/bank configuration until release
+preparation, immediately before packaging and launch. Stop recurring bank-setup
+prompts until that gate. Continue non-Stripe connector/provider work under existing
+Phase 2 authorization; this deferral does not certify their outstanding live
+acceptance or mark Phase 2 complete. Stripe Bud external-customer acceptance remains
+a distinct deferred gate from Aedrova subscription billing. Complete both at the
+release-preparation checkpoint, alongside Phase 6 billing lifecycle acceptance,
+before Phase 8 final packaging/release sign-off or Phase 9 paid launch. Public
+checkout and downloads remain gated and the website stays waitlist-only. Phase 3
+(meetings, voice and file context) remains the next major phase and requires owner
+authorization before implementation starts.
+
+## October 11 — Phase 2 checks and explicitly requested meeting wrap-up
+
+Owner approved Phase 3 following non-Stripe checks, then directly requested an
+editable end-of-meeting transcript screen with Confirm. Implemented this specific
+feature under that direct authorization, while leaving Phase 2 live provider gates
+open. See docs/final-beta-phase-2.md for fresh native/backend, runtime and credential
+metadata checks and the prepared, unsubmitted private Vercel connector registration.
+See docs/final-beta-phase-3.md for the new owner/admin wrap-up screen, atomic review,
+empty-room closure, consent preservation, local SQL/HTTP/native verification and the
+exact required staging migration. No Stripe setup, paid launch, production migration
+or release activation occurred; remaining Phase 3 voice/file work is not complete.
+
+Final verification: 739 desktop tests and 441 development backend tests passed.
+All embedded PostgreSQL migration/RLS scripts passed, including the new wrap-up
+closure/permission/atomicity/consent tests. Scoped application lint, tracked-secret
+checks and whitespace checks passed. Both native theme captures were inspected.
+Source delivery is to existing development branches only; no production auto-deploy
+or hosted migration is initiated by this checkpoint. Owner next action: run
+`supabase/migrations/202610110002_meeting_wrapup.sql` once in Aedrova Staging's SQL
+Editor, then report success for the matching staged deployment/live test.

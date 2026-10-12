@@ -165,6 +165,13 @@ class MeetingClient(ManagedClient):
     def history(self, channel):
         return self.request("/api/meetings/history/" + str(UUID(channel)))
 
+    def wrapup(self, meeting):
+        return self.request("/api/meetings/wrapup/" + str(UUID(meeting)))
+
+    def confirm_transcript(self, meeting, segments):
+        return self.request("/api/meetings/transcript/confirm",
+                            {"meeting": meeting, "segments": segments}, timeout=40)
+
     def review(self, identifier, version, body, decision=False):
         return self.request(
             "/api/meetings/transcript/review",

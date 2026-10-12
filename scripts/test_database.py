@@ -96,7 +96,9 @@ try {
    'supabase/migrations/202610070004_bud_connectors.sql',
    'supabase/tests/bud_connectors.sql',
    'supabase/migrations/202610110001_space_billing.sql',
-   'supabase/tests/space_billing.sql']) {
+   'supabase/tests/space_billing.sql',
+   'supabase/migrations/202610110002_meeting_wrapup.sql',
+   'supabase/tests/meeting_wrapup.sql']) {
   let sql = fs.readFileSync(file,'utf8');
   // Reproduce the already-activated original function, then verify its additive
   // conflict-response upgrade before running the lifecycle tests.

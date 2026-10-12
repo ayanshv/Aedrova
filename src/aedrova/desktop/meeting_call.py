@@ -804,6 +804,10 @@ def open_channel_call(window, *, mode=None):
         initial_mode=mode,
     )
     window.meeting_call = dialog
+    from aedrova.desktop.meeting_wrapup import offer_wrapup
+
+    if hasattr(worker, "review_ready"):
+        worker.review_ready.connect(lambda status: offer_wrapup(window, worker, status))
     window.account_dialog.session_closed.connect(dialog.reject)
     # A local setup preview cannot compete with call capture for the same device.
     setup = getattr(window, "meeting_setup", None)
