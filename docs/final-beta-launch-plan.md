@@ -3,7 +3,7 @@
 Status: Phase 1 closed by owner confirmation of desktop acceptance and both
 main-branch rulesets. Phases 2 and 3 have outstanding live acceptance gates.
 Phase 4 approved October 12, 2026; UI implementation and acceptance are tracked in
-[Phase 4 UX](final-beta-phase-4.md). Phases 5–9 remain planned and require separate approval. M14 remains deferred until product
+[Phase 4 UX](final-beta-phase-4.md). Phase 5 implementation is delivered with legal/business and data-operation gates still open. Phases 6–9 require separate approval. M14 remains deferred until product
 completion. Current evidence, frozen scope and exact staging handoffs are saved in
 [Phase 1 baseline](final-beta-phase-1.md). Waitlist and public billing/download gates
 remain unchanged. The owner-supplied proposal is preserved in release-plan-source.md.
@@ -185,3 +185,39 @@ before Phase 8 final packaging/release sign-off or Phase 9 paid launch. Public
 checkout and downloads remain gated and the website stays waitlist-only. Phase 3
 (meetings, voice and file context) remains the next major phase and requires owner
 authorization before implementation starts.
+
+
+## October 12 — credit-conscious path to Mac and Windows downloads
+
+Owner requests prioritizing both website downloads within the remaining weekly
+credits. This is sequencing and scope planning, not approval to bypass release gates.
+Do not guarantee a credit budget or publication date before owner dependencies clear.
+
+1. Complete current Search Console submission and obtain the actual legal operator
+   name. Keep Phase 6 approval separate; live Stripe remains deferred to release
+   preparation as requested.
+2. Prioritize distribution preparation ahead of optional media studio, migration,
+   and additional design work: audit the existing macOS packager/DMG path; add a
+   reproducible Windows packaging job on a Windows runner and versioned artifacts.
+   Existing Windows regression success is not installer or hardware acceptance.
+3. Prepare one website download section with Mac/Windows choices, architecture,
+   version, checksums and installation/support links. Enable only links to verified
+   release artifacts; never publish staging credentials or falsely available files.
+4. Complete signing and clean-machine install/launch/login/chat/upload/voice/provider
+   smoke checks once; rerun only affected checks after repairs. Preserve existing CI
+   and security checks. Test updates/recovery/uninstall and supported architectures.
+5. Close the remaining live connector/provider, meeting/transcript/isolation,
+   legal/data controls, billing lifecycle, server caps/security and monitoring/restore
+   gates before official launch. Use a single final candidate and go/no-go review;
+   activate paid downloads only after explicit owner approval.
+
+Read-only local signing inventory on October 12 found one Apple Development identity
+and no Developer ID Application identity. Public notarized Mac distribution is blocked
+until owner completes Apple Developer enrollment and creates/imports Developer ID
+Application via Apple Developer Certificates/Keychain, then configures a private
+notarytool Keychain profile. Never request the private key/password in chat.
+Windows signing enrollment and a Windows test device/VM remain required at release
+preparation. Always-on backend/meeting hosting remains a paid owner gate; prior Render
+upgrade was deferred. These owner dependencies cannot be solved by reducing credits.
+No packaging, purchase, signing enrollment or public-download activation performed
+as part of this planning update. Full codebase walkthrough remains after deployment.

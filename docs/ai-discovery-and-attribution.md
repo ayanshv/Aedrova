@@ -56,20 +56,25 @@ console submission was fabricated. No speculative llms.txt ranking guarantee.
 
 ## Rollout, verification and later owner actions
 
-After deployment, verify /robots.txt, /sitemap.xml, /product and the six-stage intro
-from the public domain. Earlier HTTP/browser blocks on aedrova.com remain an unresolved
-live-access gate; code tests alone cannot certify real crawler access. Check Render
-availability and Cloudflare events for genuine bots; do not disable broad security or
-trust a claimed user-agent alone. Use provider-published verification/IP guidance.
+Domain ownership verified in Google Search Console on October 12 after the owner
+added the requested DNS TXT and explicitly approved verification. Keep the TXT record.
+Google confirms the homepage is already indexed and its live test is available.
+Google's sitemap live test fetched successfully but detected an incorrect noindex
+response header. Website PR #13 removes it only for public robots.txt/sitemap.xml;
+preview/private exclusions remain. Production-based 407 tests and PR/main CI passed.
+Merged main commit: 1a72b9ade6476c144cc83539395ab7d14f95fdeb. Render origin now
+returns HTTP 200 and no X-Robots-Tag for both discovery files.
 
-Indexing submission requires the owner's verified search-console property. Later,
-open Google Search Console, select/add the aedrova.com Domain property, complete its
-DNS ownership verification through the domain provider if needed, then Sitemaps →
-submit https://aedrova.com/sitemap.xml. URL Inspection → inspect / and /product →
-request indexing if eligible. In Bing Webmaster Tools, add/verify the same site
-(or import the verified Google property) and submit the sitemap. No new accounts,
-DNS access grants, verification tokens or submissions were performed this turn.
-These are rollout requirements for confirmed indexing, not blockers to the code update.
+Resubmitted https://aedrova.com/sitemap.xml after deployment; Google displayed
+“Sitemap submitted successfully.” Its report still shows “Couldn't fetch” and zero
+discovered pages immediately afterward. Submission is complete; successful sitemap
+processing remains unverified and must be rechecked after Google's retry. Do not
+claim all 13 pages indexed. No further owner action is required now for submission.
+This session's Cloudflare 1010/client block does not establish a Google crawler block:
+Google's live fetch succeeded. No Cloudflare security protections were weakened.
+
+Bing Webmaster Tools import/verification and sitemap submission remain later rollout
+work, not performed here. No actual ChatGPT/Claude/Gemini citation was established.
 
 Longer term: publish actual release notes, demos, feature-specific explanations and
 accurate public profiles; seek legitimate customer coverage. Measure optional referral
@@ -89,7 +94,6 @@ has no page overflow; Prefer not to say clears/disables detail. No real registra
 or email was sent in testing. GitHub CI passed deployment-image build/startup.
 Merged website PR #12: https://github.com/ayanshv/Aedrova-website/pull/12
 main 4309b2f957d539e86915b45e44bfd3d016754e84.
-A single site:aedrova.com brand query returned no results in this search tool;
-this is not proof about all providers' indexes. Public robots retrieval is still
-blocked in this session. Do not claim live deployment/crawl/index/model visibility
-verified until the public-domain and search-console rollout checks are completed.
+Earlier search-tool queries and this session's public-domain access failures are
+superseded for Google homepage availability by actual Search Console evidence above.
+Sitemap processing and other provider visibility remain unverified.

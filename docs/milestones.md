@@ -1933,3 +1933,22 @@ staging 470, lint/JS syntax and CI image smoke passed. Local browser/mobile flow
 verified. Public robots retrieval remains blocked and search-console submissions
 are unverified; no actual LLM citation or recommendation was established. Required
 legal operator detail remains pending; Phase 6 stays unstarted.
+
+
+### October 12 — Google Search Console ownership and sitemap submission
+
+Owner added DNS TXT and approved verification; Domain property ownership verified.
+Homepage is indexed and Google's live homepage/sitemap fetches succeed. Corrected
+public machine discovery files' noindex headers in website PR #13; 407 tests and
+PR/main CI pass. Merged 1a72b9a, deployed origin confirms header absent. Resubmitted
+canonical sitemap with Google success acknowledgement; report still “Couldn't fetch”
+and zero pages immediately afterward, so processing acceptance remains pending.
+No further DNS action now; keep verification TXT. No security weakening or indexing
+promise. Evidence: work/phase-5-trust/gsc-sitemap-result.png and discovery documentation.
+
+Saved owner's credit-conscious Mac/Windows download priority in final-beta-launch-plan.md.
+Local certificate inventory has Apple Development only, no Developer ID Application;
+public Mac signing/notarization remains blocked. Windows packaging/signing/clean-machine
+acceptance remain open despite previous Windows regression success. No installers
+published or waitlist/billing gates changed. Legal operator name remains the next
+required detail; Phase 6 remains unstarted.
