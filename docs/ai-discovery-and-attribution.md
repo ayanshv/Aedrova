@@ -81,8 +81,9 @@ accurate public profiles; seek legitimate customer coverage. Measure optional re
 sources with the restricted export. Do not manufacture backlinks/reviews or pressure
 assistants to cite irrelevant claims. No tracking pixels or paid campaigns were added.
 
-Required legal detail remains unchanged: owner must supply the actual operator name
-(individual or registered company), then qualified legal review before paid launch.
+Legal operator is deliberately pending at the owner’s request: [Legal operator — to be confirmed].
+Do not infer a registered entity or individual operator. Finalize actual identity and
+qualified legal review before paid launch; no repeat name handoff is needed now.
 
 ## Validation and publication
 

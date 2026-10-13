@@ -1952,3 +1952,16 @@ public Mac signing/notarization remains blocked. Windows packaging/signing/clean
 acceptance remain open despite previous Windows regression success. No installers
 published or waitlist/billing gates changed. Legal operator name remains the next
 required detail; Phase 6 remains unstarted.
+
+
+### October 12 — legal operator deliberately pending
+
+Owner confirms Aedrova currently operates under its brand name; no registered legal
+entity or ownership structure is confirmed. Keep the internal legal operator field
+as [Legal operator — to be confirmed]. Do not infer a company, individual contracting
+party, incorporation status or ownership from the brand or founder account. Finalize
+Privacy/Terms against the actual operator after the owner confirms registration and
+ownership. Stop repeating the legal-name question until that information is available.
+This does not prevent release-candidate engineering; legal/business sign-off remains
+a public paid-launch gate. Next proposed work is Mac/Windows release-candidate
+packaging and website download preparation, with public distribution still gated.

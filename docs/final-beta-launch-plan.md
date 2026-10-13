@@ -221,3 +221,16 @@ preparation. Always-on backend/meeting hosting remains a paid owner gate; prior 
 upgrade was deferred. These owner dependencies cannot be solved by reducing credits.
 No packaging, purchase, signing enrollment or public-download activation performed
 as part of this planning update. Full codebase walkthrough remains after deployment.
+
+
+### October 12 — legal operator deliberately pending
+
+Owner confirms Aedrova currently operates under its brand name; no registered legal
+entity or ownership structure is confirmed. Keep the internal legal operator field
+as [Legal operator — to be confirmed]. Do not infer a company, individual contracting
+party, incorporation status or ownership from the brand or founder account. Finalize
+Privacy/Terms against the actual operator after the owner confirms registration and
+ownership. Stop repeating the legal-name question until that information is available.
+This does not prevent release-candidate engineering; legal/business sign-off remains
+a public paid-launch gate. Next proposed work is Mac/Windows release-candidate
+packaging and website download preparation, with public distribution still gated.
