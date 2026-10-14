@@ -1965,3 +1965,16 @@ ownership. Stop repeating the legal-name question until that information is avai
 This does not prevent release-candidate engineering; legal/business sign-off remains
 a public paid-launch gate. Next proposed work is Mac/Windows release-candidate
 packaging and website download preparation, with public distribution still gated.
+
+
+## October 13 — pre-Apple launch checks authorized and executed
+
+Owner resumed independent launch-gate engineering ahead of membership. Desktop
+782 and backend 487 tests pass; full lint/secret checks pass. Added omitted voice
+migration/test to PostgreSQL runner; private voice and full RLS runs pass. Backend
+private schema checks pass. New lifecycle/recovery/operations tests and bounded
+read-only monitor delivered; no provider charge or live payments/download activation.
+See docs/pre-apple-launch-gates.md for completed checks versus actual outstanding
+owner/hosted gates, and website docs/prelaunch-operations.md for incident/restore steps.
+Legal operator remains deliberately pending. Sign in with Apple is queued for active
+membership. Current work does not close all phases or approve public go/no-go.

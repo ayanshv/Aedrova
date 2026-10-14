@@ -3,7 +3,7 @@
 Status: Phase 1 closed by owner confirmation of desktop acceptance and both
 main-branch rulesets. Phases 2 and 3 have outstanding live acceptance gates.
 Phase 4 approved October 12, 2026; UI implementation and acceptance are tracked in
-[Phase 4 UX](final-beta-phase-4.md). Phase 5 implementation is delivered with legal/business and data-operation gates still open. Phases 6–9 require separate approval. M14 remains deferred until product
+[Phase 4 UX](final-beta-phase-4.md). Phase 5 implementation is delivered with legal/business and data-operation gates still open. Owner authorized pre-Apple launch checks on October 13, including Phase 6/7 engineering verification; public activation and gated owner actions remain separate. See pre-apple-launch-gates.md. M14 remains deferred until product
 completion. Current evidence, frozen scope and exact staging handoffs are saved in
 [Phase 1 baseline](final-beta-phase-1.md). Waitlist and public billing/download gates
 remain unchanged. The owner-supplied proposal is preserved in release-plan-source.md.
