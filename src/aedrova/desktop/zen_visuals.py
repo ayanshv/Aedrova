@@ -53,9 +53,9 @@ class ThemePhoto(QAbstractButton):
         image_rect = frame.adjusted(8, 8, -8, -44)
         desktop = QRectF(
             image_rect.left() + image_rect.width() * 0.12,
-            image_rect.top() + image_rect.height() * 0.08,
+            image_rect.top() + image_rect.height() * 0.17,
             image_rect.width() * 1.16,
-            image_rect.height() * 0.91,
+            image_rect.height() * 1.08,
         )
         clip = QPainterPath()
         clip.addRoundedRect(image_rect, 10, 10)
