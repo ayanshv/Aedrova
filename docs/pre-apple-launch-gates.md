@@ -74,3 +74,13 @@ perform a purchase based only on this general launch-gate authorization.
 
 Public go/no-go remains separate. Do not call all launch gates closed, promise a
 launch date, publish preview installers or remove waitlist mode based on these results.
+
+
+Windows CI follow-up: backend CI 38494165863 and app PostgreSQL/Mac/Linux jobs passed.
+Windows run 38494283627 exposed two voice preview cleanup failures (780 passed):
+QMediaPlayer held the WAV file after clearing its source. Dispose now destroys the
+media backend synchronously before removing the temporary file and is idempotent.
+Added an immediate/repeated-disposal regression and an early voice gate on all CI
+platforms. Eight local voice tests and lint pass; follow-up Windows CI remains needed.
+Staging readiness timed out twice; public website origin returned 200 ready. No
+hosting upgrade, production restart or public availability certification was performed.

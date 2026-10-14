@@ -1978,3 +1978,13 @@ See docs/pre-apple-launch-gates.md for completed checks versus actual outstandin
 owner/hosted gates, and website docs/prelaunch-operations.md for incident/restore steps.
 Legal operator remains deliberately pending. Sign in with Apple is queued for active
 membership. Current work does not close all phases or approve public go/no-go.
+
+
+Windows CI follow-up: backend CI 38494165863 and app PostgreSQL/Mac/Linux jobs passed.
+Windows run 38494283627 exposed two voice preview cleanup failures (780 passed):
+QMediaPlayer held the WAV file after clearing its source. Dispose now destroys the
+media backend synchronously before removing the temporary file and is idempotent.
+Added an immediate/repeated-disposal regression and an early voice gate on all CI
+platforms. Eight local voice tests and lint pass; follow-up Windows CI remains needed.
+Staging readiness timed out twice; public website origin returned 200 ready. No
+hosting upgrade, production restart or public availability certification was performed.

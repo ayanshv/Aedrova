@@ -9,6 +9,7 @@ from pathlib import Path
 from PySide6.QtCore import QEvent, QObject, QUrl, Signal, Slot
 from PySide6.QtMultimedia import QAudioOutput, QAudioSource, QMediaDevices, QMediaPlayer
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
+from shiboken6 import delete
 
 from aedrova.desktop.dialogs import button
 from aedrova.desktop.dictation import Dictation
@@ -43,6 +44,7 @@ class VoicePlayer(QWidget):
     def __init__(self, data, parent=None):
         super().__init__(parent)
         inspect_file("voice.wav", data)
+        self.disposed = False
         self.temporary = tempfile.TemporaryDirectory(prefix="aedrova-voice-")
         self.path = Path(self.temporary.name) / "voice.wav"
         self.path.write_bytes(data)
@@ -83,8 +85,17 @@ class VoicePlayer(QWidget):
         self.changed.emit()
 
     def dispose(self):
+        if self.disposed:
+            return
+        self.disposed = True
+        self.player.blockSignals(True)
         self.player.stop()
         self.player.setSource(QUrl())
+        self.player.setAudioOutput(None)
+        # Windows media backends may retain a file handle after setSource(empty).
+        # Destroy the backend synchronously before removing the private recording;
+        # deleteLater alone leaves it locked until the next event-loop pass.
+        delete(self.player)
         self.temporary.cleanup()
         self.deleteLater()
 

@@ -5,7 +5,7 @@ from shiboken6 import delete
 
 from aedrova.desktop.account import AccountJob
 from aedrova.desktop.conversation import Composer
-from aedrova.desktop.voice_messages import VoiceMessage, encode_voice
+from aedrova.desktop.voice_messages import VoiceMessage, VoicePlayer, encode_voice
 from aedrova.identity.file_policy import inspect_file
 
 
@@ -64,6 +64,17 @@ def test_scope_change_discards_unsent_preview(qtbot):
     control.check_scope()
     assert control.state == "idle" and not path.exists()
     share.assert_not_called()
+
+
+def test_dispose_releases_recording_immediately_and_can_repeat(qtbot):
+    parent = Composer()
+    qtbot.addWidget(parent)
+    player = VoicePlayer(encode_voice(b"\0\0" * 16000), parent)
+    path = player.path
+    assert path.exists()
+    player.dispose()
+    assert not path.exists() and not path.parent.exists()
+    player.dispose()
 
 
 def test_recording_cancel_has_no_network_or_ai_operation(qtbot):
