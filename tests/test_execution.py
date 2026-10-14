@@ -238,3 +238,27 @@ def test_bud_identity_survives_queue_and_changed_profile_pauses(
     assert calls == ([] if changed else [bud])
     if changed:
         assert queue.ledger.rows(queue.identity(), window.workspace_id)[0]["state"] == "paused"
+
+
+def test_history_explains_current_failure_without_persisting_output(qtbot, tmp_path, monkeypatch):
+    from aedrova.desktop.builds import BuildDialog
+
+    window, _, _ = configured(qtbot, tmp_path, monkeypatch)
+    queue = execution_queue(window)
+    queue.timer.stop()
+    run, _ = queue.ledger.enqueue("u", "w", "Synthetic failure", {})
+    queue.ledger.update(run, "failed")
+    window.build_dialog = BuildDialog(window)
+    qtbot.addWidget(window.build_dialog)
+    window.build_dialog.run_id = run
+    window.build_dialog.status.setText("Run stopped.")
+    window.build_dialog.output.setPlainText("Included AI access is not configured yet.")
+    queue.show_history()
+    assert "Included AI access" in queue.dialog.details.toPlainText()
+    assert "Included AI access" not in str(queue.ledger.rows("u", "w"))
+    window.build_dialog.workspace = "another-workspace"
+    queue.dialog.refresh()
+    assert "Included AI access" not in queue.dialog.details.toPlainText()
+    assert "Inspect saved files" in queue.dialog.details.toPlainText()
+    window.account_dialog.session_closed.emit()
+    assert not queue.dialog.details.toPlainText()

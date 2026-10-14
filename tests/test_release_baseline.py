@@ -17,6 +17,10 @@ def test_pulse_is_not_exposed_and_primary_navigation_survives(qtbot, tmp_path):
     for i in range(4):
         window.select_tab(i)
         assert window.pages.currentIndex() == i
+    for i in (0, 2, 1, 3):
+        window.tab_buttons[i].setChecked(True)
+        assert window.pages.currentIndex() == i
+        assert [tab.isChecked() for tab in window.tab_buttons] == [j == i for j in range(4)]
     window.set_theme("dark", persist=False)
     window.set_theme("light", persist=False)
 

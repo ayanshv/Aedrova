@@ -602,10 +602,13 @@ class ConnectorsDialog(AppDialog):
                     c["provider"] == provider["id"] and c["status"] == "Connected"
                     for c in self.row().get("connections", [])
                 )
+                login_ready = bool(
+                    provider.get("oauth_available") or provider.get("managed_available")
+                )
                 column.addWidget(
                     label(
                         "Service setup required"
-                        if not provider.get("available")
+                        if not login_ready and not connected
                         else "Connected to this Bud"
                         if connected
                         else "Suggested for this Bud"
@@ -615,11 +618,10 @@ class ConnectorsDialog(AppDialog):
                         wrap=True,
                     )
                 )
-                action = button("Manage" if connected else "Connect")
+                action_text = "Manage" if connected else "Connect" if login_ready else "View setup"
+                action = button(action_text)
                 action.setProperty("providerAvailable", provider.get("available", False))
-                action.setAccessibleName(
-                    ("Manage " if connected else "Connect ") + provider["name"]
-                )
+                action.setAccessibleName(action_text + " " + provider["name"])
                 action.clicked.connect(lambda checked=False, p=provider: self.open_provider(p))
                 column.addWidget(action, alignment=Qt.AlignmentFlag.AlignLeft)
                 self.cards.append(action)

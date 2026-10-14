@@ -181,6 +181,13 @@ assert '--ignore-user-config' in sys.argv
 assert 'default_permissions="aedrova"' in sys.argv
 assert any(a.startswith('permissions.aedrova.filesystem=') for a in sys.argv)
 assert 'approval_policy="never"' in sys.argv
+import tomllib, os
+policy = next(a for a in sys.argv if a.startswith('shell_environment_policy.set='))
+settings = tomllib.loads(policy)['shell_environment_policy']['set']
+assert settings['GIT_CONFIG_GLOBAL'] == os.devnull
+assert settings['GIT_CONFIG_SYSTEM'] == os.devnull
+assert settings['GIT_CONFIG_NOSYSTEM'] == '1'
+assert settings['PATH']
 print(json.dumps({'type':'item.completed','item':{'type':'command_execution','command':'test',
 'aggregated_output':'passed','exit_code':0}}),flush=True)
 print(json.dumps({'type':'item.completed','item':{'type':'agent_message','text':'Done'}}),flush=True)

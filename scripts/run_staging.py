@@ -47,6 +47,12 @@ def main():
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--check-only", action="store_true")
     parser.add_argument(
+        "--settings-file",
+        type=Path,
+        default=ROOT / "work/staging/app.ini",
+        help="Separate local preferences for a fresh-user audit; never changes hosted accounts.",
+    )
+    parser.add_argument(
         "--meeting-context",
         action="store_true",
         help="Enable consented meeting history in the internal staging source.",
@@ -81,7 +87,7 @@ def main():
             "aedrova.desktop.app",
             "--account",
             "--settings-file",
-            str(ROOT / "work/staging/app.ini"),
+            str(args.settings_file.resolve()),
         ],
         cwd=ROOT,
         env=environment,

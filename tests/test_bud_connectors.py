@@ -90,7 +90,10 @@ def test_gallery_hierarchy_filters_and_native_themes(gallery, qtbot):
     dialog.filter.setCurrentIndex(dialog.filter.findData("all"))
     assert len(dialog.cards) == 6
     dialog.filter.setCurrentIndex(dialog.filter.findData("designer"))
-    assert {card.accessibleName() for card in dialog.cards} == {"Connect Figma", "Connect Notion"}
+    assert {card.accessibleName() for card in dialog.cards} == {
+        "View setup Figma",
+        "View setup Notion",
+    }
     dialog.search.setText("figma")
     assert len(dialog.cards) == 1
     for theme in [LIGHT, DARK]:
@@ -164,7 +167,7 @@ def test_selected_bud_defaults_to_role_tools(gallery, role):
     assert dialog.filter.currentData() == role
     assert all(card.property("providerAvailable") for card in dialog.cards)
     expected = {p["name"] for p in dialog.providers if p["id"] in recommendation_set(role)}
-    assert {card.accessibleName().removeprefix("Connect ") for card in dialog.cards} == expected
+    assert {card.accessibleName().removeprefix("View setup ") for card in dialog.cards} == expected
     dialog.filter.setCurrentIndex(dialog.filter.findData("all"))
     dialog.refresh()
     assert dialog.filter.currentData() == "all"

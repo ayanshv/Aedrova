@@ -134,7 +134,8 @@ class Handler(BaseHTTPRequestHandler):
                     "name": "exec_command",
                     "arguments": json.dumps(
                         {
-                            "cmd": "printf %s 'local tool passed' > managed-proof-codex.txt",
+                            "cmd": "git rev-parse --is-inside-work-tree > managed-git-proof.txt "
+                            "&& printf %s 'local tool passed' > managed-proof-codex.txt",
                             "workdir": str(project_path),
                             "yield_time_ms": 5000,
                             "max_output_tokens": 1000,
@@ -243,6 +244,10 @@ def main(*, verify_claude_edits=True):
                         project_path / ("managed-proof-" + provider + ".txt")
                     ).read_text() != "local tool passed":
                         raise AssertionError("Local tool output missing")
+                    if provider == "codex" and (
+                        project_path / "managed-git-proof.txt"
+                    ).read_text().strip() != "true":
+                        raise AssertionError("Sandboxed Git could not read the build repository")
                 except Exception as exc:
                     report[provider] = type(exc).__name__ + ": " + str(exc)
     finally:

@@ -307,6 +307,7 @@ class AedrovaWindow(QMainWindow):
         for index, title in enumerate(("Conversation", "Project", "Work", "Files")):
             tab = button(title, f"Open {title.lower()} tab", "tab")
             tab.setCheckable(True)
+            tab.toggled.connect(lambda checked, i=index: self.select_tab(i) if checked else None)
             tab.clicked.connect(lambda checked=False, i=index: self.select_tab(i))
             self.tab_buttons.append(tab)
             tabs_layout.addWidget(tab)
@@ -1126,7 +1127,9 @@ class AedrovaWindow(QMainWindow):
         if hasattr(self, "space_symbol"):
             self.space_symbol.setText("↗" if self.channel.direct else "#")
         for i, tab in enumerate(self.tab_buttons):
+            tab.blockSignals(True)
             tab.setChecked(i == index)
+            tab.blockSignals(False)
         if index == 0 and hasattr(self, "thread_panel"):
             self._adapt_thread()
 

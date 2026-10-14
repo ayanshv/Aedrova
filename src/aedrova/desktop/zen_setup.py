@@ -143,9 +143,11 @@ class SetupPages(QScrollArea):
                 card = ThemePhoto(mode)
                 self.photo_group.addButton(card)
                 card.setChecked(mode == self.preferences["theme"])
-                card.clicked.connect(
-                    lambda checked=False, value=mode: self.appearance.setCurrentIndex(
-                        self.appearance.findData(value)
+                card.toggled.connect(
+                    lambda checked, value=mode: (
+                        self.appearance.setCurrentIndex(self.appearance.findData(value))
+                        if checked
+                        else None
                     )
                 )
                 photo_row.addWidget(card, 1)
@@ -180,6 +182,7 @@ class SetupPages(QScrollArea):
                     self.window.account_dialog,
                     onboarding=True,
                     continued=self.profile_saved,
+                    embedded=True,
                 )
                 self.profile_form.setParent(self.body, Qt.WindowType.Widget)
                 self.profile_form.setMinimumSize(0, 400)
@@ -507,6 +510,7 @@ class SetupPages(QScrollArea):
             return
         self.profile_form.back.hide()
         self.flow.primary.setText(self.profile_form.next.text())
+        self.flow.primary.setAccessibleName(self.flow.primary.text())
         self.flow.primary.setEnabled(not self.profile_form.saving)
         self.flow.back.setEnabled(not self.profile_form.saving)
         self.flow.skip.setEnabled(not self.profile_form.saving and self.flow.profile_complete())

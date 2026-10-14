@@ -287,7 +287,14 @@ class ZenOnboarding(AppDialog):
         self.primary.setEnabled(True)
         if stage == 2:
             self.processing = 0
-        self.canvas.setAccessibleName(self.primary.text() + " · Simulated product preview")
+        if 4 <= stage < LAST_STAGE:
+            title, subtitle, _ = SETUP_STEPS[stage - 4]
+            self.canvas.setAccessibleName(title + " · " + subtitle)
+        else:
+            self.canvas.setAccessibleName(
+                self.primary.text()
+                + (" · Simulated product preview" if stage < 4 else " · Settings saved")
+            )
         self.primary.setFocus()
         self.canvas.update()
 

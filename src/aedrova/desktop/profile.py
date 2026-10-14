@@ -115,7 +115,7 @@ class Avatar(QWidget):
 class ProfileDialog(AppDialog):
     state_changed = Signal()
 
-    def __init__(self, window, account, *, onboarding=False, continued=None):
+    def __init__(self, window, account, *, onboarding=False, continued=None, embedded=False):
         super().__init__(account if onboarding else window)
         self.window, self.account = window, account
         self.onboarding, self.continued = onboarding, continued
@@ -145,11 +145,14 @@ class ProfileDialog(AppDialog):
             layout.setSpacing(18)
             layout.addWidget(label(title, "heading"))
             layout.addWidget(label(subtitle, "muted", wrap=True))
-            scroll = QScrollArea()
-            scroll.setWidgetResizable(True)
-            scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-            scroll.setWidget(content)
-            self.stack.addWidget(scroll)
+            if embedded:
+                self.stack.addWidget(content)
+            else:
+                scroll = QScrollArea()
+                scroll.setWidgetResizable(True)
+                scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+                scroll.setWidget(content)
+                self.stack.addWidget(scroll)
             self.steps.append(content)
             return layout
 

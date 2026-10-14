@@ -376,7 +376,19 @@ class LocalRunner:
             "-c",
             "allow_login_shell=false",
             "-c",
-            'shell_environment_policy.set={PATH="/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin"}',
+            "shell_environment_policy.set={"
+            + ",".join(
+                key + "=" + json.dumps(value)
+                for key, value in {
+                    "PATH": environment()["PATH"]
+                    if sys.platform == "win32"
+                    else "/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin",
+                    "GIT_CONFIG_GLOBAL": os.devnull,
+                    "GIT_CONFIG_SYSTEM": os.devnull,
+                    "GIT_CONFIG_NOSYSTEM": "1",
+                }.items()
+            )
+            + "}",
             "-C",
             str(project),
             "-",

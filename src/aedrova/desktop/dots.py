@@ -530,6 +530,7 @@ class DotDialog(AppDialog):
             else "Continue →"
         )
         self.exit_button.setText("Close" if self.current() else "Finish later")
+        self.next.setAccessibleName(self.next.text())
         self.update_controls()
         if changed and not self.window.reduced_motion:
             self.transition.stop()

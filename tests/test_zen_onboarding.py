@@ -255,6 +255,16 @@ def test_theme_photos_choose_real_theme_and_persist_draft(flow, qtbot):
     assert dialog.setup.preferences["theme"] == "light"
 
 
+def test_accessible_theme_selection_updates_actual_appearance(flow):
+    _, dialog = flow
+    dialog.show_stage(4)
+    for mode in ("dark", "light", "system"):
+        dialog.setup.theme_photos[mode].setChecked(True)
+        assert dialog.setup.appearance.currentData() == mode
+        assert dialog.theme_mode == mode
+        assert dialog.setup.preferences["theme"] == mode
+
+
 def test_system_photo_keeps_both_halves_when_assets_missing(qtbot):
     from PySide6.QtGui import QPixmap
 
@@ -384,6 +394,9 @@ def test_google_returns_to_embedded_required_profile_then_project(qtbot, tmp_pat
     assert not account.isVisible() and dialog.stage == 5
     assert dialog.owner == "u" and dialog.setup.workspace == "w"
     form = dialog.setup.profile_form
+    from PySide6.QtWidgets import QScrollArea
+
+    assert not isinstance(form.stack.widget(0), QScrollArea)
     assert form.name.text() == "Maya Chen"
     assert not any(
         control.isVisible() and control.text() == "Personalize my profile"
@@ -396,6 +409,7 @@ def test_google_returns_to_embedded_required_profile_then_project(qtbot, tmp_pat
     dialog.activate()
     dialog.activate()
     assert dialog.stage == 5 and form.stack.currentIndex() == 2
+    assert dialog.primary.accessibleName() == "Save & continue"
     dialog.activate()
     qtbot.waitUntil(lambda: dialog.stage == 6)
     assert stored["profile_completed"] and stored["display_name"] == "Maya Chen"

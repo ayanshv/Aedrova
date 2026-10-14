@@ -2011,3 +2011,21 @@ receipt as active membership, copy its private order identifier into source, inf
 legal operator identity, or start signing/Apple OAuth before activation is confirmed.
 Required next owner action: Apple Developer → Account → verify active membership,
 then reply “Apple membership active.” All other live/owner gates above stay open.
+
+
+## October 13 — new-user audit before Apple setup
+
+Owner requested a thorough first-run/build/Bud/connector audit and fixes, then
+asked to finish. Real isolated staging Google sign-in, synthetic workspace creation,
+required profile/project/Bud onboarding, Marketing role filtering, Finish later →
+controls tour, command menu, chat send and builder queue were exercised. Fixed
+theme and tab accessibility selection, dynamic action labels, nested profile
+scrolling, real-stage accessibility copy, unavailable connector labels, private Git
+config sandbox reads and scoped current-session build failure details.
+785 desktop and 487 backend tests pass; Ruff and tracked-secret checks pass.
+Real local Codex generation/tests passed; installed Codex/Claude tool execution and
+Git checks passed with loopback model fixtures (not paid Claude inference).
+Live staging included AI rejects as unconfigured; Instagram/TikTok login is also
+unavailable there. No provider-wide acceptance, public gates, Apple setup, billing,
+hosting purchase or signed installers enabled. Full evidence and precise next
+setup requirements are in docs/new-user-flow-audit.md. No new SQL needed.

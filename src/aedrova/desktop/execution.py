@@ -289,7 +289,25 @@ class RunHistory(AppDialog):
             self.details.clear()
             return
         usage = self.queue.ledger.usage(row["id"], self.user, self.workspace)
-        lines = [row["task"], "", "Provider usage (missing values are unknown):"]
+        lines = [row["task"], ""]
+        latest = getattr(self.queue.window, "build_dialog", None)
+        if (
+            latest
+            and not latest.invalidated
+            and latest.user == self.user
+            and latest.workspace == self.workspace
+            and getattr(latest, "run_id", None) == row["id"]
+        ):
+            lines.extend([latest.status.text(), latest.output.toPlainText(), ""])
+        elif row["state"] in {"failed", "interrupted", "cancelled"}:
+            lines.extend(
+                [
+                    "This run stopped. Inspect saved files before retrying. "
+                    "Detailed provider output is kept only for the current session.",
+                    "",
+                ]
+            )
+        lines.append("Provider usage (missing values are unknown):")
         for entry in usage:
             lines.append(
                 f"{entry['phase']} · {entry['seconds']:.1f}s · "

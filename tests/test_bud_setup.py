@@ -120,6 +120,7 @@ def test_seven_stages_save_without_oauth_and_never_fake_ready(editor, qtbot):
     assert dialog.pages.currentIndex() == 0
     dialog.next.click()
     assert dialog.pages.currentIndex() == 1
+    assert dialog.next.accessibleName() == "Continue →"
     dialog.name.setText("Orbit")
     dialog.role.setText("Engineering updates")
     dialog.instructions.setPlainText("Focus on open pull requests.")
