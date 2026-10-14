@@ -1988,3 +1988,26 @@ Added an immediate/repeated-disposal regression and an early voice gate on all C
 platforms. Eight local voice tests and lint pass; follow-up Windows CI remains needed.
 Staging readiness timed out twice; public website origin returned 200 ready. No
 hosting upgrade, production restart or public availability certification was performed.
+
+
+## Final automated result — October 13
+
+Source bb2c9e4 passed full release-candidate CI 38495242441: macOS, Windows,
+Ubuntu and PostgreSQL/RLS all green. Local final desktop suite: 783 passed.
+Backend source 0ecd826 passed CI 38494165863, including 487 tests, private
+PostgreSQL schema checks and deployment-image build/startup. Lint/secret checks pass.
+Windows cleanup correction is validated on the actual Windows runner; no tests skipped.
+No signed installer or physical-device certification is implied by these results.
+
+Render runtime logs show repeated readiness 200s on the free staging instance;
+this session's direct HTTPS probes still timed out and its browser request was
+blocked by client. Do not diagnose those as proven application/hosting failure or
+certify always-on availability. Free-instance sleeping remains a disclosed gate.
+No hosting, credential, payment or deployment setting was changed.
+
+Owner provided purchase confirmation for Apple Developer Program membership.
+Purchase is completed; activation details are still to be emailed. Do not treat
+receipt as active membership, copy its private order identifier into source, infer
+legal operator identity, or start signing/Apple OAuth before activation is confirmed.
+Required next owner action: Apple Developer → Account → verify active membership,
+then reply “Apple membership active.” All other live/owner gates above stay open.
