@@ -56,3 +56,19 @@ def test_staging_launcher_rejects_production_fallback_and_private_keys():
     ):
         with pytest.raises(ValueError):
             validate(config | change)
+
+
+def test_reopening_account_leaves_old_creation_confirmation_before_network(
+    qtbot, tmp_path, monkeypatch
+):
+    from test_connected import setup
+
+    window, _ = setup(qtbot, tmp_path)
+    account = window.account_dialog
+    account.pages.setCurrentIndex(2)
+    account.onboarding_steps.setCurrentIndex(4)
+    monkeypatch.setattr(account, "refresh", lambda: None)
+    window.show_account()
+    assert account.pages.currentIndex() == 4
+    window.show_account("manage")
+    assert account.pages.currentIndex() == 1

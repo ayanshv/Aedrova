@@ -2029,3 +2029,9 @@ Live staging included AI rejects as unconfigured; Instagram/TikTok login is also
 unavailable there. No provider-wide acceptance, public gates, Apple setup, billing,
 hosting purchase or signed installers enabled. Full evidence and precise next
 setup requirements are in docs/new-user-flow-audit.md. No new SQL needed.
+
+Audit final detail: native-menu logout passed and returned to Google sign-in; the
+isolated source audit instance was closed. Found and fixed Account reopening staying
+on the prior workspace-created confirmation while refresh fails. All 49 focused
+account/identity/connected/baseline checks passed after that final correction.
+The synthetic staging workspace is retained as labeled audit evidence.

@@ -49,8 +49,13 @@ Observed through native/browser UI:
   Failure was also surfaced in conversation under Nova. The original folder stayed
   intact. Queue history showed Failed, recovery and saved-file controls.
 
+Account → Log out was finally verified live through the native menu: the session
+was removed and the real Google sign-in screen returned. The isolated audit app
+was then closed. Synthetic staging workspace remains available as labeled test
+data; no permanent deletion was performed.
+
 Native accessibility snapshots intermittently lost virtual list rows between syncs;
-not every message context-menu or account-menu action could be verified through
+not every message context-menu or profile-popup action could be verified through
 that tool. Those interactions have automated coverage, but are not claimed as a
 fresh live native acceptance. No physical second-device/media test was substituted
 with a synthetic fixture.
@@ -77,6 +82,9 @@ with a synthetic fixture.
    same run, user and workspace. After restart it gives explicit inspect-before-retry
    guidance. Provider output is not newly persisted in the queue database, and logout
    clears the panel. No other workspace’s output is shown.
+11. Reopening Account & workspaces now immediately leaves the old workspace-creation
+    confirmation and presents existing workspace navigation before refreshing. A
+    timed-out refresh no longer strands the user on the earlier All set screen.
 10. The staging launcher accepts a separate --settings-file so future first-run audits
     do not overwrite the owner’s normal preferences.
 
@@ -137,7 +145,8 @@ checks, not fresh real-device acceptance for every listed feature.
 Backend suite: 487 passed on this audit. Covers connector lifecycle, billing,
 server usage/rate/spending limits, context isolation, upload/voice acceptance,
 meetings, provider gateway, signed webhooks and trust-site functionality.
-Final desktop regression: 785 passed. Full source/test/script Ruff, tracked-secret
+Final full desktop regression before the last account-reopen correction: 785 passed.
+After that correction, all 49 account/identity/connected/launch-baseline tests passed. Full source/test/script Ruff, tracked-secret
 scan and diff whitespace checks pass. The real loopback Git/tool rerun passed for
 both installed CLIs. CI is triggered by the development-branch push; a new signed
 Mac/Windows release was not created.
@@ -174,7 +183,7 @@ and wrong-account checks. These block complete connector/launch acceptance.
 
 Physical final checks remain: another tester/device for calls and transcription,
 actual voice playback/listening, narrow-width/native accessibility inspection,
-Windows clean-machine install/update/uninstall and final account logout/re-login.
+Windows clean-machine install/update/uninstall and final second-account re-login.
 The code tests are useful evidence, not a replacement for those checks.
 
 Apple activation remains a separate requirement. Reply “Apple membership active”

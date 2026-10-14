@@ -1812,6 +1812,11 @@ class AedrovaWindow(QMainWindow):
             self.account_dialog.pending_workspace = self.workspace_id
         if self.account_dialog.service and self.account_dialog.service.user:
             if not self.account_dialog.busy:
+                # Reopening must not strand the user on a previous creation
+                # confirmation while a network refresh is pending or fails.
+                if self.account_dialog.snapshot.get("workspaces"):
+                    self.account_dialog.pages.setCurrentIndex(4)
+                    self.account_dialog.apply_intent()
                 self.account_dialog.refresh()
         self.account_dialog.show()
         self.account_dialog.raise_()
