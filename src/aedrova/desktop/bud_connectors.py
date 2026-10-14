@@ -690,15 +690,21 @@ class ConnectorsDialog(AppDialog):
 
     def auth_details(self, provider):
         managed = bool(provider.get("managed_available"))
-        self.oauth.setText("Enable web search" if managed else "Connect account")
+        self.oauth.setText(
+            "Enable web search"
+            if managed
+            else "Connect account"
+            if provider.get("oauth_available")
+            else "Sign-in setup pending"
+        )
         self.detail_copy.setText(
             "Search the web through Aedrova. No extra account or API key is needed. "
             "Daily usage limits apply."
             if managed
             else provider["permissions"]
             if provider.get("oauth_available")
-            else "Account sign-in is not available for this service yet. "
-            "Advanced token setup is optional below."
+            else f"{provider['name']} sign-in is not configured on this Aedrova service yet. "
+            "Your Bud can be saved while setup is completed."
         )
         self.oauth.setVisible(bool(provider.get("oauth_supported") or managed))
         self.oauth_hint.setVisible(bool(provider.get("oauth_supported") or managed))
