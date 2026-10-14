@@ -2049,3 +2049,22 @@ callback/profile/public-video acceptance and refresh remain open. No production
 gate, new scope, new target, purchase or SQL change. Exact evidence and owner steps
 are in the website repository docs/social-connectors.md. Theme illustrations now
 crop at bottom-right; 26 onboarding tests passed and commit 089fc75 is pushed.
+
+## October 14 — branded website error pages
+
+Instagram's unavailable login button now says Sign-in setup pending; this is a
+service configuration blocker, not a reason to enable unsupported OAuth. 25
+connector UI tests pass; source commit d596973 is pushed.
+Website PR #15 merged isolated branded browser error pages with existing Buds,
+Aedrova typography, blue controls, dark/system styles and recovery/support links.
+432 production-candidate tests, 512 development-backend tests, and 13 independent
+Worker tests pass. Render deployment of 2f083e4 is Live; real public 404 is branded
+with embedded artwork and restrictive hashed CSP. API contracts stay unchanged.
+The independent Cloudflare origin-outage fallback is prepared but NOT routed.
+Safari loads the owner's free Cloudflare account, but automation cannot activate
+its Worker creation button. Owner action: Cloudflare → Workers & Pages → Create
+app → Start with Hello World → name aedrova-error-fallback → deploy on existing free
+plan; leave it open and reply created. Do not add routes until the tested code is
+installed. Host-origin 502 coverage remains blocked on this setup. Browser DNS,
+certificate warning and failures before Worker execution cannot all be customized.
+Full steps/evidence: website docs/branded-error-pages.md. No SQL needed.
