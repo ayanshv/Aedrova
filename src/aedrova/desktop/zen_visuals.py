@@ -1,13 +1,12 @@
-"""Native onboarding visuals: real theme captures and clearly illustrative setup diagrams."""
+"""Native onboarding visuals: minimal theme windows and illustrative setup diagrams."""
 
 import math
 from pathlib import Path
 
 from PySide6.QtCore import QRectF, Qt
-from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QAbstractButton, QWidget
 
-from aedrova.desktop.brand import ASSETS
 from aedrova.desktop.materials import system_font
 from aedrova.desktop.zen_theme import tone, visual_theme
 
@@ -37,15 +36,11 @@ class ThemePhoto(QAbstractButton):
                 "dark": "Dark appearance",
             }[mode]
         )
-        self.photos = {
-            m: QPixmap(str(ASSETS / "onboarding" / f"{m}.png")) for m in ("light", "dark")
-        }
 
     def paintEvent(self, event):  # noqa: N802
         theme = visual_theme(self)
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         frame = QRectF(self.rect()).adjusted(3, 3, -3, -3)
         p.setPen(
             QPen(
@@ -56,24 +51,43 @@ class ThemePhoto(QAbstractButton):
         p.setBrush(QColor(tone(theme, "#EDF5FF" if self.isChecked() else "white")))
         p.drawRoundedRect(frame, 18, 18)
         image_rect = frame.adjusted(8, 8, -8, -44)
+        side = min(image_rect.width() * 0.78, image_rect.height() * 0.86)
+        desktop = QRectF(
+            image_rect.center().x() - side / 2 + image_rect.width() * 0.045,
+            image_rect.center().y() - side / 2 - image_rect.height() * 0.025,
+            side,
+            side,
+        )
+        radius = side * 0.14
         clip = QPainterPath()
-        clip.addRoundedRect(image_rect, 10, 10)
+        clip.addRoundedRect(desktop, radius, radius)
         p.save()
         p.setClipPath(clip)
         for mode in ("light", "dark") if self.mode == "system" else (self.mode,):
-            photo = self.photos[mode]
             p.save()
             if self.mode == "system":
-                half = QRectF(image_rect)
-                half.setWidth(image_rect.width() / 2)
+                half = QRectF(desktop)
+                half.setWidth(desktop.width() / 2)
                 if mode == "dark":
-                    half.moveLeft(image_rect.center().x())
+                    half.moveLeft(desktop.center().x())
                 p.setClipRect(half, Qt.ClipOperation.IntersectClip)
-            if photo.isNull():
-                p.fillRect(image_rect, QColor("#F5F5F7" if mode == "light" else "#1C1C1E"))
-            else:
-                p.drawPixmap(image_rect.toRect(), photo)
+            p.fillRect(desktop, QColor("#FFFFFF" if mode == "light" else "#202022"))
+            p.setPen(QPen(QColor("#DADDE2" if mode == "light" else "#49494D"), 1))
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawRoundedRect(desktop.adjusted(0.5, 0.5, -0.5, -0.5), radius, radius)
             p.restore()
+        p.setPen(Qt.PenStyle.NoPen)
+        dot = max(3.0, side * 0.045)
+        for index, color in enumerate(("#FF6058", "#FFBD2E", "#28C840")):
+            p.setBrush(QColor(color))
+            p.drawEllipse(
+                QRectF(
+                    desktop.left() + side * 0.14 + index * dot * 1.7,
+                    desktop.top() + side * 0.14,
+                    dot,
+                    dot,
+                )
+            )
         p.restore()
         caption(
             p,

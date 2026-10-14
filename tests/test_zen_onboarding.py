@@ -247,7 +247,7 @@ def test_theme_photos_choose_real_theme_and_persist_draft(flow, qtbot):
     dialog.show_stage(4)
     for mode in ("dark", "system", "light"):
         card = dialog.setup.theme_photos[mode]
-        assert all(not image.isNull() for image in card.photos.values())
+        assert not card.grab().isNull()
         qtbot.mouseClick(card, Qt.MouseButton.LeftButton)
         assert dialog.setup.appearance.currentData() == mode
         assert card.isChecked()
@@ -265,19 +265,16 @@ def test_accessible_theme_selection_updates_actual_appearance(flow):
         assert dialog.setup.preferences["theme"] == mode
 
 
-def test_system_photo_keeps_both_halves_when_assets_missing(qtbot):
-    from PySide6.QtGui import QPixmap
-
+def test_system_illustration_keeps_both_halves_without_screenshot_assets(qtbot):
     from aedrova.desktop.zen_visuals import ThemePhoto
 
     card = ThemePhoto("system")
     qtbot.addWidget(card)
     card.resize(300, 180)
-    card.photos = {"light": QPixmap(), "dark": QPixmap()}
     image = card.grab().toImage()
     scale = image.devicePixelRatio()
-    assert image.pixelColor(int(70 * scale), int(50 * scale)).lightness() > 200
-    assert image.pixelColor(int(230 * scale), int(50 * scale)).lightness() < 60
+    assert image.pixelColor(int(140 * scale), int(70 * scale)).lightness() > 200
+    assert image.pixelColor(int(190 * scale), int(70 * scale)).lightness() < 60
 
 
 def test_small_setup_illustrations_never_overlap_controls(flow, qtbot):
