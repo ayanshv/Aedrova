@@ -51,43 +51,65 @@ class ThemePhoto(QAbstractButton):
         p.setBrush(QColor(tone(theme, "#EDF5FF" if self.isChecked() else "white")))
         p.drawRoundedRect(frame, 18, 18)
         image_rect = frame.adjusted(8, 8, -8, -44)
-        side = min(image_rect.width() * 0.78, image_rect.height() * 0.86)
         desktop = QRectF(
-            image_rect.center().x() - side / 2 + image_rect.width() * 0.045,
-            image_rect.center().y() - side / 2 - image_rect.height() * 0.025,
-            side,
-            side,
+            image_rect.left() + image_rect.width() * 0.12,
+            image_rect.top() + image_rect.height() * 0.08,
+            image_rect.width() * 1.16,
+            image_rect.height() * 0.91,
         )
-        radius = side * 0.14
         clip = QPainterPath()
-        clip.addRoundedRect(desktop, radius, radius)
+        clip.addRoundedRect(image_rect, 10, 10)
         p.save()
         p.setClipPath(clip)
         for mode in ("light", "dark") if self.mode == "system" else (self.mode,):
             p.save()
             if self.mode == "system":
-                half = QRectF(desktop)
-                half.setWidth(desktop.width() / 2)
+                half = QRectF(image_rect)
+                half.setWidth(image_rect.width() / 2)
                 if mode == "dark":
-                    half.moveLeft(desktop.center().x())
+                    half.moveLeft(image_rect.center().x())
                 p.setClipRect(half, Qt.ClipOperation.IntersectClip)
-            p.fillRect(desktop, QColor("#FFFFFF" if mode == "light" else "#202022"))
-            p.setPen(QPen(QColor("#DADDE2" if mode == "light" else "#49494D"), 1))
-            p.setBrush(Qt.BrushStyle.NoBrush)
-            p.drawRoundedRect(desktop.adjusted(0.5, 0.5, -0.5, -0.5), radius, radius)
-            p.restore()
-        p.setPen(Qt.PenStyle.NoPen)
-        dot = max(3.0, side * 0.045)
-        for index, color in enumerate(("#FF6058", "#FFBD2E", "#28C840")):
-            p.setBrush(QColor(color))
-            p.drawEllipse(
-                QRectF(
-                    desktop.left() + side * 0.14 + index * dot * 1.7,
-                    desktop.top() + side * 0.14,
-                    dot,
-                    dot,
+            light = mode == "light"
+            p.setPen(QPen(QColor("#D5DAE2" if light else "#393C42"), 1))
+            p.setBrush(QColor("#EFF1F5" if light else "#17181B"))
+            p.drawRoundedRect(desktop, 12, 12)
+            dot = 3.2
+            p.setPen(Qt.PenStyle.NoPen)
+            for index, color in enumerate(("#FF6058", "#FFBD2E", "#28C840")):
+                p.setBrush(QColor(color))
+                p.drawEllipse(
+                    QRectF(
+                        desktop.left() + 10 + index * 5.5,
+                        desktop.top() + 9,
+                        dot,
+                        dot,
+                    )
                 )
-            )
+            for x, y, size, fill in (
+                (0.39, 0.22, 0.48, "#FAFBFD" if light else "#2B2E34"),
+                (0.15, 0.40, 0.56, "#FFFFFF" if light else "#42464E"),
+            ):
+                window = QRectF(
+                    desktop.left() + desktop.width() * x,
+                    desktop.top() + desktop.height() * y,
+                    desktop.height() * size,
+                    desktop.height() * size,
+                )
+                p.setPen(QPen(QColor("#D2D7DF" if light else "#595E68"), 1))
+                p.setBrush(QColor(fill))
+                p.drawRoundedRect(window, 7, 7)
+                p.setPen(Qt.PenStyle.NoPen)
+                p.setBrush(QColor("#B9C0CB" if light else "#969EAA"))
+                for index in range(3):
+                    p.drawEllipse(
+                        QRectF(
+                            window.left() + 6 + index * 4,
+                            window.top() + 6,
+                            2,
+                            2,
+                        )
+                    )
+            p.restore()
         p.restore()
         caption(
             p,
