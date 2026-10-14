@@ -2035,3 +2035,17 @@ isolated source audit instance was closed. Found and fixed Account reopening sta
 on the prior workspace-created confirmation while refresh fails. All 49 focused
 account/identity/connected/baseline checks passed after that final correction.
 The synthetic staging workspace is retained as labeled audit evidence.
+
+## October 14 — TikTok staging setup
+
+Approved existing TikTok sandbox credentials are deployed privately on
+aedrova-beta-staging and its HTTPS callback is registered alongside the old one.
+Render deployment dep-db80612j9qps73b4soq0 is Live; readiness returned 200 and
+58 focused backend OAuth tests passed. A real Marketing Bud in the synthetic Beta
+isolation workspace offers Connect TikTok and opens Google → TikTok sign-in
+without manual codes/IDs. The owner signed in, but TikTok returned
+non_sandbox_target; the sandbox still lists only @aedrova. Fresh staging consent,
+callback/profile/public-video acceptance and refresh remain open. No production
+gate, new scope, new target, purchase or SQL change. Exact evidence and owner steps
+are in the website repository docs/social-connectors.md. Theme illustrations now
+crop at bottom-right; 26 onboarding tests passed and commit 089fc75 is pushed.
