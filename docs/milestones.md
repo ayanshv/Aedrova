@@ -2068,3 +2068,25 @@ plan; leave it open and reply created. Do not add routes until the tested code i
 installed. Host-origin 502 coverage remains blocked on this setup. Browser DNS,
 certificate warning and failures before Worker execution cannot all be customized.
 Full steps/evidence: website docs/branded-error-pages.md. No SQL needed.
+
+## October 14 — Instagram staging live grant verified; TikTok provider limit
+
+Instagram app 2156018749127516 (Aedrova Buds-IG), under parent 3077883259220045,
+is configured for the exact staging HTTPS callback and instagram_business_basic
+only. Approved private credentials are deployed on staging (dep-db85045g1s2s7392hcs0,
+Live). Owner accepted @aedrova_ai tester invitation and personally allowed the
+read-only profile/media grant. Branded callback and native Connected status passed;
+connect requires successful live profile AND posts reads before saving the grant.
+No manual user codes/IDs, publishing/messages, production change or purchase.
+Refresh/revocation/reconnect and public Meta review remain open; Phase 2 is not closed.
+
+TikTok sandbox target confirmation resolved to @aedrova. Fresh staging login is now
+blocked by TikTok's "Maximum number of attempts reached" response. No more login
+attempts until the provider restriction clears, then one callback/profile/video
+acceptance check remains. No fixed cooldown is promised. DM + and Bud DM assessment
+are queued after social OAuth completion, per owner instruction.
+
+Owner created the free Cloudflare Worker (actual name aedrovaerrorfallback); starter
+is still unrouted and unmodified while social OAuth is prioritized. Host-outage
+fallback remains unfinished. Source evidence and exact acceptance limits are in
+website docs/social-connectors.md. No new SQL or credentials are required now.
