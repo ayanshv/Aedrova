@@ -2133,3 +2133,11 @@ OpenAI key to Render staging for capped inference (proposed $1/month accounting
 budget), matching backend deployment, and no production/checkout change. Existing
 speech-only approval is insufficient for this new credential purpose. See
 docs/private-bud-conversations.md for evidence and exact pending actions.
+
+Second-account sign-in follow-up: owner said signed in; actual browser result was
+Supabase bad_oauth_state (expired), not the probe's native callback. Renewed first
+session and reverified own history/idempotency. Second OAuth is now held locally
+until the owner identifies the second registered test-account email, allowing its
+already-signed-in browser session to be selected against a fresh link. No expiry
+or permission protection was bypassed. Hosted outsider isolation and real included
+AI responses remain open; no additional migration is needed.

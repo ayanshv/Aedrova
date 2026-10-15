@@ -128,3 +128,16 @@ read/write/reply rejection checks. No new workspace membership is being granted.
 Sessions stay only in memory; the bounded sign-in wait expires after 15 minutes.
 Same-workspace coworker isolation remains covered by the local PostgreSQL suite;
 it is not certified by an outsider check. The overall hosted acceptance gate is open.
+
+Second-account follow-up: owner reported signing in, but Safari actually returned
+`bad_oauth_state` / OAuth state expired to the staging Site URL; no second native
+callback reached the probe. Do not record this as a passed isolation check. Stopped
+that probe and locally signed out its test-only first session; source app session
+was not stopped. Renewed the first probe login and reverified own reads/idempotency.
+The new runner now waits locally before opening the second authorization URL, so
+the link cannot expire while awaiting account identification. Owner is asked which
+exact email was used for the second registered test account; then its existing
+Google browser session can be selected immediately on a fresh link. No password or
+code is requested. The local handoff wait is bounded to 30 minutes; the actual
+second OAuth attempt is bounded to three minutes. No security checks/TTL weakened.
+Current helper session is disposable, staging-only, credentials held only in RAM.
