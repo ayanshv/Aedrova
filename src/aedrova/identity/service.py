@@ -354,6 +354,8 @@ class IdentityService:
             "save_chat_profile",
             "chat_action",
             "start_direct_message",
+            "bud_conversation",
+            "append_bud_message",
             "set_meeting_announcement_channel",
             "mark_channel_read",
             "reserve_attachment",

@@ -43,7 +43,9 @@ class DotSection(TeamSection):
         add.clicked.connect(lambda: open_dots(window))
 
     def mention(self, row):
-        open_dots(self.window, row["id"])
+        from aedrova.desktop.bud_chat import open_bud_chat
+
+        open_bud_chat(self.window, row["id"])
 
     def sync(self, rows, workspace):
         cache = getattr(self.window, "dot_connection_states", {})
@@ -55,7 +57,7 @@ class DotSection(TeamSection):
             row = marble.widget.row
             marble.widget.setAccessibleName("Open " + row["name"] + " Bud")
             marble.widget.setToolTip(
-                row["name"] + " · " + row["provider"].title() + "\nClick to view connection"
+                row["name"] + " · " + row["provider"].title() + "\nClick for a private conversation"
             )
 
 

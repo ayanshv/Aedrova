@@ -111,7 +111,7 @@ def test_twelve_marbles_settle_without_respawning_and_hidden_timer_stops(qtbot):
     assert not habitat.marbles
 
 
-def test_reduced_motion_dot_click_opens_profile_without_running(qtbot, tmp_path, monkeypatch):
+def test_reduced_motion_dot_click_opens_private_chat_without_running(qtbot, tmp_path, monkeypatch):
     window, service = setup(qtbot, tmp_path)
     window.reduced_motion = True
     section = window.ai_team_section
@@ -128,7 +128,9 @@ def test_reduced_motion_dot_click_opens_profile_without_running(qtbot, tmp_path,
         for i in range(3)
     ]
     opened = []
-    monkeypatch.setattr("aedrova.desktop.dots.open_dots", lambda window, key: opened.append(key))
+    monkeypatch.setattr(
+        "aedrova.desktop.bud_chat.open_bud_chat", lambda window, key: opened.append(key)
+    )
     section.sync(dots, "w")
     assert not section.habitat.timer.isActive()
     section.habitat.wake("dot-0")

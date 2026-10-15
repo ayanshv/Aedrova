@@ -125,7 +125,9 @@ def test_dot_completion_retains_source_id_and_click_opens_profile(qtbot, tmp_pat
     assert mention("Hey @GitHub what changed?", [row]) == row
     window, _ = setup(qtbot, tmp_path)
     opened = []
-    monkeypatch.setattr("aedrova.desktop.dots.open_dots", lambda window, key: opened.append(key))
+    monkeypatch.setattr(
+        "aedrova.desktop.bud_chat.open_bud_chat", lambda window, key: opened.append(key)
+    )
     window.ai_team_section.sync([row], "w")
     window.ai_team_section.habitat.wake(row["id"])
     assert opened == [row["id"]]

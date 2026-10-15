@@ -2090,3 +2090,33 @@ Owner created the free Cloudflare Worker (actual name aedrovaerrorfallback); sta
 is still unrouted and unmodified while social OAuth is prioritized. Host-outage
 fallback remains unfinished. Source evidence and exact acceptance limits are in
 website docs/social-connectors.md. No new SQL or credentials are required now.
+
+## October 14 — coworker DM discovery and private Bud conversations approved
+
+Owner approved the coworker DM + button and private Bud conversations after the
+social OAuth status report. Implemented the + using the existing picker/server DM
+operation, with stale-workspace guards. Bud shelf clicks now open a private chat;
+Configure retains the existing editor. Ordinary messages address that Bud directly.
+Private replies use the existing configured personality/provider and Bud-scoped
+connector retrieval; workspace context is explicit opt-in per reply and off by
+default. Executable builds remain in the existing Build studio with approvals.
+
+Added account-owned bud_messages storage, RLS and authenticated bounded/idempotent
+RPCs, deliberately outside team channels/search/notifications. Other members and
+workspace owners cannot read another user's history through app permissions.
+Source supports reopened history, local echo, retries, skeleton recovery, cancel,
+logout isolation and light/dark/compact layouts. Tests use a provider fixture;
+hosted private-chat acceptance is NOT claimed yet. Details and scope limits are in
+docs/private-bud-conversations.md.
+
+Required owner action at the end: Supabase → Aedrova Staging → SQL Editor → New
+query → run supabase/migrations/202610140001_bud_conversations.sql from this repo.
+Only Staging, not production. This blocks live saved history/provider/isolation
+acceptance. No Render deployment, new credentials or payment required. TikTok
+attempt restriction, public provider review, outage fallback and release gates
+remain open. No signing, Apple OAuth, packaging or public activation performed.
+
+Validation: 795 full desktop tests passed; final private-chat subset 9 passed.
+Complete embedded PostgreSQL migration/RLS suite, Ruff and diff checks passed.
+Light, dark and compact Qt previews inspected with synthetic data. Hosted acceptance
+is still blocked on the owner-applied staging migration above.

@@ -227,7 +227,15 @@ class AedrovaWindow(QMainWindow):
         self.channel_list.currentItemChanged.connect(self._channel_selected)
         side.addWidget(self.channel_list, 3)
         side.addSpacing(12)
-        side.addWidget(label("DIRECT MESSAGES", "section"))
+        dm_header = QHBoxLayout()
+        dm_header.addWidget(label("DIRECT MESSAGES", "section"))
+        dm_header.addStretch()
+        self.start_dm_button = button("+", "New direct message", "icon")
+        self.start_dm_button.setFixedSize(25, 25)
+        self.start_dm_button.setToolTip("Message a teammate · Ctrl+Shift+M")
+        self.start_dm_button.clicked.connect(self.start_direct_message)
+        dm_header.addWidget(self.start_dm_button)
+        side.addLayout(dm_header)
         self.dm_list = QListWidget()
         self.dm_list.setObjectName("Navigation")
         self.dm_list.setAccessibleName("Direct conversations")
@@ -589,6 +597,12 @@ class AedrovaWindow(QMainWindow):
     def _channel_selected(self, item, previous):
         if item:
             self.switch_channel(item.data(Qt.ItemDataRole.UserRole))
+
+    def start_direct_message(self):
+        if self.connected and self.connected.active:
+            self.connected.start_dm()
+        else:
+            self.notify("Sign in to message a teammate in your workspace.")
 
     def _save_drafts(self):
         self.store.drafts[(self.workspace_id, self.channel_id, "")] = (

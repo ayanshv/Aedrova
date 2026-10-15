@@ -811,6 +811,11 @@ class ConnectedDashboard(QObject):
         workspace = self.window.workspace_id
 
         def choose(snapshot):
+            if (
+                not self.active or self.window.workspace_id != workspace
+                or self.account.service is not service
+            ):
+                return
             people = [
                 r
                 for r in snapshot.get("directory", [])
@@ -832,6 +837,11 @@ class ConnectedDashboard(QObject):
                 return identifier, service.snapshot()
 
             def opened(result):
+                if (
+                    not self.active or self.window.workspace_id != workspace
+                    or self.account.service is not service
+                ):
+                    return
                 identifier, data = result
                 self.apply(data, [], workspace, identifier)
 
