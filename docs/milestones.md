@@ -2141,3 +2141,19 @@ until the owner identifies the second registered test-account email, allowing it
 already-signed-in browser session to be selected against a fresh link. No expiry
 or permission protection was bypassed. Hosted outsider isolation and real included
 AI responses remain open; no additional migration is needed.
+
+
+## October 15 — current repair roadmap Step 1 baseline
+
+Owner authorized inventory/documentation only and requested all personal actions
+be saved for the final handoff. Saved docs/release-baseline-2026-10-15.md and JSON
+with every current product issue, nine connectors and all 14 meeting categories.
+Source controls and historical tests are distinguished from live acceptance.
+Included staging AI, foreign-account private Bud acceptance, social/public provider
+lifecycle gates and reported video failure remain open. Existing dashboard accept
+and message-copy code are not falsely reported as missing or fixed.
+
+No runtime/account/credential/schema/deployment/billing/signing changes performed.
+No owner action required for Step 1; later conditional actions are consolidated in
+the baseline. Next batch is Step 2 AI routing and capped provider availability,
+pending owner approval. Historical Beta phases retain their separate numbering.

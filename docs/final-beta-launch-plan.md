@@ -8,6 +8,16 @@ completion. Current evidence, frozen scope and exact staging handoffs are saved 
 [Phase 1 baseline](final-beta-phase-1.md). Waitlist and public billing/download gates
 remain unchanged. The owner-supplied proposal is preserved in release-plan-source.md.
 
+## Current repair roadmap — October 15, 2026
+
+The owner authorized Step 1 inventory only of the new repair roadmap. See the
+[complete current baseline](release-baseline-2026-10-15.md) and its
+[machine-readable requirement register](release-baseline-2026-10-15.json).
+These step numbers are separate from the historical Beta phase numbers below.
+All owner interventions are consolidated at the end; no setup action is required
+for this baseline. Implementation, account changes and promotion require the next
+approved batch.
+
 ## Phase 1 — Establish the release baseline
 
 Inventory app, backend, Supabase schema/RLS, connectors, AI runtimes, website and
