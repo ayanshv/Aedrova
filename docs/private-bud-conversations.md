@@ -93,3 +93,38 @@ new credential, paid plan, production migration or installer release is needed
 for this step. Afterward, restart the updated source staging app, verify a private
 reply/reopen under the signed-in test account, then verify the second account cannot
 read it. Production installation remains a separate release gate.
+
+## Hosted acceptance progress after owner migration confirmation
+
+The owner reported success. Restarted the updated source staging app and signed
+into the original first test account through normal Google OAuth. In the existing
+synthetic Beta isolation 1 eb8958 workspace, clicking the Marketing Bud opened
+private history with workspace context unchecked. A non-sensitive greeting request
+saved successfully and reappeared on closing/reopening the private view. The team
+channel did not receive it. Retry reused the saved question rather than creating
+another question. The independent first user-JWT probe also passed direct table and
+RPC reads of its own history and repeated-UUID idempotency against real staging.
+Evidence: ignored work/bud-chat/hosted-acceptance.json and hosted-private-history.png.
+
+The first included-AI call timed out while the free staging host woke. Retrying
+afterward returned the explicit server denial: **Included AI access is not
+configured yet.** No real model answer was generated or saved, and no local
+credential/runtime fallback bypassed the gateway. Completing the answer test needs
+staging gateway/model/key activation with server spending limits. The existing
+speech-only key deployment approval does not authorize a new generation-key
+transmission to Render. Proposed next approval: use the existing OpenAI key in
+Render aedrova-beta-staging only, deploy matching capped inference configuration,
+with a $1/month staging accounting budget and no production/checkout activation.
+Provider/model rate validation and actual enforcement must precede any inference.
+
+The native + button correctly reports that this test workspace needs an invited
+teammate; it has no second member, so live human DM creation/reopening is not claimed.
+That flow's automated desktop and PostgreSQL checks remain passed.
+
+The hosted outsider permission probe authenticated its first session and opened
+Safari's second Google account chooser. Owner must select the SECOND registered
+staging test account (different from the original account) to finish foreign history
+read/write/reply rejection checks. No new workspace membership is being granted.
+Sessions stay only in memory; the bounded sign-in wait expires after 15 minutes.
+Same-workspace coworker isolation remains covered by the local PostgreSQL suite;
+it is not certified by an outsider check. The overall hosted acceptance gate is open.

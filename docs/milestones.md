@@ -2120,3 +2120,16 @@ Validation: 795 full desktop tests passed; final private-chat subset 9 passed.
 Complete embedded PostgreSQL migration/RLS suite, Ruff and diff checks passed.
 Light, dark and compact Qt previews inspected with synthetic data. Hosted acceptance
 is still blocked on the owner-applied staging migration above.
+
+Owner subsequently reported migration success. Real staging private question
+save/reopen, exclusion from team chat, and first-account user-JWT table/RPC reads
+and duplicate-safe retry are verified. Native DM + returns the correct invite-first
+empty state in the one-member test workspace. Hosted foreign-account probe is at
+the second Google staging test account chooser; owner selection is still required.
+Actual Bud inference is blocked by the server's explicit “Included AI access is not
+configured yet” denial after a cold-host timeout. No model reply/fallback or public
+activation is claimed. Next setup approval must specifically cover the existing
+OpenAI key to Render staging for capped inference (proposed $1/month accounting
+budget), matching backend deployment, and no production/checkout change. Existing
+speech-only approval is insufficient for this new credential purpose. See
+docs/private-bud-conversations.md for evidence and exact pending actions.
