@@ -438,7 +438,9 @@ class SetupPages(QScrollArea):
             account = self.window.account_dialog
             allowed = {item["id"] for item in account.snapshot.get("workspaces", [])}
             self.workspace = (
-                self.window.workspace_id if self.window.workspace_id in allowed else None
+                self.window.workspace_id
+                if self.window.workspace_id in allowed
+                else account.workspace_id() if account.workspace_id() in allowed else None
             )
             self.original = binding(self.window, self.workspace) if self.workspace else {}
             self.draft = dict(self.original)

@@ -1041,16 +1041,28 @@ class BuildDialog(AppDialog):
             super().closeEvent(event)
 
 
-def open_build(window, task=""):
+def open_build(window, task="", *, bud=None):
     from aedrova.desktop.projects import binding
 
     if task and binding(window).get("background_build"):
-        start_background_build(window, task)
-        return
+        return (
+            start_background_build(window, task, bud=bud)
+            if bud
+            else start_background_build(window, task)
+        )
     existing = getattr(window, "build_dialog", None)
+    if existing and existing.pending:
+        existing.show()
+        existing.raise_()
+        window.notify(
+            "Your agent is already working. Wait or stop it before starting another build."
+        )
+        return False
     if existing and not existing.invalidated:
-        if existing.pending or (
-            existing.workspace == window.workspace_id and not getattr(existing, "teammate", None)
+        if (
+            existing.workspace == window.workspace_id
+            and not getattr(existing, "teammate", None)
+            and getattr(existing, "bud", None) == bud
         ):
             if task and not existing.pending:
                 existing.request.setPlainText(task)
@@ -1063,16 +1075,19 @@ def open_build(window, task=""):
             if task and not existing.pending and saved.get("folder", "") != existing.binding_folder:
                 existing.binding_folder = saved.get("folder", "")
                 existing.repository.setText(existing.binding_folder)
-            return
+            return True
     if existing:
         existing.invalidate()
         if not existing.job:
             existing.deleteLater()
     dialog = BuildDialog(window, task)
-    window.agent_feed.character_config = None
+    dialog.bud = bud
+    from aedrova.desktop.dots import shelf_rows
+
+    window.agent_feed.character_config = shelf_rows([bud])[0]["config"] if bud else None
     window.build_dialog = dialog
     dialog.show()
-    from aedrova.desktop.projects import binding
+    return True
 
 
 def start_background_build(window, task, *, bud=None):

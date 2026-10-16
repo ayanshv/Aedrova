@@ -1,5 +1,6 @@
 """Non-blocking account and workspace administration, separate from sample chat."""
 
+import json
 from pathlib import Path
 from threading import Event
 
@@ -84,6 +85,7 @@ class AccountDialog(AppDialog):
         self.service = None
         self.busy = False
         self.pending_intent = None
+        self.creation_workspace = None
         self.oauth_cancel = None
         self.awaiting_sign_in_snapshot = False
         QApplication.instance().aboutToQuit.connect(self.cancel_google)
@@ -399,7 +401,7 @@ class AccountDialog(AppDialog):
             self.onboarding_steps.addWidget(panel)
             return column
 
-        first = step("STEP 1 OF 2", "A space for your team.", "What would you like to call it?")
+        first = step("STEP 1 OF 3", "A space for your team.", "What would you like to call it?")
         self.onboarding_workspace = self.field("e.g. Northstar Labs")
         self.onboarding_workspace.setMaxLength(80)
         self.onboarding_workspace.setMinimumHeight(48)
@@ -426,7 +428,7 @@ class AccountDialog(AppDialog):
         first.addStretch()
 
         second = step(
-            "STEP 2 OF 2",
+            "STEP 2 OF 3",
             "Meet your agent.",
             "Give your team's building partner a name. You can change it later.",
         )
@@ -438,10 +440,10 @@ class AccountDialog(AppDialog):
         second.addWidget(label("Powered by", "muted"))
         self.onboarding_provider = self.provider_choice()
         second.addWidget(self.onboarding_provider)
-        self.finish_onboarding = button("Create workspace", role="primary")
-        self.finish_onboarding.setMinimumHeight(48)
-        self.finish_onboarding.clicked.connect(self.complete_onboarding)
-        second.addWidget(self.finish_onboarding)
+        self.provider_continue = button("Continue", role="primary")
+        self.provider_continue.setMinimumHeight(48)
+        self.provider_continue.clicked.connect(self.review_ai_setup)
+        second.addWidget(self.provider_continue)
         back = button("Back")
         back.clicked.connect(lambda: self.onboarding_steps.setCurrentIndex(0))
         second.addWidget(back)
@@ -503,6 +505,52 @@ class AccountDialog(AppDialog):
         invitations.addWidget(self.invite_dashboard)
         invitations.addWidget(label("You can invite more people anytime.", "muted"))
         invitations.addStretch()
+
+        # Keep existing ready/invitation indices stable; creation visits this
+        # required review before either independent Space or subspace is written.
+        self.ai_review_step = self.onboarding_steps.count()
+        review = step(
+            "STEP 3 OF 3",
+            "How should your agent work?",
+            "Choose how builds run on this computer. You can change it later.",
+        )
+        # Let the surrounding scroll area scroll on short screens instead of
+        # squeezing wrapped disclosures and actions into overlapping rows.
+        review.parentWidget().setMinimumHeight(560)
+        review.addWidget(label("Model", "section"))
+        self.onboarding_model = label("", "muted", wrap=True)
+        review.addWidget(self.onboarding_model)
+        review.addWidget(label("Build workflow · this computer", "section"))
+        self.onboarding_workflow = ChoiceBox()
+        self.onboarding_workflow.setAccessibleName("AI build workflow")
+        self.onboarding_workflow.addItem("Plan and execute in the background", True)
+        self.onboarding_workflow.addItem("Review the plan before building", False)
+        review.addWidget(self.onboarding_workflow)
+        self.onboarding_permission = label("", "muted", wrap=True)
+        review.addWidget(self.onboarding_permission)
+        review.addWidget(
+            label(
+                "Applying to original files and publishing still need approval. "
+                "Connect a project before building.",
+                "muted",
+                wrap=True,
+            )
+        )
+        self.onboarding_ack = QCheckBox("I’ve reviewed and allow this AI setup")
+        review.addWidget(self.onboarding_ack)
+        self.finish_onboarding = button("Create workspace", role="primary")
+        self.finish_onboarding.setMinimumHeight(48)
+        self.finish_onboarding.setEnabled(False)
+        self.finish_onboarding.clicked.connect(self.complete_onboarding)
+        review.addWidget(self.finish_onboarding)
+        back_ai = button("Back", role="outline")
+        back_ai.clicked.connect(lambda: self.onboarding_steps.setCurrentIndex(1))
+        review.addWidget(back_ai)
+        review.addStretch()
+        self.onboarding_ack.toggled.connect(self.finish_onboarding.setEnabled)
+        self.onboarding_workflow.currentIndexChanged.connect(self.update_ai_review)
+        self.onboarding_provider.currentIndexChanged.connect(self.update_ai_review)
+        self.update_ai_review()
         self.add_page(page)
 
         join_page = QWidget()
@@ -655,9 +703,13 @@ class AccountDialog(AppDialog):
 
     def begin_onboarding(self):
         self.pending_intent = None
+        self.creation_workspace = None
         self.onboarding_workspace.clear()
         self.onboarding_nickname.setText("Aedrova")
         self.onboarding_provider.setCurrentIndex(0)
+        self.onboarding_workflow.setCurrentIndex(0)
+        self.onboarding_ack.setChecked(False)
+        self.finish_onboarding.setText("Create workspace")
         self.onboarding_steps.setCurrentIndex(0)
         self.pages.setCurrentIndex(2)
         self.status.setText("Let's make room for your team.")
@@ -670,7 +722,34 @@ class AccountDialog(AppDialog):
             return
         self.onboarding_steps.setCurrentIndex(1)
         self.onboarding_nickname.setFocus()
-        self.status.setText("One last detail. Then you're ready.")
+        self.status.setText("Choose your team’s AI provider.")
+
+    def update_ai_review(self, *_):
+        from aedrova.agents.managed import ai_access_mode
+
+        self.onboarding_ack.setChecked(False)
+        provider = self.onboarding_provider.currentText()
+        self.onboarding_model.setText(
+            provider + " · Aedrova’s approved model and your plan’s usage limits."
+            if ai_access_mode() == "included"
+            else provider
+            + " · your provider’s default model, using your existing provider sign-in."
+        )
+        self.onboarding_permission.setText(
+            "Explicit build requests can share accessible workspace context with this provider "
+            "and run plans, isolated edits and sandboxed tests. Usage may be billed."
+            if self.onboarding_workflow.currentData()
+            else "Build requests open a plan for your review. Context is shared only when you "
+            "authorize the workflow. Automatic execution stays off."
+        )
+
+    def review_ai_setup(self):
+        if not self.onboarding_nickname.text().strip():
+            self.status.setText("Give your agent a name first.")
+            return
+        self.update_ai_review()
+        self.onboarding_steps.setCurrentIndex(self.ai_review_step)
+        self.status.setText("Review your AI setup before creating the workspace.")
 
     def show_simple_invite(self):
         if not self.workspace_id():
@@ -688,10 +767,37 @@ class AccountDialog(AppDialog):
             self.status.setText("Choose or create a workspace before opening your dashboard.")
             self.refresh()
             return
+        if self.service and self.service.user:
+            from aedrova.desktop.projects import binding_key
+
+            try:
+                data = json.loads(
+                    self.settings.value(
+                        binding_key(str(self.service.user.id), self.workspace_id()), "{}"
+                    )
+                )
+            except (ValueError, TypeError):
+                data = {}
+            if not isinstance(data, dict):
+                data = {}
+            if data.get("ai_setup_pending"):
+                self.creation_workspace = self.workspace_id()
+                self.onboarding_nickname.setText(data.get("agent_nickname", "Aedrova"))
+                self.onboarding_provider.setCurrentIndex(
+                    self.onboarding_provider.findData(data.get("provider", "codex"))
+                )
+                self.onboarding_workflow.setCurrentIndex(
+                    self.onboarding_workflow.findData(bool(data.get("background_build")))
+                )
+                self.pages.setCurrentIndex(2)
+                self.review_ai_setup()
+                self.finish_onboarding.setText("Finish AI setup")
+                self.status.setText("This workspace exists. Finish its AI setup to continue.")
+                return
         self.pending_intent = None
         self.generated_code.clear()
-        self.dashboard_requested.emit()
         self.accept()
+        self.dashboard_requested.emit()
 
     def finish_setup(self):
         self.pending_intent = None
@@ -703,6 +809,12 @@ class AccountDialog(AppDialog):
         self.status.setText("You’re all set.")
 
     def complete_onboarding(self):
+        if self.busy:
+            return
+        if not self.onboarding_ack.isChecked():
+            self.review_ai_setup()
+            self.status.setText("Review and allow your AI setup before creating the workspace.")
+            return
         name = self.onboarding_workspace.text().strip()
         nickname = self.onboarding_nickname.text().strip()
         if (
@@ -715,9 +827,33 @@ class AccountDialog(AppDialog):
                 "Add a workspace name. Nicknames can use letters, numbers, spaces, - or _."
             )
             return
+        from aedrova.agents.managed import ai_access_mode
+
+        configuration = {
+            "provider": self.onboarding_provider.currentData(),
+            "model_policy": "managed" if ai_access_mode() == "included" else "provider_default",
+            "background_build": bool(self.onboarding_workflow.currentData()),
+            "auto_plan": bool(self.onboarding_workflow.currentData()),
+            "ai_setup_version": 1,
+            "agent_nickname": nickname,
+        }
+        if self.creation_workspace:
+            self.mutate(
+                "set_agent_preferences",
+                {
+                    "p_workspace": self.creation_workspace,
+                    "p_nickname": nickname,
+                    "p_provider": configuration["provider"],
+                },
+                configuration=configuration,
+                created_workspace=self.creation_workspace,
+            )
+            return
         if self.space_parent.currentData():
             self.mutate(
-                "create_subspace", {"p_parent": self.space_parent.currentData(), "p_name": name}
+                "create_subspace",
+                {"p_parent": self.space_parent.currentData(), "p_name": name},
+                configuration=configuration,
             )
             return
         self.mutate(
@@ -727,6 +863,7 @@ class AccountDialog(AppDialog):
                 "p_nickname": nickname,
                 "p_provider": self.onboarding_provider.currentData(),
             },
+            configuration=configuration,
         )
 
     def workspace_id(self):
@@ -907,7 +1044,7 @@ class AccountDialog(AppDialog):
                 item.setData(Qt.ItemDataRole.UserRole, value)
                 widget.addItem(item)
 
-    def mutate(self, name, parameters):
+    def mutate(self, name, parameters, *, configuration=None, created_workspace=None):
         if any(value is None for value in parameters.values()):
             self.status.setText("Choose a workspace first.")
             return
@@ -916,9 +1053,24 @@ class AccountDialog(AppDialog):
         invitation_step = (
             self.pages.currentIndex() == 2 and self.onboarding_steps.currentIndex() == 3
         )
+        creator = str(self.service.user.id) if configuration else None
 
         def operation():
             value = self.service.rpc(name, parameters)
+            if name == "create_subspace" and configuration:
+                try:
+                    self.service.rpc(
+                        "set_agent_preferences",
+                        {
+                            "p_workspace": value,
+                            "p_nickname": configuration["agent_nickname"],
+                            "p_provider": configuration["provider"],
+                        },
+                    )
+                except Exception:
+                    # Creation already succeeded. Retain its ID and retry setup,
+                    # never issue another create after a preference failure.
+                    configuration["ai_setup_pending"] = True
             try:
                 snapshot = self.service.snapshot()
             except Exception:
@@ -928,14 +1080,38 @@ class AccountDialog(AppDialog):
 
         def completed(result):
             value, snapshot = result
+            if configuration:
+                from aedrova.desktop.projects import binding_key
+
+                value = created_workspace or value
+                self.creation_workspace = value
+                key = binding_key(creator, value)
+                try:
+                    stored = json.loads(self.settings.value(key, "{}"))
+                    if not isinstance(stored, dict):
+                        stored = {}
+                except (ValueError, TypeError):
+                    stored = {}
+                stored.update(configuration)
+                stored["ai_setup_pending"] = bool(configuration.get("ai_setup_pending"))
+                if stored["ai_setup_pending"]:
+                    stored["background_build"] = False
+                    stored["auto_plan"] = False
+                self.settings.setValue(key, json.dumps(stored))
+                self.settings.sync()
+                local_error = self.settings.status() != QSettings.Status.NoError
+            else:
+                local_error = False
             if snapshot is not None:
                 self.loaded(snapshot)
-                if name not in ("onboard_workspace", "accept_invitation"):
+                if name not in ("onboard_workspace", "accept_invitation") and not configuration:
                     self.pages.setCurrentIndex(previous_page)
             else:
                 self.clear_connected()
-            if name in ("onboard_workspace", "accept_invitation") or (
-                name == "set_workspace_archived" and parameters["p_archived"] is False
+            if (
+                configuration
+                or name in ("onboard_workspace", "accept_invitation")
+                or (name == "set_workspace_archived" and parameters["p_archived"] is False)
             ):
                 index = self.workspaces.findData(value)
                 if index >= 0:
@@ -952,8 +1128,10 @@ class AccountDialog(AppDialog):
                 )
             else:
                 self.status.setText("Saved. Your workspace access is up to date.")
-                if name == "onboard_workspace":
-                    self.ready_summary.setText(parameters["p_name"])
+                if name == "onboard_workspace" or configuration:
+                    self.ready_summary.setText(
+                        parameters.get("p_name", self.onboarding_workspace.text().strip())
+                    )
                     self.pages.setCurrentIndex(2)
                     self.onboarding_steps.setCurrentIndex(2)
                     self.status.setText("Workspace created. Invite your team now or do it later.")
@@ -966,9 +1144,19 @@ class AccountDialog(AppDialog):
                     )
 
             if snapshot is None:
+                if configuration:
+                    self.pending_workspace = value
                 self.status.setText(
                     "Saved successfully. Refresh workspace settings to load the latest details; "
                     "do not create it again."
+                )
+            if configuration and (configuration.get("ai_setup_pending") or local_error):
+                self.pages.setCurrentIndex(2)
+                self.onboarding_steps.setCurrentIndex(self.ai_review_step)
+                self.finish_onboarding.setText("Retry AI setup")
+                self.status.setText(
+                    "Your workspace was created. AI setup hasn’t finished. Retry setup here; "
+                    "this will not create another workspace."
                 )
 
         self.run(operation, completed)

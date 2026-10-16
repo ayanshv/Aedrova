@@ -11,8 +11,12 @@ remain unchanged. The owner-supplied proposal is preserved in release-plan-sourc
 ## Current repair roadmap — October 15, 2026
 
 Step 2 responsiveness implementation and real hosted OpenAI conversational acceptance
-are delivered. Credential rotation before broader testing and optional Claude funding
-remain owner actions; production and installer acceptance are separate. See [Step 2 evidence and final setup checklist](ai-responsiveness-step-2.md).
+are delivered. Owner elected to retain the existing key after the exposure notice;
+the mitigation and remaining limitation are documented in
+[Step 3](workspace-ai-setup-step-3.md). Optional Claude funding, production and
+installer acceptance remain separate. Step 3 desktop creation/consent and dashboard
+dismissal are implemented; website/API-wide enforcement is outside this batch.
+See [Step 2 evidence](ai-responsiveness-step-2.md).
 
 The owner authorized Step 1 inventory only of the new repair roadmap. See the
 [complete current baseline](release-baseline-2026-10-15.md) and its

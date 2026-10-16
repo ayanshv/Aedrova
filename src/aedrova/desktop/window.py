@@ -986,8 +986,13 @@ class AedrovaWindow(QMainWindow):
             )
             if building:
                 from aedrova.desktop.builds import start_background_build
+                from aedrova.desktop.projects import binding
 
-                accepted = start_background_build(self, request, bud=dot)
+                accepted = (
+                    open_build(self, request, bud=dot)
+                    if binding(self).get("background_build") is False
+                    else start_background_build(self, request, bud=dot)
+                )
             else:
                 accepted = start_analysis(self, text, bud=dot)
             if accepted:
@@ -1023,16 +1028,19 @@ class AedrovaWindow(QMainWindow):
         task = build_command(text, nickname) or (text if dot and building else None)
         if task is None:
             return False
-        if text.lstrip().startswith("/build"):
-            open_build(self, task)
+        from aedrova.desktop.projects import binding
+
+        if text.lstrip().startswith("/build") or binding(self).get("background_build") is False:
+            accepted = open_build(self, task)
         else:
             from aedrova.desktop.builds import start_background_build
 
-            if start_background_build(self, task):
-                for composer in (self.composer, self.thread_composer):
-                    if composer.editor.toPlainText().strip() == text.strip():
-                        composer.clear()
-                self._save_drafts()
+            accepted = start_background_build(self, task)
+        if accepted:
+            for composer in (self.composer, self.thread_composer):
+                if composer.editor.toPlainText().strip() == text.strip():
+                    composer.clear()
+            self._save_drafts()
         return True
 
     def _local_message(self, identifier):

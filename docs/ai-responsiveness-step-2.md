@@ -158,3 +158,10 @@ installer or public release. Step 3 is not started.
 
 The earlier pending-activation checklist above is historical and superseded by
 this successful deployment record and these final owner actions.
+
+October 15 follow-up: the owner explicitly requested retaining the existing key.
+No replacement/revocation occurred. Runtime cleanup and repository/artifact scans
+are recorded in workspace-ai-setup-step-3.md; the prior transcript cannot be
+erased by these measures. The rotation recommendation above is historical advice,
+not an outstanding owner task for this source batch. Step 3 is now implemented
+locally; production and installed builds remain separate.

@@ -2205,3 +2205,25 @@ exposed it in an automation DOM snapshot, update the staging AI/speech settings 
 private local file, deploy and revoke old key; fund Claude only if enabling it.
 No secret value is stored in tracked documents. Current source workers passed;
 older installed binaries are not silently upgraded or certified as release builds.
+
+## October 15 — repair roadmap Step 3 and retained-key decision
+
+Owner approved Step 3 and requested mitigation of the Render snapshot mistake
+without generating new keys. Existing key remains unchanged; automation runtime
+reset and exact-byte desktop tracked-file/Step 2 artifact scans completed. No copy
+found in those files. Prior tool output cannot be erased; exposure is not reversed.
+No Render settings, credentials, deployment or purchases changed in this batch.
+Owner elected to retain the key; original rotation advice is not an outstanding
+action for this source batch. Full record: docs/workspace-ai-setup-step-3.md.
+
+Desktop creation now requires provider/model-policy and execution review with
+acknowledgement. Account/computer-scoped workflow settings are persisted; main/Bud
+manual build requests open review without automatic execution. Subspace partial
+failure retries preferences without duplicate creation. Go to Dashboard closes
+before activation triggers a refresh, and the introductory profile retains its
+authorized workspace. Compact/light/dark review inspected. Existing workspaces,
+website and backend creation APIs are not newly migrated or server-gated.
+
+Final desktop suite 835 passed; Ruff/diff passed. No new live workspace creation
+or signed installer certification claimed. No owner action required now. Step 4
+requires owner approval; production promotion and release gates remain separate.
