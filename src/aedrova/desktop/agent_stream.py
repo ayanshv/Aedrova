@@ -315,3 +315,15 @@ class AgentStream(QScrollArea):
     def finish_with_result(self, text):
         self.clear()
         self.appendPlainText(text)
+
+    def set_reply(self, text):
+        """Update a single streaming response without adding activity-log rows."""
+        if not getattr(self, "reply_row", None) or self.reply_row not in self.rows:
+            self.reply_row = ActivityRow(
+                text, author=self.author_name, character_config=self.character_config
+            )
+            self.add_row(self.reply_row)
+        else:
+            self.reply_row.summary = text
+            self.reply_row.message.setText(text)
+            self.changed.emit()

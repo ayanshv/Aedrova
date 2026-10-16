@@ -141,7 +141,8 @@ def retrieve(api, context, task, runner, provider, project, emit, *, bud_id=None
     original_emit = runner.emit
     try:
         runner.emit = lambda _event: None
-        selected = calls_from_model(runner.run(provider, project, prompt, plan=True), connected)
+        answer = getattr(runner, "answer", runner.run)
+        selected = calls_from_model(answer(provider, project, prompt, plan=True), connected)
     finally:
         runner.emit = original_emit
         runner.command_results = []

@@ -96,6 +96,11 @@ class ManagedClient:
                     json=body,
                 )
             data = response.json()
+        except httpx.TimeoutException as exc:
+            raise RuntimeError(
+                "Aedrova’s AI service is taking longer to wake up. Please retry in a moment. "
+                "No local provider fallback was started."
+            ) from exc
         except (httpx.HTTPError, ValueError) as exc:
             raise RuntimeError(
                 "Could not reach Aedrova’s included AI service. No local provider "
@@ -104,6 +109,11 @@ class ManagedClient:
         if response.status_code != 200:
             message = data.get("error") if isinstance(data, dict) else None
             if isinstance(message, str) and self._access_token not in message:
+                if message == "Included AI access is not configured yet.":
+                    raise RuntimeError(
+                        "Your team’s AI service hasn’t been enabled yet. "
+                        "Ask your workspace owner to finish AI setup. Your chats still work."
+                    )
                 raise RuntimeError(message[:350])
             raise RuntimeError("Aedrova could not authorize this workspace’s included AI.")
         return data
@@ -115,7 +125,9 @@ class ManagedClient:
 
     def begin(self, workspace, provider, request_id):
         result = self.request(
-            "/api/runs", {"workspace": workspace, "provider": provider, "request_id": request_id}
+            "/api/runs",
+            {"workspace": workspace, "provider": provider, "request_id": request_id},
+            timeout=90,
         )
         suffix = "/gateway/" + provider + ("/v1" if provider == "codex" else "")
         if (

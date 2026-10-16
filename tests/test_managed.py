@@ -39,11 +39,11 @@ def access():
 
 def test_managed_begin_validates_gateway_and_hides_opaque_credentials(monkeypatch):
     client = ManagedClient("https://aedrova.example", "private-session")
-    monkeypatch.setattr(client, "request", lambda *a: access())
+    monkeypatch.setattr(client, "request", lambda *a, **kw: access())
     build = client.begin("space", "codex", "request")
     assert build.token == "t" * 64 and build.token not in repr(build)
     forged = access() | {"base_url": "https://attacker.example/gateway/codex/v1"}
-    monkeypatch.setattr(client, "request", lambda *a: forged)
+    monkeypatch.setattr(client, "request", lambda *a, **kw: forged)
     with pytest.raises(RuntimeError, match="invalid"):
         client.begin("space", "codex", "request")
 

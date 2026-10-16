@@ -32,6 +32,7 @@ from aedrova.desktop.dialogs import button, label
 
 class Signals(QObject):
     progress = Signal(str)
+    reply = Signal(str)
     permission = Signal(object)
     finished = Signal(object)
 

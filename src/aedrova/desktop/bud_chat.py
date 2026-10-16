@@ -327,12 +327,28 @@ class BudChat(AppDialog):
                 include_workspace=include_workspace,
             )
             self.job = job
+            self.reply_preview = None
             self.waiting(True)
             self.stop.show()
+            job.signals.reply.connect(lambda text: self.preview_reply(job, text))
             job.signals.finished.connect(lambda result: self.answered(question, result))
             QThreadPool.globalInstance().start(job)
 
         self.request(self.service.fork_for_context, ready)
+
+    def preview_reply(self, job, text):
+        if not self.current() or self.job is not job or job.runner.cancelled.is_set():
+            return
+        if self.reply_preview is None:
+            self.reply_preview = ActivityRow(
+                text,
+                author=self.bud["name"],
+                character_config=shelf_rows([self.bud])[0]["config"],
+            )
+            self.rows.addWidget(self.reply_preview)
+        else:
+            self.reply_preview.message.setText(text)
+        self.status.setText("Replying…")
 
     def answered(self, question, result):
         cancelled = self.job.runner.cancelled.is_set()
@@ -342,6 +358,7 @@ class BudChat(AppDialog):
             return
         self.waiting(False)
         if cancelled or result.get("error"):
+            self.render()  # Partial replies are not saved or presented as completed answers.
             self.status.setText("Reply stopped." if cancelled else result["text"])
             self.retry.show()
             return

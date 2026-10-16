@@ -1011,7 +1011,7 @@ class AedrovaWindow(QMainWindow):
                 re.IGNORECASE,
             )
         )
-        if (dot or (task is not None and rows)) and not building:
+        if (dot or task is not None) and not building:
             from aedrova.desktop.dot_analysis import start_analysis
 
             if start_analysis(self, task or text):

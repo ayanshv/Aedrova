@@ -2157,3 +2157,34 @@ No runtime/account/credential/schema/deployment/billing/signing changes performe
 No owner action required for Step 1; later conditional actions are consolidated in
 the baseline. Next batch is Step 2 AI routing and capped provider availability,
 pending owner approval. Historical Beta phases retain their separate numbering.
+
+## October 15 — repair roadmap Step 2 implementation and provider evidence
+
+Owner approved AI responsiveness and availability, with personal actions collected
+at the end. Implemented the no-Buds main greeting routing fix; source-free answers
+skip evidence/tool discovery and use lightweight fresh membership checks. Included
+read-only inference uses the existing metered gateway directly, with no coding CLI,
+tools, silent retries or personal fallback. General responses stream as one message;
+source-backed results remain withheld until access/citation rechecks. Bud identity,
+personality, private-history opt-in, existing build execution and plan caps remain.
+
+Existing OpenAI and Anthropic model/key lookup passed. Real loopback OpenAI inference
+and actual desktop main/Bud QueryJobs passed (0.84s/1.85s completion in the observed
+integration test); zero reservations remain. Synthetic auth and isolated SQLite
+were used: this is not hosted Supabase/production acceptance. Anthropic real
+inference was rejected for insufficient provider credit balance. Staging live health
+confirms gateway disabled; Render still deploys e375bdc on its sleeping free host.
+Do not label hosted AI restored or Step 2 fully accepted yet.
+
+Validation: full desktop suite 824 passed before the final lightweight inventory
+change; final focused routing/identity/context/Bud/managed suites 131 passed after
+that change. Backend gateway/budget/provider/shared-space suites 64 passed; final
+Ruff/diff checks passed. No SQL migration required. Server config overlay validated
+privately without upload/deployment; production, checkout and release mode unchanged.
+
+Consolidated owner actions and exact staging secret/settings destination are at the
+end of docs/ai-responsiveness-step-2.md. Specific inference key-transfer/deployment
+approval remains required; use existing Free allowance/owner activation and valid
+staging login for hosted tests. Claude funding is separate and optional for OpenAI.
+Step 3 remains unstarted. Website configuration proposal:
+deploy/staging-ai.env.example in the Aedrova-website repository.

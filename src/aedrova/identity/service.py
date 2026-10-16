@@ -727,6 +727,24 @@ class IdentityService:
         self._authenticated()
         return self.client.rpc("context_revision", {"p_channel": channel}).execute().data
 
+    def conversation_snapshot(self, workspace):
+        """Fresh RLS-backed membership without enumerating channels or their content."""
+        self._authenticated()
+        return {
+            "workspaces": self.client.table("workspaces")
+            .select("id")
+            .eq("id", workspace)
+            .execute()
+            .data,
+            "members": self.client.table("workspace_members")
+            .select("workspace_id,user_id,role")
+            .eq("workspace_id", workspace)
+            .eq("user_id", str(self.user.id))
+            .execute()
+            .data,
+            "channels": [],
+        }
+
     def context_snapshot(self, workspace, cancelled=lambda: False):
         """Scoped inventory with keyset paging instead of dashboard row ceilings."""
         self._authenticated()
