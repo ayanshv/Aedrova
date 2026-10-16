@@ -2327,3 +2327,27 @@ prepared sequentially before an exact personal handoff. GitHub's initial identit
 prompt resolved without owner intervention. Stripe business/bank setup remains
 deferred; Step 7 and production/installers not started. Evidence and boundaries:
 docs/connector-certification-step-6.md.
+
+
+## October 15–16 — Step 6 live read/disconnect acceptance
+
+GitHub/Supabase/Figma/Notion passed real staging OAuth callbacks, named-resource
+selection and provider reads, local disconnect and denial afterward. GitHub also
+passed fresh reconnect. Only disposable staging grants used; all four removed.
+Found web Google handoff missing OpenID scopes; a55cf9d fixed it and deployed Live.
+Found Notion app user/email access enabled; reduced to No user information, kept
+Read content, reloaded real consent shows page-only access. Cancellation recovery
+fix 6a3cc90 replaces misleading generic permission error with branded cancellation
+copy while retaining failed-state/cookie handling. Backend 528 passed, Ruff/diff pass.
+
+Instagram/TikTok reach real login but need owner test-account sessions. Exact
+actions are in connector-certification-step-6.md and final handoff. Stripe/Vercel/
+Search correctly reject setup-incomplete requests; no purchase or provider setup
+fabricated. Live renewal/provider-global revocation and fresh cross-account tests
+remain unaccepted. Step 6 is not all-nine launch certification. Step 7 needs next
+owner approval with these external gates explicitly outstanding.
+
+Final staging build 6a3cc90 is Live (Render reports deploy succeeded, 1m03s).
+Cancellation recovery is verified by controlled browser-route regressions; reusing
+the earlier live cancellation URL still returned 403 and is not acceptance of a
+fresh successful cancellation. No claim that stale/replayed proofs are accepted.

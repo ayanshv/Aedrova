@@ -1,136 +1,106 @@
-# Repair roadmap Step 6 — connector certification
+# Repair roadmap Step 6 — live connector acceptance
 
-October 15, 2026. **In progress; not certified for launch.** Owner approved this
-batch and requested personal interventions only at the final handoff. No new key,
-paid plan, production change or provider permission expansion was performed.
+October 15–16, 2026. **Core four accepted for scoped reads and local disconnect;
+all-nine launch certification remains open.** Production and installers unchanged.
 
-## Current live environment
+## Live results
 
-Fresh native Google PKCE sign-in and authenticated staging catalog/grant queries
-passed against aedrova-beta-staging.onrender.com. Public health returned HTTP 200,
-managed AI enabled and checkout disabled. The earlier cold-host query was
-incomplete, not a provider authorization failure. The separate existing connector
-host also returned health HTTP 200. Tokens were not sent between environments.
+Tested the real staging service using native Google PKCE and the named synthetic
+workspace Beta isolation 1 eb8958 / TikTok staging audit Bud. Tokens stayed in
+memory or encrypted on the server; reports contain no returned account contents.
 
-Render now shows da30ebf390627f0d289896b58a125b6035008431 /
-dep-db8s0huq1p3s7396bdfg Live after the specifically approved setup.
-All four staging callbacks were saved and re-read, retaining existing callbacks.
-The eight existing client ID/secret values were copied privately from ignored
-website .env.dots into staging; 34 existing variables were retained (42 total).
-No new key, broader scope, paid plan or production change. Fresh native Google
-PKCE and authenticated catalog queries passed: GitHub, Supabase, Figma, Notion,
-Instagram and TikTok now report OAuth available. Stripe/Vercel/Search remain
-unconfigured. Health HTTP 200, managed AI true, checkout false.
-Readiness evidence is in ignored
-work/connector-step-6/readiness.json; no provider secrets or account content are
-in that report. The named synthetic staging workspace currently has no active
-connector grants. Historical connections do not certify fresh lifecycle behavior.
+- GitHub: real OAuth callback; discovery returned only installed ayanshv/Aedrova.
+  Selection verified repository, commits, issues and deployments through actual
+  provider reads. Local disconnect passed; subsequent repository read denied.
+  Fresh OAuth/reselection then returned Connected; final cleanup disconnected it.
+- Supabase: real OAuth callback with existing Aedrova organization Projects READ.
+  Discovery listed projects, selected only Aedrova Staging. Actual project health/
+  region read passed. Local disconnect passed; subsequent project read denied.
+- Notion: real OAuth callback, discovery returned only Aedrova connector validation.
+  Actual page/immediate-block read passed. Local disconnect passed; later read denied.
+  Found shared OAuth app unnecessarily enabled user profiles/emails. Selected No
+  user information, preserving Read content and disabled writes/comments. Reloaded
+  provider consent now offers only View pages you select. Existing page selection
+  retained; no personal parent page selected or content read. This is a reduction
+  to the existing provider app's capabilities; no production server deployment.
+- Figma: real OAuth callback and scoped design read passed for the existing Bud
+  configuration prototype (Untitled). Local disconnect passed; later design read
+  denied. A file link is still required after login because file discovery is not
+  offered by this implementation. Attempt to create a disposable file hit Figma's
+  free file limit; no upgrade, payment, creation or deletion performed.
+- Instagram: fresh staging start and actual Instagram login page reached with
+  instagram_business_basic. No signed-in session in the connected browser, so no
+  fresh callback/profile/media read claimed. Historical Oct 14 reads remain prior
+  evidence only; public review, renewal and revocation remain open.
+- TikTok: fresh staging start and actual TikTok login page reached with
+  user.info.basic/video.list and PKCE. No current signed-in sandbox test session;
+  no fresh callback/profile/video read claimed. Did not retry the historical
+  attempt-limit error or bypass it. Public review/lifecycle acceptance remains open.
+- Stripe/Vercel/managed Search: authenticated live connection attempts rejected
+  with accurate owner setup hints. Missing credentials/provider registration or
+  Brave Search setup remain blockers. Stripe bank/business work stays deferred
+  until release. No false connected status, new subscription or purchase.
 
-## All nine connectors
+Local disconnect deletes Aedrova's grant and blocks its tool reads; it does NOT
+uninstall the provider app or revoke every provider-side token. Returned
+provider_revoked=false is accurate. Global provider uninstall was not performed,
+because it could disrupt existing non-staging grants. Forced live token expiry/
+refresh and a fresh cross-account test were not performed in this batch; controlled
+regressions cover token rotation, expiry, foreign-account denial and races.
 
-- **GitHub:** adapter and lifecycle tests pass; existing local client ID/secret
-  present. Staging callback/credential setup is now saved and deployed, and the
-  authenticated catalog reports OAuth available. Fresh
-  installation/resource discovery, real reads, renewal and revocation remain open.
-- **Supabase:** staging callback/credential setup completed; OAuth available.
-  Keep projects:read only; no SQL, database rows or project keys. Historical health
-  reads on the separate connector service do not certify this staging environment.
-- **Figma:** staging callback/credential setup completed; OAuth available. Keep
-  file_content:read. A file link remains required after provider consent because
-  current discovery cannot enumerate arbitrary accessible files. Do not invent IDs
-  or silently grant all files. Fresh file read/renewal/revoke checks remain open.
-- **Notion:** staging callback/credential setup completed; OAuth available. Keep Read
-  content only and the existing dedicated validation page. Do not select a personal
-  parent page or broaden installation access. Fresh named-page discovery, read,
-  refresh, disconnect/reconnect and provider revocation remain open.
-- **Instagram:** staging OAuth available; prior October 14 @aedrova_ai tester grant
-  and profile/media reads passed. A fresh OAuth start passed today, but its provider
-  page was not opened after the shared web sign-in handoff stalled. No fresh grant,
-  renewal/revocation or public App Review acceptance is claimed. Preserve the
-  professional tester and instagram_business_basic scope only.
-- **TikTok:** staging OAuth available; one fresh start passed. The web handoff
-  stalled at Google's loading account chooser before reaching TikTok. No repeated
-  TikTok authorization, new tester or quota bypass was attempted. The historical
-  @aedrova sandbox/account-attempt restriction remains unresolved by this check.
-  Fresh callback/profile/video/renewal/revocation still need acceptance.
-- **Stripe:** staging unavailable; connector client pair absent locally. Developer
-  external-test readiness/install link was previously blocked. Owner explicitly
-  deferred business/bank setup until packaging/release; no request to complete it
-  now, no fabricated credentials, and no transaction. A verified customer account
-  alone does not establish the developer app's readiness.
-- **Vercel:** staging unavailable; client pair absent locally. Prior integration
-  registration was prepared but not submitted. Owner/legal identity, provider
-  agreement and actual integration/slug remain gates. No new terms accepted.
-- **Managed Search:** staging unavailable and Brave key absent locally. The normal
-  customer flow is Enable web search, not an OAuth login. Provider subscription/key
-  and funded usage need owner setup before real acceptance. No subscription or
-  charge was started; existing global/workspace daily caps remain intact.
+## Fixes and validation
 
-## Source fixes and regression evidence
+1. Web Google handoff omitted OpenID scope compared with working native sign-in.
+   Added standard openid/email/profile scopes, retaining PKCE, cookies and identity
+   checks. The product's subsequent browser sign-in returned to staging; fresh
+   connector states reached actual providers. An earlier consumed state correctly
+   rejected reuse. a55cf9d deployed Live as dep-db8s578n74is73cknu6g.
+2. Notion app capabilities narrowed as described above; reloaded consent verified.
+3. User cancellation showed generic Forbidden/account-permission instructions.
+   Added branded cancellation recovery: no new access added, return to account.
+   Failed state and proof-cookie deletion remain enforced. Invalid/replayed grants
+   remain denied. Regression verifies cancellation cannot become Connected.
+   Source 6a3cc90 is Live (Render deploy succeeded, 1m03s). Recovery is verified
+   by controlled route regressions; reloading the earlier live cancellation URL
+   still returned 403. Fresh valid live cancellation needs separate acceptance;
+   stale/replayed proof remains denied.
 
-Backend token-exchange errors now preserve intentional authorization denials:
-Denied inherits ValueError and was being caught and relabeled as a generic outage
-in the account-exchange helper. HTTP 429 now reports provider rate limiting;
-server failures report temporary unavailability rather than suggesting a lost
-grant. Provider response/error payloads remain withheld. These changes do not add
-automatic exchange retries, which could consume one-use codes or rotating tokens.
+Full backend suite **528 passed** after both code changes; focused 108 passed
+before cancellation change; Ruff/diff passed. The local helper mistakenly sent
+four GitHub tool calls where API allows at most three; server correctly rejected
+that request. This was a test-harness error, not a product bug. GitHub's successful
+selection had already verified all four tools on the server. No limits relaxed.
 
-TikTok accepts equivalent comma/space-delimited read-only scopes while still
-rejecting broader or missing scopes. Server setup hints no longer suggest hidden
-manual token controls removed from the customer UI in Step 5.
+Four successful test grants were disconnected. Native test session signed out and
+private authorization URL files removed. Abandoned pending states expire under
+the existing ten-minute policy. No new credential, permission expansion, hosting
+charge, production promotion or installer release. Docs/source pushed to GitHub.
 
-Added catalog-wide grant tests for all nine adapters: encrypted storage, owner
-reads, foreign-account denial, version change, reconnect replacing old grants,
-disconnect and expiry. Provider responses are synthetic in these tests. Existing
-OAuth tests cover fixed hosts, CSRF/browser proof, PKCE where supported, encrypted
-state, scope checks, discovery, actual adapter read requirements and token renewal
-boundaries. They are not evidence of real provider grants or publication.
+Private ignored evidence: work/connector-step-6/live-batch.json,
+notion-page-only.jpg, staging-deployed.jpg and final deployment screenshot.
+OAuth status fields in helper report reflect the latest reconnect start, not the
+older successful selection; selected_read_verification/read_tools and disconnect
+fields record the completed reads. Notion/Supabase/Figma repeat-reconnect consent
+was not completed a second time. Only GitHub reconnect was fully accepted live.
 
-Full website/backend suite: **528 passed** after the final setup-copy cleanup.
-Ruff/diff checks pass. Desktop source
-unchanged in this batch; Step 5's 857/77 desktop results remain its evidence.
+## Owner actions and next step
 
-Temporary native test sessions were signed out and private login/authorization
-URL files removed. Pending server authorization state expires under its existing
-ten-minute policy. No new connector grant was completed during this pass.
+To finish social live acceptance, in Aedrova Staging → Buds → Marketing Bud →
+Connectors, open Instagram → Connect your account, sign in as @aedrova_ai, and
+leave the read-only consent screen open. Then do TikTok with the sandbox-approved
+@aedrova account. Use fresh buttons, not expired authorization tabs; do not send
+credentials in chat. If TikTok reports maximum attempts, stop and report it.
+These account sessions block remaining social acceptance, not the completed four
+core read/disconnect tests. Browser safety may require a specific new grant approval
+if its recipient, scopes or lifetime differ from the existing test grant.
 
-## Verified provider references
+All-nine certification also needs Stripe/Vercel/Search setup, live renewal and
+provider-revocation checks, public social/provider approvals and remaining isolated
+account checks. Keep them as release gates; do not claim every connector is ready.
 
-Reviewed official documentation, rather than inferring capabilities from UI:
-[GitHub token refresh](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens),
-[Supabase integration](https://supabase.com/docs/guides/integrations/build-a-supabase-oauth-integration),
-[Figma authentication](https://developers.figma.com/docs/rest-api/authentication/),
-[Notion authorization](https://developers.notion.com/guides/get-started/authorization),
-[TikTok tokens and revocation](https://developers.tiktok.com/docs/en/oauth-user-access-token-management),
-[Stripe Apps OAuth](https://docs.stripe.com/stripe-apps/api-authentication/oauth),
-[Vercel integration creation](https://vercel.com/docs/integrations/create-integration),
-[Brave Search](https://api-dashboard.search.brave.com/app/documentation/web-search/get-started).
-Meta's business-login documentation required sign-in; do not claim a fresh public
-documentation read for its gated page. Existing official Meta app/tester UI and
-previous live evidence remain documented in the website's social-connectors.md.
+Next roadmap item is Step 7: meeting reliability and an agreed first-release call
+scope. It has not started. Ask owner whether to proceed with these external
+connector acceptance gates explicitly outstanding; public launch remains blocked.
 
-## Approved setup completed; remaining live acceptance
-
-Owner approved the exact four-provider callback/credential transfer and tested
-staging deployment. GitHub initially displayed Confirm access, but subsequently
-opened its settings without a new owner intervention; no identity action remains.
-GitHub retained localhost and the separate connector host callbacks. Supabase,
-Figma and Notion retained their separate connector-host callbacks. Each added only
-https://aedrova-beta-staging.onrender.com/buds/oauth/{provider}/callback.
-All callbacks were re-read after saving; Figma and Notion also survived reload.
-No client secrets were printed or committed. Existing database/encryption/model/
-speech/social settings were not edited. Save only was used before deploying the
-specific tested commit. Render reports Live; safe screenshot saved in ignored
-work/connector-step-6/staging-deployed.jpg. Backend rerun: 528 passed; Ruff/diff pass.
-Fresh native test session signed out and private login URL removed.
-
-No personal action is required to finish this setup batch. Step 6 remains open:
-fresh provider consent, named-resource reads, refresh and disconnect/reconnect/
-provider revocation must be checked sequentially using disposable test resources.
-The named staging workspace still has no active grants. Do not label the six
-available OAuth providers as end-to-end certified on configuration evidence alone.
-When a newly prepared provider screen requires personal sign-in or consent, supply
-its exact current page and requested scope; do not reuse expired links or ask for
-secrets in chat. Social publication/review, Vercel registration/agreement and Search
-subscription remain separate gates. Stripe bank/business setup stays deferred.
-Step 7, production promotion and installers have not started in this batch.
+Official Google scope reference used for the fix:
+https://supabase.com/docs/guides/auth/social-login/auth-google

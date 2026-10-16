@@ -31,8 +31,10 @@ and requires approval; nine-provider completion is not claimed by UI tests.
 Step 6 is approved and in progress. Approved staging callback/credential setup for
 GitHub/Supabase/Figma/Notion is complete, preserving existing settings. Render
 da30ebf is Live; fresh authenticated catalog confirms all four plus Instagram/TikTok
-OAuth enabled. Fresh provider lifecycle acceptance remains; Stripe/Vercel/Search
-retain setup gates. See [current certification and owner handoff](connector-certification-step-6.md).
+OAuth enabled. Four real provider callback/read/local-disconnect checks now pass, with GitHub
+reconnect accepted. Instagram/TikTok need signed-in test sessions; live renewal,
+provider-global revocation and remaining isolated-account checks remain open.
+Stripe/Vercel/Search retain setup gates. See [current certification and owner handoff](connector-certification-step-6.md).
 
 The owner authorized Step 1 inventory only of the new repair roadmap. See the
 [complete current baseline](release-baseline-2026-10-15.md) and its
