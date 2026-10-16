@@ -28,6 +28,11 @@ Step 5 single-action connector UI is implemented; see
 where providers require it. Step 6 live provider lifecycle/certification is next
 and requires approval; nine-provider completion is not claimed by UI tests.
 
+Step 6 is now approved and in progress. Staging catalog verification confirms only
+Instagram/TikTok OAuth enabled; four existing local credential pairs need separately
+approved staging callback/credential deployment, while Stripe/Vercel/Search retain
+setup gates. See [current certification and owner handoff](connector-certification-step-6.md).
+
 The owner authorized Step 1 inventory only of the new repair roadmap. See the
 [complete current baseline](release-baseline-2026-10-15.md) and its
 [machine-readable requirement register](release-baseline-2026-10-15.json).

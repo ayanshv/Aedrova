@@ -2276,3 +2276,34 @@ and known boundaries: docs/connector-ux-step-5.md.
 
 Final Step 5 follow-through: connector/Bud/loading suite 77 passed after visual,
 unavailable-provider management and disconnect-status refinements; Ruff/diff pass.
+
+## October 15 — repair roadmap Step 6 in progress
+
+Owner approved live connector certification, with interventions saved for the end.
+Authenticated staging catalog/grant check passed after cold-host wake-up; only
+Instagram/TikTok OAuth enabled, no active grants in the named test workspace.
+Existing local pairs present for GitHub/Supabase/Figma/Notion; absent for Stripe/
+Vercel and managed Search key. No provider app secrets printed or transferred, no provider
+scopes, registrations, access grants, hosting charges or production changes made.
+
+One social OAuth start each passed. TikTok web handoff stalled in Google's loading
+account chooser before reaching provider; Instagram provider screen not opened.
+No renewed grant/read certification claimed; temporary sessions/URL files cleaned.
+Historical TikTok maximum-attempt and public social-review gates remain unresolved.
+
+Source fixes preserve intentional token-exchange denials, distinguish 429/5xx
+from access loss, normalize TikTok comma/space scopes without broadening them and
+remove stale token-workaround setup copy. Added all-nine grant lifecycle/isolation
+regression cases with synthetic providers. Backend 528 tests passed before final
+copy cleanup; final run recorded below. Live Render still e375bdc; patches are
+not yet deployed. Full status and references: docs/connector-certification-step-6.md.
+
+Required final approval: add staging callbacks and transfer the four EXISTING
+client ID/secret pairs privately to aedrova-beta-staging, then deploy reviewed
+staging source. Exact environment/checklist in website deploy/staging-connector-
+certification.env.example. Specific destination approval is required by browser
+safety. No new keys or scope expansion. Stripe bank setup stays deferred until
+release. Step 6 remains open; Step 7 has not started.
+
+Final Step 6 source validation: 528 backend tests passed after setup-copy cleanup;
+Ruff/diff pass. This does not certify undeployed patches or missing live grants.
