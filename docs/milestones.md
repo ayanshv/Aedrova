@@ -2188,3 +2188,20 @@ approval remains required; use existing Free allowance/owner activation and vali
 staging login for hosted tests. Claude funding is separate and optional for OpenAI.
 Step 3 remains unstarted. Website configuration proposal:
 deploy/staging-ai.env.example in the Aedrova-website repository.
+
+Step 2 hosted follow-through: owner approved the exact OpenAI key/settings/deploy
+handoff. Render staging deployment dep-db8o043l550s73ej2i90 is Live on e375bdc;
+verified gateway=true, OpenAI-only model file, $1/month company/Free-pool accounting
+ceilings and closed checkout. Fresh native Google PKCE owner authentication,
+existing Free allowance, actual hosted main/Bud replies, private Bud reply
+save/reopen and zero outstanding reservations passed. Observed completion totals
+12.96s/13.95s include fresh access checks and closure; loopback timings are not
+hosted latency. Incremental hosted usage $0.002339. No paid hosting/production/
+packaging/Stripe or migration change. Step 3 remains unstarted.
+
+Final owner actions are consolidated in docs/ai-responsiveness-step-2.md: rotate
+OpenAI credential before broader testing because a masked Render field still
+exposed it in an automation DOM snapshot, update the staging AI/speech settings and
+private local file, deploy and revoke old key; fund Claude only if enabling it.
+No secret value is stored in tracked documents. Current source workers passed;
+older installed binaries are not silently upgraded or certified as release builds.

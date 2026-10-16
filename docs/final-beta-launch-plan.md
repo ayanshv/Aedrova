@@ -10,8 +10,9 @@ remain unchanged. The owner-supplied proposal is preserved in release-plan-sourc
 
 ## Current repair roadmap — October 15, 2026
 
-Step 2 responsiveness implementation is delivered; hosted inference activation
-and acceptance remain open. See [Step 2 evidence and final setup checklist](ai-responsiveness-step-2.md).
+Step 2 responsiveness implementation and real hosted OpenAI conversational acceptance
+are delivered. Credential rotation before broader testing and optional Claude funding
+remain owner actions; production and installer acceptance are separate. See [Step 2 evidence and final setup checklist](ai-responsiveness-step-2.md).
 
 The owner authorized Step 1 inventory only of the new repair roadmap. See the
 [complete current baseline](release-baseline-2026-10-15.md) and its

@@ -107,3 +107,54 @@ References: official OpenAI streaming guidance
 https://developers.openai.com/api/docs/guides/streaming-responses and the configured
 GPT-5.3-Codex model documentation
 https://developers.openai.com/api/docs/models/gpt-5.3-codex (low reasoning supported).
+
+## Approved hosted activation and acceptance — October 15, 2026
+
+Owner explicitly approved the key transfer, bounded inference configuration and
+staging deployment. Applied only to Render aedrova-beta-staging. Deployment
+`dep-db8o043l550s73ej2i90` is Live, reusing backend revision `e375bdc`; the relevant
+gateway/config/store implementation has no diff from the locally tested revision.
+Verified saved environment settings: gateway enabled, models.openai.json,
+company and Free-pool ceilings each 1,000,000 micro-USD; checkout remains disabled.
+Live /health confirms managed_ai_enabled=true and checkout_enabled=false.
+No database migration, Stripe activation, paid hosting, production or Apple change.
+
+Fresh native PKCE login using the existing authorized owner Google session passed.
+The original staging workspace already had an active Free plan; no subscription
+was created and no allowance was reset. Actual desktop QueryJob workers used the
+hosted gateway and real OpenAI for main and Bud greetings, with zero tool-activity
+messages. Main completed in 12.96 seconds (9 text updates); Bud in 13.95 seconds
+(10 text updates). These totals include access checks and run closure; do not
+substitute earlier loopback timings for hosted performance or promise instant AI.
+The sleeping free service can still add its documented cold-start delay.
+
+The private Bud assistant reply saved and reopened using its real account-owned
+Supabase RPCs. Additional ledger usage was 2,339 micro-USD ($0.002339), with zero
+reserved usage remaining. No local provider fallback ran. Foreign-account private
+history isolation, all-connector lifecycle acceptance and a real changed-file build
+are not newly certified by this conversational smoke test. Claude remains disabled
+because its provider balance is unfunded. Existing installed copies still need the
+updated desktop code; this was current source-worker acceptance, not a new signed
+installer or public release. Step 3 is not started.
+
+### Final owner actions after hosted acceptance
+
+- **Credential hygiene before broader testing:** the browser's DOM snapshot
+  unexpectedly included the OpenAI key even though its visual control was masked.
+  It was not committed to Git or embedded in a screenshot, and no unauthorized
+  provider use is established, but treat that credential as exposed to the
+  automation transcript. In OpenAI Platform → the existing project → API keys,
+  create a replacement privately. In Render → aedrova-beta-staging → Environment,
+  replace AEDROVA_OPENAI_KEY and AEDROVA_SPEECH_KEY if they use that same key;
+  Save and deploy, then revoke the old key in OpenAI. Update the ignored local
+  .env.openai privately too. Do not paste either value into chat. Credential
+  creation/replacement must be completed by the owner. Hosted smoke tests passed
+  before rotation; retest after replacement. Wider Beta testing should wait.
+- **Optional Claude activation:** fund Anthropic Console → Billing yourself, then
+  approve its separate server key/model activation and inference test. This does
+  not block OpenAI availability.
+- **Next roadmap step:** obtain owner approval for Step 3 mandatory workspace AI
+  configuration and dashboard dismissal. No new SQL or sign-in is needed now.
+
+The earlier pending-activation checklist above is historical and superseded by
+this successful deployment record and these final owner actions.
