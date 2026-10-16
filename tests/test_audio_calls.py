@@ -69,3 +69,16 @@ def test_unreachable_service_reports_connection_without_ai_message(monkeypatch):
             "/api/meetings/channel/example"
         )
     assert "private-token" not in str(error.value) and "AI" not in str(error.value)
+
+
+@pytest.mark.parametrize('message', [
+    'Meetings are being prepared.',
+    'Call access monitoring is starting or unavailable. Retry shortly.',
+])
+def test_setup_gate_does_not_misdiagnose_valid_user_as_signed_out(monkeypatch, message):
+    original = httpx.Client
+    monkeypatch.setattr(httpx, 'Client', lambda **kwargs: original(
+        transport=httpx.MockTransport(lambda _: httpx.Response(403, json={'error': message})),
+        **kwargs))
+    with pytest.raises(MeetingRequestError, match='finish meeting setup'):
+        MeetingClient('http://127.0.0.1:8090', 'test').request('/api/meetings/join', {})

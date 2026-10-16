@@ -86,6 +86,20 @@ class MeetingClient(ManagedClient):
                     json=body,
                 )
             if response.status_code in {401, 403}:
+                try:
+                    reason = response.json().get("error")
+                except (ValueError, AttributeError):
+                    reason = None
+                unavailable = {
+                    "Meetings are being prepared.",
+                    "Meetings are being prepared. No microphone or camera was started.",
+                    "Call access monitoring is starting or unavailable. Retry shortly.",
+                }
+                if isinstance(reason, str) and reason in unavailable:
+                    raise MeetingRequestError(
+                        "Meetings are not available on this server yet. "
+                        "Your workspace owner must finish meeting setup. Devices remain off."
+                    )
                 raise MeetingRequestError(
                     "Cannot access this call. Sign in again or ask your workspace owner."
                 )
@@ -93,6 +107,8 @@ class MeetingClient(ManagedClient):
                 raise MeetingRequestError(
                     "Meeting service is not configured. Contact your workspace owner."
                 )
+            if response.status_code == 429:
+                raise MeetingRequestError("Too many meeting requests. Wait a moment and try again.")
             if response.status_code != 200:
                 raise MeetingRequestError(
                     "Meeting service is temporarily unavailable. Wait a moment and try again."

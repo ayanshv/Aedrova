@@ -36,6 +36,13 @@ reconnect accepted. Instagram/TikTok need signed-in test sessions; live renewal,
 provider-global revocation and remaining isolated-account checks remain open.
 Stripe/Vercel/Search retain setup gates. See [current certification and owner handoff](connector-certification-step-6.md).
 
+Step 7 core repair is implemented: independent heartbeats prevent video stalls;
+native audio selection, default mute, noise reduction, push-to-talk and device
+refresh have controlled checks. Generated RTC/forced TURN relay passed. Hosted
+staging meetings remain unavailable pending deferred always-on API/guard setup;
+physical/two-account acceptance remains open. Full feature list retained through
+Steps 8–9. See [Step 7 evidence and owner actions](meeting-step-7.md).
+
 The owner authorized Step 1 inventory only of the new repair roadmap. See the
 [complete current baseline](release-baseline-2026-10-15.md) and its
 [machine-readable requirement register](release-baseline-2026-10-15.json).

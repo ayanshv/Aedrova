@@ -262,11 +262,13 @@ def test_camera_fills_frame_without_bars_and_screen_keeps_edges():
 
 def test_toolbar_reports_current_state_and_tooltip_explains_action(qtbot):
     _, worker, dialog = setup(qtbot)
+    worker.state.emit('Connected · devices are off')
     for kind, off, on, action in [('microphone', 'Muted', 'Unmuted', 'Mute microphone'),
                                   ('camera', 'Camera off', 'Camera on', 'Turn camera off')]:
         assert dialog.controls[kind].text() == off
         worker.media.emit(kind, True)
         assert dialog.controls[kind].text() == on
+        assert dialog.status.text() == 'Connected'
         assert dialog.controls[kind].toolTip() == action
         assert dialog.controls[kind].accessibleName() == on
         worker.media.emit(kind, False)
@@ -277,3 +279,151 @@ def test_camera_tiles_fill_but_screen_tiles_do_not_crop(qtbot):
     _, _, dialog = setup(qtbot)
     assert dialog.tile('self/camera', 'You')[1].fill
     assert not dialog.tile('self/screen', 'Screen')[1].fill
+
+
+def test_slow_access_heartbeat_keeps_sending_video_and_access_failure_ends_call(qapp, monkeypatch):
+    from aedrova.meetings import call
+    from aedrova.meetings.access import MeetingRequestError
+
+    async def check():
+        pulse_started, release = threading.Event(), threading.Event()
+        disconnected, frames, problems = [], [], []
+
+        class Room:
+            remote_participants = {}
+            local_participant = SimpleNamespace(identity='u')
+
+            async def connect(self, *args):
+                pass
+
+            async def disconnect(self):
+                disconnected.append(True)
+
+        def pulse(_):
+            pulse_started.set()
+            assert release.wait(2)
+            raise MeetingRequestError('Cannot access this call. Sign in again.')
+
+        client = SimpleNamespace(
+            start=lambda _: 'm',
+            join=lambda *a, **k: SimpleNamespace(url='wss://test', token='test'),
+            pulse=pulse, leave=lambda _: None)
+        worker = CallWorker(client, workspace='w', channel='c', user='u')
+        worker.problem.connect(problems.append)
+        worker._events = lambda: None
+        worker._roster = lambda: None
+        worker._send_frames = lambda: frames.append(time.monotonic())
+        monkeypatch.setattr(call.rtc, 'Room', Room)
+        monkeypatch.setattr(call.rtc, 'PlatformAudio',
+                            lambda: SimpleNamespace(close=lambda: None))
+        run = asyncio.create_task(worker._run())
+        try:
+            async with asyncio.timeout(2):
+                while not pulse_started.is_set():
+                    await asyncio.sleep(.01)
+            before = len(frames)
+            await asyncio.sleep(.15)
+            assert len(frames) >= before + 3  # Video advances while HTTP is still blocked.
+            release.set()
+            await asyncio.wait_for(run, 2)
+            assert problems == ['Cannot access this call. Sign in again.']
+            assert disconnected and not worker.connected and not worker.tasks
+        finally:
+            release.set()
+            worker.stop()
+            await asyncio.gather(run, return_exceptions=True)
+
+    import time
+    asyncio.run(check())
+
+
+def test_audio_device_choices_use_sdk_ids_and_mute_before_changing(qtbot):
+    _, worker, dialog = setup(qtbot)
+    dialog.audio_inventory({'microphone': [{'id': 'stable-mic', 'name': 'Desk microphone'}],
+                            'speaker': [{'id': 'stable-out', 'name': 'Headphones'}]})
+    assert not dialog.audio_choices['microphone'].isEnabled()
+    worker.state.emit('Connected')
+    dialog.audio_choices['microphone'].setCurrentIndex(1)
+    assert worker.calls[-2:] == [('microphone', False), ('microphone_device', 'stable-mic')]
+    dialog.audio_choices['speaker'].setCurrentIndex(1)
+    assert worker.calls[-1] == ('speaker_device', 'stable-out')
+    dialog.voice_isolation.setChecked(False)
+    assert worker.calls[-2:] == [('microphone', False), ('noise_suppression', False)]
+    dialog.audio_selected('speaker', '')
+    assert dialog.audio_choices['speaker'].currentData() == ''
+    assert worker.calls[-1] == ('noise_suppression', False)  # Revert emits no command.
+
+
+def test_video_meeting_joins_muted_by_default_without_removing_audio_call_behavior(qtbot):
+    backend, worker = Backend(), Worker()
+    dialog = MeetingCall(None, worker, devices=DeviceCheck(backend=backend), initial_mode='video')
+    qtbot.addWidget(dialog)
+    worker.state.emit('Connected')
+    assert 'microphone' not in backend.permissions
+    assert ('microphone', True) not in worker.calls
+    assert dialog.join_muted.isChecked()
+
+
+def test_sdk_audio_selection_mutes_capture_and_rejects_missing_devices(qapp):
+    async def check():
+        calls = []
+        worker = CallWorker(None, workspace='w', channel='c', user='u')
+        worker.connected = True
+        worker.lock = asyncio.Lock()
+        worker.audio = SimpleNamespace(
+            recording_devices=lambda: [SimpleNamespace(id='mic', name='Desk')],
+            playout_devices=lambda: [SimpleNamespace(id='out', name='Headphones')],
+            set_recording_device=lambda value: calls.append(('input', value)),
+            set_playout_device=lambda value: calls.append(('output', value)))
+        worker.room = SimpleNamespace(local_participant=SimpleNamespace())
+        worker.microphone = SimpleNamespace(close=lambda: calls.append(('closed', True)))
+        media, errors, selected = [], [], []
+        worker.media.connect(lambda *args: media.append(args))
+        worker.problem.connect(errors.append)
+        worker.audio_selected.connect(lambda *args: selected.append(args))
+        await worker._media('microphone_device', 'mic')
+        assert calls == [('closed', True), ('input', 'mic')]
+        assert worker.microphone is None and ('microphone', False) in media
+        await worker._media('speaker_device', 'out')
+        assert calls[-1] == ('output', 'out')
+        await worker._media('speaker_device', 'unplugged')
+        assert calls[-1] == ('output', 'out') and selected[-1] == ('speaker', 'out')
+        assert errors and 'unplugged' not in errors[-1]
+        await worker._media('noise_suppression', False)
+        assert worker.noise_suppression is False
+    asyncio.run(check())
+
+
+def test_push_to_talk_release_and_focus_loss_cancel_delayed_microphone_permission(qtbot):
+    from PySide6.QtCore import QEvent, Qt
+    from PySide6.QtWidgets import QApplication
+    backend, worker, dialog = setup(qtbot)
+    worker.state.emit('Connected')
+    dialog.push_to_talk.setChecked(True)
+    qtbot.keyPress(dialog.controls['microphone'], Qt.Key.Key_Space)
+    assert dialog.push_to_talk_active and backend.permissions == ['microphone']
+    qtbot.keyRelease(dialog.controls['microphone'], Qt.Key.Key_Space)
+    backend.pending(True)
+    assert ('microphone', True) not in worker.calls and not dialog.push_to_talk_active
+    qtbot.keyPress(dialog.controls['microphone'], Qt.Key.Key_Space)
+    QApplication.sendEvent(dialog, QEvent(QEvent.Type.WindowDeactivate))
+    backend.pending(True)
+    assert ('microphone', True) not in worker.calls and not dialog.push_to_talk_active
+
+
+def test_failed_noise_processing_change_restores_setting_without_media_feedback(qapp):
+    async def check():
+        worker = CallWorker(None, workspace='w', channel='c', user='u')
+        worker.lock = asyncio.Lock()
+        worker.connected, worker.audio = True, object()
+        async def unavailable():
+            raise RuntimeError('private-device-error')
+        worker._mute_microphone = unavailable
+        selected, media, errors = [], [], []
+        worker.audio_selected.connect(lambda *args: selected.append(args))
+        worker.media.connect(lambda *args: media.append(args))
+        worker.problem.connect(errors.append)
+        await worker._media('noise_suppression', False)
+        assert selected == [('noise_suppression', 'true')]
+        assert not media and 'private' not in errors[-1]
+    asyncio.run(check())

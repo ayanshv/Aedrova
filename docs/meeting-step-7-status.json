@@ -1,0 +1,1100 @@
+{
+  "date": "2026-10-16",
+  "scope": "Core Step 7 only; full owner request retained",
+  "source": "meeting-features-owner-source-2026-10-16.txt",
+  "hosted_acceptance": "blocked: staging meeting health 503; paid hosting deferred",
+  "requirements": [
+    {
+      "id": "MTG-01-01",
+      "requirement": "Mute/unmute microphone",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-01-02",
+      "requirement": "Toggle camera",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-01-03",
+      "requirement": "Select microphone",
+      "planned_batch": 7,
+      "step_7_status": "Implemented; controlled/native selection tests pass; physical acceptance open"
+    },
+    {
+      "id": "MTG-01-04",
+      "requirement": "Select speaker",
+      "planned_batch": 7,
+      "step_7_status": "Implemented; controlled/native selection tests pass; physical acceptance open"
+    },
+    {
+      "id": "MTG-01-05",
+      "requirement": "Select camera",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-01-06",
+      "requirement": "Audio settings and microphone modes",
+      "planned_batch": 7,
+      "step_7_status": "Partial: noise reduction, AEC and AGC retained; other microphone modes not implemented; physical acceptance open"
+    },
+    {
+      "id": "MTG-01-07",
+      "requirement": "Join computer audio",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-01-08",
+      "requirement": "Telephone dial-in",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-01-09",
+      "requirement": "Speaker view",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-01-10",
+      "requirement": "Gallery view",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-01-11",
+      "requirement": "Hide/stop incoming participant videos",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-01-12",
+      "requirement": "Virtual backgrounds",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-01-13",
+      "requirement": "Video filters and appearance effects",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-01-14",
+      "requirement": "Portrait lighting and supported enhancements",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-01-15",
+      "requirement": "Share a second camera",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-01-16",
+      "requirement": "Optimize shared video playback and audio",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-01-17",
+      "requirement": "Push-to-talk",
+      "planned_batch": 7,
+      "step_7_status": "Implemented; controlled/native selection tests pass; physical acceptance open"
+    },
+    {
+      "id": "MTG-01-18",
+      "requirement": "Automatically mute on join",
+      "planned_batch": 7,
+      "step_7_status": "Implemented; controlled/native selection tests pass; physical acceptance open"
+    },
+    {
+      "id": "MTG-01-19",
+      "requirement": "Display names and profile pictures",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-01-20",
+      "requirement": "Show/hide pronouns",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-01-21",
+      "requirement": "Immersive view",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-01-22",
+      "requirement": "Dual-monitor support",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-02-01",
+      "requirement": "In-meeting group chat",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-02-02",
+      "requirement": "Private participant chat where permitted",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-02-03",
+      "requirement": "Send to everyone or selected recipients",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-02-04",
+      "requirement": "Share files where enabled",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-02-05",
+      "requirement": "Share links",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-02-06",
+      "requirement": "Save meeting chat",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-02-07",
+      "requirement": "Emoji reactions",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-02-08",
+      "requirement": "Raise hand",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-02-09",
+      "requirement": "Nonverbal feedback",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-02-10",
+      "requirement": "Respond to polls/quizzes",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-02-11",
+      "requirement": "Change own display name",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-02-12",
+      "requirement": "Add/edit own profile picture",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-02-13",
+      "requirement": "Participant list",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-02-14",
+      "requirement": "Invite participants",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-02-15",
+      "requirement": "View meeting information and joining details",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-03-01",
+      "requirement": "Share entire desktop",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-03-02",
+      "requirement": "Share application window",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-03-03",
+      "requirement": "Share browser tab/supported content",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-03-04",
+      "requirement": "Share computer audio",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-03-05",
+      "requirement": "Share video content",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-03-06",
+      "requirement": "Slides as virtual background",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-03-07",
+      "requirement": "Share second camera",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-03-08",
+      "requirement": "Pause/resume screen sharing",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-03-09",
+      "requirement": "Annotate shared content",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-03-10",
+      "requirement": "Draw/highlight/add text",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-03-11",
+      "requirement": "Permission for participant annotation",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-03-12",
+      "requirement": "Grant remote control",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-03-13",
+      "requirement": "Request remote control",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-03-14",
+      "requirement": "Multiple simultaneous screen shares",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-03-15",
+      "requirement": "Side-by-side sharing layout",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-03-16",
+      "requirement": "Share whiteboard",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-03-17",
+      "requirement": "Create/edit collaborative whiteboards",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-03-18",
+      "requirement": "Open/create Zoom Docs",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-03-19",
+      "requirement": "Co-edit documents",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-04-01",
+      "requirement": "Meeting assistant/questions during call",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-04-02",
+      "requirement": "Meeting summaries",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-04-03",
+      "requirement": "Extract action items",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-04-04",
+      "requirement": "Key points/highlights",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-04-05",
+      "requirement": "Live transcription",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-04-06",
+      "requirement": "Searchable transcripts",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-04-07",
+      "requirement": "Automated captions",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-04-08",
+      "requirement": "Translated captions",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-04-09",
+      "requirement": "Meeting language translation",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-04-10",
+      "requirement": "Ask questions about meeting content",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-04-11",
+      "requirement": "Smart recording/recording highlights",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-04-12",
+      "requirement": "Personalized AI notes",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-05-01",
+      "requirement": "Start/stop local recording",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-05-02",
+      "requirement": "Start/stop cloud recording",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-05-03",
+      "requirement": "Request host cloud recording",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-05-04",
+      "requirement": "Grant selected participants local recording",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-05-05",
+      "requirement": "Pause/resume recording",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-05-06",
+      "requirement": "Record audio/video",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-05-07",
+      "requirement": "Record shared screens",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-05-08",
+      "requirement": "Generate recording transcripts",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-05-09",
+      "requirement": "Save/review recordings",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-05-10",
+      "requirement": "Recording highlights/summaries",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-05-11",
+      "requirement": "View/search meeting transcripts",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-06-01",
+      "requirement": "Create breakout rooms",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-06-02",
+      "requirement": "Automatically assign participants",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-06-03",
+      "requirement": "Manually assign participants",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-06-04",
+      "requirement": "Participant self-selection",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-06-05",
+      "requirement": "Rename rooms",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-06-06",
+      "requirement": "Move participants between rooms",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-06-07",
+      "requirement": "Open/close rooms",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-06-08",
+      "requirement": "Broadcast messages",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-06-09",
+      "requirement": "Broadcast voice messages",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-06-10",
+      "requirement": "Return to main session",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-06-11",
+      "requirement": "Host visits rooms",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-06-12",
+      "requirement": "Share screens into rooms",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-06-13",
+      "requirement": "Timers/countdowns",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-06-14",
+      "requirement": "Preassign participants",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-07-01",
+      "requirement": "Launch live polls",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-07-02",
+      "requirement": "Create multiple-choice polls",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-07-03",
+      "requirement": "Create advanced polls",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-07-04",
+      "requirement": "Run quizzes",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-07-05",
+      "requirement": "Collect responses",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-07-06",
+      "requirement": "Display results",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-07-07",
+      "requirement": "Download reports",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-07-08",
+      "requirement": "Reactions for instant feedback",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-07-09",
+      "requirement": "Raised hands",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-07-10",
+      "requirement": "Nonverbal feedback",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-07-11",
+      "requirement": "Structured Q&A",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-08-01",
+      "requirement": "Mute individual participant",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-08-02",
+      "requirement": "Mute all participants",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-08-03",
+      "requirement": "Request unmute",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-08-04",
+      "requirement": "Stop participant video",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-08-05",
+      "requirement": "Control screen-sharing permission",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-08-06",
+      "requirement": "Control chat permission",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-08-07",
+      "requirement": "Control unmute permission",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-08-08",
+      "requirement": "Control renaming permission",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-08-09",
+      "requirement": "Assign co-hosts",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-08-10",
+      "requirement": "Transfer host privileges",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-08-11",
+      "requirement": "Rename participants",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-08-12",
+      "requirement": "Put participant on hold",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-08-13",
+      "requirement": "Remove participants",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-08-14",
+      "requirement": "Lock meeting",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-08-15",
+      "requirement": "Enable/manage waiting room",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-08-16",
+      "requirement": "Admit waiting participants",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-08-17",
+      "requirement": "Join/leave sounds",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-08-18",
+      "requirement": "Recording permissions",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-08-19",
+      "requirement": "Whiteboard permissions",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-08-20",
+      "requirement": "Manage captions/transcription",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-08-21",
+      "requirement": "Report inappropriate behavior",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-09-01",
+      "requirement": "Meeting passcodes",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-09-02",
+      "requirement": "Waiting rooms",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-09-03",
+      "requirement": "Lock meeting",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-09-04",
+      "requirement": "Restrict joining",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-09-05",
+      "requirement": "Remove unwanted participants",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-09-06",
+      "requirement": "Participant permissions",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-09-07",
+      "requirement": "Screen-sharing restrictions",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-09-08",
+      "requirement": "Chat/file-sharing restrictions",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-09-09",
+      "requirement": "Recording access control",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-09-10",
+      "requirement": "Meeting encryption",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-09-11",
+      "requirement": "End-to-end encryption for supported configurations",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-09-12",
+      "requirement": "Report participants",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-09-13",
+      "requirement": "Entry/exit management",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-10-01",
+      "requirement": "Automated captions",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-10-02",
+      "requirement": "Manual captions",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-10-03",
+      "requirement": "Live transcription",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-10-04",
+      "requirement": "Translated captions",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-10-05",
+      "requirement": "Language interpretation",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-10-06",
+      "requirement": "Caption font/type/size customization",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-10-07",
+      "requirement": "Caption position settings",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-10-08",
+      "requirement": "Keyboard navigation/shortcuts",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-10-09",
+      "requirement": "Screen-reader support",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-10-10",
+      "requirement": "Accessible meeting controls",
+      "planned_batch": 8,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-11-01",
+      "requirement": "Open Zoom Apps inside meeting",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-11-02",
+      "requirement": "Supported third-party apps",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-11-03",
+      "requirement": "Collaborate through integrated tools",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-11-04",
+      "requirement": "Open collaborative documents",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-11-05",
+      "requirement": "Whiteboards",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-11-06",
+      "requirement": "Scheduling/productivity integrations",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-11-07",
+      "requirement": "Share supported app content",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-11-08",
+      "requirement": "Notice when apps are active",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-12-01",
+      "requirement": "Stream to supported platforms",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-12-02",
+      "requirement": "Custom RTMP",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-12-03",
+      "requirement": "Broadcast presentations externally",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-12-04",
+      "requirement": "Broadcast audio",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-12-05",
+      "requirement": "Webinar Q&A",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-13-01",
+      "requirement": "Gallery/speaker switching",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-13-02",
+      "requirement": "Change display names",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-13-03",
+      "requirement": "Backgrounds/effects",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-13-04",
+      "requirement": "Toolbar placement",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-13-05",
+      "requirement": "Meeting theme",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-13-06",
+      "requirement": "Chat previews",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-13-07",
+      "requirement": "Keep controls visible",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-13-08",
+      "requirement": "Accessibility settings",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-13-09",
+      "requirement": "Screen-sharing behavior",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-13-10",
+      "requirement": "Audio/video preferences",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-13-11",
+      "requirement": "Supported display layouts",
+      "planned_batch": 9,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-14-01",
+      "requirement": "Invite participants",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-14-02",
+      "requirement": "Copy invitation",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-14-03",
+      "requirement": "Meeting ID/join information",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-14-04",
+      "requirement": "Computer audio",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-14-05",
+      "requirement": "Telephone audio",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-14-06",
+      "requirement": "Leave meeting",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-14-07",
+      "requirement": "Host end for everyone",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-14-08",
+      "requirement": "Transfer to Zoom Room",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-14-09",
+      "requirement": "Invited participants not yet joined",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    },
+    {
+      "id": "MTG-14-10",
+      "requirement": "Reclaim host privileges",
+      "planned_batch": 7,
+      "step_7_status": "Retained in baseline; not newly certified by Step 7"
+    }
+  ]
+}

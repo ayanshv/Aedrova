@@ -2351,3 +2351,32 @@ Final staging build 6a3cc90 is Live (Render reports deploy succeeded, 1m03s).
 Cancellation recovery is verified by controlled browser-route regressions; reusing
 the earlier live cancellation URL still returned 403 and is not acceptance of a
 fresh successful cancellation. No claim that stale/replayed proofs are accepted.
+
+
+## October 16 — repair roadmap Step 7 core meeting repair
+
+Owner approved Step 7 and resupplied full 14-category call feature list; saved verbatim
+in meeting-features-owner-source-2026-10-16.txt and mapped in meeting-step-7-status.json.
+Advanced capabilities remain Steps 8–9; no feature requirement deleted or advertised
+as implemented merely because it is on the list. See docs/meeting-step-7.md.
+
+Repaired video stalls caused by awaiting access heartbeats inside the frame pump.
+Independent bounded heartbeat retains fail-closed termination/guard rules. Added native
+SDK microphone/speaker selection, muted-by-default video meetings, noise reduction,
+optional hold-Space-to-talk with release/focus-loss cancellation and hot-plug refresh.
+Curated setup-unavailable errors no longer tell valid users to sign in again.
+
+Live generated RTC worker camera/screen exchange, forced removal and stale-token denial
+passed. Forced TURN relay audio/camera/screen passed both directions; real native
+audio enumeration/selection passed without capture. Full desktop 864 passed before
+final recovery test; final focused result recorded below. Local meeting health 200,
+staging 503. Paid API/guard upgrade remains deferred; physical/two-account hosted
+acceptance is still blocked. No hosting/key transfer/payment/migration/production
+or installer change. Exact owner actions consolidated in Step 7 docs/final handoff.
+Step 8 is not started and requires next owner approval.
+
+Final Step 7 verification: 865 desktop tests passed; 82 final focused meeting
+checks passed after the final UI status-copy adjustment. Ruff/diff checks passed.
+Light/dark wide/compact previews inspected. Forced TURN relay received generated
+audio/camera/screen in both directions. No physical capture or hosted-user call
+was performed. Public launch and Step 7 hardware acceptance remain gated.

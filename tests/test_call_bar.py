@@ -63,7 +63,7 @@ def test_video_call_requests_camera_after_connect_only(qtbot):
 
     call.toggle = toggle
     worker.state.emit("Connected")
-    assert requested == ["microphone", "camera"]
+    assert requested == ["camera"]  # Meetings now default to joining muted.
     assert not call.states["camera"]  # no camera exists in fake backend
 
 

@@ -5,10 +5,14 @@ import time
 from PySide6.QtCore import QEvent, QSize, Qt, QTimer
 from PySide6.QtGui import QImage, QPainter, QPalette
 from PySide6.QtWidgets import (
+    QAbstractSpinBox,
     QApplication,
+    QCheckBox,
+    QComboBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
+    QLineEdit,
     QScrollArea,
     QSizePolicy,
     QToolButton,
@@ -68,6 +72,7 @@ class MeetingCall(AppDialog):
         self.worker = worker
         self.initial_mode = initial_mode
         self.initial_media_applied = False
+        self.push_to_talk_active = False
         self.devices = devices or DeviceCheck(self)
         self.connected = False
         self.closed = False
@@ -148,6 +153,32 @@ class MeetingCall(AppDialog):
         self.device_panel = QFrame()
         device_layout = QVBoxLayout(self.device_panel)
         device_layout.setContentsMargins(12, 8, 12, 8)
+        audio_choices = QGridLayout()
+        self.audio_choices = {}
+        for column, kind in enumerate(("microphone", "speaker")):
+            choice = ChoiceBox(self)
+            choice.addItem("System default", "")
+            choice.setAccessibleName("Call " + kind + " device")
+            choice.setEnabled(False)
+            choice.currentIndexChanged.connect(lambda _, kind=kind: self.select_audio(kind))
+            audio_choices.addWidget(label(kind.title(), "muted"), 0, column)
+            audio_choices.addWidget(choice, 1, column)
+            self.audio_choices[kind] = choice
+        device_layout.addLayout(audio_choices)
+        self.voice_isolation = QCheckBox("Reduce background noise")
+        self.voice_isolation.setChecked(True)
+        self.voice_isolation.setEnabled(False)
+        self.voice_isolation.toggled.connect(self.set_noise_suppression)
+        device_layout.addWidget(self.voice_isolation)
+        self.join_muted = QCheckBox("Mute microphone when joining this meeting")
+        self.join_muted.setChecked(True)
+        self.join_muted.setVisible(initial_mode != "audio")
+        device_layout.addWidget(self.join_muted)
+        self.push_to_talk = QCheckBox("Hold Space to talk while muted")
+        self.push_to_talk.toggled.connect(
+            lambda enabled: None if enabled else self.release_push_to_talk()
+        )
+        device_layout.addWidget(self.push_to_talk)
         choices = QHBoxLayout()
         self.camera_choice, self.screen_choice = ChoiceBox(self), ChoiceBox(self)
         for kind, choice in [("camera", self.camera_choice), ("screen", self.screen_choice)]:
@@ -162,7 +193,7 @@ class MeetingCall(AppDialog):
         device_layout.addLayout(choices)
         device_layout.addWidget(
             label(
-                "Microphone and speakers use your system default. "
+                "Changing microphone or noise reduction mutes you; unmute when ready. "
                 "Screen sharing includes the entire selected screen.",
                 "muted",
                 wrap=True,
@@ -248,6 +279,9 @@ class MeetingCall(AppDialog):
         worker.roster.connect(self.render_roster)
         worker.problem.connect(self.status.setText)
         worker.media.connect(self.media_state)
+        if hasattr(worker, "audio_devices"):
+            worker.audio_devices.connect(self.audio_inventory)
+            worker.audio_selected.connect(self.audio_selected)
         worker.ended.connect(self.call_ended)
         if hasattr(worker, "speaker"):
             worker.speaker.connect(self.speaker_changed)
@@ -257,6 +291,31 @@ class MeetingCall(AppDialog):
         self.timer.start()
         self.finished.connect(self.shutdown)
         QApplication.instance().aboutToQuit.connect(self.shutdown)
+        for target in self.findChildren(QWidget):
+            target.installEventFilter(self)
+
+    def release_push_to_talk(self):
+        if self.push_to_talk_active:
+            self.push_to_talk_active = False
+            self.disable("microphone")
+
+    def event(self, event):
+        if event.type() == QEvent.Type.WindowDeactivate and hasattr(self, "push_to_talk_active"):
+            self.release_push_to_talk()
+        return super().event(event)
+
+    def eventFilter(self, target, event):
+        if (event.type() in {QEvent.Type.KeyPress, QEvent.Type.KeyRelease}
+                and event.key() == Qt.Key.Key_Space and self.push_to_talk.isChecked()
+                and not isinstance(target, (QComboBox, QLineEdit, QAbstractSpinBox, QCheckBox))):
+            if not event.isAutoRepeat():
+                if event.type() == QEvent.Type.KeyRelease:
+                    self.release_push_to_talk()
+                elif self.connected and not self.closed and not self.states["microphone"]:
+                    self.push_to_talk_active = True
+                    self.toggle("microphone")
+            return True
+        return super().eventFilter(target, event)
 
     def join_call(self):
         if self.closed or self.connected:
@@ -275,14 +334,64 @@ class MeetingCall(AppDialog):
             control.setEnabled(self.connected)
             if not self.connected:
                 self.disable(kind)
+        for choice in self.audio_choices.values():
+            choice.setEnabled(self.connected and choice.count() > 1)
+        self.voice_isolation.setEnabled(self.connected)
+        self.join_muted.setEnabled(not self.connected)
         self.join.setVisible(not self.connected)
         if self.connected and self.initial_mode and not self.initial_media_applied:
             self.initial_media_applied = True
-            self.toggle("microphone")
+            if self.initial_mode == "audio" or not self.join_muted.isChecked():
+                self.toggle("microphone")
             if self.initial_mode == "video":
                 self.toggle("camera")
         if self.meeting_text_enabled:
             self.consent_changed(self.last_consent_snapshot or {})
+
+    def audio_inventory(self, inventory):
+        if self.closed:
+            return
+        for kind, choice in self.audio_choices.items():
+            selected = choice.currentData()
+            choice.blockSignals(True)
+            choice.clear()
+            choice.addItem("System default", "")
+            choice.model().item(0).setEnabled(False)
+            for device in inventory.get(kind, []):
+                choice.addItem(device["name"], device["id"])
+            index = choice.findData(selected)
+            choice.setCurrentIndex(max(0, index))
+            choice.blockSignals(False)
+            choice.setEnabled(self.connected and choice.count() > 1)
+
+    def select_audio(self, kind):
+        if self.closed or not self.connected:
+            return
+        identifier = self.audio_choices[kind].currentData()
+        if not identifier:
+            return
+        if kind == "microphone":
+            self.disable("microphone")
+        self.worker.command(kind + "_device", identifier)
+
+    def audio_selected(self, kind, identifier):
+        if kind == "noise_suppression":
+            self.voice_isolation.blockSignals(True)
+            self.voice_isolation.setChecked(identifier == "true")
+            self.voice_isolation.blockSignals(False)
+            return
+        choice = self.audio_choices.get(kind)
+        if self.closed or choice is None:
+            return
+        index = choice.findData(identifier)
+        choice.blockSignals(True)
+        choice.setCurrentIndex(max(0, index))
+        choice.blockSignals(False)
+
+    def set_noise_suppression(self, enabled):
+        if self.connected and not self.closed:
+            self.disable("microphone")
+            self.worker.command("noise_suppression", enabled)
 
     def text_capability(self, enabled):
         self.meeting_text_enabled = enabled
@@ -424,6 +533,8 @@ class MeetingCall(AppDialog):
         if kind not in self.states:
             return
         self.states[kind] = enabled
+        if self.connected:
+            self.status.setText("Connected")
         self.consent_changed(self.last_consent_snapshot)
         if not enabled:
             self.disable(kind, notify_worker=False)
@@ -593,7 +704,16 @@ class MeetingCall(AppDialog):
     def devices_changed(self):
         for kind in self.states:
             self.disable(kind)
-        self.status.setText("Devices changed. Leave and rejoin to refresh device choices.")
+        for kind, choice in (("camera", self.camera_choice), ("screen", self.screen_choice)):
+            choice.blockSignals(True)
+            choice.clear()
+            for device in self.devices.backend.list(kind):
+                choice.addItem(device.name() if kind == "screen" else device.description(), device)
+            if not choice.count():
+                choice.addItem("No " + kind + " available", None)
+            choice.blockSignals(False)
+        self.worker.command("refresh_audio_devices", True)
+        self.status.setText("Devices changed. Your microphone and camera are off; choose a device.")
 
     def call_ended(self):
         self.connected = False
