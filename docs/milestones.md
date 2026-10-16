@@ -2250,3 +2250,29 @@ items, not claimed by this narrower test. Details: docs/messaging-step-4.md.
 
 No owner action required now. Step 5 single-action connector UX needs approval;
 Step 6 live provider certification and Step 10 production promotion remain gated.
+
+## October 15 — repair roadmap Step 5 connector UX
+
+Owner approved Step 5. Disconnected detail has one Connect your account action,
+with app icon and scoped permission/policy copy; no normal token/ID fields,
+advanced toggle or duration menu. Managed Search uses an honest enable/topic flow.
+Provider-required named resource/Figma-link selection appears after OAuth only.
+Connected accounts use a separate Manage access/Disconnect view, including when
+new OAuth setup is unavailable. Default grant lifetime stays 24 hours; no broad
+or permanent account-access claim was added.
+
+Duplicate pending actions check status; stale start responses are invalidated on
+navigation/Bud changes. Empty discovery shows only reconnect. Success requires
+refreshed matching Connected grant data. Light/dark/compact states inspected;
+dark content surface fixed. Existing compatibility token handlers/backend APIs
+retained outside the normal customer flow. Full desktop suite 857 passed before
+final visual/management refinements; final focused results recorded below.
+
+No provider grants, credentials, backend/schema/API changes, external deployment,
+production or installer changes. Real catalog/lifecycle certification remains
+Step 6. No personal action required now. Approval required before Step 6; exact
+future provider interventions will be collected at the final handoff. Evidence
+and known boundaries: docs/connector-ux-step-5.md.
+
+Final Step 5 follow-through: connector/Bud/loading suite 77 passed after visual,
+unavailable-provider management and disconnect-status refinements; Ruff/diff pass.

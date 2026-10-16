@@ -592,7 +592,7 @@ class DotDialog(AppDialog):
             if provider.get("available")
             else "Connector setup is pending. Save your Bud now; your workspace owner "
             "must configure this connector before you can connect it. "
-            "You can also use a scoped access token in Browse connectors."
+            "Account sign-in will be available when that setup is complete."
         )
 
     def continue_setup(self):

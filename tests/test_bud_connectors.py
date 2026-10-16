@@ -124,7 +124,7 @@ def test_verify_flow_clears_password_and_reloads_real_connection(gallery):
     assert "Orbit" in dialog.success_copy.text()
     assert len(rows[0]["connections"]) == 1
     dialog.disconnect_tool(rows[0]["connections"][0])
-    assert "Revoke the token" in dialog.status.text()
+    assert "revoke Aedrova" in dialog.status.text()
     assert rows[0]["connections"] == []
 
 
@@ -175,6 +175,10 @@ def test_selected_bud_defaults_to_role_tools(gallery, role):
 
 def test_confirmation_stays_inline_and_readable_in_both_themes(gallery, qtbot, tmp_path):
     dialog, _, _, providers = gallery
+    dialog.rows[0]["connections"] = [
+        dict(id="verified", provider=providers[1]["id"], resource="file", status="Connected")
+    ]
+    dialog.open_provider(providers[1])
     for theme in (LIGHT, DARK):
         dialog.setStyleSheet(stylesheet(theme))
         dialog.setPalette(palette(theme))
@@ -211,7 +215,8 @@ def test_resource_lookup_help_covers_every_supported_connector(gallery):
     }
     dialog.open_provider(supabase)
     assert "Paste your Supabase dashboard project link" in dialog.resource_help.text()
-    assert "HTTPS" in dialog.oauth_hint.text()
+    assert "not available yet" in dialog.oauth_hint.text()
+    assert "token" not in dialog.oauth_hint.text()
     assert not dialog.oauth.isEnabled()
 
 

@@ -13,7 +13,6 @@ from PySide6.QtWidgets import (
     QLayout,
     QLineEdit,
     QScrollArea,
-    QSpinBox,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -110,6 +109,10 @@ GLYPHS = {
     "vercel": "▲",
 }
 
+# Retain the existing service's default grant lifetime; removing a menu must not
+# silently broaden access. Provider/token expiry and revocation still apply.
+CONNECTION_HOURS = 24
+
 
 def normalize_resource(provider, value):
     """Accept ordinary provider links without widening the authorized resource scope."""
@@ -160,6 +163,7 @@ class ConnectorsDialog(AppDialog):
         self.role_target = None
         self.cards, self.grid_layouts = [], []
         self.oauth_state, self.oauth_deadline = "", 0
+        self.oauth_attempt = None
         self.oauth_timer = QTimer(self)
         self.oauth_timer.setInterval(3000)
         self.oauth_timer.timeout.connect(self.poll_oauth)
@@ -225,7 +229,7 @@ class ConnectorsDialog(AppDialog):
                 self.filter.setVisible(index == 0),
                 self.search.setVisible(index == 0),
                 self.bud.setVisible(index == 0 and embedded_owner is None),
-                refresh.setVisible(index != 2),
+                refresh.setVisible(index == 0),
             )
         )
         main.addWidget(self.pages, 1)
@@ -235,50 +239,58 @@ class ConnectorsDialog(AppDialog):
         self.gallery.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.pages.addWidget(self.gallery)
         detail = QWidget(self)
+        detail.setObjectName("ConnectorPage")
         form = QVBoxLayout(detail)
         form.setContentsMargins(0, 4, 0, 4)
         form.setSpacing(14)
         back_tools = button("‹  All connectors")
-        back_tools.clicked.connect(lambda: self.pages.setCurrentIndex(0))
+        back_tools.clicked.connect(self.back_to_gallery)
         form.addWidget(back_tools, alignment=Qt.AlignmentFlag.AlignLeft)
         self.detail_heading = label("", "heading")
+        detail_identity = QHBoxLayout()
+        self.detail_icon = label("")
+        self.detail_icon.setFixedSize(48, 48)
+        detail_identity.addWidget(self.detail_icon)
+        detail_identity.addWidget(self.detail_heading, 1)
         self.detail_copy = label("", "muted", wrap=True)
         self.detail_copy.setTextFormat(Qt.TextFormat.PlainText)
-        form.addWidget(self.detail_heading)
+        form.addSpacing(12)
+        form.addLayout(detail_identity)
         form.addWidget(self.detail_copy)
+        self.access_note = label(
+            "You choose what to share on the provider’s consent screen. "
+            "Access lasts up to 24 hours; provider limits may end it sooner. "
+            "Disconnect anytime in your Bud’s settings.",
+            "muted",
+            wrap=True,
+        )
+        form.addWidget(self.access_note)
+        # Compatibility state for the existing scoped-token verification path.
+        # It is deliberately outside the customer connection screen: normal
+        # customers never enter developer tokens, resource IDs or a lifetime.
+        self.legacy_setup = QWidget(self)
+        self.legacy_setup.hide()
+        legacy = QVBoxLayout(self.legacy_setup)
         self.resource_label = label("Resource link or ID", "muted")
-        form.addWidget(self.resource_label)
+        legacy.addWidget(self.resource_label)
         self.resource = QLineEdit(self)
         self.resource.setMaxLength(2048)
         self.resource.setAccessibleName("Connector resource")
-        form.addWidget(self.resource)
+        legacy.addWidget(self.resource)
         self.resource_help = label("", "muted", wrap=True)
         self.resource_help.setTextFormat(Qt.TextFormat.PlainText)
         self.resource_help.setAccessibleName("Where to find the resource ID")
-        form.addWidget(self.resource_help)
-        expiry = QHBoxLayout()
-        expiry.addWidget(label("Remove Aedrova’s access after", "muted"))
-        self.hours = QSpinBox(self)
-        self.hours.setRange(1, 2160)
-        self.hours.setValue(24)
-        self.hours.setSuffix(" hours")
-        self.hours.setAccessibleName("Connection lifetime in hours")
-        expiry.addWidget(self.hours)
-        expiry.addStretch()
-        form.addLayout(expiry)
-        self.oauth = button("Connect account", role="primary")
-        self.oauth.clicked.connect(self.connect_oauth)
+        legacy.addWidget(self.resource_help)
+        self.oauth = button("Connect your account", role="primary")
+        self.oauth.setMinimumSize(220, 44)
+        self.oauth.clicked.connect(self.connection_action)
         form.addWidget(self.oauth, alignment=Qt.AlignmentFlag.AlignLeft)
         self.oauth_hint = label("", "muted", wrap=True)
         form.addWidget(self.oauth_hint)
-        self.advanced = button("Use an access token instead")
-        self.advanced.setCheckable(True)
         self.token_panel = QWidget(self)
         token_form = QVBoxLayout(self.token_panel)
         token_form.setContentsMargins(0, 0, 0, 0)
-        self.advanced.toggled.connect(self.show_token_fields)
-        form.addWidget(self.advanced)
-        form.addWidget(self.token_panel)
+        legacy.addWidget(self.token_panel)
         token_form.addWidget(label("Scoped access token", "muted"))
         self.credential = QLineEdit(self)
         self.credential.setEchoMode(QLineEdit.EchoMode.Password)
@@ -294,13 +306,9 @@ class ConnectorsDialog(AppDialog):
                 wrap=True,
             )
         )
-        self.connect = button("Verify & connect", role="primary")
-        self.connect.clicked.connect(self.connect_tool)
-        token_form.addWidget(self.connect, alignment=Qt.AlignmentFlag.AlignLeft)
         self.existing = QWidget(self)
         self.existing_layout = QVBoxLayout(self.existing)
         self.existing_layout.setContentsMargins(0, 8, 0, 0)
-        form.addWidget(self.existing)
         form.addStretch()
         details = QScrollArea(self)
         details.setWidgetResizable(True)
@@ -309,6 +317,7 @@ class ConnectorsDialog(AppDialog):
         details.setWidget(detail)
         self.pages.addWidget(details)
         success = QWidget(self)
+        success.setObjectName("ConnectorPage")
         success_layout = QVBoxLayout(success)
         success_layout.setContentsMargins(24, 24, 24, 24)
         success_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
@@ -354,6 +363,7 @@ class ConnectorsDialog(AppDialog):
         self.success_scroll.setWidget(success)
         self.pages.addWidget(self.success_scroll)
         selection = QWidget(self)
+        selection.setObjectName("ConnectorPage")
         selection_layout = QVBoxLayout(selection)
         selection_layout.setContentsMargins(28, 28, 28, 28)
         selection_layout.addWidget(label("Choose what your Bud can read", "heading"))
@@ -370,10 +380,32 @@ class ConnectorsDialog(AppDialog):
         self.selection_submit.clicked.connect(self.select_oauth_resource)
         selection_layout.addWidget(self.selection_submit)
         self.selection_retry = button("Sign in again")
-        self.selection_retry.clicked.connect(self.connect_oauth)
+        self.selection_retry.clicked.connect(self.restart_oauth)
         selection_layout.addWidget(self.selection_retry)
         selection_layout.addStretch()
         self.pages.addWidget(selection)
+        management = QWidget(self)
+        management.setObjectName("ConnectorPage")
+        management_layout = QVBoxLayout(management)
+        back_manage = button("‹  Back to connector")
+        back_manage.clicked.connect(lambda: self.pages.setCurrentIndex(1))
+        management_layout.addWidget(back_manage, alignment=Qt.AlignmentFlag.AlignLeft)
+        management_layout.addWidget(label("Your connected resources", "heading"))
+        management_layout.addWidget(
+            label(
+                "Remove a resource to stop this Bud using its saved access. "
+                "You can also revoke Aedrova in the provider’s settings.",
+                "muted",
+                wrap=True,
+            )
+        )
+        management_layout.addWidget(self.existing)
+        management_layout.addStretch()
+        management_scroll = QScrollArea(self)
+        management_scroll.setWidgetResizable(True)
+        management_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        management_scroll.setWidget(management)
+        self.pages.addWidget(management_scroll)
         self.status = label("Loading connectors…", "muted", wrap=True)
         self.status.setTextFormat(Qt.TextFormat.PlainText)
         main.addWidget(self.status)
@@ -391,12 +423,6 @@ class ConnectorsDialog(AppDialog):
         can_connect = bool(self.bud.currentData()) or bool(
             self.embedded_owner and self.embedded_owner.admin()
         )
-        self.connect.setEnabled(can_connect and not busy)
-        self.connect.setText(
-            "Save Bud & connect"
-            if self.embedded_owner and not self.embedded_owner.current()
-            else "Verify & connect"
-        )
         self.oauth.setEnabled(
             can_connect
             and not busy
@@ -405,12 +431,12 @@ class ConnectorsDialog(AppDialog):
                 and (
                     self.selected_provider.get("oauth_available")
                     or self.selected_provider.get("managed_available")
+                    or self.connected_resources()
                 )
             )
         )
         self.resource.setEnabled(not busy)
         self.credential.setEnabled(not busy)
-        self.hours.setEnabled(not busy)
         self.selection_submit.setEnabled(not busy)
         self.selection_retry.setEnabled(not busy)
         self.resource_picker.setEnabled(not busy)
@@ -419,6 +445,31 @@ class ConnectorsDialog(AppDialog):
             card.setEnabled(not busy and bool(card.property("providerAvailable")) and can_connect)
         if self.embedded_owner:
             self.embedded_owner.update_controls()
+
+    def back_to_gallery(self):
+        self.stop_oauth()
+        self.pages.setCurrentIndex(0)
+
+    def connection_action(self):
+        if self.oauth_state:
+            self.poll_oauth()
+        elif self.connected_resources():
+            self.pages.setCurrentIndex(4)
+        else:
+            self.connect_oauth()
+
+    def connected_resources(self):
+        return [
+            c
+            for c in self.row().get("connections", [])
+            if self.selected_provider
+            and c["provider"] == self.selected_provider["id"]
+            and c["status"] == "Connected"
+        ]
+
+    def restart_oauth(self):
+        self.stop_oauth()
+        self.connect_oauth()
 
     def refresh(self, *, on_loaded=None):
         selected = self.bud.currentData() or self.selected
@@ -458,6 +509,8 @@ class ConnectorsDialog(AppDialog):
             self.apply_role_filter()
             self.rebuild_gallery()
             self.refresh_existing()
+            if self.selected_provider:
+                self.auth_details(self.selected_provider)
             self.status.setText(
                 "Choose a tool to connect."
                 if self.rows
@@ -473,6 +526,7 @@ class ConnectorsDialog(AppDialog):
         self.run(fetch, loaded, recovery=True)
 
     def bud_changed(self):
+        self.stop_oauth()
         self.credential.clear()
         self.pages.setCurrentIndex(0)
         self.apply_role_filter()
@@ -516,6 +570,16 @@ class ConnectorsDialog(AppDialog):
     def show_confirmation(self, provider, bud_id):
         row = self.row()
         if row.get("id") != bud_id:
+            return
+        if not any(
+            c["provider"] == provider["id"] and c["status"] == "Connected"
+            for c in row.get("connections", [])
+        ):
+            self.pages.setCurrentIndex(1)
+            self.status.setText(
+                "Account authorization finished, but verified access is not available yet. "
+                "Return to the gallery and refresh before trying again."
+            )
             return
         self.success_bud.set_config(row)
         self.success_heading.setText(provider["name"] + " is connected.")
@@ -620,7 +684,11 @@ class ConnectorsDialog(AppDialog):
                 )
                 action_text = "Manage" if connected else "Connect" if login_ready else "View setup"
                 action = button(action_text)
-                action.setProperty("providerAvailable", provider.get("available", False))
+                # Disconnect must remain reachable even if new provider sign-in
+                # is unavailable (for example, app configuration was removed).
+                action.setProperty(
+                    "providerAvailable", provider.get("available", False) or connected
+                )
                 action.setAccessibleName(action_text + " " + provider["name"])
                 action.clicked.connect(lambda checked=False, p=provider: self.open_provider(p))
                 column.addWidget(action, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -652,8 +720,11 @@ class ConnectorsDialog(AppDialog):
 
     def open_provider(self, provider):
         self.stop_oauth()
+        self.status.clear()
         self.selected_provider = provider
         self.detail_heading.setText(provider["name"])
+        self.detail_icon.setPixmap(connector_pixmap(provider["id"], 40))
+        self.detail_icon.setAccessibleName(provider["name"] + " app icon")
         self.auth_details(provider)
         self.resource.setText(
             self.row().get("resource", "") if self.row().get("provider") == provider["id"] else ""
@@ -662,11 +733,6 @@ class ConnectorsDialog(AppDialog):
             self.resource.setText("me")
         self.resource.setPlaceholderText("Paste a resource link or " + provider["resource_hint"])
         automatic = bool(provider.get("oauth_available"))
-        self.resource.setVisible(not automatic)
-        self.resource_label.setVisible(not automatic)
-        self.advanced.setChecked(False)
-        self.token_panel.setVisible(self.advanced.isChecked())
-        self.show_token_fields(self.advanced.isChecked())
         link_help = {
             "github": "Paste your repository’s GitHub link. We’ll select that repository.",
             "figma": "Paste your Figma file link. We’ll extract the file key for you.",
@@ -681,40 +747,41 @@ class ConnectorsDialog(AppDialog):
         self.credential.clear()
         self.refresh_existing()
         self.pages.setCurrentIndex(1)
-        (self.oauth if automatic else self.resource).setFocus()
-
-    def show_token_fields(self, visible):
-        self.token_panel.setVisible(visible)
-        for control in (self.resource, self.resource_label, self.resource_help):
-            control.setVisible(visible)
+        self.oauth.setFocus()
 
     def auth_details(self, provider):
         managed = bool(provider.get("managed_available"))
+        connected = bool(self.connected_resources())
         self.oauth.setText(
-            "Enable web search"
+            "Check connection"
+            if self.oauth_state
+            else "Manage access"
+            if connected
+            else "Enable web search"
             if managed
-            else "Connect account"
-            if provider.get("oauth_available")
-            else "Sign-in setup pending"
+            else "Connect your account"
         )
         self.detail_copy.setText(
             "Search the web through Aedrova. No extra account or API key is needed. "
             "Daily usage limits apply."
             if managed
-            else provider["permissions"]
-            if provider.get("oauth_available")
+            else provider.get("permissions", provider["description"])
+            if provider.get("oauth_available") or connected
             else f"{provider['name']} sign-in is not configured on this Aedrova service yet. "
             "Your Bud can be saved while setup is completed."
         )
-        self.oauth.setVisible(bool(provider.get("oauth_supported") or managed))
-        self.oauth_hint.setVisible(bool(provider.get("oauth_supported") or managed))
+        self.oauth.setVisible(True)
+        self.oauth_hint.setVisible(True)
         self.oauth_hint.setText(
-            "Choose a research topic for your Bud. No codes or keys to copy."
+            "Finish signing in through your browser. Your Bud will update here."
+            if self.oauth_state
+            else "Choose a research topic for your Bud. No codes or keys to copy."
             if managed
             else "Sign in and approve read-only access. Finish here without copying codes or IDs."
             if provider.get("oauth_available")
-            else provider.get("oauth_setup_hint")
-            or "Account sign-in needs Aedrova’s provider app setup. A scoped token works below."
+            else "Your account is connected. Manage the resources shared with this Bud."
+            if connected
+            else "Account sign-in is not available yet. Aedrova must finish this provider’s setup."
         )
         self.update_controls()
 
@@ -742,8 +809,16 @@ class ConnectorsDialog(AppDialog):
     def stop_oauth(self):
         self.oauth_timer.stop()
         self.oauth_state = ""
+        self.oauth_attempt = None
+        if self.selected_provider:
+            self.auth_details(self.selected_provider)
 
     def connect_oauth(self):
+        if self.pending or self.job:
+            return
+        if self.oauth_state:
+            self.poll_oauth()
+            return
         provider = self.selected_provider
         resource = "me" if provider and provider["id"] == "tiktok" else ""
         if not provider or not (
@@ -784,19 +859,29 @@ class ConnectorsDialog(AppDialog):
                 "Choose a research topic. Aedrova handles the connection; daily usage limits apply."
             )
             self.selection_submit.setText("Enable web search")
+            self.selection_submit.show()
+            self.selection_retry.hide()
             return
         self.selection_submit.setText("Connect selected resource")
         self.selection_link.setPlaceholderText("Paste a Figma file link")
         self.stop_oauth()
+        attempt = self.oauth_attempt = object()
+        target = (provider["id"], self.bud.currentData())
         body = {
             "workspace": self.workspace,
             "dot": self.bud.currentData(),
             "provider": provider["id"],
             "resource": resource,
-            "hours": self.hours.value(),
+            "hours": CONNECTION_HOURS,
         }
 
         def started(value):
+            if (
+                self.oauth_attempt is not attempt
+                or not self.selected_provider
+                or target != (self.selected_provider["id"], self.bud.currentData())
+            ):
+                return
             state = value.get("state", "")
             origin = connector_origin()
             if (
@@ -810,8 +895,9 @@ class ConnectorsDialog(AppDialog):
                 self.status.setText("Your browser could not open. Try Connect account again.")
                 return
             self.oauth_state, self.oauth_deadline = state, time.monotonic() + 600
+            self.auth_details(provider)
             self.oauth_timer.start()
-            self.status.setText("Finish authorization in your browser. This Bud will update here.")
+            self.status.clear()
 
         self.run(lambda service: client(service).request("/api/buds/oauth/start", body), started)
 
@@ -840,6 +926,12 @@ class ConnectorsDialog(AppDialog):
                 link = bool(value.get("requires_link"))
                 self.resource_picker.setVisible(not link)
                 self.selection_link.setVisible(link)
+                available = link or bool(value.get("resources"))
+                self.selection_submit.setVisible(available)
+                self.selection_retry.setVisible(not available)
+                self.selection_retry.setText("Connect your account")
+                if not available:
+                    self.resource_picker.hide()
                 self.selection_copy.setText(
                     "Paste a Figma file link. Your Bud will only read that file."
                     if link
@@ -854,7 +946,7 @@ class ConnectorsDialog(AppDialog):
                 self.stop_oauth()
                 self.status.setText("Authorization did not complete. Try Connect account again.")
             else:
-                self.status.setText("Waiting for authorization in your browser…")
+                self.status.clear()
                 self.oauth_timer.start()
 
         self.run(
@@ -874,7 +966,7 @@ class ConnectorsDialog(AppDialog):
                 "workspace": self.workspace,
                 "dot": self.bud.currentData(),
                 "topic": topic,
-                "hours": self.hours.value(),
+                "hours": CONNECTION_HOURS,
             }
             provider, bud_id = dict(self.selected_provider), self.bud.currentData()
             self.run(
@@ -950,7 +1042,7 @@ class ConnectorsDialog(AppDialog):
             "provider": self.selected_provider["id"],
             "resource": resource,
             "credential": credential,
-            "hours": self.hours.value(),
+            "hours": CONNECTION_HOURS,
         }
         self.credential.clear()
         self.status.setText("Verifying access to your selected resource…")
@@ -978,10 +1070,14 @@ class ConnectorsDialog(AppDialog):
         }
 
         def removed(_value):
-            self.refresh()
-            self.status.setText(
-                "Access removed from Aedrova. Revoke the token in the provider’s settings too."
-            )
+            def refreshed():
+                self.pages.setCurrentIndex(1)
+                self.status.setText(
+                    "Access removed from Aedrova. You can also revoke Aedrova "
+                    "in the provider’s settings."
+                )
+
+            self.refresh(on_loaded=refreshed)
 
         self.run(
             lambda service: client(service).request("/api/buds/connections/disconnect", body),

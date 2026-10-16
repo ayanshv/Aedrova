@@ -23,6 +23,11 @@ Real staging private Bud replies/save/reopen and distinct-account denial passed;
 see [Step 4 evidence and boundaries](messaging-step-4.md). Step 5 connector UX
 requires next approval. Production and installed binaries remain separate.
 
+Step 5 single-action connector UI is implemented; see
+[connector UX evidence](connector-ux-step-5.md). Post-login resource choice remains
+where providers require it. Step 6 live provider lifecycle/certification is next
+and requires approval; nine-provider completion is not claimed by UI tests.
+
 The owner authorized Step 1 inventory only of the new repair roadmap. See the
 [complete current baseline](release-baseline-2026-10-15.md) and its
 [machine-readable requirement register](release-baseline-2026-10-15.json).

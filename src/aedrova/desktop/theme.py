@@ -109,6 +109,7 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QDialog#EmbeddedConnectors {{ background: transparent; }}
     QFrame#ConnectorRail {{ background: {t.canvas}; border-right: 1px solid {t.border}; }}
     QWidget#ConnectorGallery {{ background: transparent; }}
+    QWidget#ConnectorPage {{ background: {t.bg}; }}
     QFrame#ConnectorCard {{ background: {t.bg}; border: 1px solid {t.border};
         border-radius: 12px; }}
     QFrame#ConnectorCard:hover {{ border-color: {t.accent}; }}
