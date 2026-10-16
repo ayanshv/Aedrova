@@ -10,8 +10,8 @@ from PySide6.QtCore import QEvent, QObject, Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QApplication, QFileDialog
 
-from aedrova.desktop.controls import choose_teammate
 from aedrova.desktop.conversation import MESSAGE_ROLE
+from aedrova.desktop.conversation_picker import choose_conversation
 from aedrova.desktop.state import Channel, DemoStore, Message, Workspace
 from aedrova.identity.realtime import RealtimeWakeups
 from aedrova.identity.transfers import save_download
@@ -292,7 +292,11 @@ class ConnectedDashboard(QObject):
                         and (not parent or w.thread_id == parent)
                         and not composer.editor.toPlainText()
                     ):
-                        composer.editor.setPlainText(pending_row["body"])
+                        composer.editor.setPlainText(
+                            pending_row.get("_draft_text", pending_row["body"])
+                        )
+                        pending_row["_restored_revision"] = composer.editor.document().revision()
+                        w._save_drafts()
             if retryable:
                 self.queue.appendleft(action)
             else:
@@ -646,7 +650,7 @@ class ConnectedDashboard(QObject):
         if not w.channel_id or not text.strip() or len(text.strip()) > 10000:
             w.notify("Write a message of 1–10,000 characters in an available channel.")
             return
-        channel_id, workspace_id = w.channel_id, w.workspace_id
+        channel_id = w.channel_id
         key = (channel_id, parent_id, text.strip())
         message_id = self.pending.setdefault(key, str(uuid4()))
         editor = w.thread_composer if parent_id else w.composer
@@ -665,18 +669,21 @@ class ConnectedDashboard(QObject):
 
         def sent(_):
             self.pending.pop(key, None)
-            if message_id in self.outbox:
-                self.outbox[message_id]["delivery"] = ""
-            self.render_local_messages()
-            draft_key = (workspace_id, channel_id, parent_id or "")
-            same = (w.workspace_id, w.channel_id) == (workspace_id, channel_id)
-            if parent_id:
-                same = same and w.thread_id == parent_id
-            if same and editor.editor.toPlainText() == text:
+            pending_row = self.outbox.get(message_id, {})
+            restored = pending_row.get("_restored_revision")
+            pending_row["delivery"] = ""
+            if (
+                restored is not None
+                and w.channel_id == channel_id
+                and (not parent_id or w.thread_id == parent_id)
+                and editor.editor.document().revision() == restored
+                and editor.submission_text() == text.strip()
+            ):
                 editor.clear()
-                w.store.drafts[draft_key] = ""
-            elif not same and w.store.drafts.get(draft_key) == text:
-                w.store.drafts[draft_key] = ""
+                w._save_drafts()
+            self.render_local_messages()
+            # Accepted messages clear optimistically below. A delayed receipt
+            # must never erase a new draft, even if its text happens to match.
             w.notify("Message sent.")
 
         accepted = self.enqueue(("send", message_id), operation, sent, priority=True)
@@ -692,9 +699,10 @@ class ConnectedDashboard(QObject):
             "sequence": 0,
             "local": True,
             "delivery": "Sending…",
+            "_draft_text": editor.editor.toPlainText() or text.strip(),
         }
-        editor.clear()
-        w.store.drafts[(workspace_id, channel_id, parent_id or "")] = ""
+        editor.clear_submission(text)
+        w._save_drafts()
         self.render_local_messages()
         view = w.thread_messages if parent_id else w.messages
         view.scrollToBottom()
@@ -812,7 +820,8 @@ class ConnectedDashboard(QObject):
 
         def choose(snapshot):
             if (
-                not self.active or self.window.workspace_id != workspace
+                not self.active
+                or self.window.workspace_id != workspace
                 or self.account.service is not service
             ):
                 return
@@ -821,14 +830,29 @@ class ConnectedDashboard(QObject):
                 for r in snapshot.get("directory", [])
                 if r["workspace_id"] == workspace and r["user_id"] != str(service.user.id)
             ]
-            if not people:
-                self.window.notify("Invite a teammate before starting a direct message.")
+            buds = [b for b in snapshot.get("dots", []) if b["workspace_id"] == workspace]
+            if not people and not buds:
+                self.window.notify("Invite a teammate or configure a Bud to start a conversation.")
                 return
-            labels = [r["display_name"] + " · " + r["user_id"][:8] for r in people]
-            label, ok = choose_teammate(self.window, labels)
-            if not ok:
+            selected = choose_conversation(self.window, people, buds)
+            if (
+                not selected
+                or not self.active
+                or self.window.workspace_id != workspace
+                or self.account.service is not service
+            ):
                 return
-            recipient = people[labels.index(label)]["user_id"]
+            kind, recipient = selected
+            if kind == "bud":
+                if recipient not in {b["id"] for b in buds}:
+                    return
+                from aedrova.desktop.bud_chat import open_bud_chat
+
+                self.account.snapshot["dots"] = snapshot.get("dots", [])
+                open_bud_chat(self.window, recipient)
+                return
+            if kind != "person" or recipient not in {p["user_id"] for p in people}:
+                return
 
             def create():
                 identifier = service.rpc(
@@ -838,7 +862,8 @@ class ConnectedDashboard(QObject):
 
             def opened(result):
                 if (
-                    not self.active or self.window.workspace_id != workspace
+                    not self.active
+                    or self.window.workspace_id != workspace
                     or self.account.service is not service
                 ):
                     return

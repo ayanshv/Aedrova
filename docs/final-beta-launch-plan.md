@@ -18,6 +18,11 @@ installer acceptance remain separate. Step 3 desktop creation/consent and dashbo
 dismissal are implemented; website/API-wide enforcement is outside this batch.
 See [Step 2 evidence](ai-responsiveness-step-2.md).
 
+Step 4 messaging and the People/Buds DM picker are implemented in desktop source.
+Real staging private Bud replies/save/reopen and distinct-account denial passed;
+see [Step 4 evidence and boundaries](messaging-step-4.md). Step 5 connector UX
+requires next approval. Production and installed binaries remain separate.
+
 The owner authorized Step 1 inventory only of the new repair roadmap. See the
 [complete current baseline](release-baseline-2026-10-15.md) and its
 [machine-readable requirement register](release-baseline-2026-10-15.json).

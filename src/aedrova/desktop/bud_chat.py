@@ -236,7 +236,12 @@ class BudChat(AppDialog):
                     label("You · Sending…" if row.get("pending") else "You", "section")
                 )
                 body = label(row["body"], wrap=True)
-                body.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+                body.setTextInteractionFlags(
+                    Qt.TextInteractionFlag.TextSelectableByMouse
+                    | Qt.TextInteractionFlag.TextSelectableByKeyboard
+                )
+                body.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+                body.setMargin(2)
                 column.addWidget(body)
             self.rows.addWidget(widget)
         if not visible:
@@ -277,6 +282,7 @@ class BudChat(AppDialog):
             "p_bud": self.bud["id"],
             "p_body": text,
         }
+        self.composer.clear_submission(text)
         self.render()
         self.save_question()
 
@@ -287,7 +293,6 @@ class BudChat(AppDialog):
         def saved(row):
             self.history.append(row)
             self.pending_message = None
-            self.composer.clear()
             self.render()
             self.answer(row)
 
@@ -422,6 +427,11 @@ def open_bud_chat(window, bud_id):
         return
     existing = getattr(window, "bud_chat", None)
     if existing and not existing.closed:
+        if existing.bud["id"] == bud_id and existing.current():
+            existing.show()
+            existing.raise_()
+            existing.composer.editor.setFocus()
+            return
         existing.reject()
     window.bud_chat = BudChat(window, bud)
     window.bud_chat.open()

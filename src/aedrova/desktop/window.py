@@ -941,7 +941,7 @@ class AedrovaWindow(QMainWindow):
         self.build_activity.hide()
         self.messages.set_agent_visible(getattr(self, "activity_channel", None) == self.channel_id)
 
-    def start_agent_request(self, text):
+    def start_agent_request(self, text, *, composer=None):
         from aedrova.agents.context import build_command
         from aedrova.desktop.builds import open_build
 
@@ -996,9 +996,8 @@ class AedrovaWindow(QMainWindow):
             else:
                 accepted = start_analysis(self, text, bud=dot)
             if accepted:
-                for composer in (self.composer, self.thread_composer):
-                    if composer.editor.toPlainText().strip() == text.strip():
-                        composer.clear()
+                for target in (composer,) if composer else (self.composer, self.thread_composer):
+                    target.clear_submission(text)
                 self._save_drafts()
             return True
         import re
@@ -1020,9 +1019,8 @@ class AedrovaWindow(QMainWindow):
             from aedrova.desktop.dot_analysis import start_analysis
 
             if start_analysis(self, task or text):
-                for composer in (self.composer, self.thread_composer):
-                    if composer.editor.toPlainText().strip() == text.strip():
-                        composer.clear()
+                for target in (composer,) if composer else (self.composer, self.thread_composer):
+                    target.clear_submission(text)
                 self._save_drafts()
             return True
         task = build_command(text, nickname) or (text if dot and building else None)
@@ -1037,9 +1035,8 @@ class AedrovaWindow(QMainWindow):
 
             accepted = start_background_build(self, task)
         if accepted:
-            for composer in (self.composer, self.thread_composer):
-                if composer.editor.toPlainText().strip() == text.strip():
-                    composer.clear()
+            for target in (composer,) if composer else (self.composer, self.thread_composer):
+                target.clear_submission(text)
             self._save_drafts()
         return True
 
@@ -1090,7 +1087,7 @@ class AedrovaWindow(QMainWindow):
 
     def send_message(self, text):
         if self.connected and self.connected.active:
-            if self.start_agent_request(text):
+            if self.start_agent_request(text, composer=self.composer):
                 return
             self.connected.send(text)
             return
@@ -1113,7 +1110,7 @@ class AedrovaWindow(QMainWindow):
 
     def send_reply(self, text):
         if self.connected and self.connected.active:
-            if self.start_agent_request(text):
+            if self.start_agent_request(text, composer=self.thread_composer):
                 return
             self.connected.send(text, self.thread_id or None)
             return

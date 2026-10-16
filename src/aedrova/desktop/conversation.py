@@ -371,6 +371,7 @@ class MessageDelegate(QStyledItemDelegate):
         document = self.document(message, rect.width() - 94)
         painter.save()
         painter.translate(rect.x() + 74, rect.y() + self.body_offset(index))
+        self.view.paint_text_selection(painter, message, document)
         context = QAbstractTextDocumentLayout.PaintContext()
         context.palette.setColor(QPalette.ColorRole.Text, QColor(t.secondary))
         document.documentLayout().draw(painter, context)
@@ -484,6 +485,8 @@ class MessageView(QListView):
         self.agent_visible = False
         self.agent_anchor = None
         self.source_messages = []
+        self.text_selection = None  # message ID, UTF-16 anchor, UTF-16 position
+        self.selecting_text = False
         self.allow_threads = allow_threads
         self.setObjectName("Messages")
         self.setAccessibleName("Conversation messages")
@@ -542,7 +545,126 @@ class MessageView(QListView):
                 self.files_dropped.emit(paths)
                 event.acceptProposedAction()
 
+    def text_hit(self, point, *, clamp=False):
+        index = self.indexAt(point)
+        if not index.isValid() or index.data(MESSAGE_ROLE).id == self.agent_message_id:
+            return None
+        rect = self.visualRect(index)
+        document = self.delegate.document(index.data(MESSAGE_ROLE), rect.width() - 94)
+        local = QPointF(
+            point.x() - rect.x() - 74, point.y() - rect.top() - self.delegate.body_offset(index)
+        )
+        if not clamp and not QRectF(0, 0, document.textWidth(), document.size().height()).contains(
+            local
+        ):
+            return None
+        position = document.documentLayout().hitTest(local, Qt.HitTestAccuracy.FuzzyHit)
+        return index, document, max(0, min(position, document.characterCount() - 1))
+
+    def mousePressEvent(self, event):  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton:
+            hit = self.text_hit(event.position().toPoint())
+            self.selecting_text = hit is not None
+            if hit:
+                index, _, position = hit
+                anchor = (
+                    self.text_selection[1]
+                    if self.text_selection
+                    and self.text_selection[0] == index.data(MESSAGE_ROLE).id
+                    and event.modifiers() & Qt.KeyboardModifier.ShiftModifier
+                    else position
+                )
+                self.text_selection = (index.data(MESSAGE_ROLE).id, anchor, position)
+            else:
+                self.text_selection = None
+            self.viewport().update()
+        super().mousePressEvent(event)
+
+    def mouseDoubleClickEvent(self, event):  # noqa: N802
+        hit = self.text_hit(event.position().toPoint())
+        if hit and event.button() == Qt.MouseButton.LeftButton:
+            index, document, position = hit
+            cursor = QTextCursor(document)
+            cursor.setPosition(position)
+            cursor.select(QTextCursor.SelectionType.WordUnderCursor)
+            self.text_selection = (index.data(MESSAGE_ROLE).id, cursor.anchor(), cursor.position())
+            self.selecting_text = True
+            self.viewport().update()
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
+
+    def selection_cursor(self):
+        if not self.text_selection:
+            return None
+        identifier, anchor, position = self.text_selection
+        for row, message in enumerate(self.model().messages):
+            if message.id == identifier:
+                index = self.model().index(row)
+                document = self.delegate.document(message, self.visualRect(index).width() - 94)
+                cursor = QTextCursor(document)
+                cursor.setPosition(min(anchor, document.characterCount() - 1))
+                cursor.setPosition(
+                    min(position, document.characterCount() - 1), QTextCursor.MoveMode.KeepAnchor
+                )
+                return cursor
+        self.text_selection = None
+        return None
+
+    def paint_text_selection(self, painter, message, document):
+        if not self.text_selection or self.text_selection[0] != message.id:
+            return
+        start, end = sorted(self.text_selection[1:])
+        if start == end:
+            return
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(self.delegate.theme.accent_bg))
+        block = document.findBlock(start)
+        while block.isValid() and block.position() < end:
+            bounds = document.documentLayout().blockBoundingRect(block)
+            layout = block.layout()
+            for n in range(layout.lineCount()):
+                line = layout.lineAt(n)
+                first = max(start - block.position(), line.textStart())
+                last = min(end - block.position(), line.textStart() + line.textLength())
+                if first >= last:
+                    continue
+                x1, x2 = line.cursorToX(first)[0], line.cursorToX(last)[0]
+                painter.drawRoundedRect(
+                    QRectF(
+                        bounds.x() + min(x1, x2) - 2,
+                        bounds.y() + line.y() - 1,
+                        abs(x2 - x1) + 4,
+                        line.height() + 2,
+                    ),
+                    3,
+                    3,
+                )
+            block = block.next()
+
     def mouseReleaseEvent(self, event):  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton and self.selecting_text:
+            self.selecting_text = False
+            cursor = self.selection_cursor()
+            if cursor and cursor.hasSelection():
+                event.accept()
+                return
+            # Links keep their normal single-click behavior; ordinary body clicks
+            # place a text caret instead of unexpectedly opening a thread.
+            hit = self.text_hit(event.position().toPoint())
+            if hit:
+                index, document, _ = hit
+                rect = self.visualRect(index)
+                link = document.documentLayout().anchorAt(
+                    QPointF(
+                        event.position().x() - rect.x() - 74,
+                        event.position().y() - rect.y() - self.delegate.body_offset(index),
+                    )
+                )
+                if link and urlsplit(link).scheme in ("https", "http"):
+                    self.link_requested.emit(link)
+            event.accept()
+            return
         self._click_position = event.position().toPoint()
         super().mouseReleaseEvent(event)
 
@@ -592,6 +714,17 @@ class MessageView(QListView):
             self.react(identifier, emoji)
 
     def mouseMoveEvent(self, event):  # noqa: N802
+        if (
+            self.selecting_text
+            and self.text_selection
+            and event.buttons() & Qt.MouseButton.LeftButton
+        ):
+            hit = self.text_hit(event.position().toPoint(), clamp=True)
+            if hit and hit[0].data(MESSAGE_ROLE).id == self.text_selection[0]:
+                self.text_selection = (*self.text_selection[:2], hit[2])
+                self.viewport().update()
+            self.reaction_bar.hide()
+            return
         super().mouseMoveEvent(event)
         index = self.indexAt(event.position().toPoint())
         if not index.isValid():
@@ -624,16 +757,55 @@ class MessageView(QListView):
             self.thread_requested.emit(index.data(MESSAGE_ROLE).id)
 
     def keyPressEvent(self, event):  # noqa: N802
-        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+        moves = {
+            Qt.Key.Key_Left: QTextCursor.MoveOperation.PreviousCharacter,
+            Qt.Key.Key_Right: QTextCursor.MoveOperation.NextCharacter,
+            Qt.Key.Key_Up: QTextCursor.MoveOperation.Up,
+            Qt.Key.Key_Down: QTextCursor.MoveOperation.Down,
+            Qt.Key.Key_Home: QTextCursor.MoveOperation.StartOfLine,
+            Qt.Key.Key_End: QTextCursor.MoveOperation.EndOfLine,
+        }
+        if (
+            self.text_selection
+            and event.key() in moves
+            and (event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+        ):
+            cursor = self.selection_cursor()
+            if cursor:
+                cursor.movePosition(moves[event.key()], QTextCursor.MoveMode.KeepAnchor)
+                self.text_selection = (self.text_selection[0], cursor.anchor(), cursor.position())
+                self.viewport().update()
+                event.accept()
+                return
+        if event.matches(QKeySequence.StandardKey.SelectAll) and self.currentIndex().isValid():
+            index = self.currentIndex()
+            document = self.delegate.document(
+                index.data(MESSAGE_ROLE), self.visualRect(index).width() - 94
+            )
+            self.text_selection = (index.data(MESSAGE_ROLE).id, 0, document.characterCount() - 1)
+            self.viewport().update()
+            event.accept()
+        elif event.key() == Qt.Key.Key_Escape and self.text_selection:
+            self.text_selection = None
+            self.viewport().update()
+            event.accept()
+        elif event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self._request_thread(self.currentIndex())
             event.accept()
         elif event.matches(QKeySequence.StandardKey.Copy):
             self.copy_current()
             event.accept()
         else:
+            if event.key() in moves:
+                self.text_selection = None
+                self.viewport().update()
             super().keyPressEvent(event)
 
     def copy_current(self):
+        cursor = self.selection_cursor()
+        if cursor and cursor.hasSelection():
+            QApplication.clipboard().setText(cursor.selectedText().replace("\u2029", "\n"))
+            return
         if self.currentIndex().isValid():
             QApplication.clipboard().setText(self.currentIndex().data(MESSAGE_ROLE).body)
 
@@ -642,6 +814,8 @@ class MessageView(QListView):
         if not index.isValid():
             return
         self.setCurrentIndex(index)
+        if self.text_selection and self.text_selection[0] != index.data(MESSAGE_ROLE).id:
+            self.text_selection = None
         menu = AppMenu(self)
         if self.allow_threads and index.data(MESSAGE_ROLE).id != self.agent_message_id:
             menu.addAction("Reply in thread", lambda: self._request_thread(index))
@@ -684,7 +858,10 @@ class MessageView(QListView):
                 menu.addAction(
                     "Delete / unsend message", lambda: self.unsend_requested.emit(message.id)
                 )
-        menu.addAction("Copy message", self.copy_current)
+        cursor = self.selection_cursor()
+        if cursor and cursor.hasSelection():
+            menu.addAction("Copy selection", self.copy_current)
+        menu.addAction("Copy message", lambda: QApplication.clipboard().setText(message.body))
         menu.exec(self.viewport().mapToGlobal(position))
 
     def _choose_for(self, identifier):
@@ -1255,16 +1432,32 @@ class Composer(QFrame):
             self.hint.setText("↵ send  ·  ⇧↵ new line")
 
     def _submit(self):
-        text = self.editor.toPlainText().strip()
+        text = self.submission_text()
         if text and len(text) <= 10_000:
             if hasattr(self, "dictation"):
                 self.dictation.cancel()
-            for name, token in self.mention_tokens.items():
-                text = re.sub(
-                    r"(?<!\S)@" + re.escape(name) + r"(?=$|[\s.,!?])", lambda _, t=token: t, text
-                )
+            self.submission = (text, self.editor.document().revision())
             self.submitted.emit(text)
 
+    def submission_text(self):
+        text = self.editor.toPlainText().strip()
+        for name, token in self.mention_tokens.items():
+            text = re.sub(
+                r"(?<!\S)@" + re.escape(name) + r"(?=$|[\s.,!?])", lambda _, t=token: t, text
+            )
+        return text
+
+    def clear_submission(self, text):
+        """Clear only the accepted revision, comparing the actual wire mentions."""
+        sent = getattr(self, "submission", None)
+        if self.submission_text() != text.strip():
+            return False
+        if sent and sent != (text.strip(), self.editor.document().revision()):
+            return False
+        self.clear()
+        return True
+
     def clear(self):
+        self.submission = None
         self.editor.clear()
         QTimer.singleShot(0, self.editor.setFocus)

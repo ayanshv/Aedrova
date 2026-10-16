@@ -115,11 +115,8 @@ def test_coworker_picker_creates_and_reopens_server_dm(qtbot, tmp_path, monkeypa
 
     service.rpc = rpc
     monkeypatch.setattr(
-        "aedrova.desktop.connected.choose_teammate",
-        lambda _, labels: (
-            labels[0],
-            True,
-        ),
+        "aedrova.desktop.connected.choose_conversation",
+        lambda _, people, buds: ("person", people[0]["user_id"]),
     )
     window.start_dm_button.click()
     qtbot.waitUntil(lambda: window.channel_id == "dm")

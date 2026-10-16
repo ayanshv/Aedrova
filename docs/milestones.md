@@ -2227,3 +2227,26 @@ website and backend creation APIs are not newly migrated or server-gated.
 Final desktop suite 835 passed; Ruff/diff passed. No new live workspace creation
 or signed installer certification claimed. No owner action required now. Step 4
 requires owner approval; production promotion and release gates remain separate.
+
+## October 15 — repair roadmap Step 4 messaging
+
+Owner approved Step 4, personal interventions at the end. Implemented selectable
+conversation text, rounded line highlights, native keyboard copy for agent/Bud
+labels, token/revision-aware composer clearing and distinct main/thread drafts.
+Receipts preserve newly typed text; retries clear only untouched restored drafts.
+Private Bud sends clear immediately with existing saved-message retry IDs.
+DM + now offers searchable People/Buds, configured avatars, stable identities,
+workspace/session guards and non-interrupting same-Bud dialog reopening.
+
+Full desktop suite 846 passed, Ruff/diff passed; embedded PostgreSQL migration/RLS
+suite passed including coworker DM and private Bud isolation. Real staging fresh
+native sessions verified actual streamed Bud reply/save/reopen, repeated-ID
+idempotency, foreign-account table/RPC read/write/spoofed-reply denial and zero
+reserved usage. Incremental test usage $0.001992. No new keys, schema, workspace
+memberships, connector scopes, Render deployment or production/installer changes. The first cold-host
+attempt was incomplete; subsequent health-verified attempt passed. Live two-human
+messaging/notifications and all membership lifecycles remain release acceptance
+items, not claimed by this narrower test. Details: docs/messaging-step-4.md.
+
+No owner action required now. Step 5 single-action connector UX needs approval;
+Step 6 live provider certification and Step 10 production promotion remain gated.

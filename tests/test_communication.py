@@ -277,7 +277,7 @@ def test_direct_message_action_uses_selected_teammate(qtbot, tmp_path, monkeypat
 
     service.rpc = rpc
     monkeypatch.setattr(
-        "aedrova.desktop.connected.choose_teammate", lambda *a: ("Morgan · peer", True)
+        "aedrova.desktop.connected.choose_conversation", lambda *a: ("person", "peer")
     )
     window.connected.start_dm()
     qtbot.waitUntil(lambda: window.channel_id == "dm" and not window.account_dialog.busy)

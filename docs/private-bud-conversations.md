@@ -1,5 +1,11 @@
 # Private Bud conversations and coworker DM discovery
 
+October 15 current evidence supersedes the pending handoffs below: see
+[repair roadmap Step 4](messaging-step-4.md). Real staging private Bud replies,
+save/reopen and distinct-account read/write/reply denial passed. The combined
+People/Buds picker is implemented. No new migration or owner sign-in is needed
+for this source batch. Historical progress and its limitations follow.
+
 October 14, 2026. Source implementation delivered; hosted acceptance is pending
 the additive staging migration below. No public release gates changed.
 

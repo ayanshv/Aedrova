@@ -117,7 +117,12 @@ class ActivityRow(QFrame):
             column.addLayout(header)
             self.message = QLabel(summary)
             self.message.setTextFormat(Qt.TextFormat.PlainText)
-            self.message.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            self.message.setTextInteractionFlags(
+                Qt.TextInteractionFlag.TextSelectableByMouse
+                | Qt.TextInteractionFlag.TextSelectableByKeyboard
+            )
+            self.message.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            self.message.setMargin(2)
             self.message.setWordWrap(True)
             self.message.setAccessibleName("Agent update")
             self.message.setFont(system_font(14))
