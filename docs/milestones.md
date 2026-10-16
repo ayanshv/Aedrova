@@ -2307,3 +2307,23 @@ release. Step 6 remains open; Step 7 has not started.
 
 Final Step 6 source validation: 528 backend tests passed after setup-copy cleanup;
 Ruff/diff pass. This does not certify undeployed patches or missing live grants.
+
+
+## October 15 — Step 6 approved staging setup delivered
+
+Registered and re-read exact staging callbacks for existing GitHub/Supabase/Figma/
+Notion apps, retaining prior callbacks/scopes. Copied only their eight existing
+client ID/secret values privately into Render aedrova-beta-staging; retained all
+34 prior variables (42 total). No new keys, purchases, production changes or
+permission expansion. Saved environment then deployed specific tested da30ebf.
+Render dep-db8s0huq1p3s7396bdfg Live. Health 200, AI enabled, checkout disabled.
+Fresh native Google PKCE/authenticated catalog passed: all four plus Instagram/
+TikTok OAuth available; Stripe/Vercel/Search remain unavailable. No active grants
+in named staging workspace. Backend rerun 528 passed, Ruff/diff pass.
+
+No owner action required for this completed setup. Step 6 remains open for fresh
+provider consent/resource reads and lifecycle acceptance; those actions must be
+prepared sequentially before an exact personal handoff. GitHub's initial identity
+prompt resolved without owner intervention. Stripe business/bank setup remains
+deferred; Step 7 and production/installers not started. Evidence and boundaries:
+docs/connector-certification-step-6.md.

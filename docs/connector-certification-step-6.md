@@ -12,8 +12,16 @@ managed AI enabled and checkout disabled. The earlier cold-host query was
 incomplete, not a provider authorization failure. The separate existing connector
 host also returned health HTTP 200. Tokens were not sent between environments.
 
-Render Deploys still shows e375bdc / dep-db8o043l550s73ej2i90 Live. Source fixes
-below are not yet deployed. Readiness evidence is in ignored
+Render now shows da30ebf390627f0d289896b58a125b6035008431 /
+dep-db8s0huq1p3s7396bdfg Live after the specifically approved setup.
+All four staging callbacks were saved and re-read, retaining existing callbacks.
+The eight existing client ID/secret values were copied privately from ignored
+website .env.dots into staging; 34 existing variables were retained (42 total).
+No new key, broader scope, paid plan or production change. Fresh native Google
+PKCE and authenticated catalog queries passed: GitHub, Supabase, Figma, Notion,
+Instagram and TikTok now report OAuth available. Stripe/Vercel/Search remain
+unconfigured. Health HTTP 200, managed AI true, checkout false.
+Readiness evidence is in ignored
 work/connector-step-6/readiness.json; no provider secrets or account content are
 in that report. The named synthetic staging workspace currently has no active
 connector grants. Historical connections do not certify fresh lifecycle behavior.
@@ -21,17 +29,17 @@ connector grants. Historical connections do not certify fresh lifecycle behavior
 ## All nine connectors
 
 - **GitHub:** adapter and lifecycle tests pass; existing local client ID/secret
-  present. Staging reports OAuth unavailable. Add its staging callback and deploy
-  the existing credentials privately after the exact transfer approval. Fresh
+  present. Staging callback/credential setup is now saved and deployed, and the
+  authenticated catalog reports OAuth available. Fresh
   installation/resource discovery, real reads, renewal and revocation remain open.
-- **Supabase:** same staging configuration blocker; existing local pair present.
+- **Supabase:** staging callback/credential setup completed; OAuth available.
   Keep projects:read only; no SQL, database rows or project keys. Historical health
   reads on the separate connector service do not certify this staging environment.
-- **Figma:** same staging configuration blocker; local pair present. Keep
+- **Figma:** staging callback/credential setup completed; OAuth available. Keep
   file_content:read. A file link remains required after provider consent because
   current discovery cannot enumerate arbitrary accessible files. Do not invent IDs
   or silently grant all files. Fresh file read/renewal/revoke checks remain open.
-- **Notion:** same staging configuration blocker; local pair present. Keep Read
+- **Notion:** staging callback/credential setup completed; OAuth available. Keep Read
   content only and the existing dedicated validation page. Do not select a personal
   parent page or broaden installation access. Fresh named-page discovery, read,
   refresh, disconnect/reconnect and provider revocation remain open.
@@ -101,24 +109,28 @@ Meta's business-login documentation required sign-in; do not claim a fresh publi
 documentation read for its gated page. Existing official Meta app/tester UI and
 previous live evidence remain documented in the website's social-connectors.md.
 
-## Consolidated owner handoff — required next
+## Approved setup completed; remaining live acceptance
 
-Approve **adding the exact staging callbacks and privately copying the existing
-GitHub, Supabase, Figma and Notion client IDs/secrets from ignored website .env.dots
-to Render → aedrova-beta-staging → Environment**, then deploying the tested staging
-backend revision. No new keys, scope expansion, production changes or purchases.
-This is a different credential destination from the prior separate connector host;
-browser safety requires this specific approval before transfer/registration.
+Owner approved the exact four-provider callback/credential transfer and tested
+staging deployment. GitHub initially displayed Confirm access, but subsequently
+opened its settings without a new owner intervention; no identity action remains.
+GitHub retained localhost and the separate connector host callbacks. Supabase,
+Figma and Notion retained their separate connector-host callbacks. Each added only
+https://aedrova-beta-staging.onrender.com/buds/oauth/{provider}/callback.
+All callbacks were re-read after saving; Figma and Notion also survived reload.
+No client secrets were printed or committed. Existing database/encryption/model/
+speech/social settings were not edited. Save only was used before deploying the
+specific tested commit. Render reports Live; safe screenshot saved in ignored
+work/connector-step-6/staging-deployed.jpg. Backend rerun: 528 passed; Ruff/diff pass.
+Fresh native test session signed out and private login URL removed.
 
-The agent will perform the approved work; do not paste secrets here. The prepared
-non-secret checklist is website deploy/staging-connector-certification.env.example.
-Do not import its blank values as a complete environment or replace database,
-encryption, AI, speech or social settings. Keep existing callbacks and grants.
-This approval blocks live certification of those four providers.
-
-After configuration, fresh provider login/consent may need the owner personally.
-Exact, newly generated pages will be supplied when ready; do not reuse expired
-links or repeat the historical setup. Social consent/reconnect, Vercel registration
-agreement and Search subscription are separate handoffs when actually prepared.
-Stripe business/bank work stays deferred as instructed. Step 6 stays open; do not
-start Step 7 or label all connectors complete.
+No personal action is required to finish this setup batch. Step 6 remains open:
+fresh provider consent, named-resource reads, refresh and disconnect/reconnect/
+provider revocation must be checked sequentially using disposable test resources.
+The named staging workspace still has no active grants. Do not label the six
+available OAuth providers as end-to-end certified on configuration evidence alone.
+When a newly prepared provider screen requires personal sign-in or consent, supply
+its exact current page and requested scope; do not reuse expired links or ask for
+secrets in chat. Social publication/review, Vercel registration/agreement and Search
+subscription remain separate gates. Stripe bank/business setup stays deferred.
+Step 7, production promotion and installers have not started in this batch.
