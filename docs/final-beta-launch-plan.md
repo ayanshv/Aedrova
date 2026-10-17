@@ -8,6 +8,15 @@ completion. Current evidence, frozen scope and exact staging handoffs are saved 
 [Phase 1 baseline](final-beta-phase-1.md). Waitlist and public billing/download gates
 remain unchanged. The owner-supplied proposal is preserved in release-plan-source.md.
 
+## Deferred meeting launch gates — October 16, 2026
+
+Owner requested that remaining meeting engineering, paid staging API/guard setup,
+two-account physical acceptance and production/installer parity be saved as
+[explicit launch gates](meeting-launch-gates.md). All remain open. No immediate
+owner action or purchase is required; deferral does not mark Step 8 complete or
+remove any requested feature. Resolve these gates before advertising/releasing
+the corresponding meeting functionality.
+
 ## Current repair roadmap — October 15, 2026
 
 Step 2 responsiveness implementation and real hosted OpenAI conversational acceptance

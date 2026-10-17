@@ -2399,3 +2399,13 @@ speech/call-bar tests passed after final request-correlation and lifecycle chang
 Backend context/wrapup API suite: 8 passed. Ruff and diff checks passed. Qt fixture
 previews rendered in light/dark; these are controlled checks, not hosted RLS or
 physical speech/meeting certification.
+
+## October 16 — meeting launch gates saved
+
+Owner requested deferral of the remaining meeting work and acceptance requirements
+to launch gates. Saved docs/meeting-launch-gates.md and linked the final Beta plan.
+Four open gates cover feature/scope completion, deferred paid staging API plus
+independent guard, two-account physical/accessibility/security acceptance, and
+production/installer parity. No gate closed, feature removed, hosting purchased,
+code changed or environment deployed. No owner action required now; exact deferred
+Render/device actions, costs and blockers remain explicit in the gate register.
