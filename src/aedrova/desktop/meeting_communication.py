@@ -223,7 +223,7 @@ class MeetingCaptions(MeetingTextSurface):
         self.worker, self.people, self.names = worker, people, names
         self.body.addWidget(
             label(
-                "Unreviewed microphone text · processing may leave gaps. "
+                "Unreviewed meeting text · speech processing may leave gaps. "
                 "Opening captions does not start transcription. Each speaker "
                 "must consent and start it themselves.",
                 "muted",
