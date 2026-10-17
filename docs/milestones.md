@@ -2474,3 +2474,45 @@ Focused Bud/setup/connected checks: 26 passed. Backend 530 passed; public RLS an
 private PostgreSQL schema/atomic-lease checks passed locally. No claim that these
 replace hosted two-account, restore or multi-worker acceptance. Developer ID signing
 identity is absent locally (only Apple Development present); signing gate open.
+
+## October 17 — candidate CI and live staging isolation checkpoint
+
+Desktop source 3a9b698 passed GitHub CI 38998004293 on macOS, Windows, Ubuntu
+and PostgreSQL/RLS. Local desktop suite: 886 passed before the final focused
+fixture/layout corrections; 26 focused checks passed afterward. Backend suite:
+530 passed. Public and private embedded PostgreSQL checks, lint and tracked-secret
+checks passed. These results do not certify installers, physical capture or a
+hosted recovery/multi-worker drill.
+
+Deployed existing backend source 96d18562aea773ad2e312aa4074815c3581c8b3e to the
+existing free aedrova-beta-staging service (Render deploy
+dep-db9efldg1s2s738dg480, observed Live). No environment credentials, hosting plan,
+production service, public downloads or billing activation changed. Readiness
+returned 200 after initial request timeouts; meeting health remains 503 unavailable.
+Always-on reliability and meeting activation are still OPEN.
+
+Live ordinary-user staging acceptance passed private file/thread publication and
+verified download, upload cancellation at two points, foreign-workspace denial,
+same-workspace private-channel denial, removed-member denial and signed-out media
+denial. Separate live Bud acceptance passed idempotent private history, outsider
+read/write denial, same-workspace private-history/reply isolation, reverse member
+isolation, no shared-channel publication and removed-member denial. Both used two
+distinct Google accounts; synthetic Bud/workspace fixtures were soft-removed or
+archived and probe sessions signed out. No inference or connector grant was used.
+Repeatable Bud probe: scripts/check_staging_bud_privacy.py. Private local evidence:
+work/staging/gate-closure-media.json and gate-closure-bud.json; never commit sessions.
+
+Fresh native workspace creation verified mandatory AI execution consent and that
+Go to dashboard dismisses its account popup and opens the welcome flow. Remaining
+required-Bud/Finish later/highlight walkthrough is NOT accepted: macOS automation
+failed to acquire the staging application's capture stream (-3811). No product
+crash was found in the launcher log; this does not establish full native acceptance.
+
+ALL-gate closure remains INCOMPLETE. Outstanding engineering remains explicitly
+listed in meeting-launch-gates.md and original requirement/status inventories.
+Other open gates include provider lifecycle/public approval, real model accounting,
+hosted alerts/recovery/multi-worker and independent security review, Stripe account
+and lifecycle acceptance, legal operator confirmation, Apple OAuth/Developer ID,
+Windows signing and clean-machine/update/uninstall tests. Step 10 has not started.
+Consolidated owner dependencies and exact next actions are in
+docs/launch-gate-checkpoint-2026-10-17.md. No purchase performed.

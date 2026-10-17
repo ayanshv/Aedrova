@@ -1,5 +1,11 @@
 # Pre-Apple launch gate checkpoint — October 13, 2026
 
+**Historical checkpoint:** October 17 progress and consolidated current owner
+actions are in [the latest checkpoint](launch-gate-checkpoint-2026-10-17.md).
+Two-account media and Bud privacy checks below have since passed. Native onboarding,
+meetings and the other listed acceptance gates remain open; old immediate sign-in
+handoffs below are retained as history, not new user requirements.
+
 Owner explicitly authorized resuming launch-gate work before Apple enrollment.
 No live charges, membership purchase, public access activation, legal identity
 inference, production data deletion or provider-wide revocation is authorized here.
