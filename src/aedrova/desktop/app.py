@@ -31,7 +31,9 @@ def main():
     app.setApplicationName("Aedrova")
     app.setOrganizationName("Aedrova")
     app.setStyle("Fusion")
-    app.setWindowIcon(app_icon())
+    icon = app_icon()
+    if not icon.isNull():
+        app.setWindowIcon(icon)
     settings = (
         QSettings(str(args.settings_file), QSettings.Format.IniFormat)
         if args.settings_file

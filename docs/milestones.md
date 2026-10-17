@@ -2516,3 +2516,22 @@ and lifecycle acceptance, legal operator confirmation, Apple OAuth/Developer ID,
 Windows signing and clean-machine/update/uninstall tests. Step 10 has not started.
 Consolidated owner dependencies and exact next actions are in
 docs/launch-gate-checkpoint-2026-10-17.md. No purchase performed.
+
+## October 17 — native macOS adaptive app icon
+
+Owner requested Aedrova respond to macOS Default/Dark/Clear/Tinted icon styles.
+Added branding/Aedrova.icon using the existing mark, light and charcoal backgrounds
+and native system mono material. Apple controls tint, Always/Auto and light/dark
+renditions; no app theme override or new in-app option. Owner accepted Icon Composer's
+first-use license personally. No new generated logo, payment or account grant.
+
+Packaging and staging now compile Assets.car/compatible ICNS with Xcode actool,
+merge its icon metadata and install before signing. Qt skips its fixed runtime icon
+when the native macOS bundle catalog is present. Non-macOS/unbundled sources retain
+the static fallback. Updated local staging bundle and verified ad-hoc signature.
+Native Default, Dark, ClearLight, ClearDark, TintedLight and TintedDark exports all
+passed; preview inspected. Four focused brand/native-icon tests and lint passed.
+This is not signed distribution/installer or live Dock-style acceptance. Required
+owner action: relaunch the updated staging build, then choose each macOS Appearance
+icon style to confirm the Dock result; an already-running/older installed app will
+not receive source changes automatically. Public release gates remain unchanged.

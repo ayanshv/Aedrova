@@ -56,7 +56,9 @@ class AedrovaWindow(QMainWindow):
         self.reduced_transparency = self.settings.value("reduceTransparency", False, type=bool)
         QApplication.instance().setProperty("reduceMotion", self.reduced_motion)
         self.setFont(system_font())
-        self.setWindowIcon(app_icon())
+        icon = app_icon()
+        if not icon.isNull():
+            self.setWindowIcon(icon)
         self.setWindowTitle("Aedrova — Northstar Labs · Local preview")
         self.resize(1440, 940)
         self.setMinimumSize(900, 650)

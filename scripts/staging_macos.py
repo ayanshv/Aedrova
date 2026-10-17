@@ -13,6 +13,8 @@ import sys
 import sysconfig
 from pathlib import Path
 
+from macos_icon import install as install_macos_icon
+
 
 def prepare(root: Path, environment: dict[str, str]) -> Path:
     bundle = root / "work/staging/Aedrova Staging.app"
@@ -35,6 +37,7 @@ def prepare(root: Path, environment: dict[str, str]) -> Path:
         ),
         "NSCameraUsageDescription": "Enable video in a meeting when you choose to.",
     }
+    info.update(install_macos_icon(root, contents))
     with (contents / "Info.plist").open("wb") as stream:
         plistlib.dump(info, stream)
     subprocess.run(
