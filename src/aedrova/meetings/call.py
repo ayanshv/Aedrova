@@ -60,6 +60,7 @@ class CallWorker(QObject):
         self.wrapup_status = None
         self.selected_audio = {"microphone": "", "speaker": ""}
         self.noise_suppression = True
+        self.receive_video = True
 
     def start(self):
         if self.thread:
@@ -259,7 +260,7 @@ class CallWorker(QObject):
         listen("participant_disconnected", lambda *_: self._roster())
         listen("track_muted", lambda *_: self._roster())
         listen("track_unmuted", lambda *_: self._roster())
-        listen("track_published", lambda *_: self._roster())
+        listen("track_published", self._published)
         listen("track_unpublished", lambda *_: self._roster())
         listen(
             "active_speakers_changed",
@@ -304,11 +305,22 @@ class CallWorker(QObject):
         self.state.emit("Reconnected · enable your devices when ready")
         self._roster()
 
+    def _published(self, publication, participant):
+        if not self.receive_video and publication.kind == rtc.TrackKind.KIND_VIDEO:
+            try:
+                publication.set_subscribed(False)
+            except Exception:
+                self.problem.emit("Could not update incoming video. Retry this setting.")
+        self._roster()
+
     def _subscribed(self, track, publication, participant):
         if self.cleaning or self.stop_requested.is_set():
             return
         if track.kind != rtc.TrackKind.KIND_VIDEO:
             return  # ADM handles remote audio playback, without an audio recorder.
+        if not self.receive_video:
+            publication.set_subscribed(False)
+            return
         if len(self.streams) >= 32:
             return
         key = participant.identity + (
@@ -332,6 +344,8 @@ class CallWorker(QObject):
     async def _receive(self, key, stream):
         try:
             async for event in stream:
+                if not self.receive_video:
+                    continue
                 frame = event.frame
                 image = QImage(
                     bytes(frame.data),
@@ -406,6 +420,22 @@ class CallWorker(QObject):
             if self.cleaning or self.stop_requested.is_set():
                 return
             try:
+                if kind == "receive_video":
+                    self.receive_video = bool(enabled)
+                    if not enabled:
+                        for key, _stream, task in list(self.streams.values()):
+                            task.cancel()
+                            self.media.emit(key, False)
+                        self.streams.clear()
+                        with self.frames_lock:
+                            for key in list(self.frames):
+                                if "/" in key:
+                                    self.frames.pop(key, None)
+                    for participant in self.room.remote_participants.values():
+                        for publication in participant.track_publications.values():
+                            if publication.kind == rtc.TrackKind.KIND_VIDEO:
+                                publication.set_subscribed(bool(enabled))
+                    return
                 if kind == "refresh_audio_devices":
                     self._audio_inventory()
                     return
@@ -511,6 +541,9 @@ class CallWorker(QObject):
                 self.media.emit(kind, enabled)
                 self._roster()
             except Exception:
+                if kind == "receive_video":
+                    self.problem.emit("Could not update incoming video. Retry this setting.")
+                    return
                 if kind in {"consent", "withdraw_text"}:
                     self.privacy_result.emit(enabled.get("request", ""), kind, False)
                     return

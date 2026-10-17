@@ -3,7 +3,8 @@
 Saved October 16, 2026 at the owner's request. **All gates below are OPEN.**
 Deferred to the pre-launch review; no hosting purchase, deployment or live testing
 is requested now. Deferral does not mean acceptance, deletion of scope or permission
-to advertise unfinished features. Step 8 remains partial and Step 9 has not started.
+to advertise unfinished features. Step 8 remains partial. Step 9 started with owner approval on October 16; its
+first implementation batch is documented in meeting-step-9.md.
 
 ## LG-MTG-01 — Finish meeting functionality and freeze release scope
 
@@ -79,7 +80,10 @@ Step 8 foundation: 872 desktop regression tests, followed by 73 final focused
 meeting tests; 8 backend API tests passed. Light/dark Qt fixture previews inspected.
 Chat/captions/privacy/review source delivered; no production deployment, installer
 rebuild, paid upgrade or physical hosted meeting acceptance performed in that batch.
-Detailed boundaries: meeting-step-7.md and meeting-step-8.md.
+Step 9 first batch: 884 desktop regression tests, 89 final focused checks and live
+generated-media video subscription pause/resume/removal checks passed. Physical
+capture and hosted-account acceptance remain open. Detailed boundaries:
+meeting-step-7.md, meeting-step-8.md and meeting-step-9.md.
 
 At the final go/no-go review, record candidate commits, environment, test evidence,
 owner approval and closure date for each gate. No gate is closed by this document.

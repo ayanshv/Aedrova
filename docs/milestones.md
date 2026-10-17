@@ -2409,3 +2409,30 @@ independent guard, two-account physical/accessibility/security acceptance, and
 production/installer parity. No gate closed, feature removed, hosting purchased,
 code changed or environment deployed. No owner action required now; exact deferred
 Render/device actions, costs and blockers remain explicit in the gate register.
+
+## October 16 — repair roadmap Step 9, first advanced presentation batch
+
+Owner approved Step 9 after saving outstanding Step 8 work as launch gates.
+Implemented native application-window share targets, permission/watchdog retention,
+stop/unpublish-based share pause with acknowledged resume, sharer freehand drawings
+in outgoing screen pixels, pin/unpin video, video-only receive unsubscription,
+self-view/preview-only mirror and basic outgoing monochrome/soft-light treatment.
+Presentation and device settings scroll; fixed compact clipping during visual QA.
+No background segmentation, remote-control permission or pretend advanced controls.
+No new schema/backend/provider/model call or paid infrastructure. Source only;
+production, installed binaries and hosted feature gates remain unchanged.
+
+Validation: full desktop suite 884 passed; 89 final focused native meeting tests
+passed after final optimizations/race checks. Ruff/diff checks passed. Existing
+synthetic native RTC probe passed two-way camera/screen exchange, incoming-video
+pause/resume while outgoing continued (109 resumed frames), forced removal and
+cached-token rejection. No physical capture, hosted Supabase-user acceptance,
+recording or transcription. Rendered light/dark wide and compact previews;
+inspected compact share and Presentation; fixed clipped copy.
+
+Full original requirements retained in docs/meeting-step-9-status.json; details,
+limits and consolidated owner actions in docs/meeting-step-9.md. Step 9 remains
+partial: backgrounds, advanced collaboration/moderation, breakouts/polls, translation,
+telephony and streaming still open. No owner action now. Existing deferred Render
+always-on API/independent guard and two-device OS-permission/listening tests remain
+launch blockers in docs/meeting-launch-gates.md. Step 10 has not started.

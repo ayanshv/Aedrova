@@ -17,6 +17,13 @@ owner action or purchase is required; deferral does not mark Step 8 complete or
 remove any requested feature. Resolve these gates before advertising/releasing
 the corresponding meeting functionality.
 
+## Step 9 progress — October 16, 2026
+
+Owner approved advanced meeting work. First batch adds native window capture,
+pause/resume sharing, sharer annotations, pinning, video receive/self-view choices
+and basic outgoing camera treatments. This is partial delivery with original
+advanced requirements and launch gates retained. See [Step 9 evidence and limits](meeting-step-9.md).
+
 ## Current repair roadmap — October 15, 2026
 
 Step 2 responsiveness implementation and real hosted OpenAI conversational acceptance
