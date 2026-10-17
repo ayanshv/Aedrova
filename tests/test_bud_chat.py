@@ -12,6 +12,9 @@ from aedrova.desktop.bud_chat import BudChat
 
 def ready_chat(qtbot, tmp_path):
     window, service = setup(qtbot, tmp_path)
+    # Settle initial dashboard sync before replacing its shared fake RPC transport.
+    qtbot.waitUntil(lambda: bool(window.channel.messages) and not window.account_dialog.busy
+                    and not window.connected.current_action and not window.connected.queue)
     history, calls = [], []
 
     def rpc(name, params):
@@ -244,7 +247,7 @@ def test_private_reply_is_persisted_with_bud_identity_and_no_shared_feed(
     )
     monkeypatch.setattr("aedrova.agents.runtime.LocalRunner.run", lambda *a, **k: "A useful draft.")
     dialog.send("Please help")
-    qtbot.waitUntil(lambda: len(history) == 2)
+    qtbot.waitUntil(lambda: len(dialog.history) == 2 and not dialog.busy)
     assert history[-1]["role"] == "assistant"
     assert history[-1]["body"] == "A useful draft."
     assert dialog.history == history and closed == [True]

@@ -2456,3 +2456,21 @@ launch plan and meeting gate register; no deferred item is treated as complete.
 Release-candidate packaging/clean-machine checks precede promotion; production-only
 smoke is run in Step 10 and still gates public activation. No setup/payment,
 implementation, deployment or acceptance is claimed by this documentation change.
+
+## October 16 — all-gate closure authorized; payments excluded
+
+Owner authorizes access to necessary materials, implementation and staging testing
+for ALL launch gates, with an explicit exception: no payments/purchases on owner's
+behalf. This supersedes earlier implementation deferrals, not acceptance evidence,
+account ownership, human hardware tests or security-specific confirmation rules.
+Step 10 remains blocked. Current all-gate closure work is ongoing, not complete.
+
+Latest GitHub candidate 006b695 failed Windows/Linux while macOS and PostgreSQL
+passed. Traced Windows Bud-history failure to the fixture replacing its shared
+transport before initial sync settled; Linux reply test waited for server-side
+fixture mutation before GUI completion. Corrected both waits. Fixed actual Linux
+AI review disclosure compression with a non-compressible minimum text height.
+Focused Bud/setup/connected checks: 26 passed. Backend 530 passed; public RLS and
+private PostgreSQL schema/atomic-lease checks passed locally. No claim that these
+replace hosted two-account, restore or multi-worker acceptance. Developer ID signing
+identity is absent locally (only Apple Development present); signing gate open.

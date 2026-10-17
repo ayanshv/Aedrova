@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -527,6 +528,9 @@ class AccountDialog(AppDialog):
         self.onboarding_workflow.addItem("Review the plan before building", False)
         review.addWidget(self.onboarding_workflow)
         self.onboarding_permission = label("", "muted", wrap=True)
+        self.onboarding_permission.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Minimum
+        )
         review.addWidget(self.onboarding_permission)
         review.addWidget(
             label(
@@ -741,6 +745,10 @@ class AccountDialog(AppDialog):
             if self.onboarding_workflow.currentData()
             else "Build requests open a plan for your review. Context is shared only when you "
             "authorize the workflow. Automatic execution stays off."
+        )
+
+        self.onboarding_permission.setMinimumHeight(
+            self.onboarding_permission.sizeHint().height()
         )
 
     def review_ai_setup(self):
