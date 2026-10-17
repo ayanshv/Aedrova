@@ -2380,3 +2380,22 @@ checks passed after the final UI status-copy adjustment. Ruff/diff checks passed
 Light/dark wide/compact previews inspected. Forced TURN relay received generated
 audio/camera/screen in both directions. No physical capture or hosted-user call
 was performed. Public launch and Step 7 hardware acceptance remain gated.
+
+## October 16 — repair roadmap Step 8 foundation (partial)
+
+Owner approved Step 8. Added authenticated persistent channel chat inside calls,
+explicit permitted captions with adjustable text size, bounded latest transcript
+API query using caller RLS, server-acknowledged privacy choices with request IDs,
+and transcript draft preservation/current-page search. No recording, RTC data
+publishing, implicit AI reuse or new device capture. Exact source/evidence and
+remaining work: docs/meeting-step-8.md; every original requirement retained in
+meeting-step-8-status.json. Step 8 remains open for additional engineering and
+hosted/physical acceptance; Step 9 has not started. Paid staging API/independent
+guard are still deferred. No migration, provider key/allowance change, production
+deployment or installer build. Owner actions consolidated in Step 8 handoff.
+
+Step 8 validation: full desktop suite 872 passed, then 73 final focused meeting/
+speech/call-bar tests passed after final request-correlation and lifecycle changes.
+Backend context/wrapup API suite: 8 passed. Ruff and diff checks passed. Qt fixture
+previews rendered in light/dark; these are controlled checks, not hosted RLS or
+physical speech/meeting certification.

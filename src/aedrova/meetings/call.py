@@ -19,6 +19,7 @@ class CallWorker(QObject):
     media = Signal(str, bool)
     ended = Signal()
     review_ready = Signal(object)
+    privacy_result = Signal(str, str, bool)
     consent_snapshot = Signal(object)
     text_capability = Signal(bool)
     speech_capability = Signal(bool)
@@ -450,6 +451,7 @@ class CallWorker(QObject):
                         enabled["ai_context"],
                     )
                     self.update_consent(snapshot)
+                    self.privacy_result.emit(enabled.get("request", ""), kind, True)
                     return
                 if kind == "withdraw_text":
                     self.pause_speech()
@@ -458,6 +460,7 @@ class CallWorker(QObject):
                     )
                     snapshot = await asyncio.to_thread(self.client.pulse, self.meeting)
                     self.update_consent(snapshot)
+                    self.privacy_result.emit(enabled.get("request", ""), kind, True)
                     return
                 if kind == "end":
                     await asyncio.to_thread(self.client.end, self.meeting)
@@ -508,6 +511,9 @@ class CallWorker(QObject):
                 self.media.emit(kind, enabled)
                 self._roster()
             except Exception:
+                if kind in {"consent", "withdraw_text"}:
+                    self.privacy_result.emit(enabled.get("request", ""), kind, False)
+                    return
                 if kind == "noise_suppression":
                     self.audio_selected.emit(kind, "true" if self.noise_suppression else "false")
                     self.problem.emit("Could not change noise reduction. Please retry.")

@@ -1,5 +1,8 @@
 """Explicit per-participant meeting-text consent. No audio capture is started here."""
 
+from uuid import uuid4
+
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QCheckBox, QVBoxLayout
 
 from aedrova.desktop.controls import AppDialog
@@ -10,6 +13,20 @@ from aedrova.desktop.dialogs import button, label
 class MeetingPrivacy(AppDialog):
     def __init__(self, parent, worker, snapshot):
         super().__init__(parent)
+        self.pending = None
+        self.request_id = None
+        self.closed = False
+        self.timeout = QTimer(self)
+        self.timeout.setSingleShot(True)
+        self.timeout.setInterval(30000)
+        self.timeout.timeout.connect(lambda: self.completed(self.request_id, self.pending, False))
+        if hasattr(worker, "privacy_result"):
+            worker.privacy_result.connect(self.completed)
+        self.finished.connect(self.finish)
+        if parent is not None and hasattr(parent, "finished"):
+            parent.finished.connect(self.reject)
+        if hasattr(worker, "ended"):
+            worker.ended.connect(self.reject)
         self.setWindowTitle("Meeting privacy · Aedrova")
         self.resize(560, 540)
         self.setMinimumSize(520, 540)
@@ -19,14 +36,17 @@ class MeetingPrivacy(AppDialog):
         layout.addWidget(label("Your meeting text. Your choice.", "title", wrap=True))
         layout.addWidget(
             label(
-                ("With everyone's consent, Start transcription sends short microphone chunks "
-                 "to OpenAI for speech-to-text. Raw audio is not saved by Aedrova. "
-                 "Each participant "
-                 "must start their own transcription and unmute. Processing may leave gaps. "
-                 "Provider data handling applies; already-sent audio cannot be recalled."
-                 if getattr(worker, "speech_available", False) else
-                 "Audio transcription is not connected. These permissions apply to participant "
-                 "text supplied during a call. No audio or video recording starts here."),
+                (
+                    "With everyone's consent, Start transcription sends short microphone chunks "
+                    "to OpenAI for speech-to-text. Raw audio is not saved by Aedrova. "
+                    "Each participant "
+                    "must start their own transcription and unmute. Processing may leave gaps. "
+                    "Provider data handling applies; already-sent audio cannot be recalled."
+                    if getattr(worker, "speech_available", False)
+                    else "Audio transcription is not connected. These permissions apply to "
+                    "participant "
+                    "text supplied during a call. No audio or video recording starts here."
+                ),
                 "muted",
                 wrap=True,
             )
@@ -63,6 +83,9 @@ class MeetingPrivacy(AppDialog):
         delete = button("Delete saved meeting text for everyone", role="outline")
         delete.clicked.connect(lambda: self.confirm_delete(worker))
         layout.addWidget(delete)
+        self.feedback = label("", "muted", wrap=True)
+        self.feedback.setAccessibleName("Privacy save status")
+        layout.addWidget(self.feedback)
         actions = FlowActions()
         cancel = button("Cancel", role="outline")
         cancel.clicked.connect(self.reject)
@@ -71,6 +94,7 @@ class MeetingPrivacy(AppDialog):
         actions.addWidget(cancel)
         actions.addWidget(save)
         layout.addLayout(actions)
+        self.controls = [self.transcription, self.ai_context, withdraw_ai, delete, save]
 
     def sync_choices(self, checked):
         self.ai_context.setEnabled(checked)
@@ -78,18 +102,52 @@ class MeetingPrivacy(AppDialog):
             self.ai_context.setChecked(False)
 
     def save(self, worker):
+        if self.pending or self.closed:
+            return
+        self.begin("consent")
         worker.command(
             "consent",
             {
+                "request": self.request_id,
                 "transcription": self.transcription.isChecked(),
                 "ai_context": self.ai_context.isChecked(),
             },
         )
-        self.accept()
 
     def withdraw(self, worker, delete):
-        worker.command("withdraw_text", {"delete": delete})
-        self.accept()
+        if self.pending or self.closed:
+            return
+        self.begin("withdraw_text")
+        worker.command("withdraw_text", {"delete": delete, "request": self.request_id})
+
+    def begin(self, operation):
+        self.pending = operation
+        self.request_id = str(uuid4())
+        for control in self.controls:
+            control.setEnabled(False)
+        self.feedback.setText("Saving your privacy choices…")
+        self.timeout.start()
+
+    def completed(self, request_id, operation, success):
+        if (self.closed or request_id != self.request_id
+                or operation != self.pending or self.pending is None):
+            return
+        self.timeout.stop()
+        self.pending = None
+        if success:
+            self.accept()
+            return
+        for control in self.controls:
+            control.setEnabled(True)
+        self.sync_choices(self.transcription.isChecked())
+        self.feedback.setText(
+            "Could not verify this change. Reopen meeting privacy to check "
+            "your current choices, or try again."
+        )
+
+    def finish(self, *_):
+        self.closed = True
+        self.timeout.stop()
 
     def confirm_delete(self, worker):
         confirmation = AppDialog(self)

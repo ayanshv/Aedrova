@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 from aedrova.agents.managed import application_origin
 from aedrova.desktop.brand import BrandMark
 from aedrova.desktop.controls import AppDialog, ChoiceBox
+from aedrova.desktop.design_system import FlowActions
 from aedrova.desktop.dialogs import button, label
 from aedrova.desktop.meeting_icons import meeting_icon
 from aedrova.desktop.meeting_setup import FramePreview
@@ -64,12 +65,15 @@ def toolbar_control(text):
 
 class MeetingCall(AppDialog):
     def __init__(
-        self, parent, worker, *, devices=None, channel_name="Team channel", initial_mode=None
+        self, parent, worker, *, devices=None, channel_name="Team channel", initial_mode=None,
+        channel_chat=None,
     ):
         super().__init__(parent)
         if parent is not None and hasattr(parent, "theme"):
             self.setPalette(palette(parent.theme))
         self.worker = worker
+        self.channel_chat = channel_chat
+        self.text_dialogs = {}
         self.initial_mode = initial_mode
         self.initial_media_applied = False
         self.push_to_talk_active = False
@@ -234,11 +238,20 @@ class MeetingCall(AppDialog):
         self.toolbar_buttons.append(leave)
         self.arrange_toolbar()
         layout.addWidget(self.toolbar)
-        footer = QHBoxLayout()
+        footer = FlowActions()
         self.privacy_status = label(
             "No recording · No transcription · No AI meeting access", "muted", wrap=True
         )
         layout.addWidget(self.privacy_status)
+        self.chat_button = button("Channel chat", role="outline")
+        self.chat_button.setVisible(channel_chat is not None)
+        self.chat_button.setEnabled(False)
+        self.chat_button.clicked.connect(self.show_chat)
+        footer.addWidget(self.chat_button)
+        self.captions_button = button("Captions", role="outline")
+        self.captions_button.hide()
+        self.captions_button.clicked.connect(self.show_captions)
+        footer.addWidget(self.captions_button)
         self.last_consent_snapshot = None
         self.meeting_text_enabled = False
         self.audio_transcription_enabled = False
@@ -329,6 +342,8 @@ class MeetingCall(AppDialog):
         self.status.setText(state)
         self.connected = state.startswith(("Connected", "Reconnected"))
         self.end.setEnabled(self.connected)
+        self.chat_button.setEnabled(self.connected)
+        self.captions_button.setEnabled(self.connected)
         self.privacy_button.setEnabled(self.connected)
         for kind, control in self.controls.items():
             control.setEnabled(self.connected)
@@ -395,6 +410,7 @@ class MeetingCall(AppDialog):
 
     def text_capability(self, enabled):
         self.meeting_text_enabled = enabled
+        self.captions_button.setVisible(enabled)
         self.privacy_button.setVisible(enabled)
         self.transcript_button.setVisible(enabled)
         self.privacy_button.setEnabled(self.connected)
@@ -442,6 +458,39 @@ class MeetingCall(AppDialog):
             and permit is not None
             and self.states["microphone"]
         )
+
+    def open_text_surface(self, key, factory):
+        if not self.connected or self.closed:
+            return
+        current = self.text_dialogs.get(key)
+        if current and not current.closed:
+            current.raise_()
+            current.activateWindow()
+            return
+        dialog = factory()
+        self.text_dialogs[key] = dialog
+        dialog.show()
+
+    def show_chat(self):
+        if self.channel_chat is not None:
+            from aedrova.desktop.meeting_communication import MeetingChat
+
+            self.open_text_surface("chat", lambda: MeetingChat(
+                self, **self.channel_chat, names=self.names,
+            ))
+
+    def show_captions(self):
+        if self.meeting_text_enabled:
+            from aedrova.desktop.meeting_communication import MeetingCaptions
+
+            self.open_text_surface("captions", lambda: MeetingCaptions(
+                self, self.worker, people=lambda: self.people, names=lambda: self.names,
+            ))
+
+    def close_text_surfaces(self):
+        for dialog in self.text_dialogs.values():
+            dialog.reject()
+        self.text_dialogs.clear()
 
     def show_privacy(self):
         if self.connected and self.meeting_text_enabled:
@@ -716,6 +765,9 @@ class MeetingCall(AppDialog):
         self.status.setText("Devices changed. Your microphone and camera are off; choose a device.")
 
     def call_ended(self):
+        self.close_text_surfaces()
+        self.chat_button.setEnabled(False)
+        self.captions_button.setEnabled(False)
         self.connected = False
         self.devices.close()
         for kind in self.states:
@@ -735,6 +787,7 @@ class MeetingCall(AppDialog):
         if self.closed:
             return
         self.closed = True
+        self.close_text_surfaces()
         self.mic_epoch += 1
         self.devices.close()
         self.timer.stop()
@@ -754,12 +807,14 @@ class AudioCall(MeetingCall):
     """Phone presentation sharing the same authenticated, consent-aware transport."""
 
     def __init__(
-        self, parent, worker, *, devices=None, channel_name="Team channel", initial_mode="audio"
+        self, parent, worker, *, devices=None, channel_name="Team channel", initial_mode="audio",
+        channel_chat=None,
     ):
         self.audio_started = None
         self.audio_cards = {}
         super().__init__(
-            parent, worker, devices=devices, channel_name=channel_name, initial_mode="audio"
+            parent, worker, devices=devices, channel_name=channel_name, initial_mode="audio",
+            channel_chat=channel_chat
         )
         self.setWindowTitle("Aedrova · " + channel_name + " audio call")
         self.resize(760, 660)
@@ -922,6 +977,10 @@ def open_channel_call(window, *, mode=None):
         worker,
         channel_name=window.workspace.name + " / " + window.channel.name,
         initial_mode=mode,
+        channel_chat=dict(
+            service=service, channel=window.channel_id, user=str(service.user.id),
+            valid=lambda: not dialog.closed and window.account_dialog.service is service,
+        ),
     )
     window.meeting_call = dialog
     from aedrova.desktop.meeting_wrapup import offer_wrapup

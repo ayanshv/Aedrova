@@ -178,6 +178,9 @@ class MeetingClient(ManagedClient):
     def transcript(self, meeting, page=0):
         return self.request("/api/meetings/transcript/" + str(UUID(meeting)) + "?page=" + str(page))
 
+    def captions(self, meeting):
+        return self.request("/api/meetings/transcript/" + str(UUID(meeting)) + "?latest=true")
+
     def history(self, channel):
         return self.request("/api/meetings/history/" + str(UUID(channel)))
 
