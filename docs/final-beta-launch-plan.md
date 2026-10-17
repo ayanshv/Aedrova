@@ -8,6 +8,31 @@ completion. Current evidence, frozen scope and exact staging handoffs are saved 
 [Phase 1 baseline](final-beta-phase-1.md). Waitlist and public billing/download gates
 remain unchanged. The owner-supplied proposal is preserved in release-plan-source.md.
 
+## Required sequence — owner correction, October 16, 2026
+
+**Step 10 has not started. Close the pre-production launch gates first.**
+Complete all remaining requested engineering and setup, apply the exact changes to
+staging, and pass staging acceptance before starting production promotion/release.
+Saved, deferred, pushed, mocked or unit-tested is not the same as a closed gate.
+This applies across the whole product, including connectors, AI, meetings, privacy/
+legal/data controls, security/RLS/rate limits, billing lifecycle, operational recovery,
+website/onboarding and signed release-candidate installer acceptance. Use the existing
+phase/gate documents and requirement registers; do not silently narrow scope or
+waive requirements to advance the roadmap.
+
+For each gate record its implementation, staging app/backend/schema/config versions,
+test evidence, remaining owner actions and explicit closure result. Run the combined
+regression and real account/device flows on the final staging candidate after the
+individual fixes. Failed or unverified gates remain open. Then report the completed
+acceptance evidence and obtain owner approval to begin Step 10.
+
+Release-candidate packaging/signing/clean-machine checks belong before promotion.
+Actual production deployment/smoke checks necessarily occur during Step 10 and must
+pass before public downloads/billing/launch; they cannot be used to bypass a missing
+staging prerequisite or be marked passed in advance. No Step 10 preparation or audit
+is authorized merely by this sequencing correction. Existing private-account,
+consent, owner-submitted payments and physical-device requirements still apply.
+
 ## Deferred meeting launch gates — October 16, 2026
 
 Owner requested that remaining meeting engineering, paid staging API/guard setup,

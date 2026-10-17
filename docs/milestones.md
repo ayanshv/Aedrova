@@ -2446,3 +2446,13 @@ controls. Updated status links. No feature removed, gate closed, payment submitt
 or environment changed. No immediate owner action. Step 10 is staging promotion
 and release preparation per the original 10-step repair roadmap; starting it still
 requires owner approval, and production/download/billing activation remains gated.
+
+## October 16 — owner requires gate closure and staging acceptance before Step 10
+
+Owner corrected sequencing: complete all pre-production launch gates, apply the
+changes to staging and test the integrated candidate before Step 10. Step 10 has
+not started and requires approval after verified gate closure. Updated the main
+launch plan and meeting gate register; no deferred item is treated as complete.
+Release-candidate packaging/clean-machine checks precede promotion; production-only
+smoke is run in Step 10 and still gates public activation. No setup/payment,
+implementation, deployment or acceptance is claimed by this documentation change.

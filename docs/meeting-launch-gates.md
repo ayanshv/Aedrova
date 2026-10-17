@@ -6,6 +6,15 @@ is requested now. Deferral does not mean acceptance, deletion of scope or permis
 to advertise unfinished features. Step 8 remains partial. Step 9 started with owner approval on October 16; its
 first implementation batch is documented in meeting-step-9.md.
 
+## Sequencing correction — October 16, 2026
+
+The owner requires completing and applying all pre-production launch gates to
+staging, then testing the integrated candidate, before Step 10 begins. Deferral
+is not closure. Release-candidate installer checks must precede promotion; actual
+production deployment/smoke is performed only in Step 10 and still gates public
+launch. No outstanding engineering or live acceptance gate is waived. See the
+required sequence in final-beta-launch-plan.md.
+
 ## LG-MTG-01 — Finish meeting functionality and freeze release scope
 
 Owner: engineering; owner approves any release-scope reduction.
@@ -66,13 +75,18 @@ Engineering records results for:
 
 Generated RTC/TURN traffic, fixture UI checks and unit tests do not close this gate.
 
-## LG-MTG-04 — Production promotion and installer parity
+## LG-MTG-04 — Release-candidate parity and final production acceptance
 
-After the prior gates pass, approve the exact candidate for production promotion.
-Deploy the corresponding backend, rebuild and sign/notarize the Mac release and
-produce/sign the Windows release as required by the release plan. Test clean
-install/update/sign-in and the advertised meeting flows on both platforms before
-publishing download links. Current source pushes are not installer acceptance.
+Before Step 10, rebuild the exact candidate, sign/notarize the Mac candidate and
+produce/sign the Windows candidate as required by the release plan. Test clean
+install/update/sign-in and the advertised meeting flows against staging on both
+platforms. Record app/backend/schema/config parity; current source pushes are not
+installer acceptance. All other pre-production gates must also pass.
+
+Only then approve Step 10 production promotion. Actual production deployment and
+production smoke occur during Step 10; public download/billing activation waits
+for their success. This final production check remains open until actually run,
+and does not create a circular prerequisite to deploying production itself.
 
 ## LG-MTG-05 — Remaining Step 9 capabilities and presentation acceptance
 
@@ -100,7 +114,7 @@ Any feature postponed beyond launch needs explicit owner-approved release scope
 and matching UI/website copy; deferral alone does not remove the original request.
 Evidence/status: meeting-step-9.md and meeting-step-9-status.json. No owner action
 is required now. This gate blocks release of unverified advertised capabilities,
-not preparation of the Step 10 promotion checklist or rollback plan.
+and starting Step 10. The owner requires integrated staging acceptance first.
 
 ## Evidence retained
 
