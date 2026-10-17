@@ -2436,3 +2436,13 @@ partial: backgrounds, advanced collaboration/moderation, breakouts/polls, transl
 telephony and streaming still open. No owner action now. Existing deferred Render
 always-on API/independent guard and two-device OS-permission/listening tests remain
 launch blockers in docs/meeting-launch-gates.md. Step 10 has not started.
+
+## October 16 — remaining Step 9 work retained as launch gates
+
+Owner requested remaining Step 9 work be added to launch gates before discussing
+Step 10. Added explicit OPEN LG-MTG-05 in docs/meeting-launch-gates.md covering
+all advanced capability families and physical acceptance of delivered presentation
+controls. Updated status links. No feature removed, gate closed, payment submitted
+or environment changed. No immediate owner action. Step 10 is staging promotion
+and release preparation per the original 10-step repair roadmap; starting it still
+requires owner approval, and production/download/billing activation remains gated.

@@ -21,7 +21,7 @@ Owner: engineering; owner approves any release-scope reduction.
 - Resolve each retained Step 9 requirement against the approved release scope.
   All original requested features remain in meeting-features-owner-source-2026-10-16.txt
   and release-baseline-2026-10-15.json; current implementation status is in
-  meeting-step-8-status.json. No blanket Zoom-parity claim.
+  meeting-step-8-status.json and meeting-step-9-status.json. No blanket Zoom-parity claim.
 
 Close only with working implementation and evidence for every advertised feature,
 or an explicit owner-approved scope adjustment reflected in website/product copy.
@@ -73,6 +73,34 @@ Deploy the corresponding backend, rebuild and sign/notarize the Mac release and
 produce/sign the Windows release as required by the release plan. Test clean
 install/update/sign-in and the advertised meeting flows on both platforms before
 publishing download links. Current source pushes are not installer acceptance.
+
+## LG-MTG-05 — Remaining Step 9 capabilities and presentation acceptance
+
+Owner requested these remaining items be retained as launch gates. **OPEN**;
+no implementation, purchase or scope reduction is authorized by this deferral.
+
+- Resolve virtual backgrounds/segmentation and advanced appearance effects,
+  second-camera capture, browser-tab capture and shared computer/video audio.
+- Resolve participant annotation permissions, text/highlighter tools, remote
+  control and collaborative whiteboards/documents.
+- Resolve breakout rooms, polls/quizzes/Q&A and advanced host moderation.
+- Resolve translated captions/language interpretation, telephony, external apps,
+  RTMP/live broadcast, immersive and dual-monitor experiences, plus vendor-specific
+  Zoom Apps/Docs/Rooms integration or Aedrova-equivalent decisions.
+- Physically verify the delivered Step 9 controls on Mac and Windows: capture only
+  the selected application window; safely stop if it disappears; pause removes
+  capture/publication and resume requires explicit action; sharer drawings reach
+  recipients and clear; pin/unpin, incoming-video stop/resume, self-view, local-only
+  mirroring and outgoing camera treatment behave as described.
+
+Engineering owns implementation and evidence. The owner supplies OS permissions
+and physical-device participation when LG-MTG-02 enables hosted acceptance.
+Before promotion, each feature advertised for the release must pass acceptance.
+Any feature postponed beyond launch needs explicit owner-approved release scope
+and matching UI/website copy; deferral alone does not remove the original request.
+Evidence/status: meeting-step-9.md and meeting-step-9-status.json. No owner action
+is required now. This gate blocks release of unverified advertised capabilities,
+not preparation of the Step 10 promotion checklist or rollback plan.
 
 ## Evidence retained
 
