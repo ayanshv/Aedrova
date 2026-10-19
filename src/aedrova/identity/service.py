@@ -177,6 +177,8 @@ class IdentityService:
             self.client.auth.sign_out({"scope": "local"})
         finally:
             # Discard the entire client even if remote revocation is unavailable.
+            self._bud_catalog_cache = {}
+            self._bud_catalog_scope = None
             self.user = None
             self.client = None
 

@@ -2535,3 +2535,39 @@ This is not signed distribution/installer or live Dock-style acceptance. Require
 owner action: relaunch the updated staging build, then choose each macOS Appearance
 icon style to confirm the Dock result; an already-running/older installed app will
 not receive source changes automatically. Public release gates remain unchanged.
+
+## October 18 — Mac DMG focus and requested launch hardening
+
+Owner prioritizes Mac DMG launch; no niche pivot or 34-change roadmap authorized.
+Built source 4e67d8e as an internal staging arm64/macOS 14+ preview DMG. Integrity,
+manifest SHA-256, mounted app deep/strict signature, Applications link, adaptive
+icon, frozen endpoint isolation, baseline secret scan and light chat/dark account
+startup smoke passed. Full desktop suite: 889 passed. No Developer ID identity found;
+no notarization/public download or production change. Exact signing actions and
+artifact evidence: docs/mac-dmg-launch-2026-10-18.md.
+
+Owner additionally requires caching, optimistic rendering, icon tooltips, endpoint/
+login rate limits, credential scanning/private configuration and bounded malformed
+input rejection before launch. Implemented 30-second session-scoped catalog-only
+cache and shared icon tooltip defaults; retained existing optimistic send/retry
+and access-change invalidation. Added database-backed website/connector ingress
+limits and bounded metadata/JSON/mutating bodies; main DTOs reject extra fields.
+Login starts 10/5 minutes per IP, callbacks 30/5 minutes separately; these are
+initial policies requiring traffic/proxy/provider acceptance, not universal optimum.
+Liveness uses bounded local limiting to survive DB outages. Provider/Supabase-hosted
+endpoints and custom transient buttons still require explicit acceptance coverage.
+
+Current tracked scans passed in both repositories; historical source patterns
+scanned 1,029 app and 2,925 website objects. The sole historical match was confirmed
+as encoded WebAssembly in vendored Prettier, not a credential. First-party literal
+assignment audit found none. No credential migration/rotation was indicated by
+these limited scans. Existing server secret environment, encrypted per-user grant
+storage and OS Keychain remain; no shared secrets in frontend. Backend suite after
+changes: 533 passed. Desktop focused cache/tooltip checks: 2 passed; connected/Bud
+checks: 18 passed before the final tooltip assertion. Full revised suite: 890
+passed; final cache/tooltip/voice checks: 10 passed after the final small fixes.
+Shell audit found missing meeting-options, voice-discard and native menu-overflow
+tooltips; corrected them. Full source/script/test Ruff passes in both repositories.
+Source/local checks do not certify deployed rate limits. Rebuild the DMG after the
+final desktop changes; prior preview does not contain this hardening. Public gates
+stay OPEN. See website docs/launch-hardening-2026-10-18.md for exact coverage/limits.

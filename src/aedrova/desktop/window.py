@@ -525,6 +525,10 @@ class AedrovaWindow(QMainWindow):
         help_menu.addAction("Explore Aedrova…", self.show_tour)
         help_menu.addAction("Check for updates…", self.show_updates)
         help_menu.addAction("About this preview", self.show_about)
+        overflow = self.menuBar().findChild(QWidget, "qt_menubar_ext_button")
+        if overflow:
+            overflow.setAccessibleName("More menus")
+            overflow.setToolTip("More menus")
 
     def _populate_rail(self):
         while self.rail_items.count():
