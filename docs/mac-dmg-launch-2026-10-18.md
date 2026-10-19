@@ -7,10 +7,10 @@ remain authoritative; this focus is not permission to mark them passed.
 
 ## Current artifact
 
-- Source: `4e67d8e`; existing product with adaptive macOS icon.
+- Source: `9dfb7c0`; adaptive macOS icon and desktop hardening included.
 - Local installer: `work/Aedrova-preview.dmg`, **internal staging preview only**.
-- Version 0.1.0, Apple silicon/arm64, macOS 14+, 322,329,375 bytes.
-- SHA-256: `27a4ae8eb7ff6e829d57a46d7f996445f0def03dbecee2a9a5f12978dc9034fe`.
+- Version 0.1.0, Apple silicon/arm64, macOS 14+, 322,330,142 bytes.
+- SHA-256: `40270266eafc7f9998523873b221560e659fd0cc939b904fe9ac4565a040a4fa`.
 - Adjacent manifest explicitly declares `public_release: false`.
 - Explicit staging Supabase/managed AI/connector origins verified inside the
   frozen bundle. Included-AI mode selected; no local fallback configured.
@@ -26,10 +26,13 @@ remain authoritative; this focus is not permission to mark them passed.
 Local detailed evidence: `work/staging/dmg-acceptance.json`, smoke JSON/PNGs,
 test XML and private packaging logs. Artifacts and credentials are not committed.
 
-Full desktop validation of that artifact's source passed: 889 tests. The owner's
-subsequent caching/tooltip/security request adds changes after this artifact; rebuild
-and revalidate before calling the DMG current. See the October 18 hardening entry
-in milestones.md and the website repository's docs/launch-hardening-2026-10-18.md.
+Initial desktop validation passed 889 tests; revised source passed 890, followed by
+10 focused cache/tooltip/voice tests after the last small fixes. Rebuilt this DMG
+with desktop caching/tooltips. Repeated integrity, digest, mounted signature,
+Applications link, native icon, staging endpoint and frozen account startup checks
+passed (`work/staging/hardening-dmg-acceptance.json`). The separate server hardening
+still requires hosted staging acceptance; bundling a client does not deploy a server.
+See the website repository's docs/launch-hardening-2026-10-18.md.
 
 ## Immediate signing dependency
 

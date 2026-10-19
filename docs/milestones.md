@@ -2568,6 +2568,12 @@ checks: 18 passed before the final tooltip assertion. Full revised suite: 890
 passed; final cache/tooltip/voice checks: 10 passed after the final small fixes.
 Shell audit found missing meeting-options, voice-discard and native menu-overflow
 tooltips; corrected them. Full source/script/test Ruff passes in both repositories.
-Source/local checks do not certify deployed rate limits. Rebuild the DMG after the
-final desktop changes; prior preview does not contain this hardening. Public gates
+Source/local checks do not certify deployed rate limits. Public gates
 stay OPEN. See website docs/launch-hardening-2026-10-18.md for exact coverage/limits.
+
+Final packaging follow-up: rebuilt staging preview from 9dfb7c0 with desktop
+catalog caching/tooltips; repeated integrity/digest, mounted signature, Applications
+link, adaptive icon, staging endpoint and frozen account startup checks passed.
+Current artifact/hash in docs/mac-dmg-launch-2026-10-18.md supersedes the earlier
+preview. Server hardening still needs hosted acceptance, including Supabase Auth
+limits/trusted ingress. No public release, hosting payment or website activation.
