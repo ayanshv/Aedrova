@@ -2633,3 +2633,14 @@ including C-corp/ownership/EIN/bank/market scope, consumer disclosures, live pro
 and security acceptance, operations, Stripe verification/prices/webhooks/lifecycle,
 Mac signing/notarization, Windows signing/testing, and final go/no-go. No entity
 formation, bank submission, purchase, paid hosting or commercial release performed.
+
+Publication follow-up: website PR #16 passed both required verify checks and merged
+as db2bbc8. Its tree matches the 571-test local candidate. Render staging 33fc716 and
+production db2bbc8 are Live. Real hosted readiness, refund UI, branded 404, private
+403, security/cache headers and crawl files passed; checkout/managed AI stayed closed.
+No payments, new migrations, secret changes or public installers. Cloudflare robots
+activation remains a technical manual handoff: embedded code editor rejects automation
+input and active Safari switching prevents reliable native edits. Single-file bundle
+and exact two path routes are documented in website deploy/search-discovery/README.md.
+Owner approval already exists; no new permission is needed. Policy-date correction
+and hosted acceptance record are being published separately after normal checks.
