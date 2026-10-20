@@ -364,3 +364,15 @@ def test_success_content_never_overlaps_when_height_is_constrained(gallery, qtbo
     dialog.resize(900, 800)
     qtbot.wait(50)
     dialog.grab().save("work/connector-confirmation-fixed.png")
+
+
+def test_failed_oauth_poll_restores_login_action(gallery):
+    dialog, _, _, providers = gallery
+    provider = dict(providers[0], oauth_available=True)
+    dialog.open_provider(provider)
+    dialog.oauth_state = "pending-state"
+    dialog.oauth_timer.start()
+    dialog.request_failed()
+    assert not dialog.oauth_state and not dialog.oauth_timer.isActive()
+    assert dialog.oauth.text() == "Connect your account"
+    assert dialog.oauth.isEnabled()

@@ -12,9 +12,10 @@ from PySide6.QtCore import (
     QTimer,
     QVariantAnimation,
 )
-from PySide6.QtGui import QColor, QKeySequence, QPainter, QPainterPath, QRegion, QShortcut
+from PySide6.QtGui import QColor, QKeySequence, QRegion, QShortcut
 from PySide6.QtWidgets import (
     QFrame,
+    QGraphicsColorizeEffect,
     QHBoxLayout,
     QPushButton,
     QVBoxLayout,
@@ -265,7 +266,7 @@ from aedrova.desktop.zen_onboarding import ZenOnboarding as SetupDialog  # noqa:
 
 
 class SpotlightTour(QWidget):
-    """A cutout permits real control interaction; the guide never triggers that control."""
+    """Tint the real component; only the guide card intercepts interaction."""
 
     def __init__(self, window):
         super().__init__(window.centralWidget())
@@ -280,6 +281,8 @@ class SpotlightTour(QWidget):
         self.highlight_animation.setDuration(240)
         self.highlight_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         self.highlight_animation.valueChanged.connect(self.animate_highlight)
+        self.highlighted_target = None
+        self.component_effect = None
         self.target_rect = QRect()
         self.saved_tab = window.pages.currentIndex()
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -360,7 +363,14 @@ class SpotlightTour(QWidget):
 
     def animate_highlight(self, value):
         self.reveal = float(value)
+        if self.component_effect is not None:
+            self.component_effect.setStrength(0.65 * self.reveal)
         self.update()
+
+    def clear_component_highlight(self):
+        if self.highlighted_target is not None and self.component_effect is not None:
+            self.highlighted_target.setGraphicsEffect(None)
+        self.highlighted_target = self.component_effect = None
 
     def advance(self):
         if self.index == len(STEPS) - 1:
@@ -391,6 +401,16 @@ class SpotlightTour(QWidget):
                 ),
                 None,
             )
+        if target is not self.highlighted_target:
+            self.clear_component_highlight()
+            if target is not None and target.isVisible() and target.isEnabled():
+                # Never replace a control’s own rendering effect.
+                if target.graphicsEffect() is None:
+                    self.component_effect = QGraphicsColorizeEffect(target)
+                    self.component_effect.setColor(QColor("#0066FF"))
+                    self.component_effect.setStrength(0.65)
+                    target.setGraphicsEffect(self.component_effect)
+                    self.highlighted_target = target
         if target is not None and target.isVisible() and target.isEnabled():
             origin = self.mapFromGlobal(target.mapToGlobal(QPoint(0, 0)))
             self.target_rect = QRect(origin, target.size()).intersected(self.rect())
@@ -405,10 +425,8 @@ class SpotlightTour(QWidget):
             else self.height() - self.card.height() - 28
         )
         self.card.move(x, max(24, y))
-        region = QRegion(self.rect())
-        if not self.target_rect.isEmpty():
-            region = region.subtracted(QRegion(self.target_rect))
-        self.setMask(region.united(QRegion(self.card.geometry())))
+        # Only the guide intercepts input. The actual control stays interactive.
+        self.setMask(QRegion(self.card.geometry()))
         self.update()
 
     def eventFilter(self, watched, event):  # noqa: N802
@@ -416,22 +434,9 @@ class SpotlightTour(QWidget):
             QTimer.singleShot(0, self.reposition)
         return super().eventFilter(watched, event)
 
-    def paintEvent(self, event):  # noqa: N802
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        path = QPainterPath()
-        path.addRect(self.rect())
-        if not self.target_rect.isEmpty():
-            cutout = QPainterPath()
-            cutout.addRoundedRect(self.target_rect, 16, 16)
-            path = path.subtracted(cutout)
-        painter.fillPath(
-            path,
-            QColor(0, 0, 0, int((175 if self.window.reduced_transparency else 140) * self.reveal)),
-        )
-
     def finish(self, status):
         self.highlight_animation.stop()
+        self.clear_component_highlight()
         self.window.settings.setValue(self.prefix + "/status", status)
         self.window.settings.sync()
         self.window.select_tab(self.saved_tab)

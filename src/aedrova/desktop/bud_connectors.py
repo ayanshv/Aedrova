@@ -901,6 +901,13 @@ class ConnectorsDialog(AppDialog):
 
         self.run(lambda service: client(service).request("/api/buds/oauth/start", body), started)
 
+    def request_failed(self):
+        # A failed poll must not strand the primary action on “Check connection”.
+        if self.oauth_state:
+            self.stop_oauth()
+            if self.selected_provider:
+                self.auth_details(self.selected_provider)
+
     def poll_oauth(self):
         if not self.oauth_state or self.pending or self.job:
             return

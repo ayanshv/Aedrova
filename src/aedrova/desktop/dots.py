@@ -86,7 +86,8 @@ class DotDialog(AppDialog):
             return
         token = object()
         self._bud_request = token
-        loading = not bool(getattr(self, "oauth_state", None))
+        loading = not recovery and not bool(getattr(self, "oauth_state", None))
+        self._read_only_loading = recovery
         timer = QTimer(self)
         timer.setSingleShot(True)
         retry = getattr(self, "_load_retry", None)
@@ -112,6 +113,7 @@ class DotDialog(AppDialog):
         def release():
             timer.stop()
             self.pending = False
+            self._read_only_loading = False
             self.job = None
             if loading:
                 self.set_loading(self.pages, False)
@@ -122,6 +124,9 @@ class DotDialog(AppDialog):
             self._bud_request = None
             release()
             self.status.setText(message)
+            handler = getattr(self, "request_failed", None)
+            if handler:
+                handler()
             if recovery and retry is not None:
                 retry.show()
             self.update_controls()
@@ -141,7 +146,7 @@ class DotDialog(AppDialog):
         if recovery:
             # Only read-only loads may be retried. Never retry a timed-out write.
             timer.timeout.connect(stalled)
-            timer.start(getattr(self, "_load_timeout_ms", 30000))
+            timer.start(getattr(self, "_load_timeout_ms", 100000))
 
         def ready(value):
             if not current():
@@ -227,6 +232,7 @@ class DotDialog(AppDialog):
 
     def refresh(self):
         resume_step = self.pages.currentIndex() if self.current() else None
+        draft_name = self.name.text()
 
         def fetch(service):
             api = client(service)
@@ -262,7 +268,9 @@ class DotDialog(AppDialog):
                 self.list.setVisible(True)
             else:
                 self.list.setVisible(False)
-                self.new_dot()
+                # Local draft remains usable while the host wakes.
+                if self.name.text() == draft_name and self.pages.currentIndex() == 0:
+                    self.new_dot()
             if self.after_refresh is not None:
                 step, self.after_refresh = self.after_refresh, None
                 self.show_step(step)
@@ -553,7 +561,11 @@ class DotDialog(AppDialog):
         )
         self.back.setEnabled(not busy)
         self.list.setEnabled(not busy)
-        self.next.setEnabled(not busy)
+        local_step = self.pages.currentIndex() < 5
+        self.back.setEnabled(not busy or getattr(self, "_read_only_loading", False))
+        self.next.setEnabled(
+            not busy or (local_step and getattr(self, "_read_only_loading", False))
+        )
         self.new.setEnabled(self.admin() and not busy)
         self.save.setEnabled(
             self.admin()

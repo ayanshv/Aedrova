@@ -41,9 +41,10 @@ def test_stalled_queue_releases_skeleton_and_discards_late_session(qtbot):
     dialog, queue = loader(qtbot)
     applied, closed = [], []
     dialog.run(lambda _: True, applied.append, recovery=True)
-    assert dialog._loading_skeleton.isVisible()
+    assert dialog.pages.isVisible()
+    assert not getattr(dialog, "_loading_skeleton", None)
     qtbot.waitUntil(lambda: not dialog.pending)
-    assert not dialog._loading_skeleton.isVisible()
+    assert not getattr(dialog, "_loading_skeleton", None)
     assert dialog._load_retry.isVisible()
     assert "taking longer" in dialog.status.text()
     queue[0][1]({"service": SimpleNamespace(close_context=lambda: closed.append(True))})
@@ -68,7 +69,7 @@ def test_late_worker_cannot_overwrite_successful_retry(qtbot):
         release.set()
     qtbot.waitUntil(lambda: not dialog._bud_jobs)
     assert applied == ["new"] and len(closed) == 2
-    assert not dialog.pending and not dialog._loading_skeleton.isVisible()
+    assert not dialog.pending and not getattr(dialog, "_loading_skeleton", None)
 
 
 def test_display_failure_restores_retry_instead_of_skeleton(qtbot):
@@ -81,5 +82,5 @@ def test_display_failure_restores_retry_instead_of_skeleton(qtbot):
     queue[0][1]({"service": SimpleNamespace(close_context=lambda: None)})
     qtbot.waitUntil(lambda: not dialog.pending)
     assert dialog._load_retry.isVisible()
-    assert not dialog._loading_skeleton.isVisible()
+    assert not getattr(dialog, "_loading_skeleton", None)
     assert "private-detail" not in dialog.status.text()

@@ -2664,3 +2664,27 @@ the routes are saved so hosted robots and Google inspection can be rechecked.
 Commercial operator/address, asset-rights evidence, final legal/security/accessibility
 reviews, Stripe/hosting/signing and live product acceptance remain launch gates in the
 commercial plan; none is represented as completed by this security publication.
+
+## October 19 — GitHub, Bud loading, connector recovery and component highlights
+
+GitHub helper setup now checks existing authorization asynchronously and switches
+verified login to a compact branded confirmation with one Continue action. A helper
+installation alone no longer marks authorization complete. Publishing approval is
+unchanged. Bud read-only loads leave the configuration usable immediately, allow
+local setup navigation during wake-up, preserve a new local draft, and retain a
+100-second bounded background read window instead of discarding a cold-host response
+at 30 seconds. Writes remain blocked until current server state is loaded.
+Connector poll failures restore a fresh Connect your account action instead of
+stranding Check connection. Onboarding now colors the real target component; the
+only overlay/input mask is the guide card, with effects cleared on step/finish.
+
+Website fix in companion repo: generic browser-error middleware had swallowed the
+specific OAuth account-recovery template. An explicit server-only response marker
+preserves that page and is removed before delivery. Expired state links get a
+fresh-link recovery screen. Standalone error pages embed the actual brand asset,
+including the exported edge fallback; identity/state/CSRF/permissions checks remain.
+Full local suites: desktop 896 passed; website 571 passed. Follow-up visual changes
+receive focused checks. Error fallback Node suite: 13 passed. Screenshots in ignored
+work/ui-recovery-oct19 are UI fixtures, not new live provider consent evidence.
+Free-host wake latency and third-party provider approval gates remain real limits;
+no payment, broadened scopes, public installer or commercial activation performed.
