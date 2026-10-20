@@ -2704,3 +2704,35 @@ No further configuration, keys or payment is required for these fixes. Free host
 can still take 50+ seconds to wake for an actual connector request; the local wizard
 now remains visible and usable while that happens. Whole-site Cloudflare outage
 routing and provider publication/live acceptance remain the previously recorded gates.
+
+## October 20 — complete connector request, active provider gates
+
+Owner requested all connectors completed now; no payments remain authorized.
+Fresh native staging sign-in and authenticated nine-provider catalog passed; six
+existing OAuth configurations enabled, no saved grants in the synthetic test Bud.
+117 backend connector tests passed. Created the specifically approved unlisted
+Vercel Aedrova Buds integration and saved only Configuration/Projects/Deployments
+Read scopes (all others None), staging callback and brand/product media. Copied
+its generated credentials to ignored 0600 local config and Render staging with
+specific approval; existing free service deployment succeeded at 404105f.
+Owner approved project-scoped install on ayansh2 / amicus-website-mq. Real consent,
+callback token exchange and authorized-project discovery passed. Late resource
+selection correctly rejected the expired ten-minute state; no reader/disconnect
+acceptance yet. Fixed duplicate Vercel project selection when exactly one project
+was authorized; provider readers still verify before Connected. Backend suite 573
+passed; website PR #19 created and staged source f06e0bd pushed for deployment.
+
+Owner approved Stripe v0.1.0 external testing and it is now enabled, unpublished,
+0/25 tested accounts. Prepared v0.1.1 adds staging callback with the same two read
+permissions. Separate callback/upload/test-key-to-Render approval remains pending.
+Fresh Instagram/TikTok starts reached their real login screens once each; owner
+sign-in needed, no new social grant/read claimed. Meta admin access now requires
+owner email-code identity confirmation. Brave Search is unconfigured and reaches
+Login; no new account, plan, card or purchase submitted. TikTok production remains
+Draft with no production products/scopes or genuine end-to-end review video.
+Public approvals, renewals/revocation and remaining live tests are still launch gates.
+
+Also fixed Bud timeout copy that incorrectly described a slow connector as an AI
+service failure. 35 focused desktop transport/catalog/gallery/recovery tests passed.
+No permissions, grant duration, paid hosting, public launch or checkout expanded.
+Exact status/owner actions are in website docs/connector-completion-2026-10-20.md.

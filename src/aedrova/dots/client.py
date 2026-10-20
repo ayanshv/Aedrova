@@ -30,6 +30,11 @@ class BudClient(ManagedClient):
                 cache[path] = (time.monotonic() + 30, deepcopy(result))
             return result
         except RuntimeError as exc:
+            if str(exc).startswith("Aedrova’s AI service is taking longer to wake up."):
+                raise RuntimeError(
+                    "The Bud connector service is taking longer to wake up. "
+                    "Retry in a moment. Your Bud settings have not changed."
+                ) from exc
             if str(exc).startswith("Could not reach Aedrova’s included AI service."):
                 raise RuntimeError(
                     "Could not reach the Bud connector service. It may be waking up. "
