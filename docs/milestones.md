@@ -2688,3 +2688,19 @@ receive focused checks. Error fallback Node suite: 13 passed. Screenshots in ign
 work/ui-recovery-oct19 are UI fixtures, not new live provider consent evidence.
 Free-host wake latency and third-party provider approval gates remain real limits;
 no payment, broadened scopes, public installer or commercial activation performed.
+
+Delivery confirmed: website PR #18 passed both required verify checks and merged as
+`db8bca9`; Render production reports Live at that commit. Staging source `404105f`
+contains the same tested recovery implementation and Render staging reports Live.
+Real hosted checks passed on both origins: readiness 200, actual embedded logo on
+404, no-store, and private provider endpoint retaining JSON 403. Staging expired
+OAuth links preserve the specific fresh-connection recovery page without leaking
+the internal marker. No live OAuth grants were added for this UI regression check.
+App source `3a1cfc2` is packaged in the refreshed internal DMG; acceptance and exact
+hash are in docs/mac-dmg-launch-2026-10-18.md. Owner action to use desktop fixes:
+quit the currently running old Aedrova, then open `/Volumes/Aedrova 1/Aedrova.app`
+from the newly mounted image. Old volume was busy and was not forcefully unmounted.
+No further configuration, keys or payment is required for these fixes. Free hosting
+can still take 50+ seconds to wake for an actual connector request; the local wizard
+now remains visible and usable while that happens. Whole-site Cloudflare outage
+routing and provider publication/live acceptance remain the previously recorded gates.
