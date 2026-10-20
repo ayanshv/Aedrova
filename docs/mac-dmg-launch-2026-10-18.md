@@ -83,3 +83,14 @@ configuration matched the isolated public profile inside the frozen bundle.
   user-app termination performed. Owner should quit the old app, then open the app
   from `/Volumes/Aedrova 1/Aedrova.app` to see these changes. Existing installed apps
   do not update merely because source or a DMG was rebuilt.
+
+## October 20 internal connector-copy refresh
+
+Rebuilt source 31d5d2a after Bud-specific timeout recovery copy fix (35 focused tests).
+Internal staging DMG is 322,333,062 bytes, SHA256
+977c7ed7c2d2acc74a8b87763f37904d0dc32f6d461afa3d1954fe159d033458.
+public_release=false; image CRC and deep/strict app signature passed. Frozen light
+preview startup smoke passed with 4 tabs and 5 sample messages; no network services
+connected in this fixture. New image was not mounted over the owner's running app;
+existing older mounted volumes were not forcefully detached. Signing/clean-machine
+release gates above remain open. This is not a commercial download.

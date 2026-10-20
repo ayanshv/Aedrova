@@ -2724,7 +2724,8 @@ passed; website PR #19 created and staged source f06e0bd pushed for deployment.
 
 Owner approved Stripe v0.1.0 external testing and it is now enabled, unpublished,
 0/25 tested accounts. Prepared v0.1.1 adds staging callback with the same two read
-permissions. Separate callback/upload/test-key-to-Render approval remains pending.
+permissions. Owner subsequently approved callback/upload/test-key-to-Render activation; see final
+acceptance below for the credential that is still unavailable.
 Fresh Instagram/TikTok starts reached their real login screens once each; owner
 sign-in needed, no new social grant/read claimed. Meta admin access now requires
 owner email-code identity confirmation. Brave Search is unconfigured and reaches
@@ -2736,3 +2737,43 @@ Also fixed Bud timeout copy that incorrectly described a slow connector as an AI
 service failure. 35 focused desktop transport/catalog/gallery/recovery tests passed.
 No permissions, grant duration, paid hosting, public launch or checkout expanded.
 Exact status/owner actions are in website docs/connector-completion-2026-10-20.md.
+
+### October 20 final live acceptance
+
+Website PR #19 passed both checks and merged 3a1f43b; Render production Live.
+Staging f06e0bd Live. Vercel fresh callback auto-selected only authorized
+amicus-website-mq; actual project/deployments tools, local disconnect and subsequent
+read denial passed. Fresh GitHub four-tool, Supabase staging-project and Notion
+validation-page reads/disconnect/denial also passed. Local disconnect does not
+uninstall provider apps (provider_revoked=false). Current test session signed out
+locally and pending-link files removed; no account contents committed.
+
+Stripe v0.1.1 uploaded successfully under explicit approval, Approved for testing,
+and selected as external test version with staging callback. Actual test OAuth
+URL/client ID saved privately. CLI uses a login session; no matching reusable app
+developer API key exists in its config. No checkout key reused, no CLI session
+credential repurposed, no partial invalid Render env deployed. Required owner step:
+Stripe developer test environment -> API keys -> existing matching TEST app-developer
+secret, save privately into website .env.stripe-bud-staging as
+AEDROVA_STRIPE_BUD_CLIENT_SECRET. File already contains actual test URL/client ID,
+is ignored and mode 0600. Do not send key/chat. This blocks hosted Stripe token
+exchange/read validation. No bank/payment work required by this connector step.
+
+Other exact required actions: Meta checkpoint -> choose controlled email -> Next ->
+enter confirmation code privately (admin gate); Aedrova Staging -> Marketing Bud ->
+Connectors -> fresh Instagram/TikTok Connect your account -> sign in professional
+@aedrova_ai / approved TikTok @aedrova (social acceptance gate; stop on attempt-limit);
+Brave Search API dashboard -> personally activate intended API account/plan and keep
+key private (managed Search gate; agent may not pay). Provider public reviews and
+live renewal/revocation remain release gates. Figma Oct 15-16 read/disconnect and
+Instagram Oct14 evidence remain historical, not new this turn. Figma requires a
+file link because implemented scope has no account-wide file discovery.
+
+Internal staging preview rebuilt from app source 31d5d2a, SHA256
+977c7ed7c2d2acc74a8b87763f37904d0dc32f6d461afa3d1954fe159d033458.
+Image CRC, strict/deep app signature and packaged light preview startup passed.
+Frozen smoke is demo data with no network, not real AI/call/login acceptance.
+public_release=false; no Developer ID/notarization/public installer claim.
+Backend 573 tests and focused desktop 35 passed; actual hosted health 200 and
+HTML branded 404/no-store verified on both production and staging. No scope
+expansion, charge, production credential transfer or commercial launch performed.
