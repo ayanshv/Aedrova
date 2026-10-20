@@ -61,3 +61,25 @@ until the applicable product, business and release acceptance gates are passed.
 
 References: [Developer ID certificates](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/),
 [notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow).
+
+## October 19 internal preview refresh
+
+Rebuilt from source `3a1cfc2` with the GitHub confirmation, immediate local Bud
+setup, connector poll recovery and component-only tour highlight fixes. This replaces
+the earlier internal preview; it is **ad-hoc signed for internal staging**, not a
+Developer ID/notarized production release. Staging public endpoints and included-AI
+configuration matched the isolated public profile inside the frozen bundle.
+
+- `work/Aedrova-preview.dmg`: 322,331,591 bytes.
+- SHA-256 `8b8a350280740745fe89812709c537e5b3a884ff4a40cf7acbb8bb4fc5b9a762`.
+- Manifest `public_release: false`; checksum, image CRC, deep/strict app signature,
+  frozen account startup and screenshot capture passed.
+- Full desktop suite: 896 passed; 22 follow-up GitHub/tour checks passed after final
+  confirmation spacing/tint adjustments. Release secret-pattern scan and Ruff passed.
+- Evidence: ignored `work/ui-recovery-oct19/acceptance.json`, screenshots and private
+  build logs. UI confirmation/tour captures use preview fixtures, not provider consent.
+- Mounted new image at `/Volumes/Aedrova 1`; mounted app strict verification passed.
+  Older `/Volumes/Aedrova` could not unmount because it is busy. No forced unmount or
+  user-app termination performed. Owner should quit the old app, then open the app
+  from `/Volumes/Aedrova 1/Aedrova.app` to see these changes. Existing installed apps
+  do not update merely because source or a DMG was rebuilt.
