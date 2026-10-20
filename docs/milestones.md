@@ -2644,3 +2644,23 @@ input and active Safari switching prevents reliable native edits. Single-file bu
 and exact two path routes are documented in website deploy/search-discovery/README.md.
 Owner approval already exists; no new permission is needed. Policy-date correction
 and hosted acceptance record are being published separately after normal checks.
+
+Final publication: PR #17 passed both required verify checks, merged as a445578 and
+Render production is Live at that commit. Updated October 19 policy dates were
+verified on /refunds, /privacy, /terms, /support and /cookies. The 57 focused follow-up
+checks passed. Final website/staging backend security and consumer controls are
+published; optional preference controls also honor withdrawal in already-open pages.
+App source and complete commercial plan are pushed; the opened staging DMG remains
+an internal preview rather than a newly rebuilt/signed commercial release.
+
+Required owner handoff now for stable search crawling: Cloudflare → Workers & Pages →
+aedrovaerrorfallback → Edit code, replace worker.js with website
+`deploy/search-discovery/worker-bundled.js`, Deploy on the existing free plan, then
+Domains & Routes → Add → Route (zone aedrova.com) for `aedrova.com/robots.txt` and
+`www.aedrova.com/robots.txt` separately. Do not add a whole-site wildcard, DNS change
+or paid upgrade. This is a tooling/editor blocker, not missing approval; Google
+ownership and the successful sitemap/homepage index are already verified. Reply when
+the routes are saved so hosted robots and Google inspection can be rechecked.
+Commercial operator/address, asset-rights evidence, final legal/security/accessibility
+reviews, Stripe/hosting/signing and live product acceptance remain launch gates in the
+commercial plan; none is represented as completed by this security publication.
