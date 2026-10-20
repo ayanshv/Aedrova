@@ -27,6 +27,38 @@ STATIC = {
 }
 
 
+class PreviewServer(http.server.ThreadingHTTPServer):
+    """A local page cannot exhaust threads by opening idle preview connections."""
+
+    daemon_threads = True
+    request_queue_size = 8
+
+    def __init__(self, *args, **kwargs):
+        self.slots = threading.BoundedSemaphore(8)
+        super().__init__(*args, **kwargs)
+
+    def get_request(self):
+        connection, address = super().get_request()
+        connection.settimeout(2)
+        return connection, address
+
+    def process_request(self, request, client_address):
+        if not self.slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self.slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self.slots.release()
+
+
 class StaticHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *args):
         pass
@@ -36,11 +68,14 @@ class StaticHandler(http.server.SimpleHTTPRequestHandler):
         return None
 
     def permitted(self):
-        if self.headers.get("Host") != f"127.0.0.1:{self.server.server_port}":
+        if self.headers.get_all("Host", []) != [f"127.0.0.1:{self.server.server_port}"]:
             self.send_error(403)
             return False
         if self.headers.get("Origin") not in {None, f"http://127.0.0.1:{self.server.server_port}"}:
             self.send_error(403)
+            return False
+        if len(self.path) > 8192 or len(self.headers.get_all("Origin", [])) > 1:
+            self.send_error(400)
             return False
         path = unquote(urlsplit(self.path).path)
         if any(part.startswith(".") for part in path.split("/") if part):
@@ -87,7 +122,7 @@ class StaticPreview:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(version.data)
         handler = functools.partial(StaticHandler, directory=str(self.temp))
-        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        self.server = PreviewServer(("127.0.0.1", 0), handler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         self.url = f"http://127.0.0.1:{self.server.server_port}/"

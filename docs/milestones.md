@@ -2577,3 +2577,59 @@ link, adaptive icon, staging endpoint and frozen account startup checks passed.
 Current artifact/hash in docs/mac-dmg-launch-2026-10-18.md supersedes the earlier
 preview. Server hardening still needs hosted acceptance, including Supabase Auth
 limits/trusted ingress. No public release, hosting payment or website activation.
+
+## October 19 — onboarding / pre-checkout preparation screen
+
+Owner requested a short, branded spinner screen after onboarding and before payment.
+Website source now shows a Bud-led, three-step preparation dialog after the optional
+introduction (including Skip), and during the actual confirmed checkout request.
+Plan-page preload, direct Continue escape, error/timeout recovery, safe Stripe URL
+validation, reduced motion, focus handling, mobile layout and charcoal styling are
+implemented. Existing app Settings → Team plan & billing uses this shared website
+flow; no native payment gate, new pricing, hosted billing activation or packaged-app
+change. Source details: ../Aedrova_site/docs/onboarding-preparation.md.
+
+Local validation: 68 focused website checks passed, including eight isolated browser
+cases for onboarding/skip, mobile/reduced motion, preload failure, monthly/annual
+checkout, server error, unsafe redirect and timeout. No live payment or provider
+call. No owner credential/SQL/payment setup needed. Normal authorized push and
+website deployment remain necessary to make this visible live; neither was performed
+in this task. Existing launch gates remain open as documented.
+
+## October 19 — endpoint security audit and Google discovery
+
+Reviewed all 84 website/backend routes plus desktop OAuth/preview boundaries.
+Fixed JSON media-type validation gaps, early-error security/cache headers,
+sanitized unexpected API failures, vulnerable aiohttp resolution (now 3.14.5),
+preview connection bounds and standalone credential-scanner imports. Website 562
+and desktop 893 full tests passed; RLS/private PostgreSQL checks, dependency and
+credential audits passed. Full details: ../Aedrova_site/docs/security-audit-2026-10-19.md.
+
+Confirmed existing Google Search Console verified domain ownership, homepage indexed,
+seven indexed pages and successful sitemap with 13 discovered pages. Product-page
+indexing currently fails Google's cached robots check; canonical recrawl requested.
+Prepared and tested an exact-path robots edge route to avoid Render Free sleeping
+robots behavior. No push/deploy/edge route activation occurred. Owner deployment
+approval remains required under website instructions. Hosted proxy/multi-worker,
+provider acceptance, independent review and other release gates remain open.
+
+## October 19 — consumer trust checklist and commercial launch roadmap
+
+Owner approved audit publication/backend deployment and requested the 20-item public
+trust checklist plus SQL-injection protection. Website now implements dedicated
+refund information, equal optional preference-storage choices, strict waitlist
+marketing/age eligibility confirmation, purpose-bound email opt-out confirmation,
+suppression-aware exports, focusable skip target and contrast corrections. Existing
+Privacy/Terms/data-request/service-provider disclosures retained and updated.
+SQLAlchemy value binding reviewed; adversarial OR/UNION/DROP regressions passed.
+Business operator/address placeholders remain unresolved per owner's instruction;
+no commercial gate or payment activated. Full checklist and evidence are in website
+docs/consumer-launch-checklist-2026-10-19.md.
+
+Owner requested latest staging file opened: local Aedrova-preview.dmg was opened;
+it remains the documented internal staging artifact, not a new commercial installer.
+Saved complete phased commercial B2C plan in docs/commercial-b2c-deployment-plan.md,
+including C-corp/ownership/EIN/bank/market scope, consumer disclosures, live product
+and security acceptance, operations, Stripe verification/prices/webhooks/lifecycle,
+Mac signing/notarization, Windows signing/testing, and final go/no-go. No entity
+formation, bank submission, purchase, paid hosting or commercial release performed.
