@@ -2908,3 +2908,5 @@ reinterpreting subscriptions. Before enabling purchases, separate tier from bill
 interval and provision/verify all four approved Stripe prices and lifecycle flows.
 No owner action now. This billing migration remains a commercial launch gate.
 Website implementation detail: docs/pricing-options-oct20.md in website repository.
+Production /plans and annual URL verified HTTP 200 with new pricing after Render
+auto-deployment. Live browser shows correct annual prices and waitlist CTAs.
