@@ -2891,3 +2891,20 @@ ad-hoc internal preview, not notarized public distribution. Mounted at
 Required owner action to see changes: quit old Aedrova with Command-Q, then open
 /Volumes/Aedrova Upload Preview/Aedrova.app in Finder. No key/SQL/payment action
 is required for this upload fix. Current connector and commercial release gates stay open.
+
+### October 20 — Public pricing intervals and teammate illustrations
+
+Website PR #20 merged as c6b5193 after both required verify checks passed.
+Public pricing now offers a minimal keyboard-accessible monthly/annual switch:
+Pro $15/month or $120/year per team; Team $25/month or $250/year per team.
+Pro retains three teammate icons; Team uses five. Icons do not impose member limits.
+Desktop CTAs remain aligned, monthly defaults, annual query links work without JS,
+and selection requires no tracking/preference storage. Free/Enterprise unchanged.
+574 website tests passed, including real-browser responsive/keyboard/icon checks;
+Ruff and diff checks passed. Screenshots: website work/pricing-oct20/.
+Paid public CTAs remain Join waitlist. Legacy Stripe identifiers/policies and AI
+budgets were deliberately preserved to avoid breaking hosted configuration or
+reinterpreting subscriptions. Before enabling purchases, separate tier from billing
+interval and provision/verify all four approved Stripe prices and lifecycle flows.
+No owner action now. This billing migration remains a commercial launch gate.
+Website implementation detail: docs/pricing-options-oct20.md in website repository.
