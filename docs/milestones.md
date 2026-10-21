@@ -2777,3 +2777,43 @@ public_release=false; no Developer ID/notarization/public installer claim.
 Backend 573 tests and focused desktop 35 passed; actual hosted health 200 and
 HTML branded 404/no-store verified on both production and staging. No scope
 expansion, charge, production credential transfer or commercial launch performed.
+
+### October 20 approved social/Brave follow-up
+
+Owner explicitly authorized Meta email verification, Instagram @aedrova_ai / TikTok
+@aedrova fresh login, and Brave account activation; no payment authorization.
+Completed the Meta email challenge using only the requested security@facebookmail.com
+message in the signed-in Aedrova Gmail account. Meta accepted the code, then presented
+a new reCAPTCHA human check. No CAPTCHA solved or ID submitted. Owner must complete
+that check in the retained Facebook tab; any subsequent identity review remains a
+provider gate. No broader inbox search, outgoing email or stored email copy.
+
+Fresh native staging PKCE and current catalog passed. Seven OAuth providers enabled;
+Stripe and managed Search still unconfigured. Fresh social starts reached real login.
+Instagram in IAB needs existing-account login. Existing Safari session reaches a
+professional-account conversion URL but is blocked by the daily usage reminder.
+Its active handle/professional status could not be verified; do not convert an
+unrelated personal account. Normal reminder Close had no effect; no usage limit
+changed. Owner: dismiss reminder privately and select professional @aedrova_ai,
+then use a fresh staging Connect your account action.
+
+TikTok Safari reaches an existing-account email verification screen. Selecting Email
+then displayed Maximum number of attempts reached. Try again later before any code
+was entered. Stopped all TikTok attempts immediately; no resend/retry/uninstall or
+rate-limit workaround. Owner should wait until TikTok allows normal login again;
+no provider reset time claimed. Existing handle not visible/verified in this challenge.
+
+Brave has no signed-in session. Opened Create account and prepared owner name plus
+aedrova.ai@gmail.com. No password entered, terms accepted, account submitted, plan
+selected or payment performed. Browser safety requires owner to enter and submit
+new password personally. Owner: complete the retained Brave registration form
+(or existing-account login), email verification, then leave API dashboard open.
+If activation requires payment, owner must decide and pay personally. Managed Search
+credential transfer still requires destination-specific approval when a key exists.
+
+No new social grant/read acceptance this turn. No production/code deployment or
+new test suite needed for this account-only follow-up. Native synthetic test session
+signed out locally and private pending URL files cleaned. Current private report is
+work/connector-completion-oct20/social-followup.json (start-only, not prior read proof).
+Screenshots meta-human-check.png, brave-registration.png and tiktok-attempt-limit.png
+record actual blockers without password/OTP storage. All-nine launch gate stays open.
