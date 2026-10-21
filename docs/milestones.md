@@ -2842,3 +2842,52 @@ instagram-connected-oct20.png and meta-access-restored.png. No code or deploymen
 changes, no payment, no new full regression suite needed for this live account test.
 TikTok was not retried after the attempt-limit result. Brave password/signup and
 Stripe private test developer key/hosted activation remain the prior owner gates.
+
+## October 20 — responsive file uploads
+
+Owner reported slow/clunky file uploads. Source 9985920 plus final UI-lifetime guard
+0ca84dc now uses the existing validated isolated user session mechanism to perform
+uploads in a two-worker bounded pool instead of occupying the chat/account transport
+for the entire Storage/verification request. Session preparation remains serialized.
+Send actions retain priority; batch upload preparation preserves selection order.
+Exact original channel/thread and identity captured; cancellation checked before
+preparation, before transfer/verification and each multipart read. No shared auth
+client used concurrently; cloned transports close on completion/failure/logout.
+Late results are discarded after identity/UI changes; successful publication metadata
+is read through the same user's RLS and merged only into still-accessible channels.
+
+Native picker now accepts up to ten files in one selection. SDK-compatible bounded
+BufferedReader reports real byte percentages and interrupts cancelled multipart reads.
+Interrupted private uploads never call publication; removal/abandon is best-effort
+with existing bounded orphan cleanup. Same-path in-flight duplicates rejected.
+Compact inline status cards keep the composer usable; successful/cancelled cards
+auto-clear, errors remain dismissible. No unverified file is optimistically shared.
+Server type/size/hash verification, original 10 MB limit and all workspace RLS remain.
+Verification disables Cancel once a commit may be in flight, retaining existing safety.
+
+At attachment intent, a background unauthenticated GET /health pre-wakes only the
+configured verifier at most once per minute; no user/file data and no stored response.
+Verification POST gets one bounded 90s read wait/10s connect timeout for free-host
+cold starts. No automatic retry after ambiguous publication; error tells user to
+check chat before retrying. Other media requests retain their 35s bound. Free-host
+wake latency still exists; no paid hosting, migration or backend deployment needed.
+
+Validation: full suite 905 passed, followed by 27 focused tests after the final
+destroyed-UI guard; Ruff/diff passed. Tests prove chat sends while upload is blocked,
+selection order, no transfer after cancellation/logout, measured chunk progress,
+no publication after mid-transfer cancel and throttled pre-wake without auth/data.
+Real native Google staging login -> isolated session -> 256 KiB synthetic text upload
+-> server verification -> private download/hash match passed in 5.57s total on warm
+staging. No before/after latency multiplier or cold-start benchmark claimed. Test
+message unsent afterward, cloned/native sessions closed/signed out locally. Private
+evidence: work/upload-polish-oct20/report.json and UI fixture upload-preview.png.
+
+Internal staging DMG rebuilt from 0ca84dc, 321,728,790 bytes, SHA256
+6243382a01c894e71a34acb72f07ddcfcc72b9ed48fa6bc7ddc0ac2d1cee5c29.
+Image CRC, manifest digest/public_release=false, mounted strict/deep signature and
+isolated staging origins passed; frozen sample startup smoke passed. This is an
+ad-hoc internal preview, not notarized public distribution. Mounted at
+/Volumes/Aedrova Upload Preview; older running /Volumes/Aedrova 1 app left untouched.
+Required owner action to see changes: quit old Aedrova with Command-Q, then open
+/Volumes/Aedrova Upload Preview/Aedrova.app in Finder. No key/SQL/payment action
+is required for this upload fix. Current connector and commercial release gates stay open.

@@ -94,3 +94,20 @@ preview startup smoke passed with 4 tabs and 5 sample messages; no network servi
 connected in this fixture. New image was not mounted over the owner's running app;
 existing older mounted volumes were not forcefully detached. Signing/clean-machine
 release gates above remain open. This is not a commercial download.
+
+## October 20 upload responsiveness refresh
+
+Latest internal staging preview replaces earlier images: source 0ca84dc,
+321,728,790 bytes, SHA256
+6243382a01c894e71a34acb72f07ddcfcc72b9ed48fa6bc7ddc0ac2d1cee5c29.
+Includes isolated bounded upload workers, multi-file picker, real byte progress,
+responsive cancellation and compact/auto-clearing completion feedback. Full suite
+905 passed; final UI-destruction guard followed by 27 focused passing tests. Real
+warm staging 256 KiB upload/verification/private-download integrity passed, 5.57s
+including session preparation and download. Synthetic message cleaned by unsend.
+
+CRC/digest, mounted deep/strict signature, staging-origin equality and packaged
+preview startup passed. public_release=false; ad-hoc internal only. Mounted as
+/Volumes/Aedrova Upload Preview. Owner must quit the old running Aedrova, then
+open that volume's Aedrova.app to use the new client. Old running volume was not
+force-unmounted, and no automatic production update/public download was enabled.
