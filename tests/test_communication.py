@@ -298,7 +298,7 @@ def test_attachment_picker_and_save_action(qtbot, tmp_path, monkeypatch):
         return "message"
 
     service.upload_attachment = upload
-    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *a: (str(source), ""))
+    monkeypatch.setattr(QFileDialog, "getOpenFileNames", lambda *a: ([str(source)], ""))
     window.connected.upload()
     qtbot.waitUntil(lambda: bool(uploads) and not window.account_dialog.busy)
     assert uploads[0][1:3] == ("c", str(source))

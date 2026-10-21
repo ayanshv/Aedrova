@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
-from PySide6.QtCore import QEvent, QObject, Qt, QTimer
+from PySide6.QtCore import QEvent, QObject, Qt, QThreadPool, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QApplication, QFileDialog
 
@@ -117,6 +117,9 @@ class ConnectedDashboard(QObject):
         self.window, self.account = window, account
         self.active = False
         self.pending = {}
+        self.upload_jobs = {}
+        self.upload_pool = QThreadPool(self)
+        self.upload_pool.setMaxThreadCount(2)
         self.outbox = {}
         self.reaction_edits = {}
         self.reaction_jobs = set()
@@ -340,8 +343,9 @@ class ConnectedDashboard(QObject):
             return
         action = (key, operation, completed)
         if priority:
+            preceding = {"send", "upload"} if key[0] == "upload" else {"send"}
             position = next(
-                (i for i, queued in enumerate(self.queue) if queued[0][0] != "send"),
+                (i for i, queued in enumerate(self.queue) if queued[0][0] not in preceding),
                 len(self.queue),
             )
             self.queue.insert(position, action)
@@ -364,14 +368,16 @@ class ConnectedDashboard(QObject):
             return
         if self.queue:
             self.current_action = self.queue.popleft()
-            _, operation, completed = self.current_action
+            action_key, operation, completed = self.current_action
 
             def done(result):
                 self.current_action = None
                 self.failures = 0
                 self.retry_at = 0
-                if self.active:
+                # A prepared isolated upload session must be closed even after logout.
+                if self.active or action_key[0] == "upload":
                     completed(result)
+                if self.active:
                     QTimer.singleShot(0, self.refresh)
 
             self.account.run(operation, done)
@@ -877,27 +883,58 @@ class ConnectedDashboard(QObject):
     def upload(self, path=None, *, parent=None, voice_data=None, completed=None, cancelled=None):
         if not self.active or not self.window.channel_id:
             return
+        from aedrova.identity.service import IdentityService
+
+        if isinstance(self.account.service, IdentityService):
+            from aedrova.agents.managed import application_origin
+            from aedrova.identity.media import warm_upload_verifier
+
+            try:
+                origin = application_origin()
+                if origin:
+                    warm_upload_verifier(origin)
+            except ValueError:
+                pass  # Optional pre-wake must not prevent choosing a file.
         if voice_data is None and (not path or isinstance(path, bool)):
             parent = parent or (
                 self.window.thread_id if self.window.thread_composer.editor.hasFocus() else None
             )
-            path, _ = QFileDialog.getOpenFileName(self.window, "Attach a file · up to 10 MB")
+            paths, _ = QFileDialog.getOpenFileNames(self.window, "Attach files · up to 10 MB each")
+            if len(paths) > 10:
+                self.window.notify("Choose up to 10 files at a time.")
+                return False
+            for selected in paths:
+                self.upload(selected, parent=parent)
+            return bool(paths)
         if not path:
             return
         from aedrova.desktop.upload_progress import UploadProgress
 
         composer = self.window.thread_composer if parent else self.window.composer
-        if len(composer.findChildren(UploadProgress)) >= 10:
+        if sum(key[0] == "upload" for key in self.pending) >= 10:
             self.window.notify("Finish or dismiss uploads before adding more files.")
             return
         # Capture context before the dialog/worker runs; changing channels never redirects uploads.
         channel = self.window.channel_id
         service = self.account.service
+        user_id = str(service.user.id)
         key = ("upload", channel, parent, str(Path(path).resolve()))
+        if key in self.pending:
+            return False
         identifier = self.pending.setdefault(key, str(uuid4()))
         progress = UploadProgress(composer, Path(path).name)
 
-        def operation():
+        def stopped():
+            return (
+                progress.cancelled.is_set()
+                or bool(cancelled and cancelled())
+                or not self.active
+                or self.account.service is not service
+                or service.user is None
+                or str(service.user.id) != user_id
+            )
+
+        def operation(transport):
             import tempfile
 
             temporary = None
@@ -907,39 +944,107 @@ class ConnectedDashboard(QObject):
                     temporary = tempfile.TemporaryDirectory(prefix="aedrova-voice-upload-")
                     source = Path(temporary.name) / Path(path).name
                     source.write_bytes(voice_data)
-                result = service.upload_attachment(
+                result = transport.upload_attachment(
                     identifier,
                     channel,
                     source,
                     parent,
-                    cancelled=lambda: (
-                        progress.cancelled.is_set()
-                        or bool(cancelled and cancelled())
-                        or not self.active
-                        or self.account.service is not service
-                    ),
+                    cancelled=stopped,
                     progress=progress.updated.emit,
                 )
-                return {"shared": bool(result)}
+                publication = {"shared": bool(result)}
+                # Fetch only the verified message instead of waiting for a workspace snapshot.
+                if result and hasattr(transport, "client") and not stopped():
+                    try:
+                        rows = (
+                            transport.client.table("messages")
+                            .select("id,sender_id,body,channel_id,parent_id,created_at,sequence")
+                            .eq("id", result)
+                            .eq("channel_id", channel)
+                            .limit(1)
+                            .execute()
+                            .data
+                        )
+                        files = transport.attachments_for([result])
+                        if rows:
+                            publication.update(rows=rows, files=files)
+                    except Exception:
+                        pass  # Already shared; normal realtime reconciliation can recover metadata.
+                return publication
             except ValueError as error:
                 return {"error": str(error)}
             except Exception:
-                return {"error": "Not shared. Check connection, file type or channel access."}
+                return {"error": "Could not confirm upload. Check the chat before trying again."}
             finally:
                 if temporary is not None:
                     temporary.cleanup()
+                if transport is not service:
+                    transport.close_context()
 
         def done(result):
-            self.pending.pop(key, None)
-            progress.complete(
-                result.get("error")
-                or ("Shared · verified securely" if result.get("shared") else "Upload cancelled")
-            )
+            from shiboken6 import isValid
+
+            self.upload_jobs.pop(identifier, None)
+            if self.pending.get(key) == identifier:
+                self.pending.pop(key, None)
+            if (
+                not self.active
+                or self.account.service is not service
+                or service.user is None
+                or str(service.user.id) != user_id
+            ):
+                return
+            allowed = {c["id"] for c in self.account.snapshot.get("channels", [])}
+            if result.get("rows") and channel in allowed:
+                self.cache.setdefault(channel, {}).update({r["id"]: r for r in result["rows"]})
+                self.files.update({f["message_id"]: f for f in result.get("files", [])})
+                if self.window.channel_id == channel:
+                    self.render_local_messages()
+            if isValid(progress):
+                progress.complete(
+                    result.get("error")
+                    or (
+                        "Shared · verified securely" if result.get("shared") else "Upload cancelled"
+                    ),
+                    success=bool(result.get("shared")),
+                )
             if completed:
                 completed(result)
+            QTimer.singleShot(0, self.refresh)
 
-        queued = self.enqueue(key, operation, done)
+        def prepare():
+            if stopped():
+                return None
+            factory = getattr(service, "fork_for_context", None)
+            if factory is None:
+                return {"inline": operation(service)}
+            try:
+                return {"transport": factory()}
+            except Exception:
+                return {"error": "Could not prepare upload. Check your connection and retry."}
+
+        def prepared(value):
+            transport = (value or {}).get("transport")
+            if stopped():
+                if transport:
+                    transport.close_context()
+                done({"shared": False})
+                return
+            if not transport:
+                done((value or {}).get("inline", value or {"shared": False}))
+                return
+            from aedrova.desktop.account import AccountJob
+
+            job = AccountJob(lambda: operation(transport))
+            self.upload_jobs[identifier] = job
+            job.signals.finished.connect(
+                lambda result, ok: done(result if ok else {"error": "Upload interrupted. Retry."})
+            )
+            self.upload_pool.start(job)
+
+        queued = self.enqueue(key, prepare, prepared, priority=True)
         if not queued:
+            self.pending.pop(key, None)
             progress.complete("Already queued or unavailable. Your file was not added twice.")
         return bool(queued)
 

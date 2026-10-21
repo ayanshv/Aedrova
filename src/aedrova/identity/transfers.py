@@ -1,6 +1,7 @@
 """Bounded file transfers; private objects are never opened or rendered automatically."""
 
 import hashlib
+import io
 import os
 import tempfile
 from pathlib import Path
@@ -38,3 +39,27 @@ def save_download(destination, data):
     finally:
         if temporary and os.path.exists(temporary):
             os.unlink(temporary)
+
+
+class UploadCancelled(Exception):
+    """Cancellation while the private request body is still being transferred."""
+
+
+class UploadReader(io.BufferedReader):
+    """SDK-compatible multipart reader with measured progress and chunk cancellation."""
+
+    def __init__(self, data, cancelled, progress):
+        super().__init__(io.BytesIO(data))
+        self.total = len(data)
+        self.cancelled, self.progress = cancelled, progress
+        self.last_percent = -1
+
+    def read(self, size=-1):
+        if self.cancelled():
+            raise UploadCancelled()
+        chunk = super().read(size)
+        percent = min(100, self.tell() * 100 // max(1, self.total))
+        if percent != self.last_percent:
+            self.last_percent = percent
+            self.progress(f"Uploading · {percent}%")
+        return chunk

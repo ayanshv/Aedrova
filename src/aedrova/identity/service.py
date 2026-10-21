@@ -855,10 +855,12 @@ class IdentityService:
     ):
         from aedrova.agents.managed import application_origin
         from aedrova.identity.media import MediaClient
-        from aedrova.identity.transfers import read_upload
+        from aedrova.identity.transfers import UploadCancelled, UploadReader, read_upload
 
         cancelled = cancelled or (lambda: False)
         progress = progress or (lambda _: None)
+        if cancelled():
+            return None
         progress("Checking file…")
         name, data, digest = read_upload(path)
         if cancelled():
@@ -878,9 +880,12 @@ class IdentityService:
                 self.rpc("abandon_attachment", {"p_id": identifier})
                 return None
             progress("Uploading securely…")
-            self.client.storage.from_("aedrova-files").upload(
-                object_path, data, {"content-type": "application/octet-stream", "upsert": "false"}
-            )
+            with UploadReader(data, cancelled, progress) as stream:
+                self.client.storage.from_("aedrova-files").upload(
+                    object_path,
+                    stream,
+                    {"content-type": "application/octet-stream", "upsert": "false"},
+                )
             if cancelled():
                 self.client.storage.from_("aedrova-files").remove([object_path])
                 self.rpc("abandon_attachment", {"p_id": identifier})
@@ -890,6 +895,14 @@ class IdentityService:
             return MediaClient(application_origin(), token).request(
                 "/api/files/verify", {"identifier": identifier, "parent": parent}
             )["message"]
+        except UploadCancelled:
+            # An interrupted multipart request may leave a private object; never publish it.
+            try:
+                self.client.storage.from_("aedrova-files").remove([object_path])
+                self.rpc("abandon_attachment", {"p_id": identifier})
+            except Exception:
+                pass  # Existing bounded orphan cleanup remains authoritative.
+            return None
         except Exception:
             # No automatic publish/retry after ambiguous Storage or verification failures.
             # Pending bytes are private and use the bounded orphan cleanup lifecycle.
