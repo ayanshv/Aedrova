@@ -2817,3 +2817,28 @@ signed out locally and private pending URL files cleaned. Current private report
 work/connector-completion-oct20/social-followup.json (start-only, not prior read proof).
 Screenshots meta-human-check.png, brave-registration.png and tiktok-attempt-limit.png
 record actual blockers without password/OTP storage. All-nine launch gate stays open.
+
+### October 20 Meta restored and fresh Instagram acceptance
+
+Owner completed Meta CAPTCHA and Instagram login. Live browser verified Meta
+Access restored, returned to existing app roles and confirmed @aedrova_ai remains
+an Instagram Tester. App Publish Status is Unpublished: general public distribution
+review is still a release gate, not implied by restored developer access.
+
+Owner completed Instagram in the in-app browser, while Safari retained a different
+session blocked by the daily reminder/professional conversion page. Old completed
+callback reached generic403; did not replay its code or weaken proof/state checks.
+Created a fresh native-authenticated staging OAuth state, opened it in the correct
+signed-in IAB session, verified provider consent explicitly named aedrova_ai and
+previously connected Aedrova Buds-IG, then renewed equivalent existing basic-read
+access for the same staging callback and 24h local grant. Branded Connected page
+returned. Real profile and posts tools both passed. Disconnected only the synthetic
+Beta isolation audit Bud's grant; subsequent profile read denied. provider_revoked
+was false: no provider-wide uninstall claimed/performed. Test identity signed out
+locally and private pending URL files removed. No post/message scopes or writes.
+
+Private evidence: work/connector-completion-oct20/instagram-acceptance-oct20.json,
+instagram-connected-oct20.png and meta-access-restored.png. No code or deployment
+changes, no payment, no new full regression suite needed for this live account test.
+TikTok was not retried after the attempt-limit result. Brave password/signup and
+Stripe private test developer key/hosted activation remain the prior owner gates.
