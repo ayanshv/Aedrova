@@ -925,8 +925,13 @@ class ConnectedDashboard(QObject):
         progress = UploadProgress(composer, Path(path).name)
 
         def stopped():
+            from shiboken6 import isValid
+
             return (
-                progress.cancelled.is_set()
+                not isValid(self)
+                or not isValid(self.window)
+                or not isValid(progress)
+                or progress.cancelled.is_set()
                 or bool(cancelled and cancelled())
                 or not self.active
                 or self.account.service is not service
@@ -988,7 +993,10 @@ class ConnectedDashboard(QObject):
             if self.pending.get(key) == identifier:
                 self.pending.pop(key, None)
             if (
-                not self.active
+                not isValid(self)
+                or not isValid(self.window)
+                or not isValid(self.account)
+                or not self.active
                 or self.account.service is not service
                 or service.user is None
                 or str(service.user.id) != user_id
