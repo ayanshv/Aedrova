@@ -2994,3 +2994,8 @@ metadata as applicable; product brand can remain Aedrova. No automatic rename or
 assumed Inc. suffix, and no retroactive liability protection implied.
 No immediate owner action. Revisit only after owner confirms actual incorporation.
 44 focused website checks, Ruff and diff checks passed; hosted publication pending.
+Website naming PR #21 merged as 2ef66018 after both required checks passed; main
+verify also passed. Live Privacy/Terms/Support still returned the previous wording
+at the final check; Render dashboard did not load through connected browser.
+Do not claim the new shared disclosure is deployed yet. Current live pages already
+use the Aedrova brand. Recheck deployment next session; no owner action required.
