@@ -3043,3 +3043,11 @@ Validation: 589 full website/backend tests passed; targeted clock/budget/authori
 and no-charge regressions, real-browser countdown/clock/reload/exact-expiry and
 mobile/desktop checks included. Ruff, diff, release-secret scan passed. Website
 source 1e22132; PR/public deployment acceptance recorded next.
+Website PR #22 merged as a108b7d after both required verify checks succeeded.
+Production /plans monthly/annual and /terms returned HTTP 200 with $0.00 on both
+paid-plan cards and December 20 11:59 p.m. Pacific disclosure. Public clock API
+verified immutable 2026-12-21T07:59:59Z deadline and positive remaining time; live
+browser shows countdown, thin price strikethrough and preserved 3/5 avatars.
+Screenshot: website work/early-access-oct21/live-prices.png. Publication confirmed;
+hosted gift flag remains unchanged/off, public access still waitlist-gated as above.
+No owner action now. Never silently restart the shared period during future launch.
