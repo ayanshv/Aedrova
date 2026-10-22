@@ -2999,3 +2999,7 @@ verify also passed. Live Privacy/Terms/Support still returned the previous wordi
 at the final check; Render dashboard did not load through connected browser.
 Do not claim the new shared disclosure is deployed yet. Current live pages already
 use the Aedrova brand. Recheck deployment next session; no owner action required.
+Final acceptance immediately afterward: production /privacy, /terms and /support
+all returned HTTP 200 with Business name: Aedrova and October 21 revision. Live
+browser verified new disclosure; publication now confirmed. Prior deployment wait
+above is resolved. No owner action required for the current name update.
