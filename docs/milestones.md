@@ -2977,3 +2977,20 @@ operator in customer terms/privacy. Sole proprietorship, if applicable, does not
 provide separate personal-liability protection. Never activate public checkout
 solely because incorporation was deferred. Existing product/security/billing release
 gates remain intact. No Atlas action required from owner now.
+
+### October 21 — Public name Aedrova; future legal-name transition
+
+Owner explicitly requested Aedrova as the current name across all public text,
+including Privacy/Terms, with a later incorporated-name update. App src and website
+application source audited: no current Aedrova, Inc. claims found. Existing product
+branding remains Aedrova. Public Privacy, Terms and Support now share an explicit
+Business name: Aedrova statement, transparently retaining unconfirmed legal
+operator/address/jurisdiction and the paid-launch verification gate. No individual
+identity inferred or public private details added. Revision October 21, 2026.
+Website docs/business-identity-transition.md saves exact post-incorporation steps:
+verify accepted Delaware certificate/exact legal name, then update legal pages,
+Stripe merchant records/receipts, legal/publisher/OAuth identities and public
+metadata as applicable; product brand can remain Aedrova. No automatic rename or
+assumed Inc. suffix, and no retroactive liability protection implied.
+No immediate owner action. Revisit only after owner confirms actual incorporation.
+44 focused website checks, Ruff and diff checks passed; hosted publication pending.
