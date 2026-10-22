@@ -3003,3 +3003,43 @@ Final acceptance immediately afterward: production /privacy, /terms and /support
 all returned HTTP 200 with Business name: Aedrova and October 21 revision. Live
 browser verified new disclosure; publication now confirmed. Prior deployment wait
 above is resolved. No owner action required for the current name update.
+
+### October 21 — Owner-approved shared 60-day $0 early-access offer
+
+Owner chose a single shared window starting today, not 60 days per activation.
+Fixed recorded start October 21 9:58:40 p.m. Pacific (October 22 04:58:40 UTC).
+Owner then requested final-day cutoff 11:59 p.m.: end December 20, 2026 11:59:59
+p.m. Pacific (December 21 07:59:59 UTC). This deliberately extends the original
+exact 60x24-hour interval through the final evening. NEVER restart per signup,
+refresh, redeployment or renewed session, or silently extend it. No recurring
+reminder/automation created. Canonical schedule in website promotion.py; permanent
+operational reminder/activation/cost/expiry details in docs/early-access-offer.md.
+
+Public pricing: Pro/Team regular prices remain visible with thin strikethrough;
+$0.00 emphasized for the limited window. Billing switch and 3/5 teammate icons
+preserved. Countdown uses server remaining seconds + monotonic timer, periodically
+resyncs through a bounded no-store public endpoint and expires the discount in
+place. Server-rendered/no-JS responses also return regular prices at cutoff. Terms
+show current planned rates and promotion conditions, with no automatic charge,
+paid subscription or new 60 days for late participants. The public site REMAINS
+waitlist-only: the offer does NOT unlock app/download/AI access and its clock is
+already running while launch remains gated.
+
+Backend prepared, NOT activated on hosted services by this marketing update:
+EARLY_ACCESS_ENABLED defaults false and requires Free enabled/waitlist off. On
+approved activation, ordinary authenticated workspace creation can grant Team
+capacity without a subscription; existing eligible Free spaces use the existing
+CSRF-protected owner/admin Free action. Gifts expire at the same immutable end,
+preserve replay/usage accounting, never overwrite paid/pending/development billing,
+and fall back to Free with concurrency=1. Every reservation rechecks entitlement.
+Pro/Team, per-owner, aggregate Free-pool, company, request and rolling limits remain;
+no unlimited usage or budget increase. Live paid checkout blocked during the offer
+independent of grant flag, with isolated Stripe test checkout retained for regression.
+No provider key, SQL migration, payment, Stripe subscription, production Free gate,
+public release or installer changed. Hosted grant activation and actual-user tests
+remain part of authorized release/staging acceptance; no owner action required now
+for the price/countdown update. Full verification/publication recorded below.
+Validation: 589 full website/backend tests passed; targeted clock/budget/authorization
+and no-charge regressions, real-browser countdown/clock/reload/exact-expiry and
+mobile/desktop checks included. Ruff, diff, release-secret scan passed. Website
+source 1e22132; PR/public deployment acceptance recorded next.
