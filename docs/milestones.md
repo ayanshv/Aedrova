@@ -2910,3 +2910,70 @@ No owner action now. This billing migration remains a commercial launch gate.
 Website implementation detail: docs/pricing-options-oct20.md in website repository.
 Production /plans and annual URL verified HTTP 200 with new pricing after Render
 auto-deployment. Live browser shows correct annual prices and waitlist CTAs.
+
+### October 21 — Delaware C corporation / Stripe Atlas preparation
+
+Owner selected Stripe Atlas and authorized preparation except payments/personal
+information. Delaware live entity search for Aedrova returned No Records Found;
+this is not name clearance or reservation. Prepared non-personal company input
+worksheet in ignored work/incorporation-oct21/company-details-draft.txt.
+Atlas public pricing reviewed: $500 formation/first-year agent; $100/year agent
+thereafter. Tax/reporting and other-state obligations are separate.
+Opened existing-account Stripe Login redirecting to Atlas. No formation application
+saved/submitted, founder data entered, agreement accepted, or payment made.
+Required owner action NOW: sign in to existing Stripe account in the open tab and
+reply signed in; do not submit founder/signature/payment steps. Personal-info
+restriction prevents agent sign-in. Atlas draft editing blocked until login.
+Founder identity, ownership/share structure, vesting and appointments remain unset;
+proposed Aedrova, Inc. name requires owner confirmation/provider approval. Website
+legal operator placeholder remains unchanged until actual formation is verified.
+
+Atlas continuation: owner completed sign-in. Created the separate Atlas company
+draft account acct_1UT7vE5OlgWhvw72 (original merchant account unchanged), selected
+C corporation, entered proposed Aedrova name with default , Inc. suffix. Atlas
+reported Available! Aedrova, Inc. Public Stripe profile visibility left OFF.
+Saved two-sentence software business description and https://aedrova.com.
+Application reached Founders at 33% with Structure/Name/Description marked complete.
+STOPPED at founder personal-info boundary. Existing Stripe names were auto-filled
+by Stripe; agent did not type/verify/submit founder names or any personal fields.
+No signatures, payment, equity allocation, founder invitations, EIN request or
+Delaware incorporation filing performed; operator placeholder remains unchanged.
+Required owner action NOW: in the open Atlas -> Founders page, verify legal name,
+enter date of birth/residence privately and add only actual co-founders, then Next.
+Stop at Ownership and reply founders completed. Do not post personal data in chat.
+Founder completion blocks further application preparation; share/vesting/roles
+must be consciously reviewed by the owner, not inferred or auto-filled by agent.
+
+Atlas owner reported Founders completed; UI verifies Founders complete and Ownership
+in progress, application 44%. Ownership screen's current unaccepted default shows
+10,000,000 authorized shares: founder 9,000,000 and future team pool 1,000,000 (10%).
+No ownership field edited and Next not clicked. Asked owner to confirm the desired
+pool percentage or review with counsel before proceeding. Do not infer approval
+from completion of personal founder fields; actual share issuance remains unperformed.
+
+Atlas owner advanced independently through Ownership, Equity terms and Roles;
+current UI is 83(b) election at 77.8%. These intervening selections have not been
+reviewed or changed by agent. SSN/ITIN field is empty; no taxpayer information
+entered/read/copied. Owner must enter their actual SSN/ITIN privately or select
+no SSN/ITIN only if true, then Next; stop at Tax ID or Summary and report screen.
+83(b) is personal tax treatment, not an EIN application. Agent will not choose or
+submit a personal tax election or sign/pay on the owner's behalf in this task.
+
+### October 21 — Owner deferred incorporation for customer validation
+
+SUPERSEDES the immediate Atlas personal-information handoffs above. Owner paused
+Delaware C corporation formation until demand/initial sales justify revisiting it.
+No further Atlas edits, personal data collection, signatures, filing, payment or
+agent appointment authorized while deferred. Preserve existing draft without
+submitting/deleting it. Latest observed draft was 83(b), 77.8%; no state acceptance
+has been verified. Do not advertise Aedrova, Inc. as formed.
+No numerical revenue quota selected by owner; do not create an automatic revenue
+trigger or resume formation without renewed instruction. Proposed business review
+checkpoint only: 10 paying workspaces plus evidence of renewals/regular usage.
+Formation is deferred, not treated as a mandatory blocker for testing demand.
+Before actual paid launch, still verify lawful operator/business type, Stripe
+eligibility/identity, applicable local/DBA/tax requirements and accurate legal
+operator in customer terms/privacy. Sole proprietorship, if applicable, does not
+provide separate personal-liability protection. Never activate public checkout
+solely because incorporation was deferred. Existing product/security/billing release
+gates remain intact. No Atlas action required from owner now.
