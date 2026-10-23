@@ -3051,3 +3051,21 @@ browser shows countdown, thin price strikethrough and preserved 3/5 avatars.
 Screenshot: website work/early-access-oct21/live-prices.png. Publication confirmed;
 hosted gift flag remains unchanged/off, public access still waitlist-gated as above.
 No owner action now. Never silently restart the shared period during future launch.
+
+### October 22 — Search Console technical remediation
+
+Website PR #23 merged c1a3ad2f after both required checks. 590 website/backend and
+10 Worker tests passed. Existing free Cloudflare Worker d987d7f5 now serves only
+robots.txt and sitemap.xml on four exact apex/www routes, independently of origin
+sleep/outage; all four hosted responses match tested source. Main new robots was
+fetched by Google; older variants' recrawl requests accepted. Five page indexing
+requests accepted (product/plans/support/terms/data-controls), sitemap resubmitted,
+and robots conflict validation Started. Google processing remains pending; not all
+reports are green yet. Expected HTTP/www redirects retained. HTTPS/security/manual
+reports clear; Core Web Vitals lacks data. Decorative homepage video intentionally
+is not a watch-page video result. Private access and waitlist/release gates intact.
+No purchase, DNS, credential or ownership change. No owner action currently.
+Owner also requested Preferred Source badge: Google selector currently returns
+No results for aedrova.com. Markup prepared but not displayed as working/endorsed.
+Activate only once Google offers domain; no owner setting can force eligibility.
+Details: ../Aedrova_site/docs/search-console-2026-10-22.md.
