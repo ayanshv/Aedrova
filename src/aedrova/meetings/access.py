@@ -98,14 +98,14 @@ class MeetingClient(ManagedClient):
                 if isinstance(reason, str) and reason in unavailable:
                     raise MeetingRequestError(
                         "Meetings are not available on this server yet. "
-                        "Your workspace owner must finish meeting setup. Devices remain off."
+                        "Contact Aedrova support at contact@aedrova.com. Devices remain off."
                     )
                 raise MeetingRequestError(
                     "Cannot access this call. Sign in again or ask your workspace owner."
                 )
             if response.status_code in {404, 405}:
                 raise MeetingRequestError(
-                    "Meeting service is not configured. Contact your workspace owner."
+                    "Meeting service is not configured. Contact contact@aedrova.com."
                 )
             if response.status_code == 429:
                 raise MeetingRequestError("Too many meeting requests. Wait a moment and try again.")

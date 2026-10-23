@@ -116,6 +116,20 @@ class QueryJob(QRunnable):
                     query=self.task,
                     preferred_channel=self.channel,
                 )
+            # A literal greeting needs no provider startup, tokens or tool process.
+            # Membership has already been checked above; never shortcut Bud settings.
+            if not self.bud and self.task.strip().casefold().rstrip("!. ") in {
+                "hi",
+                "hello",
+                "hey",
+            }:
+                if self.runner.cancelled.is_set():
+                    from aedrova.agents.runtime import BuildCancelled
+
+                    raise BuildCancelled()
+                authorize(inventory(self.workspace), self.workspace, user)
+                self.signals.finished.emit({"text": "Hello! How can I help?"})
+                return
             api = client(self.service) if self.bud or self.sources else None
             origin = application_ai_origin()
             if origin:
@@ -143,7 +157,11 @@ class QueryJob(QRunnable):
                 from aedrova.agents.retrieval import retrieval_record, validate_citations
 
                 evidence.write_text(retrieval_record(context, self.task) + "\n" + context.text)
-                identity = "You are the central Aedrova agent. "
+                identity = (
+                    "You are Aedrova, the workspace assistant. Introduce yourself as Aedrova. "
+                    "If asked about your underlying model or provider, answer truthfully "
+                    "using known configuration; do not invent a model or conceal its provider. "
+                )
                 if self.bud:
                     live = next(
                         (
@@ -267,7 +285,7 @@ def start_analysis(window, task, *, bud=None):
         job = QueryJob(value["service"], workspace, channel, task, provider, bud=bud)
         from aedrova.desktop.dots import shelf_rows
 
-        window.agent_feed.clear()
+        window.agent_feed.reply_row = None
         window.agent_feed.character_config = shelf_rows([bud])[0]["config"] if bud else None
         window.dot_query = job
         job.runner.cancelled = cancelled

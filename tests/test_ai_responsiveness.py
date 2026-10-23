@@ -214,7 +214,8 @@ def test_greeting_skips_evidence_and_tools_but_rechecks_identity(monkeypatch, ad
     result = []
     job.signals.finished.connect(result.append)
     job.run()
-    assert result == [{"text": "Hello!"}] and len(checks) == 2 and closed == [True]
+    assert result == [{"text": "Hello!" if addressed_bud else "Hello! How can I help?"}]
+    assert len(checks) == 2 and closed == [True]
     assert len(requests) == int(addressed_bud)
 
 
@@ -303,7 +304,7 @@ def test_general_reply_uses_membership_check_without_channel_inventory(monkeypat
     results = []
     job.signals.finished.connect(results.append)
     job.run()
-    assert checks == [True, True] and results == [{"text": "Hello"}]
+    assert checks == [True, True] and results == [{"text": "Hello! How can I help?"}]
 
 
 def test_lightweight_inventory_is_authenticated_and_user_scoped(monkeypatch):

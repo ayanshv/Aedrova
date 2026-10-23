@@ -59,7 +59,7 @@ HELP = {
         "public use."
     ),
     "search": (
-        "Use a Brave Search API subscription token. Enter a research topic. Searches "
+        "Use your configured web-search API token. Enter a research topic. Searches "
         "use your provider allowance; up to five snippets are retrieved."
     ),
     "vercel": (
