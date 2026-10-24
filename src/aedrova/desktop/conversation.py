@@ -1425,13 +1425,20 @@ class Composer(QFrame):
     def _changed(self):
         self.update_suggestion()
         text = self.editor.toPlainText().strip()
-        self.send.setEnabled(bool(text) and len(text) <= 10_000)
+        self.send.setEnabled(
+            (bool(text) or bool(getattr(self, "attachment_drafts", []))) and len(text) <= 10_000
+        )
         if len(text) > 10_000:
             self.hint.setText("Limit: 10,000 characters")
         else:
             self.hint.setText("↵ send  ·  ⇧↵ new line")
 
     def _submit(self):
+        for card, publish in list(getattr(self, "attachment_drafts", [])):
+            publish()
+            card.deleteLater()
+        self.attachment_drafts = []
+        self._changed()
         text = self.submission_text()
         if text and len(text) <= 10_000:
             if hasattr(self, "dictation"):

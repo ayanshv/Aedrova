@@ -904,7 +904,18 @@ class ConnectedDashboard(QObject):
                 self.window.notify("Choose up to 10 files at a time.")
                 return False
             for selected in paths:
-                self.upload(selected, parent=parent)
+                from aedrova.desktop.attachment_draft import stage
+
+                composer = self.window.thread_composer if parent else self.window.composer
+                channel = self.window.channel_id
+
+                def publish(path=selected, thread=parent, captured=channel):
+                    if self.window.channel_id != captured:
+                        self.window.notify("Return to the original conversation to send this file.")
+                        return
+                    self.upload(path, parent=thread)
+
+                stage(composer, selected, publish)
             return bool(paths)
         if not path:
             return
