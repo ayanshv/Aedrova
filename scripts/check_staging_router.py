@@ -40,7 +40,20 @@ def main():
         report["checks"]["migration_and_authorized_auto_save"] = "passed"
         token = service.client.auth.get_session().access_token
         balance = ManagedClient(config["managed_origin"], token).balance(workspace)
-        assert isinstance(balance.get("coding_providers"), list)
+        if balance.get("status") == "no_plan":
+            assert balance["available"] == 0
+            report["checks"]["unfunded_workspace_denied"] = "passed"
+            for row in service.client.table("workspaces").select("id").limit(20).execute().data:
+                if row["id"] == workspace:
+                    continue
+                candidate = ManagedClient(config["managed_origin"], token).balance(row["id"])
+                if isinstance(candidate.get("coding_providers"), list):
+                    balance = candidate
+                    break
+        if not isinstance(balance.get("coding_providers"), list):
+            report["checks"]["funded_provider_preflight"] = "blocked_no_plan"
+            report["status"] = "partial"
+            return 1
         report["checks"]["authenticated_managed_preflight"] = "passed"
         report["checks"]["provider_count"] = len(balance["coding_providers"])
         report["checks"]["credit_available"] = bool(balance.get("available", 0) > 0)

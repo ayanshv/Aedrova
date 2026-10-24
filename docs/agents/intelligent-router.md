@@ -119,3 +119,15 @@ Earlier Remaining acceptance text describes the initial snapshot; shared selecto
 backend preflight and durable interactive records are now implemented as above.
 Remaining deployment/acceptance and unavailable empirical benchmarks must not be
 reported as completed. No source migration automatically deploys itself.
+
+### Live staging acceptance after owner migration
+
+Staging backend 7f6278c is Live (Render dep-dbe51ul9fdbs739bigc0).
+Health readiness 200; unauthenticated balance 403. check_staging_router.py completed
+with authenticated owner RPC Auto save/read passing, unfunded disposable workspace
+returning no_plan/zero available, and an existing authorized workspace returning
+provider preflight and positive available credit. One configured provider was
+reported. Disposable workspace archived; test session signed out. No model call
+or provider spend occurred. Result: work/staging/router-acceptance.json.
+This verifies configuration/preflight, not actual coding inference or both-provider
+end-to-end behavior. Those acceptance gates remain distinct.

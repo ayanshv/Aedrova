@@ -3108,3 +3108,11 @@ managed/router checks and 17 policy tests pass. Staging acceptance script is wai
 on ordinary Google sign-in, session 76540; no model invocation or provider spending.
 Next verify work/staging/router-acceptance.json and then actual task execution;
 never infer live inference success from readiness or user-reported migration.
+
+Router live configuration acceptance passed after sign-in: owner RPC saved/read Auto,
+unfunded Space denied, authorized funded Space preflight returned one configured
+provider and positive available credit. Synthetic workspace archived and test session
+signed out. Backend readiness 200; unauthenticated balance 403. Report at
+work/staging/router-acceptance.json; Render screenshot router-backend-live.png.
+Actual coding inference/both-provider live behavior not tested in this pass; no
+model spend or payment. No further owner action needed for migration/preflight.
