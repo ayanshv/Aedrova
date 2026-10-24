@@ -165,7 +165,7 @@ class BuildJob(QRunnable):
             if self.provider == "auto":
                 from aedrova.agents.routing import choose, runtime_candidates
 
-                candidates = runtime_candidates()
+                candidates = runtime_candidates(managed=self.managed_client is not None)
                 if self.managed_client:
                     balance = self.managed_client.balance(self.context.workspace_id)
                     if (

@@ -172,7 +172,10 @@ class CodingAdapter:
         self.runner.cancel()
 
 
-def runtime_candidates():
+def runtime_candidates(*, managed=False):
+    import importlib.util
+    import os
+
     from aedrova.agents.runtime import executable
 
     result = []
@@ -182,6 +185,10 @@ def runtime_candidates():
             installed = True
         except ValueError:
             installed = False
+        if provider == "claude_code":
+            installed = importlib.util.find_spec("claude_agent_sdk") is not None and (
+                managed or bool(os.environ.get("ANTHROPIC_API_KEY"))
+            )
         # Installation is only a preflight; live login and budget are verified by existing runtime.
         result.append(Candidate(provider, installed))
     return result
