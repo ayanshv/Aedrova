@@ -259,6 +259,8 @@ def start_analysis(window, task, *, bud=None):
     from aedrova.desktop.projects import binding
 
     provider = binding(window).get("provider", "codex")
+    if provider == "auto":
+        provider = "codex"
     workspace, channel, user = window.workspace_id, window.channel_id, str(window.current_user().id)
 
     cancelled = threading.Event()

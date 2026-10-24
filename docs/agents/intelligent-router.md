@@ -68,3 +68,54 @@ telemetry and actual cost/repair/test-outcome records, broad routing across back
 and Bud flows, live provider and cross-Space end-to-end acceptance. No owner action
 is required for local tests; live execution requires a signed-in staging workspace
 with provider access and explicitly authorized usage. Do not claim those gates passed.
+
+## Completion pass — October 23
+
+Shared provider selector now exposes Auto in onboarding, local project settings and
+owner/admin Space settings (existing RPC authorization retained). Saved background
+and Bud build requests carry that setting into the same BuildJob routing boundary.
+Conversation replies resolve Auto to the default text provider and never run the
+coding classifier/harness. Build Room pins the provider selected for an approved
+plan. Automatic provider fallback remains disabled.
+
+Managed Auto preflight calls the existing authenticated /api/balance/{workspace}.
+That response now includes configured provider/model identifiers only, after
+billing_context authorization. Auto intersects those with installed runtimes and
+requires positive available credit. The existing atomic /api/runs reservation is
+still mandatory, so a balance race cannot authorize unbudgeted inference. Preflight
+availability means configured, not a promise that an upstream provider is online;
+provider errors stop work. No second provider is tried or charged automatically.
+
+Interactive phases get a unique private ledger run containing a generic task label
+rather than prompt text, along with the same observed usage/outcome records.
+Actual monetary cost remains authoritative on the server; absent actual cost/test
+quality information is unknown, never fabricated. CLI completion alone does not
+establish test success. Raw command results remain in the existing review evidence.
+
+Development builds may opt into a reviewed cohort with
+AEDROVA_ROUTING_EVALUATION_FILE=/private/path/cohort.json. Frozen builds ignore that
+environment variable. JSON must be <=64KB with reviewed=true, exact category and
+configuration="aedrova-local-harness-v1", and providers keyed by codex/claude_code.
+Each metrics object must contain samples, successes, estimated_cost, latency.
+Use the same currency/units across candidates. No automatic online updates. This
+loader checks cohort compatibility, not the truth of reviewer-supplied measurements.
+Production release must ship an explicitly reviewed configuration before enabling
+measured-policy optimization; no real performance dataset is available yet.
+
+### Required staging acceptance actions
+1. Supabase → Aedrova Staging → SQL Editor → New query: run
+   /Users/ayanshvarma/Documents/Aedrova/supabase/migrations/202610230001_auto_agent_preference.sql.
+   This expands only the preference enum; existing RLS and owner/admin RPC remain.
+   Shared Space Auto cannot be saved until this is installed. Do not run in production.
+2. Deploy the website/backend source change (app.py balance provider preflight) to
+   aedrova-beta-staging before testing managed Auto. Old servers fail closed with a
+   curated preflight error; manual choices remain available.
+3. In staging with configured provider access/credit, choose Auto in Project settings,
+   request a small repository task, approve plan, verify changes/tests, cancellation,
+   usage, and a second member's denied admin edit. Real inference is not yet verified
+   in this pass. No keys or payments are requested.
+
+Earlier Remaining acceptance text describes the initial snapshot; shared selector,
+backend preflight and durable interactive records are now implemented as above.
+Remaining deployment/acceptance and unavailable empirical benchmarks must not be
+reported as completed. No source migration automatically deploys itself.

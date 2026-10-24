@@ -165,7 +165,47 @@ class BuildJob(QRunnable):
             if self.provider == "auto":
                 from aedrova.agents.routing import choose, runtime_candidates
 
-                decision = choose(self.task, runtime_candidates())
+                candidates = runtime_candidates()
+                if self.managed_client:
+                    balance = self.managed_client.balance(self.context.workspace_id)
+                    if (
+                        type(balance.get("available")) not in {int, float}
+                        or balance["available"] <= 0
+                    ):
+                        raise ValueError(
+                            "Your Space has no available AI credit. Check team billing."
+                        )
+                    configured = {row["provider"] for row in balance.get("coding_providers", [])}
+                    if not configured:
+                        raise ValueError(
+                            "Routing preflight unavailable. Update the server or select a provider."
+                        )
+                    from dataclasses import replace as candidate_replace
+
+                    candidates = [
+                        candidate_replace(
+                            row, available=row.available and row.provider in configured
+                        )
+                        for row in candidates
+                    ]
+                import os
+                import sys
+
+                from aedrova.agents.routing import category, reviewed_candidates
+
+                evaluation = (
+                    ""
+                    if getattr(sys, "frozen", False)
+                    else os.getenv("AEDROVA_ROUTING_EVALUATION_FILE", "")
+                )
+                if evaluation:
+                    candidates = reviewed_candidates(
+                        evaluation,
+                        candidates,
+                        task_category=category(self.task),
+                        configuration="aedrova-local-harness-v1",
+                    )
+                decision = choose(self.task, candidates)
                 if decision.provider is None:
                     raise ValueError("This is a conversation request. Ask Aedrova in chat.")
                 self.provider = decision.provider
@@ -342,6 +382,15 @@ class BuildJob(QRunnable):
                 time.monotonic() - started,
                 self.runner.usage,
             )
+        if self.ledger and self.run_id and getattr(self, "interactive_telemetry", False):
+            self.ledger.update(
+                self.run_id,
+                "cancelled"
+                if self.runner.cancelled.is_set()
+                else "completed"
+                if outcome.get("ok")
+                else "failed",
+            )
         outcome["provider"] = self.provider
         outcome["routing"] = getattr(self, "routing_decision", None)
         outcome["commands"] = self.runner.command_results
@@ -413,7 +462,6 @@ class BuildDialog(AppDialog):
         row.addWidget(self.repository, 1)
         row.addWidget(self.choose)
         self.provider = CodingProviderChoice()
-        self.provider.addItem("Auto · Aedrova chooses", "auto")
         self.provider.setCurrentIndex(1 if pref.get("provider") == "claude_code" else 0)
         row.addWidget(self.provider)
         layout.addLayout(row)
@@ -764,6 +812,23 @@ class BuildDialog(AppDialog):
                 self.job.ledger = self.execution_queue.ledger
                 self.job.run_id = self.run_id
                 self.job.runner.lease_fd = self.execution_queue.lease.fileno()
+            if self.job.ledger is None:
+                from PySide6.QtCore import QSettings
+
+                from aedrova.agents.ledger import RunLedger
+
+                directory = Path.home() / "Library/Application Support/Aedrova/execution"
+                if self.window.settings.format() == QSettings.Format.IniFormat:
+                    directory = Path(self.window.settings.fileName()).parent / "execution"
+                self.job.ledger = RunLedger(directory)
+                self.job.run_id, _ = self.job.ledger.enqueue(
+                    self.user,
+                    self.workspace,
+                    "Interactive build phase",
+                    {"request": str(uuid4()), "provider": self.provider.currentData()},
+                )
+                self.job.ledger.update(self.job.run_id, "running")
+            self.job.interactive_telemetry = not bool(self.execution_queue and self.run_id)
             self.job.signals.progress.connect(self.progress)
             self.job.signals.permission.connect(self.permission)
             self.job.signals.finished.connect(self.phase_finished)

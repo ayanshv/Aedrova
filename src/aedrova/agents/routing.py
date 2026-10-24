@@ -204,3 +204,34 @@ def evaluate(cases, candidates, *, policy=None):
         "matched": sum(r["matches_expected"] for r in results),
         "results": results,
     }
+
+
+def reviewed_candidates(path, candidates, *, task_category, configuration):
+    """Load an explicitly reviewed offline cohort for this exact harness configuration."""
+    import json
+    from dataclasses import replace
+    from pathlib import Path
+
+    raw = Path(path).read_bytes()
+    if len(raw) > 65536:
+        raise ValueError("Evaluation policy too large")
+    data = json.loads(raw)
+    if (
+        data.get("reviewed") is not True
+        or data.get("category") != task_category
+        or data.get("configuration") != configuration
+    ):
+        raise ValueError("Evaluation cohort is unreviewed or incompatible")
+    rows = data.get("providers", {})
+    result = []
+    for candidate in candidates:
+        metrics = rows.get(candidate.provider)
+        if metrics is None:
+            result.append(candidate)
+            continue
+        if set(metrics) != {"samples", "successes", "estimated_cost", "latency"}:
+            raise ValueError("Unexpected evaluation fields")
+        if type(metrics["samples"]) is not int or type(metrics["successes"]) is not int:
+            raise ValueError("Invalid evaluation sample count")
+        result.append(replace(candidate, evaluated=True, **metrics))
+    return result

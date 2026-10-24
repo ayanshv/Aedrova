@@ -3084,3 +3084,14 @@ backend preflight capabilities/credits, authenticated Space-level default admin 
 reviewed category/config cohorts, durable interactive metrics and live acceptance.
 No owner action required now. This milestone remains incomplete; do not label the
 full request production-ready or infer objective provider superiority.
+
+### October 23 — Router completion integration pass
+
+Shared Auto selector wired into project/onboarding/Space settings and existing
+background/Bud execution. Managed Auto uses authenticated provider/credit preflight
+and retains atomic reservations. Interactive outcomes now durable with generic task
+labels; reviewed-cohort loading is category/config-specific and opt-in in dev.
+Regression groups: 136 routing/build tests and 106 UI/onboarding tests passed.
+Staging requires migration 202610230001_auto_agent_preference.sql and backend app.py
+preflight deployment. Live provider acceptance and empirical benchmarks remain open.
+Exact handoff: docs/agents/intelligent-router.md. No paid action taken.

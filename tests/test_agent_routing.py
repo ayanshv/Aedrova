@@ -114,3 +114,18 @@ def test_tool_and_latency_limits():
 def test_invalid_budget_is_rejected(value):
     with pytest.raises(ValueError):
         choose("fix bug", [Candidate("codex", True)], remaining_credit=value)
+
+
+def test_reviewed_cohort_requires_exact_category_and_configuration(tmp_path):
+    import json
+
+    from aedrova.agents.routing import reviewed_candidates
+
+    path = tmp_path / "cohort.json"
+    path.write_text(
+        json.dumps({"reviewed": True, "category": "repair", "configuration": "v1", "providers": {}})
+    )
+    rows = [Candidate("codex", True)]
+    assert reviewed_candidates(path, rows, task_category="repair", configuration="v1") == rows
+    with pytest.raises(ValueError, match="incompatible"):
+        reviewed_candidates(path, rows, task_category="testing", configuration="v1")
