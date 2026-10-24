@@ -3095,3 +3095,16 @@ Regression groups: 136 routing/build tests and 106 UI/onboarding tests passed.
 Staging requires migration 202610230001_auto_agent_preference.sql and backend app.py
 preflight deployment. Live provider acceptance and empirical benchmarks remain open.
 Exact handoff: docs/agents/intelligent-router.md. No paid action taken.
+
+### Router staging deployment follow-up
+
+Owner reports migration 202610230001 ran successfully; authenticated verification
+is pending. Matching backend patch pushed only to staging branch
+codex/bud-connectors-https at 7f6278c and manually deployed to existing Free service.
+Render dep-dbe51ul9fdbs739bigc0 reports Deploy succeeded | Live. Public readiness
+returns 200; unauthenticated balance returns 403. No production deployment/purchase.
+Desktop af89b1b pushed; actual Claude SDK capability preflight corrected. 76 build/
+managed/router checks and 17 policy tests pass. Staging acceptance script is waiting
+on ordinary Google sign-in, session 76540; no model invocation or provider spending.
+Next verify work/staging/router-acceptance.json and then actual task execution;
+never infer live inference success from readiness or user-reported migration.

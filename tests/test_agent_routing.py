@@ -129,3 +129,20 @@ def test_reviewed_cohort_requires_exact_category_and_configuration(tmp_path):
     assert reviewed_candidates(path, rows, task_category="repair", configuration="v1") == rows
     with pytest.raises(ValueError, match="incompatible"):
         reviewed_candidates(path, rows, task_category="testing", configuration="v1")
+
+
+def test_claude_sdk_preflight_does_not_require_separate_cli(monkeypatch):
+    import importlib.util
+    from aedrova.agents.routing import runtime_candidates
+
+    monkeypatch.setattr(importlib.util, "find_spec", lambda _: object())
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(
+        "aedrova.agents.runtime.executable", lambda _: (_ for _ in ()).throw(ValueError())
+    )
+    assert next(
+        row for row in runtime_candidates(managed=True) if row.provider == "claude_code"
+    ).available
+    assert not next(
+        row for row in runtime_candidates(managed=False) if row.provider == "claude_code"
+    ).available
