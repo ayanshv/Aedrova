@@ -312,7 +312,7 @@ def test_cross_source_query_job_selects_fetches_and_answers_with_citations(
         assert plan is True
         if len(calls) == 1:
             return json.dumps({"calls": [{"dot": row["id"], "tool": "changes"}]})
-        assert ("Respond as the addressed Bud" if addressed_bud else "central Aedrova") in prompt
+        assert ("Respond as the addressed Bud" if addressed_bud else "You are Aedrova") in prompt
         if addressed_bud:
             assert '"warmth": 83' in prompt and "Candid, dry wit." in prompt
             assert "never override safety" in prompt

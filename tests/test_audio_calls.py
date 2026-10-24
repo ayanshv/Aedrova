@@ -80,5 +80,5 @@ def test_setup_gate_does_not_misdiagnose_valid_user_as_signed_out(monkeypatch, m
     monkeypatch.setattr(httpx, 'Client', lambda **kwargs: original(
         transport=httpx.MockTransport(lambda _: httpx.Response(403, json={'error': message})),
         **kwargs))
-    with pytest.raises(MeetingRequestError, match='finish meeting setup'):
+    with pytest.raises(MeetingRequestError, match='Contact Aedrova support'):
         MeetingClient('http://127.0.0.1:8090', 'test').request('/api/meetings/join', {})

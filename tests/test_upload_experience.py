@@ -183,5 +183,7 @@ def test_picker_accepts_multiple_files_in_one_selection(qtbot, tmp_path, monkeyp
     service.upload_attachment = lambda *a, **kw: uploaded.append(a[2]) or "message"
     monkeypatch.setattr(QFileDialog, "getOpenFileNames", lambda *a: (list(map(str, files)), ""))
     window.connected.upload()
+    assert not uploaded
+    window.composer._submit()
     qtbot.waitUntil(lambda: len(uploaded) == 2 and not window.connected.pending)
     assert uploaded == list(map(str, files))

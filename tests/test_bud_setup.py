@@ -127,7 +127,7 @@ def test_seven_stages_save_without_oauth_and_never_fake_ready(editor, qtbot):
     dialog.shape.setCurrentIndex(dialog.shape.findData("cloud"))
     dialog.color.addItem("Custom", "#334455")
     dialog.color.setCurrentIndex(dialog.color.findData("#334455"))
-    for stage in [2, 3, 4, 5]:
+    for stage in [2, 3, 5]:
         dialog.next.click()
         assert dialog.pages.currentIndex() == stage
     dialog.resource.setText("team/project")
