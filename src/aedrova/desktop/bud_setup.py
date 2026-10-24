@@ -122,7 +122,11 @@ def build_setup(d, window):
     navigation.addWidget(d.exit_button)
     column.addLayout(navigation)
     d.back = button("‹  Back")
-    d.back.clicked.connect(lambda: d.show_step(max(0, d.pages.currentIndex() - 1)))
+    d.back.clicked.connect(
+        lambda: d.show_step(
+            3 if d.pages.currentIndex() == 5 else max(0, d.pages.currentIndex() - 1)
+        )
+    )
     column.addWidget(d.back, alignment=Qt.AlignmentFlag.AlignLeft)
     d.pages = QStackedWidget(panel)
     column.addWidget(d.pages, 1)

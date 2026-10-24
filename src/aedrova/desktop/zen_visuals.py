@@ -226,6 +226,15 @@ class ProjectPicker(QAbstractButton):
         self.refresh()
 
     def paintEvent(self, event):  # noqa: N802
+        theme = visual_theme(self)
+        surface = QColor(theme.text)
+        surface.setAlpha(12)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(surface)
+        painter.drawRoundedRect(QRectF(self.rect()).adjusted(1, 1, -1, -1), 24, 24)
+        painter.end()
         if self.hasFocus():
             theme = visual_theme(self)
             p = QPainter(self)

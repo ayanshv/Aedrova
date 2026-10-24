@@ -318,6 +318,22 @@ class AgentStream(QScrollArea):
             self.changed.emit()
 
     def finish_with_result(self, text):
+        for transient in list(self.rows):
+            if transient is self.status_row or getattr(transient, "is_reply", False):
+                continue
+            self.layout.removeWidget(transient)
+            self.rows.remove(transient)
+            transient.deleteLater()
+        if self.status_row is not None:
+            row = self.status_row
+            self.layout.removeWidget(row)
+            if row in self.rows:
+                self.rows.remove(row)
+            if self.status_controls:
+                self.status_controls.hide()
+                self.status_controls.setParent(self)
+            row.deleteLater()
+            self.status_row = None
         self.set_reply(text)
 
     def set_reply(self, text):
@@ -326,6 +342,7 @@ class AgentStream(QScrollArea):
             self.reply_row = ActivityRow(
                 text, author=self.author_name, character_config=self.character_config
             )
+            self.reply_row.is_reply = True
             self.add_row(self.reply_row)
         else:
             self.reply_row.summary = text

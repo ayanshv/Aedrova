@@ -15,7 +15,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QColor, QKeySequence, QRegion, QShortcut
 from PySide6.QtWidgets import (
     QFrame,
-    QGraphicsColorizeEffect,
+    QGraphicsDropShadowEffect,
     QHBoxLayout,
     QPushButton,
     QVBoxLayout,
@@ -364,7 +364,7 @@ class SpotlightTour(QWidget):
     def animate_highlight(self, value):
         self.reveal = float(value)
         if self.component_effect is not None:
-            self.component_effect.setStrength(0.65 * self.reveal)
+            self.component_effect.setBlurRadius(12 + 16 * self.reveal)
         self.update()
 
     def clear_component_highlight(self):
@@ -406,9 +406,10 @@ class SpotlightTour(QWidget):
             if target is not None and target.isVisible() and target.isEnabled():
                 # Never replace a control’s own rendering effect.
                 if target.graphicsEffect() is None:
-                    self.component_effect = QGraphicsColorizeEffect(target)
+                    self.component_effect = QGraphicsDropShadowEffect(target)
                     self.component_effect.setColor(QColor("#0066FF"))
-                    self.component_effect.setStrength(0.65)
+                    self.component_effect.setOffset(0, 0)
+                    self.component_effect.setBlurRadius(28)
                     target.setGraphicsEffect(self.component_effect)
                     self.highlighted_target = target
         if target is not None and target.isVisible() and target.isEnabled():

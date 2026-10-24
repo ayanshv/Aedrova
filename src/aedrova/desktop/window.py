@@ -1749,7 +1749,10 @@ class AedrovaWindow(QMainWindow):
             or ""
         )
         initials = "".join(part[0] for part in name.split()[:2]).upper() if name else "○"
-        self.profile_button.setText(initials)
+        self.profile_button.setText(
+            initials + (" " + profile["status_emoji"] if profile.get("status_emoji") else "")
+        )
+        self.profile_button.setStyleSheet("border-radius: 10px;")
         self.profile_button.setIcon(QIcon())
         path = profile.get("avatar_path")
         collaboration = getattr(self, "collaboration", None)

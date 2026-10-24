@@ -506,6 +506,8 @@ class DotDialog(AppDialog):
             self.color.setCurrentIndex(self.color.findData(value))
 
     def show_step(self, step):
+        if step == 4:
+            step = 5  # The embedded gallery replaces the legacy connector form.
         changed = self.pages.currentIndex() != step
         self.setup_panel.setMinimumWidth(500)
         self.setup_panel.setMaximumWidth(1120 if step == 5 else 560)
@@ -617,7 +619,7 @@ class DotDialog(AppDialog):
             if step == 3 and len(self.configured_instructions()) > 2000:
                 self.status.setText("Keep instructions under 2,000 characters.")
                 return
-            self.show_step(step + 1)
+            self.show_step(5 if step == 3 else step + 1)
         elif step == 5:
             if (
                 self.current()

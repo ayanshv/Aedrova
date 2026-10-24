@@ -406,7 +406,7 @@ def test_google_returns_to_embedded_required_profile_then_project(qtbot, tmp_pat
     dialog.activate()
     dialog.activate()
     assert dialog.stage == 5 and form.stack.currentIndex() == 2
-    assert dialog.primary.accessibleName() == "Save & continue"
+    assert dialog.primary.accessibleName() == "Continue"
     dialog.activate()
     qtbot.waitUntil(lambda: dialog.stage == 6)
     assert stored["profile_completed"] and stored["display_name"] == "Maya Chen"
