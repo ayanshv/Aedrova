@@ -273,7 +273,14 @@ class ProjectDialog(AppDialog):
 
     def disconnect(self):
         if self.user:
-            self.window.settings.remove(binding_key(self.user, self.workspace))
+            data = binding(self.window, self.workspace)
+            if data.get("ai_setup_version"):
+                data.pop("folder", None)
+                data.pop("repository", None)
+                data.update(auto_plan=False, background_build=False)
+                save_binding(self.window, data, self.workspace)
+            else:
+                self.window.settings.remove(binding_key(self.user, self.workspace))
             self.stop_revoked_build()
             self.window._render_pages()
         self.close()

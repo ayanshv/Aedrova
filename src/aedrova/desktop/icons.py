@@ -120,6 +120,10 @@ def assign(button, name):
     button.setProperty("iconName", name)
     button.setIconSize(QSize(18, 18))
     button.setIcon(icon(name, button.palette().windowText().color().name()))
+    if not button.toolTip():
+        button.setToolTip(
+            button.accessibleName() or button.text() or name.replace("_", " ").title()
+        )
 
 
 def refresh(root, theme):

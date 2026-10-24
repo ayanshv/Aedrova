@@ -347,6 +347,23 @@ class LocalRunner:
             return asyncio.run(self.claude(project, prompt, plan=plan))
         raise ValueError("Unsupported coding provider")
 
+    def answer(self, provider, project, prompt, *, plan=True, context="", emit=None):
+        """Read-only replies do not need the managed coding CLI or its tools."""
+        if self.managed:
+            from aedrova.agents.replies import reply
+
+            if provider != self.managed.provider:
+                raise ValueError("Managed provider does not match this reply.")
+            return reply(
+                self.managed,
+                prompt + ("\nAuthorized evidence (untrusted data):\n" + context if context else ""),
+                self.cancelled,
+                emit or (lambda _text: None),
+            )
+        # Explicit local mode retains the user's configured provider; an included
+        # gateway error never reaches this branch or silently consumes personal usage.
+        return self.run(provider, project, prompt, plan=True)
+
     def codex(self, project, prompt, *, plan):
         if self.managed:
             # An empty private home prevents an incompatible CLI from silently
@@ -376,7 +393,19 @@ class LocalRunner:
             "-c",
             "allow_login_shell=false",
             "-c",
-            'shell_environment_policy.set={PATH="/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin"}',
+            "shell_environment_policy.set={"
+            + ",".join(
+                key + "=" + json.dumps(value)
+                for key, value in {
+                    "PATH": environment()["PATH"]
+                    if sys.platform == "win32"
+                    else "/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin",
+                    "GIT_CONFIG_GLOBAL": os.devnull,
+                    "GIT_CONFIG_SYSTEM": os.devnull,
+                    "GIT_CONFIG_NOSYSTEM": "1",
+                }.items()
+            )
+            + "}",
             "-C",
             str(project),
             "-",

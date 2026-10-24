@@ -77,6 +77,13 @@ class IdentityService:
             path = Path(__file__).parents[1] / "desktop/assets/public-config.json"
             configuration = json.loads(path.read_text()) if path.exists() else {}
             meeting_context_enabled = configuration.get("meeting_context_enabled", False)
+            # Internal staging source can opt in; public packaged builds use their manifest.
+            if (
+                not getattr(sys, "frozen", False)
+                and os.getenv("AEDROVA_DEPLOYMENT_ENVIRONMENT") == "staging"
+                and "cpelagtufyocepnqcqqd" not in connection.url
+            ):
+                meeting_context_enabled = os.getenv("AEDROVA_MEETING_CONTEXT_ENABLED") == "true"
         self.meeting_context_enabled = meeting_context_enabled is True
         self._transport = (
             httpx.Client(timeout=15, follow_redirects=False) if client is None else None
@@ -170,6 +177,8 @@ class IdentityService:
             self.client.auth.sign_out({"scope": "local"})
         finally:
             # Discard the entire client even if remote revocation is unavailable.
+            self._bud_catalog_cache = {}
+            self._bud_catalog_scope = None
             self.user = None
             self.client = None
 
@@ -347,9 +356,12 @@ class IdentityService:
             "save_chat_profile",
             "chat_action",
             "start_direct_message",
+            "bud_conversation",
+            "append_bud_message",
             "set_meeting_announcement_channel",
             "mark_channel_read",
             "reserve_attachment",
+            "abandon_attachment",
             "finish_attachment",
             "send_message",
             "unsend_message",
@@ -717,6 +729,24 @@ class IdentityService:
         self._authenticated()
         return self.client.rpc("context_revision", {"p_channel": channel}).execute().data
 
+    def conversation_snapshot(self, workspace):
+        """Fresh RLS-backed membership without enumerating channels or their content."""
+        self._authenticated()
+        return {
+            "workspaces": self.client.table("workspaces")
+            .select("id")
+            .eq("id", workspace)
+            .execute()
+            .data,
+            "members": self.client.table("workspace_members")
+            .select("workspace_id,user_id,role")
+            .eq("workspace_id", workspace)
+            .eq("user_id", str(self.user.id))
+            .execute()
+            .data,
+            "channels": [],
+        }
+
     def context_snapshot(self, workspace, cancelled=lambda: False):
         """Scoped inventory with keyset paging instead of dashboard row ceilings."""
         self._authenticated()
@@ -820,10 +850,21 @@ class IdentityService:
             str(self.user.id),
         )
 
-    def upload_attachment(self, identifier, channel_id, path, parent=None):
-        from aedrova.identity.transfers import read_upload
+    def upload_attachment(
+        self, identifier, channel_id, path, parent=None, *, cancelled=None, progress=None
+    ):
+        from aedrova.agents.managed import application_origin
+        from aedrova.identity.media import MediaClient
+        from aedrova.identity.transfers import UploadCancelled, UploadReader, read_upload
 
+        cancelled = cancelled or (lambda: False)
+        progress = progress or (lambda _: None)
+        if cancelled():
+            return None
+        progress("Checking file…")
         name, data, digest = read_upload(path)
+        if cancelled():
+            return None
         object_path = self.rpc(
             "reserve_attachment",
             {
@@ -835,14 +876,37 @@ class IdentityService:
             },
         )
         try:
-            self.client.storage.from_("aedrova-files").upload(
-                object_path, data, {"content-type": "application/octet-stream", "upsert": "false"}
-            )
+            if cancelled():
+                self.rpc("abandon_attachment", {"p_id": identifier})
+                return None
+            progress("Uploading securely…")
+            with UploadReader(data, cancelled, progress) as stream:
+                self.client.storage.from_("aedrova-files").upload(
+                    object_path,
+                    stream,
+                    {"content-type": "application/octet-stream", "upsert": "false"},
+                )
+            if cancelled():
+                self.client.storage.from_("aedrova-files").remove([object_path])
+                self.rpc("abandon_attachment", {"p_id": identifier})
+                return None
+            progress("Verifying before sharing…")
+            token = self.client.auth.get_session().access_token
+            return MediaClient(application_origin(), token).request(
+                "/api/files/verify", {"identifier": identifier, "parent": parent}
+            )["message"]
+        except UploadCancelled:
+            # An interrupted multipart request may leave a private object; never publish it.
+            try:
+                self.client.storage.from_("aedrova-files").remove([object_path])
+                self.rpc("abandon_attachment", {"p_id": identifier})
+            except Exception:
+                pass  # Existing bounded orphan cleanup remains authoritative.
+            return None
         except Exception:
-            # An upload may have succeeded before its response was lost. The server checks
-            # the reserved immutable path and actual stored size before publishing it.
-            return self.rpc("finish_attachment", {"p_id": identifier, "p_parent": parent})
-        return self.rpc("finish_attachment", {"p_id": identifier, "p_parent": parent})
+            # No automatic publish/retry after ambiguous Storage or verification failures.
+            # Pending bytes are private and use the bounded orphan cleanup lifecycle.
+            raise
 
     def download_attachment(self, identifier):
         from aedrova.identity.transfers import MAX_BYTES

@@ -56,7 +56,9 @@ class AedrovaWindow(QMainWindow):
         self.reduced_transparency = self.settings.value("reduceTransparency", False, type=bool)
         QApplication.instance().setProperty("reduceMotion", self.reduced_motion)
         self.setFont(system_font())
-        self.setWindowIcon(app_icon())
+        icon = app_icon()
+        if not icon.isNull():
+            self.setWindowIcon(icon)
         self.setWindowTitle("Aedrova — Northstar Labs · Local preview")
         self.resize(1440, 940)
         self.setMinimumSize(900, 650)
@@ -227,7 +229,15 @@ class AedrovaWindow(QMainWindow):
         self.channel_list.currentItemChanged.connect(self._channel_selected)
         side.addWidget(self.channel_list, 3)
         side.addSpacing(12)
-        side.addWidget(label("DIRECT MESSAGES", "section"))
+        dm_header = QHBoxLayout()
+        dm_header.addWidget(label("DIRECT MESSAGES", "section"))
+        dm_header.addStretch()
+        self.start_dm_button = button("+", "New direct message", "icon")
+        self.start_dm_button.setFixedSize(25, 25)
+        self.start_dm_button.setToolTip("Message a teammate · Ctrl+Shift+M")
+        self.start_dm_button.clicked.connect(self.start_direct_message)
+        dm_header.addWidget(self.start_dm_button)
+        side.addLayout(dm_header)
         self.dm_list = QListWidget()
         self.dm_list.setObjectName("Navigation")
         self.dm_list.setAccessibleName("Direct conversations")
@@ -307,6 +317,7 @@ class AedrovaWindow(QMainWindow):
         for index, title in enumerate(("Conversation", "Project", "Work", "Files")):
             tab = button(title, f"Open {title.lower()} tab", "tab")
             tab.setCheckable(True)
+            tab.toggled.connect(lambda checked, i=index: self.select_tab(i) if checked else None)
             tab.clicked.connect(lambda checked=False, i=index: self.select_tab(i))
             self.tab_buttons.append(tab)
             tabs_layout.addWidget(tab)
@@ -514,6 +525,10 @@ class AedrovaWindow(QMainWindow):
         help_menu.addAction("Explore Aedrova…", self.show_tour)
         help_menu.addAction("Check for updates…", self.show_updates)
         help_menu.addAction("About this preview", self.show_about)
+        overflow = self.menuBar().findChild(QWidget, "qt_menubar_ext_button")
+        if overflow:
+            overflow.setAccessibleName("More menus")
+            overflow.setToolTip("More menus")
 
     def _populate_rail(self):
         while self.rail_items.count():
@@ -588,6 +603,12 @@ class AedrovaWindow(QMainWindow):
     def _channel_selected(self, item, previous):
         if item:
             self.switch_channel(item.data(Qt.ItemDataRole.UserRole))
+
+    def start_direct_message(self):
+        if self.connected and self.connected.active:
+            self.connected.start_dm()
+        else:
+            self.notify("Sign in to message a teammate in your workspace.")
 
     def _save_drafts(self):
         self.store.drafts[(self.workspace_id, self.channel_id, "")] = (
@@ -926,7 +947,7 @@ class AedrovaWindow(QMainWindow):
         self.build_activity.hide()
         self.messages.set_agent_visible(getattr(self, "activity_channel", None) == self.channel_id)
 
-    def start_agent_request(self, text):
+    def start_agent_request(self, text, *, composer=None):
         from aedrova.agents.context import build_command
         from aedrova.desktop.builds import open_build
 
@@ -971,14 +992,18 @@ class AedrovaWindow(QMainWindow):
             )
             if building:
                 from aedrova.desktop.builds import start_background_build
+                from aedrova.desktop.projects import binding
 
-                accepted = start_background_build(self, request, bud=dot)
+                accepted = (
+                    open_build(self, request, bud=dot)
+                    if binding(self).get("background_build") is False
+                    else start_background_build(self, request, bud=dot)
+                )
             else:
                 accepted = start_analysis(self, text, bud=dot)
             if accepted:
-                for composer in (self.composer, self.thread_composer):
-                    if composer.editor.toPlainText().strip() == text.strip():
-                        composer.clear()
+                for target in (composer,) if composer else (self.composer, self.thread_composer):
+                    target.clear_submission(text)
                 self._save_drafts()
             return True
         import re
@@ -996,28 +1021,29 @@ class AedrovaWindow(QMainWindow):
                 re.IGNORECASE,
             )
         )
-        if (dot or (task is not None and rows)) and not building:
+        if (dot or task is not None) and not building:
             from aedrova.desktop.dot_analysis import start_analysis
 
             if start_analysis(self, task or text):
-                for composer in (self.composer, self.thread_composer):
-                    if composer.editor.toPlainText().strip() == text.strip():
-                        composer.clear()
+                for target in (composer,) if composer else (self.composer, self.thread_composer):
+                    target.clear_submission(text)
                 self._save_drafts()
             return True
         task = build_command(text, nickname) or (text if dot and building else None)
         if task is None:
             return False
-        if text.lstrip().startswith("/build"):
-            open_build(self, task)
+        from aedrova.desktop.projects import binding
+
+        if text.lstrip().startswith("/build") or binding(self).get("background_build") is False:
+            accepted = open_build(self, task)
         else:
             from aedrova.desktop.builds import start_background_build
 
-            if start_background_build(self, task):
-                for composer in (self.composer, self.thread_composer):
-                    if composer.editor.toPlainText().strip() == text.strip():
-                        composer.clear()
-                self._save_drafts()
+            accepted = start_background_build(self, task)
+        if accepted:
+            for target in (composer,) if composer else (self.composer, self.thread_composer):
+                target.clear_submission(text)
+            self._save_drafts()
         return True
 
     def _local_message(self, identifier):
@@ -1067,7 +1093,7 @@ class AedrovaWindow(QMainWindow):
 
     def send_message(self, text):
         if self.connected and self.connected.active:
-            if self.start_agent_request(text):
+            if self.start_agent_request(text, composer=self.composer):
                 return
             self.connected.send(text)
             return
@@ -1090,7 +1116,7 @@ class AedrovaWindow(QMainWindow):
 
     def send_reply(self, text):
         if self.connected and self.connected.active:
-            if self.start_agent_request(text):
+            if self.start_agent_request(text, composer=self.thread_composer):
                 return
             self.connected.send(text, self.thread_id or None)
             return
@@ -1126,7 +1152,9 @@ class AedrovaWindow(QMainWindow):
         if hasattr(self, "space_symbol"):
             self.space_symbol.setText("↗" if self.channel.direct else "#")
         for i, tab in enumerate(self.tab_buttons):
+            tab.blockSignals(True)
             tab.setChecked(i == index)
+            tab.blockSignals(False)
         if index == 0 and hasattr(self, "thread_panel"):
             self._adapt_thread()
 
@@ -1177,6 +1205,10 @@ class AedrovaWindow(QMainWindow):
             tile.update()
         for mark in self.findChildren(BrandMark):
             mark.set_reduced_motion(self.reduced_motion)
+        from aedrova.desktop.ai_teammates import Character
+
+        for character in self.findChildren(Character):
+            character.set_reduced_motion(self.reduced_motion)
         for control in self.findChildren(SpringButton):
             control.motion.set_enabled(not self.reduced_motion)
 
@@ -1717,7 +1749,10 @@ class AedrovaWindow(QMainWindow):
             or ""
         )
         initials = "".join(part[0] for part in name.split()[:2]).upper() if name else "○"
-        self.profile_button.setText(initials)
+        self.profile_button.setText(
+            initials + (" " + profile["status_emoji"] if profile.get("status_emoji") else "")
+        )
+        self.profile_button.setStyleSheet("border-radius: 10px;")
         self.profile_button.setIcon(QIcon())
         path = profile.get("avatar_path")
         collaboration = getattr(self, "collaboration", None)
@@ -1805,6 +1840,11 @@ class AedrovaWindow(QMainWindow):
             self.account_dialog.pending_workspace = self.workspace_id
         if self.account_dialog.service and self.account_dialog.service.user:
             if not self.account_dialog.busy:
+                # Reopening must not strand the user on a previous creation
+                # confirmation while a network refresh is pending or fails.
+                if self.account_dialog.snapshot.get("workspaces"):
+                    self.account_dialog.pages.setCurrentIndex(4)
+                    self.account_dialog.apply_intent()
                 self.account_dialog.refresh()
         self.account_dialog.show()
         self.account_dialog.raise_()

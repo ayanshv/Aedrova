@@ -10,6 +10,8 @@ import sys
 import tomllib
 from pathlib import Path
 
+from macos_icon import install as install_macos_icon
+
 from aedrova.agents.managed import application_origin, connector_origin
 from aedrova.agents.runtime import executable
 from aedrova.identity.service import Connection
@@ -200,10 +202,12 @@ info.update(
             {"CFBundleURLName": "com.aedrova.chat", "CFBundleURLSchemes": ["aedrova"]}
         ],
         "NSMicrophoneUsageDescription": (
-            "Use your microphone when you enable a meeting or local microphone check."
+            "Use your microphone when you dictate a chat draft, enable meeting audio "
+            "or run a local microphone check."
         ),
     }
 )
+info.update(install_macos_icon(ROOT, bundle / "Contents"))
 with info_path.open("wb") as stream:
     plistlib.dump(info, stream)
 resign = ["codesign", "--force", "--sign", identity or "-"]

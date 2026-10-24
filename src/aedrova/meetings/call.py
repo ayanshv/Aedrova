@@ -18,10 +18,14 @@ class CallWorker(QObject):
     problem = Signal(str)
     media = Signal(str, bool)
     ended = Signal()
+    review_ready = Signal(object)
+    privacy_result = Signal(str, str, bool)
     consent_snapshot = Signal(object)
     text_capability = Signal(bool)
     speech_capability = Signal(bool)
     transcription_state = Signal(str)
+    audio_devices = Signal(object)
+    audio_selected = Signal(str, str)
 
     def __init__(self, client, *, workspace, channel, user, parent=None):
         super().__init__(parent)
@@ -52,6 +56,11 @@ class CallWorker(QObject):
         self.snapshot = None
         self.snapshot_at = 0
         self.call_started = time.monotonic()
+        self.text_available = False
+        self.wrapup_status = None
+        self.selected_audio = {"microphone": "", "speaker": ""}
+        self.noise_suppression = True
+        self.receive_video = True
 
     def start(self):
         if self.thread:
@@ -83,6 +92,7 @@ class CallWorker(QObject):
                 return
             if hasattr(self.client, "capabilities"):
                 capabilities = await asyncio.to_thread(self.client.capabilities)
+                self.text_available = capabilities.get("meeting_text") is True
                 self.text_capability.emit(capabilities.get("meeting_text") is True)
                 self.speech_available = capabilities.get("audio_transcription") is True
                 self.speech_capability.emit(self.speech_available)
@@ -91,6 +101,7 @@ class CallWorker(QObject):
             self._events()
             # ADM provides speaker playout and AEC. No microphone source is created here.
             self.audio = rtc.PlatformAudio()
+            self._audio_inventory()
             phase = "LiveKit connection"
             await asyncio.wait_for(
                 self.room.connect(access.url, access.token, rtc.RoomOptions(connect_timeout=15)),
@@ -100,14 +111,12 @@ class CallWorker(QObject):
             self.state.emit("Connected · devices are off")
             self._roster()
             phase = "access heartbeat"
-            last_pulse = 0
+            heartbeat = asyncio.create_task(self._heartbeat())
+            self.tasks.add(heartbeat)
             while not self.stop_requested.is_set():
-                if time.monotonic() - last_pulse >= 8:
-                    snapshot = await asyncio.wait_for(
-                        asyncio.to_thread(self.client.pulse, self.meeting), 20
-                    )
-                    self.update_consent(snapshot)
-                    last_pulse = time.monotonic()
+                if heartbeat.done():
+                    # Propagate access loss; never continue media without leases.
+                    heartbeat.result()
                 self._send_frames()
                 await asyncio.sleep(0.03)
         except Exception as error:
@@ -123,6 +132,41 @@ class CallWorker(QObject):
             await self._cleanup()
             self.state.emit(failure or "Call ended · devices are off")
             self.ended.emit()
+            if self.wrapup_status:
+                self.review_ready.emit(self.wrapup_status)
+
+    async def _heartbeat(self):
+        """HTTP authorization must not block the video frame pump."""
+        while not self.stop_requested.is_set():
+            snapshot = await asyncio.wait_for(
+                asyncio.to_thread(self.client.pulse, self.meeting), 20
+            )
+            if self.stop_requested.is_set() or self.cleaning:
+                return
+            self.update_consent(snapshot)
+            await asyncio.sleep(8)
+
+    def _audio_inventory(self):
+        if not all(hasattr(self.audio, name) for name in ("recording_devices", "playout_devices")):
+            return
+        try:
+            self.audio_devices.emit({
+                kind: [{"id": d.id, "name": d.name} for d in method()]
+                for kind, method in (("microphone", self.audio.recording_devices),
+                                     ("speaker", self.audio.playout_devices))
+            })
+        except Exception:
+            self.problem.emit("Audio device list is unavailable. System defaults remain selected.")
+
+    async def _mute_microphone(self):
+        self.pause_speech()
+        self.local_audio_track = None
+        if self.microphone:
+            self.microphone.close()
+            self.microphone = None
+        if self.mic_publication:
+            await self.room.local_participant.unpublish_track(self.mic_publication.sid)
+            self.mic_publication = None
 
     def update_consent(self, snapshot):
         self.snapshot, self.snapshot_at = snapshot, time.monotonic()
@@ -216,7 +260,7 @@ class CallWorker(QObject):
         listen("participant_disconnected", lambda *_: self._roster())
         listen("track_muted", lambda *_: self._roster())
         listen("track_unmuted", lambda *_: self._roster())
-        listen("track_published", lambda *_: self._roster())
+        listen("track_published", self._published)
         listen("track_unpublished", lambda *_: self._roster())
         listen(
             "active_speakers_changed",
@@ -261,11 +305,22 @@ class CallWorker(QObject):
         self.state.emit("Reconnected · enable your devices when ready")
         self._roster()
 
+    def _published(self, publication, participant):
+        if not self.receive_video and publication.kind == rtc.TrackKind.KIND_VIDEO:
+            try:
+                publication.set_subscribed(False)
+            except Exception:
+                self.problem.emit("Could not update incoming video. Retry this setting.")
+        self._roster()
+
     def _subscribed(self, track, publication, participant):
         if self.cleaning or self.stop_requested.is_set():
             return
         if track.kind != rtc.TrackKind.KIND_VIDEO:
             return  # ADM handles remote audio playback, without an audio recorder.
+        if not self.receive_video:
+            publication.set_subscribed(False)
+            return
         if len(self.streams) >= 32:
             return
         key = participant.identity + (
@@ -289,6 +344,8 @@ class CallWorker(QObject):
     async def _receive(self, key, stream):
         try:
             async for event in stream:
+                if not self.receive_video:
+                    continue
                 frame = event.frame
                 image = QImage(
                     bytes(frame.data),
@@ -363,6 +420,48 @@ class CallWorker(QObject):
             if self.cleaning or self.stop_requested.is_set():
                 return
             try:
+                if kind == "receive_video":
+                    self.receive_video = bool(enabled)
+                    if not enabled:
+                        for key, _stream, task in list(self.streams.values()):
+                            task.cancel()
+                            self.media.emit(key, False)
+                        self.streams.clear()
+                        with self.frames_lock:
+                            for key in list(self.frames):
+                                if "/" in key:
+                                    self.frames.pop(key, None)
+                    for participant in self.room.remote_participants.values():
+                        for publication in participant.track_publications.values():
+                            if publication.kind == rtc.TrackKind.KIND_VIDEO:
+                                publication.set_subscribed(bool(enabled))
+                    return
+                if kind == "refresh_audio_devices":
+                    self._audio_inventory()
+                    return
+                if kind in {"microphone_device", "speaker_device", "noise_suppression"}:
+                    if not self.connected or not self.audio:
+                        return
+                    device_kind = kind.removesuffix("_device")
+                    if kind != "noise_suppression":
+                        method = (self.audio.recording_devices if device_kind == "microphone"
+                                  else self.audio.playout_devices)
+                        if not isinstance(enabled, str) or enabled not in {d.id for d in method()}:
+                            raise ValueError("Device no longer available")
+                    if kind != "speaker_device":
+                        await self._mute_microphone()
+                        self.media.emit("microphone", False)
+                    if kind == "noise_suppression":
+                        if type(enabled) is not bool:
+                            raise ValueError("Invalid audio processing setting")
+                        self.noise_suppression = enabled
+                    else:
+                        setter = (self.audio.set_recording_device if device_kind == "microphone"
+                                  else self.audio.set_playout_device)
+                        setter(enabled)
+                        self.selected_audio[device_kind] = enabled
+                        self.audio_selected.emit(device_kind, enabled)
+                    return
                 if kind == "transcription":
                     if not enabled:
                         self.pause_speech()
@@ -382,6 +481,7 @@ class CallWorker(QObject):
                         enabled["ai_context"],
                     )
                     self.update_consent(snapshot)
+                    self.privacy_result.emit(enabled.get("request", ""), kind, True)
                     return
                 if kind == "withdraw_text":
                     self.pause_speech()
@@ -390,6 +490,7 @@ class CallWorker(QObject):
                     )
                     snapshot = await asyncio.to_thread(self.client.pulse, self.meeting)
                     self.update_consent(snapshot)
+                    self.privacy_result.emit(enabled.get("request", ""), kind, True)
                     return
                 if kind == "end":
                     await asyncio.to_thread(self.client.end, self.meeting)
@@ -398,19 +499,12 @@ class CallWorker(QObject):
                 if enabled and not self.connected:
                     raise RuntimeError("Not connected")
                 if kind == "microphone":
-                    self.pause_speech()
-                    self.local_audio_track = None
-                    if self.microphone:
-                        self.microphone.close()
-                        self.microphone = None
-                    if self.mic_publication:
-                        await self.room.local_participant.unpublish_track(self.mic_publication.sid)
-                        self.mic_publication = None
+                    await self._mute_microphone()
                     if enabled:
                         self.microphone = self.audio.create_audio_source(
                             rtc.PlatformAudioOptions(
                                 echo_cancellation=True,
-                                noise_suppression=True,
+                                noise_suppression=self.noise_suppression,
                                 auto_gain_control=True,
                             )
                         )
@@ -447,6 +541,21 @@ class CallWorker(QObject):
                 self.media.emit(kind, enabled)
                 self._roster()
             except Exception:
+                if kind == "receive_video":
+                    self.problem.emit("Could not update incoming video. Retry this setting.")
+                    return
+                if kind in {"consent", "withdraw_text"}:
+                    self.privacy_result.emit(enabled.get("request", ""), kind, False)
+                    return
+                if kind == "noise_suppression":
+                    self.audio_selected.emit(kind, "true" if self.noise_suppression else "false")
+                    self.problem.emit("Could not change noise reduction. Please retry.")
+                    return
+                if kind in {"microphone_device", "speaker_device"}:
+                    device_kind = kind.removesuffix("_device")
+                    self.audio_selected.emit(device_kind, self.selected_audio[device_kind])
+                    self.problem.emit("That audio device is unavailable. Choose another device.")
+                    return
                 if kind == "microphone" and self.microphone:
                     self.microphone.close()
                     self.microphone = None
@@ -473,6 +582,7 @@ class CallWorker(QObject):
             self.run_task.cancel()
 
     async def _cleanup(self):
+        self.wrapup_status = None
         tasks = list(self.tasks)
         for task in tasks:
             task.cancel()
@@ -490,6 +600,8 @@ class CallWorker(QObject):
         self.video.clear()
         self.streams.clear()
         self.tasks.clear()
+        with self.frames_lock:
+            self.frames.clear()
         self.mic_publication = None
         if self.room:
             for event, callback in self.listeners:
@@ -502,5 +614,9 @@ class CallWorker(QObject):
         if self.meeting:
             try:
                 await asyncio.wait_for(asyncio.to_thread(self.client.leave, self.meeting), 5)
+                if self.text_available and hasattr(self.client, "wrapup"):
+                    self.wrapup_status = await asyncio.wait_for(
+                        asyncio.to_thread(self.client.wrapup, self.meeting), 8
+                    )
             except Exception:
                 pass  # Durable server lease still expires without heartbeat.

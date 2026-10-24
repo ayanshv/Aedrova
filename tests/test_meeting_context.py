@@ -105,7 +105,8 @@ def test_ui_choices_start_unchecked_and_storage_controls_ai():
     dialog.transcription.setChecked(False)
     assert not dialog.ai_context.isChecked()
     dialog.save(worker)
-    assert commands == [("consent", {"transcription": False, "ai_context": False})]
+    assert commands == [("consent", {"transcription": False, "ai_context": False,
+                                      "request": dialog.request_id})]
     dialog.deleteLater()
     app.processEvents()
 
@@ -117,6 +118,6 @@ def test_ui_withdrawal_is_explicit():
     dialog = MeetingPrivacy(None, worker, {})
     assert not commands
     dialog.withdraw(worker, False)
-    assert commands == [("withdraw_text", {"delete": False})]
+    assert commands == [("withdraw_text", {"delete": False, "request": dialog.request_id})]
     dialog.deleteLater()
     app.processEvents()

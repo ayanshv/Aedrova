@@ -190,6 +190,11 @@ class Collaboration(QObject):
         for view in (window.messages, window.thread_messages):
             view.avatar_images = self.avatar_images
             view.avatar_paths = {}
+        from aedrova.desktop.attachment_previews import AttachmentPreviews
+
+        self.previews = AttachmentPreviews(
+            window, self.connected, lambda: self.dictation_scope(window.composer)
+        )
         self.manual_unread = set()
         self.dialogs = []
         self.local_saved = set()
@@ -217,6 +222,22 @@ class Collaboration(QObject):
             view.link_requested.connect(self.preview_link)
             view.files_dropped.connect(lambda paths, v=view: self.drop_files(paths, v))
         for composer in (window.composer, window.thread_composer):
+            from aedrova.desktop.voice_messages import VoiceMessage
+
+            composer.dictation = VoiceMessage(
+                composer,
+                lambda c=composer: self.dictation_scope(c),
+                lambda name, data, parent, completed, cancelled: bool(
+                    self.connected()
+                    and self.connected().upload(
+                        name,
+                        parent=parent,
+                        voice_data=data,
+                        completed=completed,
+                        cancelled=cancelled,
+                    )
+                ),
+            )
             attach = button("＋", "Attach files or images", "icon")
             attach.setFixedSize(30, 29)
             attach.clicked.connect(lambda checked=False, c=composer: self.attach(c))
@@ -504,6 +525,9 @@ class Collaboration(QObject):
             QTimer.singleShot(0, lambda: self.open_link(link))
 
     def reset(self):
+        self.previews.clear()
+        if hasattr(self, "voice_playback"):
+            self.voice_playback.clear()
         self.avatar_images.clear()
         self.avatar_pending.clear()
         self.avatar_failed.clear()
@@ -804,9 +828,7 @@ class Collaboration(QObject):
     def attach(self, composer=None):
         if self.connected():
             self.connected().upload(
-                parent=self.window.thread_id
-                if self.window.thread_composer.editor.hasFocus()
-                else None
+                parent=self.window.thread_id if composer is self.window.thread_composer else None
             )
         else:
             self.window.notify("Sign in to upload files securely.")
@@ -816,12 +838,28 @@ class Collaboration(QObject):
         if not connected:
             self.window.notify("Sign in to upload files securely.")
             return
-        for path in paths[:10]:
+        if len(paths) > 10:
+            self.window.notify("Drop up to 10 files at a time. Each file can be up to 10 MB.")
+            return
+        for path in paths:
             if Path(path).is_file():
                 connected.upload(
                     path,
                     parent=self.window.thread_id if view is self.window.thread_messages else None,
                 )
+
+    def dictation_scope(self, composer):
+        connected = self.connected()
+        if not connected or not self.window.channel_id:
+            return None
+        service = connected.account.service
+        return (
+            service,
+            str(service.user.id),
+            self.window.workspace_id,
+            self.window.channel_id,
+            self.window.thread_id if composer.thread else None,
+        )
 
     def open_attachment(self, identifier, filename):
         connected = self.connected()
@@ -829,6 +867,17 @@ class Collaboration(QObject):
             self.window.notify("This sample file has no uploaded content.")
             return
         service = connected.account.service
+        if Path(filename).suffix.lower() == ".wav":
+            from aedrova.desktop.voice_messages import VoicePlayback
+
+            if not hasattr(self, "voice_playback"):
+                self.voice_playback = VoicePlayback(
+                    self.window,
+                    self.connected,
+                    lambda: self.dictation_scope(self.window.composer),
+                )
+            self.voice_playback.toggle(identifier)
+            return
 
         def loaded(data):
             dialog = AppDialog(self.window)
@@ -1197,33 +1246,21 @@ class Collaboration(QObject):
 
     def mention_menu(self, composer):
         menu = AppMenu(self.window)
-        choices = (
-            [
-                (composer.agent_name, "@" + composer.agent_name),
-                ("channel", "@channel"),
-                ("everyone", "@everyone"),
-            ]
-            + [(r["name"], "<@dot:" + r["id"] + "|" + r["name"] + ">") for r in composer.dots]
-            + [
-                (r["config"]["name"], "<@ai:" + r["id"] + "|" + r["config"]["name"] + ">")
-                for r in composer.ai_teammates
-                if not r["paused"]
-            ]
-            + [
-                (p["display_name"], "<@" + p["user_id"] + "|" + p["display_name"] + ">")
-                for p in composer.people
-            ]
-            + [
-                (p["username"], "<@" + p["user_id"] + "|" + p["username"] + ">")
-                for p in composer.people
-                if p.get("username")
-            ]
-        )
-        for name, token in choices:
-            menu.addAction(
-                "@" + name + (" · Bud" if token.startswith("<@dot:") else ""),
+        section = None
+        for group, name, token, detail, config in composer.mention_entries():
+            if section != group:
+                menu.addSection(group)
+                section = group
+            action = menu.addAction(
+                "@" + name + " · " + str(detail or "Teammate"),
                 lambda checked=False, t=token, n=name: self.insert_person(composer, n, t),
             )
+            if group == "Buds":
+                from PySide6.QtGui import QIcon
+
+                from aedrova.desktop.bud_art import appearance, sprite
+
+                action.setIcon(QIcon(sprite(appearance(config), str(config.get("color", "")))))
         menu.exec(composer.mention.mapToGlobal(composer.mention.rect().topLeft()))
         composer.editor.setFocus()
 

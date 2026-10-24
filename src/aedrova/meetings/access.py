@@ -86,13 +86,29 @@ class MeetingClient(ManagedClient):
                     json=body,
                 )
             if response.status_code in {401, 403}:
+                try:
+                    reason = response.json().get("error")
+                except (ValueError, AttributeError):
+                    reason = None
+                unavailable = {
+                    "Meetings are being prepared.",
+                    "Meetings are being prepared. No microphone or camera was started.",
+                    "Call access monitoring is starting or unavailable. Retry shortly.",
+                }
+                if isinstance(reason, str) and reason in unavailable:
+                    raise MeetingRequestError(
+                        "Meetings are not available on this server yet. "
+                        "Contact Aedrova support at contact@aedrova.com. Devices remain off."
+                    )
                 raise MeetingRequestError(
                     "Cannot access this call. Sign in again or ask your workspace owner."
                 )
             if response.status_code in {404, 405}:
                 raise MeetingRequestError(
-                    "Meeting service is not configured. Contact your workspace owner."
+                    "Meeting service is not configured. Contact contact@aedrova.com."
                 )
+            if response.status_code == 429:
+                raise MeetingRequestError("Too many meeting requests. Wait a moment and try again.")
             if response.status_code != 200:
                 raise MeetingRequestError(
                     "Meeting service is temporarily unavailable. Wait a moment and try again."
@@ -162,8 +178,18 @@ class MeetingClient(ManagedClient):
     def transcript(self, meeting, page=0):
         return self.request("/api/meetings/transcript/" + str(UUID(meeting)) + "?page=" + str(page))
 
+    def captions(self, meeting):
+        return self.request("/api/meetings/transcript/" + str(UUID(meeting)) + "?latest=true")
+
     def history(self, channel):
         return self.request("/api/meetings/history/" + str(UUID(channel)))
+
+    def wrapup(self, meeting):
+        return self.request("/api/meetings/wrapup/" + str(UUID(meeting)))
+
+    def confirm_transcript(self, meeting, segments):
+        return self.request("/api/meetings/transcript/confirm",
+                            {"meeting": meeting, "segments": segments}, timeout=40)
 
     def review(self, identifier, version, body, decision=False):
         return self.request(

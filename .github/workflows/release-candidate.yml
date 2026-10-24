@@ -38,6 +38,8 @@ jobs:
           uv run python -m compileall -q src scripts
       - name: Native process lease safety
         run: uv run pytest -q tests/test_file_lock.py
+      - name: Voice recording cleanup safety
+        run: uv run pytest -q tests/test_voice_messages.py
       - name: Compact layout safety
         run: >-
           uv run pytest -q

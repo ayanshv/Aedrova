@@ -115,18 +115,19 @@ def editor(qtbot, tmp_path, monkeypatch):
     return dialog, rows, saved, window
 
 
-def test_six_stages_save_without_oauth_and_never_fake_ready(editor, qtbot):
+def test_seven_stages_save_without_oauth_and_never_fake_ready(editor, qtbot):
     dialog, rows, saved, window = editor
     assert dialog.pages.currentIndex() == 0
     dialog.next.click()
     assert dialog.pages.currentIndex() == 1
+    assert dialog.next.accessibleName() == "Continue →"
     dialog.name.setText("Orbit")
     dialog.role.setText("Engineering updates")
     dialog.instructions.setPlainText("Focus on open pull requests.")
     dialog.shape.setCurrentIndex(dialog.shape.findData("cloud"))
     dialog.color.addItem("Custom", "#334455")
     dialog.color.setCurrentIndex(dialog.color.findData("#334455"))
-    for stage in [2, 3, 4]:
+    for stage in [2, 3, 5]:
         dialog.next.click()
         assert dialog.pages.currentIndex() == stage
     dialog.resource.setText("team/project")
@@ -135,16 +136,16 @@ def test_six_stages_save_without_oauth_and_never_fake_ready(editor, qtbot):
     assert saved[0]["p_role"] == "Builder · Engineering updates"
     assert saved[0]["p_shape"] == "cloud"
     assert dialog.current()["id"] == "bud-1"
-    assert dialog.pages.currentIndex() == 4
+    assert dialog.pages.currentIndex() == 5
     dialog.next.click()
     assert len(saved) == 1
     assert "connector card" in dialog.status.text()
-    assert dialog.pages.currentIndex() == 4
+    assert dialog.pages.currentIndex() == 5
     rows[0]["status"] = "Connected"
     dialog.refresh()
-    dialog.show_step(4)
+    dialog.show_step(5)
     dialog.next.click()
-    assert dialog.pages.currentIndex() == 5
+    assert dialog.pages.currentIndex() == 6
     dialog.next.click()
     assert window.composer.editor.toPlainText().endswith("@Orbit ")
     assert window.composer.mention_tokens["Orbit"] == "<@dot:bud-1|Orbit>"
@@ -173,6 +174,19 @@ def test_choices_preview_and_no_extra_top_level_widgets(editor, qtbot):
         assert not control.isWindow()
     qtbot.keyClick(dialog.exit_button, Qt.Key.Key_Space)
     assert not dialog.isVisible()
+
+
+@pytest.mark.parametrize(
+    "specialty", ["builder", "designer", "marketing", "finance", "research", "product"]
+)
+def test_accessible_appearance_selection_updates_real_specialty(editor, specialty):
+    dialog, _, _, _ = editor
+    dialog.show_step(1)
+    tile = next(tile for tile, value in dialog.appearance_buttons if value == specialty)
+    tile.setChecked(True)
+    assert dialog.job_role.currentData() == specialty
+    assert dialog.character.config["appearance"] == specialty
+    assert dialog.configured_role().split(" · ")[0].lower() == specialty
 
 
 @pytest.mark.parametrize("has_notes", [False, True])
@@ -302,16 +316,17 @@ def test_connector_step_is_inline_gallery_and_draft_connects_without_extra_windo
     from PySide6.QtWidgets import QFrame
 
     dialog, rows, saved, window = editor
-    dialog.show_step(4)
+    dialog.show_step(5)
     gallery = dialog.embedded_connectors
     assert not gallery.isWindow()
-    assert gallery.parentWidget() is dialog.pages.widget(4)
+    assert gallery.parentWidget() is dialog.pages.widget(5)
     assert not dialog.provider.isVisible() and not dialog.resource.isVisible()
     assert not dialog.recommendations.isVisible()
     assert gallery.filter.currentData() == "builder"
     assert len(gallery.findChildren(QFrame, "ConnectorCard")) == 1
     qtbot.wait(40)
-    assert gallery.columns == 3
+    assert dialog.minimumWidth() == 600
+    assert gallery.columns in {1, 2}
     assert gallery.gallery.horizontalScrollBar().maximum() == 0
     gallery.open_provider(gallery.providers[0])
     gallery.resource.setText("team/project")
@@ -320,9 +335,9 @@ def test_connector_step_is_inline_gallery_and_draft_connects_without_extra_windo
     assert len(saved) == 1
     assert rows[0]["connections"][0]["resource"] == "team/project"
     assert gallery.credential.text() == ""
-    assert dialog.pages.currentIndex() == 4
-    dialog.next.click()
     assert dialog.pages.currentIndex() == 5
+    dialog.next.click()
+    assert dialog.pages.currentIndex() == 6
     dialog.back.click()
     assert gallery.bud.currentData() == rows[0]["id"]
     gallery.credential.setText("never-retain-this")
@@ -337,7 +352,7 @@ def test_new_bud_clears_previous_connector_target(editor):
     gallery = dialog.embedded_connectors
     assert gallery.bud.currentData() == rows[0]["id"]
     dialog.new_dot()
-    dialog.show_step(4)
+    dialog.show_step(5)
     assert gallery.bud.currentData() is None
     assert gallery.row().get("connections") == []
 
@@ -347,7 +362,7 @@ def test_connector_saves_changed_profile_before_authorizing_current_version(edit
     dialog.resource.setText("team/project")
     dialog.save_dot()
     dialog.name.setText("Renamed Bud")
-    dialog.show_step(4)
+    dialog.show_step(5)
     gallery = dialog.embedded_connectors
     gallery.open_provider(gallery.providers[0])
     gallery.resource.setText("team/project")
@@ -358,12 +373,12 @@ def test_connector_saves_changed_profile_before_authorizing_current_version(edit
     assert rows[0]["status"] == "Connected"
     assert not dialog.has_changes()
     dialog.next.click()
-    assert dialog.pages.currentIndex() == 5
+    assert dialog.pages.currentIndex() == 6
 
 
 def test_pending_inline_connection_prevents_changing_bud_or_advancing(editor):
     dialog, _, _, _ = editor
-    dialog.show_step(4)
+    dialog.show_step(5)
     gallery = dialog.embedded_connectors
     gallery.pending = True
     gallery.update_controls()
@@ -380,7 +395,7 @@ def test_inline_oauth_saves_draft_opens_same_service_and_updates_real_connection
     editor, monkeypatch
 ):
     dialog, rows, saved, window = editor
-    dialog.show_step(4)
+    dialog.show_step(5)
     gallery = dialog.embedded_connectors
     provider = {
         **gallery.providers[0],
@@ -423,7 +438,7 @@ def test_inline_oauth_saves_draft_opens_same_service_and_updates_real_connection
     assert dialog.current()["status"] == "Connected"
     assert window.composer.dots[0]["status"] == "Connected"
     dialog.next.click()
-    assert dialog.pages.currentIndex() == 5
+    assert dialog.pages.currentIndex() == 6
 
 
 def test_oauth_rejects_external_redirect_and_stops_polling_when_closed(editor, monkeypatch):
@@ -490,7 +505,7 @@ def test_finish_later_closes_required_setup_without_completing_it(editor):
 def test_required_setup_finishes_only_after_verified_tool_and_final_stage(editor):
     dialog, rows, _, _ = editor
     dialog.required = True
-    dialog.show_step(4)
+    dialog.show_step(5)
     gallery = dialog.embedded_connectors
     gallery.open_provider(gallery.providers[0])
     gallery.resource.setText("team/project")
@@ -500,7 +515,7 @@ def test_required_setup_finishes_only_after_verified_tool_and_final_stage(editor
     dialog.accept()
     assert dialog.isVisible()  # A connected grant cannot skip the final handoff.
     dialog.next.click()
-    assert dialog.pages.currentIndex() == 5
+    assert dialog.pages.currentIndex() == 6
     for status in ("Needs authorization", "Disconnected", "Permission issue", "Error"):
         dialog.current()["status"] = status
         dialog.accept()
@@ -513,3 +528,25 @@ def test_required_setup_finishes_only_after_verified_tool_and_final_stage(editor
     dialog.accept()
     assert not dialog.isVisible()
     assert dialog.result() == dialog.DialogCode.Accepted
+
+
+def test_custom_personality_roundtrips_and_invalidates_saved_profile(editor):
+    from aedrova.dots.personality import unpack
+
+    dialog, rows, saved, _ = editor
+    dialog.personality_sliders["warmth"].setValue(83)
+    dialog.personality_sliders["diligence"].setValue(91)
+    dialog.personality_sliders["reporting"].setValue(47)
+    dialog.personality_voice.setText("Candid, thoughtful, dry wit.")
+    dialog.resource.setText("team/project")
+    dialog.save_dot()
+    _, preferences, voice = unpack(saved[-1]["p_instructions"])
+    assert preferences["warmth"] == 83 and preferences["diligence"] == 91
+    assert preferences["reporting"] == 47 and voice == "Candid, thoughtful, dry wit."
+    assert not dialog.has_changes()
+    dialog.personality_sliders["detail"].setValue(76)
+    assert dialog.has_changes()
+    dialog.select(0)
+    assert dialog.personality_sliders["detail"].value() == 45
+    dialog.finish_later()
+    assert dialog.deferred_setup and not dialog.isVisible()

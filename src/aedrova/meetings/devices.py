@@ -16,10 +16,12 @@ from PySide6.QtMultimedia import (
     QAudioSink,
     QAudioSource,
     QCamera,
+    QCapturableWindow,
     QMediaCaptureSession,
     QMediaDevices,
     QScreenCapture,
     QVideoSink,
+    QWindowCapture,
 )
 from PySide6.QtWidgets import QApplication
 
@@ -51,7 +53,7 @@ class NativeDevices:
     def list(self, kind):
         return {'camera': QMediaDevices.videoInputs, 'microphone': QMediaDevices.audioInputs,
                 'speaker': QMediaDevices.audioOutputs,
-                'screen': QApplication.screens}[kind]()
+                'screen': QApplication.screens, 'window': QWindowCapture.capturableWindows}[kind]()
 
     def permission(self, kind, callback):
         if kind == 'screen':
@@ -72,11 +74,17 @@ class NativeDevices:
 
     def start(self, kind, device, frame, level, failed):
         if kind in {'camera', 'screen'}:
-            source = (QCamera(device, self.parent) if kind == 'camera'
-                      else QScreenCapture(self.parent))
+            window = kind == 'screen' and isinstance(device, QCapturableWindow)
+            if window and not device.isValid():
+                raise RuntimeError('Shared window is no longer available')
+            source = (QCamera(device, self.parent) if kind == 'camera' else
+                      QWindowCapture(self.parent) if window else QScreenCapture(self.parent))
             session, sink = QMediaCaptureSession(self.parent), QVideoSink(self.parent)
             if kind == 'camera':
                 session.setCamera(source)
+            elif window:
+                source.setWindow(device)
+                session.setWindowCapture(source)
             else:
                 source.setScreen(device)
                 session.setScreenCapture(source)

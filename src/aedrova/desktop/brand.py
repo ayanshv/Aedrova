@@ -1,5 +1,6 @@
 """The supplied Aedrova artwork, preserved intact and framed for native surfaces."""
 
+import sys
 from functools import lru_cache
 from pathlib import Path
 
@@ -29,6 +30,15 @@ def brand_image():
 
 
 def app_icon():
+    # A runtime NSApplication icon overrides Apple's adaptive bundle renditions.
+    # Let Launch Services choose Default/Dark/Clear/Tinted, including Auto mode.
+    resources = Path(sys.executable).parent.parent / "Resources"
+    if (
+        sys.platform == "darwin"
+        and resources.parent.name == "Contents"
+        and (resources / "Assets.car").is_file()
+    ):
+        return QIcon()
     return QIcon(str(ASSETS / "aedrova.icns"))
 
 

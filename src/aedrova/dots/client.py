@@ -1,7 +1,10 @@
 """Authenticated Bud API and strictly bounded model-selected retrieval."""
 
+import hashlib
 import json
 import re
+import time
+from copy import deepcopy
 from dataclasses import replace
 from urllib.parse import urlencode
 
@@ -12,9 +15,26 @@ class BudClient(ManagedClient):
     """Allow a sleeping staging host to wake in the existing background worker."""
 
     def request(self, path, body=None, *, timeout=90):
+        # Only display catalog metadata; never cache messages, grants, resource
+        # contents, OAuth status or permission checks used by agent execution.
+        cache = getattr(self, "_catalog_cache", {})
+        cacheable = body is None and path in {"/api/dots/providers", "/api/buds/connectors"}
+        if body is not None:
+            cache.clear()
+        cached = cache.get(path) if cacheable else None
+        if cached and cached[0] > time.monotonic():
+            return deepcopy(cached[1])
         try:
-            return super().request(path, body, timeout=timeout)
+            result = super().request(path, body, timeout=timeout)
+            if cacheable:
+                cache[path] = (time.monotonic() + 30, deepcopy(result))
+            return result
         except RuntimeError as exc:
+            if str(exc).startswith("Aedrova’s AI service is taking longer to wake up."):
+                raise RuntimeError(
+                    "The Bud connector service is taking longer to wake up. "
+                    "Retry in a moment. Your Bud settings have not changed."
+                ) from exc
             if str(exc).startswith("Could not reach Aedrova’s included AI service."):
                 raise RuntimeError(
                     "Could not reach the Bud connector service. It may be waking up. "
@@ -30,7 +50,13 @@ def client(service):
     _, _, token, user = service.realtime_credentials()
     if str(service.user.id) != user:
         raise PermissionError("Sign in again before using Buds.")
-    return BudClient(origin, token)
+    scope = (origin, user, hashlib.sha256(token.encode()).hexdigest())
+    if getattr(service, "_bud_catalog_scope", None) != scope:
+        service._bud_catalog_scope = scope
+        service._bud_catalog_cache = {}
+    api = BudClient(origin, token)
+    api._catalog_cache = service._bud_catalog_cache
+    return api
 
 
 def mention(text, rows):
@@ -141,7 +167,8 @@ def retrieve(api, context, task, runner, provider, project, emit, *, bud_id=None
     original_emit = runner.emit
     try:
         runner.emit = lambda _event: None
-        selected = calls_from_model(runner.run(provider, project, prompt, plan=True), connected)
+        answer = getattr(runner, "answer", runner.run)
+        selected = calls_from_model(answer(provider, project, prompt, plan=True), connected)
     finally:
         runner.emit = original_emit
         runner.command_results = []

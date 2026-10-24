@@ -147,3 +147,20 @@ def test_completed_tour_can_be_replayed_from_start(window):
     window.show_tour()
     assert window.tour.index == 0
     window.tour.finish("skipped")
+
+
+def test_tour_highlights_component_without_a_surrounding_overlay(window, qtbot):
+    window.set_reduced_motion(True)
+    window.show_tour()
+    tour = window.tour
+    qtbot.wait(10)
+    for index in range(len(STEPS)):
+        tour.show_step(index)
+        if tour.highlighted_target is not None:
+            break
+    target = tour.highlighted_target
+    assert target is not None
+    assert target.graphicsEffect() is tour.component_effect
+    assert tour.mask().boundingRect() == tour.card.geometry()
+    tour.finish("paused")
+    assert target.graphicsEffect() is None

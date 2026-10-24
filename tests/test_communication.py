@@ -221,7 +221,7 @@ def test_private_download_is_bounded_and_verifies_digest(monkeypatch):
         service.download_attachment("file")
 
 
-def test_upload_lost_response_finalizes_same_reservation(tmp_path):
+def test_upload_lost_response_does_not_publish_unverified_bytes(tmp_path):
     from types import SimpleNamespace
 
     from aedrova.identity.service import Connection, IdentityService
@@ -244,9 +244,10 @@ def test_upload_lost_response_finalizes_same_reservation(tmp_path):
         return "workspace/channel/file" if name == "reserve_attachment" else "message-id"
 
     service.rpc = rpc
-    assert service.upload_attachment("stable-id", "channel", path) == "message-id"
-    assert [x[0] for x in operations] == ["reserve_attachment", "finish_attachment"]
-    assert operations[0][1]["p_id"] == operations[1][1]["p_id"] == "stable-id"
+    with pytest.raises(httpx.ReadTimeout):
+        service.upload_attachment("stable-id", "channel", path)
+    assert [x[0] for x in operations] == ["reserve_attachment"]
+    assert operations[0][1]["p_id"] == "stable-id"
     assert uploads[0][2]["upsert"] == "false"
 
 
@@ -276,7 +277,7 @@ def test_direct_message_action_uses_selected_teammate(qtbot, tmp_path, monkeypat
 
     service.rpc = rpc
     monkeypatch.setattr(
-        "aedrova.desktop.connected.choose_teammate", lambda *a: ("Morgan · peer", True)
+        "aedrova.desktop.connected.choose_conversation", lambda *a: ("person", "peer")
     )
     window.connected.start_dm()
     qtbot.waitUntil(lambda: window.channel_id == "dm" and not window.account_dialog.busy)
@@ -292,13 +293,15 @@ def test_attachment_picker_and_save_action(qtbot, tmp_path, monkeypatch):
     source.write_bytes(b"abc")
     uploads = []
 
-    def upload(*args):
+    def upload(*args, **kwargs):
         uploads.append(args)
         return "message"
 
     service.upload_attachment = upload
-    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *a: (str(source), ""))
+    monkeypatch.setattr(QFileDialog, "getOpenFileNames", lambda *a: ([str(source)], ""))
     window.connected.upload()
+    assert not uploads  # File stays a local draft until Send.
+    window.composer._submit()
     qtbot.waitUntil(lambda: bool(uploads) and not window.account_dialog.busy)
     assert uploads[0][1:3] == ("c", str(source))
     file = {"id": "file", "message_id": "m", "channel_id": "c", "filename": "notes.txt"}

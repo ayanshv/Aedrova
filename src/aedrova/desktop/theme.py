@@ -99,10 +99,17 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     selected = t.accent_bg
     bud_surface = "#FEFDFC" if t.name == "light" else t.surface
     return f"""
+    QFrame#DictationStrip, QFrame#UploadProgress {{ background: {t.canvas};
+        border: none; border-radius: 10px; }}
+    QFrame#DictationStrip QLabel {{ color: {t.text}; font-size: 12px; }}
+    QProgressBar#UploadMeter {{ border: none; background: {t.surface};
+        height: 3px; max-height: 3px; border-radius: 1px; }}
+    QProgressBar#UploadMeter::chunk {{ background: {t.accent}; border-radius: 1px; }}
     QDialog#Connectors {{ background: {t.bg}; }}
     QDialog#EmbeddedConnectors {{ background: transparent; }}
     QFrame#ConnectorRail {{ background: {t.canvas}; border-right: 1px solid {t.border}; }}
     QWidget#ConnectorGallery {{ background: transparent; }}
+    QWidget#ConnectorPage {{ background: {t.bg}; }}
     QFrame#ConnectorCard {{ background: {t.bg}; border: 1px solid {t.border};
         border-radius: 12px; }}
     QFrame#ConnectorCard:hover {{ border-color: {t.accent}; }}
@@ -230,6 +237,21 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
         border: 1px solid {t.border}; border-radius: 8px; padding: 12px 17px; font-size: 12px; }}
     QPushButton#Search {{ background: {t.surface}; color: {t.muted}; border: 1px solid {t.border};
         border-radius: 7px; padding: 8px 16px; font-size: 12px; }}
+    QListWidget#ConversationRecipients {{ background: transparent; border: none;
+        outline: none; padding: 0; }}
+    QListWidget#ConversationRecipients::item {{ padding: 4px 10px; border: none;
+        border-radius: 7px; color: {t.text}; }}
+    QListWidget#ConversationRecipients::item:selected {{ background: {t.accent_bg};
+        color: {t.accent_text}; }}
+    QListWidget#ConversationRecipients::item:hover {{ background: {t.hover}; }}
+    QListWidget#ConversationRecipients::item:disabled {{ color: {t.muted};
+        font-size: 11px; background: transparent; }}
+    QListWidget#MentionPicker {{ background: {t.surface}; border: 1px solid {t.border};
+        border-radius: 10px; outline: none; padding: 4px; }}
+    QListWidget#MentionPicker::item {{ padding: 4px 8px; border-radius: 6px; }}
+    QListWidget#MentionPicker::item:selected {{ background: {t.accent_bg}; color: {t.text}; }}
+    QListWidget#MentionPicker::item:hover {{ background: {t.hover}; }}
+    QListWidget#MentionPicker::item:disabled {{ color: {t.muted}; font-size: 11px; }}
     QListWidget#Navigation {{ border: none; background: transparent; outline: none; }}
     QListWidget#Navigation::item {{ height: 30px; border-radius: 4px; padding-left: 10px; }}
     QListWidget#Navigation::item:selected {{ background: {selected}; color: {t.accent_text};

@@ -120,6 +120,23 @@ async def probe():
                     counts[index]['/screen' if key.endswith('/screen') else '/camera'] += 1
             await asyncio.sleep(.03)
         assert all(count >= 5 for result in counts for count in result.values())
+        await workers[0]._media('receive_video', False)
+        for _ in range(30):
+            for worker in workers:
+                worker.frame('camera', frame)
+                worker.frame('screen', frame)
+            await asyncio.sleep(.03)
+        assert not workers[0].take_remote_frames(), 'Hidden video still delivered to UI'
+        assert workers[1].take_remote_frames(), 'Hiding incoming video stopped outgoing video'
+        await workers[0]._media('receive_video', True)
+        resumed = 0
+        for _ in range(120):
+            for worker in workers:
+                worker.frame('camera', frame)
+                worker.frame('screen', frame)
+            resumed += len(workers[0].take_remote_frames())
+            await asyncio.sleep(.03)
+        assert resumed >= 5, 'Video subscriptions did not resume'
         denied.add(users[0])
         await leases.sweep(identity, service)
         await until(lambda: workers[0].stop_requested.is_set())
@@ -132,7 +149,8 @@ async def probe():
         except Exception:
             rejected = True
         assert rejected, 'Revoked cached token was accepted'
-        return {'native_worker_two_way_video': counts, 'forced_disconnect': 'passed',
+        return {'native_worker_two_way_video': counts, 'incoming_video_pause_resume': 'passed',
+                'resumed_frames': resumed, 'forced_disconnect': 'passed',
                 'cached_token_rejection': 'passed', 'hardware': 'not tested',
                 'hosted_supabase_rls': 'not tested; synthetic identities',
                 'echo_network_reconnect': 'not tested', 'transcription': 'not started'}
@@ -160,7 +178,7 @@ if __name__ == '__main__':
     try:
         result = asyncio.run(probe())
         target.write_text(json.dumps(result, indent=2))
-        print('PASS native worker synthetic video, forced removal and cached-token rejection')
+        print('PASS native worker video, incoming-video pause/resume, removal and token rejection')
     except Exception:
         print('FAIL native call check. Inspect configuration/connectivity; no hardware was used.')
         raise SystemExit(1) from None

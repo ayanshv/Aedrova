@@ -7,6 +7,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
+    QApplication,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -83,7 +84,10 @@ class ActivityRow(QFrame):
             if character_config:
                 from aedrova.desktop.ai_teammates import Character
 
-                avatar = Character(character_config, reduced_motion=True)
+                avatar = Character(
+                    character_config,
+                    reduced_motion=QApplication.instance().property("reduceMotion") is True,
+                )
                 avatar.setFixedSize(34, 32)
             else:
                 avatar = BrandMark(34)
@@ -113,7 +117,12 @@ class ActivityRow(QFrame):
             column.addLayout(header)
             self.message = QLabel(summary)
             self.message.setTextFormat(Qt.TextFormat.PlainText)
-            self.message.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            self.message.setTextInteractionFlags(
+                Qt.TextInteractionFlag.TextSelectableByMouse
+                | Qt.TextInteractionFlag.TextSelectableByKeyboard
+            )
+            self.message.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+            self.message.setMargin(2)
             self.message.setWordWrap(True)
             self.message.setAccessibleName("Agent update")
             self.message.setFont(system_font(14))
@@ -309,5 +318,33 @@ class AgentStream(QScrollArea):
             self.changed.emit()
 
     def finish_with_result(self, text):
-        self.clear()
-        self.appendPlainText(text)
+        for transient in list(self.rows):
+            if transient is self.status_row or getattr(transient, "is_reply", False):
+                continue
+            self.layout.removeWidget(transient)
+            self.rows.remove(transient)
+            transient.deleteLater()
+        if self.status_row is not None:
+            row = self.status_row
+            self.layout.removeWidget(row)
+            if row in self.rows:
+                self.rows.remove(row)
+            if self.status_controls:
+                self.status_controls.hide()
+                self.status_controls.setParent(self)
+            row.deleteLater()
+            self.status_row = None
+        self.set_reply(text)
+
+    def set_reply(self, text):
+        """Update a single streaming response without adding activity-log rows."""
+        if not getattr(self, "reply_row", None) or self.reply_row not in self.rows:
+            self.reply_row = ActivityRow(
+                text, author=self.author_name, character_config=self.character_config
+            )
+            self.reply_row.is_reply = True
+            self.add_row(self.reply_row)
+        else:
+            self.reply_row.summary = text
+            self.reply_row.message.setText(text)
+            self.changed.emit()

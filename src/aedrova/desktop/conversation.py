@@ -26,6 +26,7 @@ from PySide6.QtGui import (
     QColor,
     QFont,
     QFontMetrics,
+    QIcon,
     QKeySequence,
     QPainter,
     QPainterPath,
@@ -41,6 +42,8 @@ from PySide6.QtWidgets import (
     QLabel,
     QLayout,
     QListView,
+    QListWidget,
+    QListWidgetItem,
     QPlainTextEdit,
     QStyle,
     QStyledItemDelegate,
@@ -48,6 +51,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from aedrova.desktop.attachment_previews import preview_height
 from aedrova.desktop.controls import AppMenu
 from aedrova.desktop.emojis import QUICK_EMOJI, pick_emoji
 from aedrova.desktop.materials import SpringButton, system_font
@@ -155,6 +159,8 @@ class MessageDelegate(QStyledItemDelegate):
                 lambda m: "@" + m[2],
                 message.body,
             )
+            if message.attachment.lower().endswith(".wav") and text.startswith("Shared a file:"):
+                text = "Voice message"
             document.setMarkdown(escape(text, quote=False))
             previews = ""
             for url in message_urls(message.body):
@@ -248,7 +254,7 @@ class MessageDelegate(QStyledItemDelegate):
         if message.id == getattr(self.view, "agent_message_id", None):
             return QSize(width, self.view.agent_feed.content_height(width))
         document = self.document(message, width - 94)
-        extra = (58 if message.attachment else 0) + (
+        extra = (preview_height(message.attachment) if message.attachment else 0) + (
             26 if message.replies and self.view.allow_threads else 0
         )
         chips = reaction_chips(message, width, 0)
@@ -365,6 +371,7 @@ class MessageDelegate(QStyledItemDelegate):
         document = self.document(message, rect.width() - 94)
         painter.save()
         painter.translate(rect.x() + 74, rect.y() + self.body_offset(index))
+        self.view.paint_text_selection(painter, message, document)
         context = QAbstractTextDocumentLayout.PaintContext()
         context.palette.setColor(QPalette.ColorRole.Text, QColor(t.secondary))
         document.documentLayout().draw(painter, context)
@@ -372,22 +379,70 @@ class MessageDelegate(QStyledItemDelegate):
         x = rect.x() + 74
         bottom = rect.y() + self.body_offset(index) + document.size().height()
         if message.attachment:
+            voice = message.attachment.lower().endswith(".wav")
+            playback = getattr(self.view, "voice_playback", {})
+            active = playback.get("id") == message.attachment_id
             painter.setPen(QColor(t.border))
             painter.setBrush(QColor(t.surface))
             card_width = min(350, rect.width() - 96)
-            painter.drawRoundedRect(QRectF(x, bottom + 10, card_width, 44), 12, 12)
+            height = preview_height(message.attachment)
+            painter.drawRoundedRect(QRectF(x, bottom + 10, card_width, height - 14), 12, 12)
             painter.setPen(QColor(t.accent))
             painter.setFont(font(10, True))
-            painter.drawText(QRectF(x + 12, bottom + 23, 30, 18), "FILE")
+            painter.drawText(
+                QRectF(x + 12, bottom + 23, 30, 18),
+                ("Ⅱ" if active and playback.get("playing") else "▶") if voice else "FILE",
+            )
             painter.setFont(font(11))
             painter.setPen(QColor(t.secondary))
             elided = painter.fontMetrics().elidedText(
-                message.attachment,
+                (
+                    (
+                        "Voice message · "
+                        + (
+                            f"{playback.get('position', 0) // 1000}s / "
+                            f"{playback.get('duration', 0) // 1000}s"
+                            if active
+                            else "Play"
+                        )
+                    )
+                    if voice
+                    else message.attachment
+                ),
                 Qt.TextElideMode.ElideRight,
                 int(card_width - 60),
             )
             painter.drawText(QRectF(x + 48, bottom + 23, card_width - 55, 18), elided)
-            bottom += 58
+            if height > 58:
+                preview = getattr(self.view, "attachment_previews", {}).get(message.attachment_id)
+                area = QRectF(x + 12, bottom + 48, card_width - 24, height - 58)
+                from PySide6.QtGui import QPixmap
+
+                if isinstance(preview, QPixmap):
+                    scaled = preview.scaled(
+                        area.size().toSize(),
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                    painter.drawPixmap(
+                        int(area.x()), int(area.y() + (area.height() - scaled.height()) / 2), scaled
+                    )
+                else:
+                    if preview is None:
+                        placeholder = QColor(t.secondary)
+                        placeholder.setAlpha(30)
+                        painter.setPen(Qt.PenStyle.NoPen)
+                        painter.setBrush(placeholder)
+                        for line, fraction in enumerate((0.88, 0.7, 0.48)):
+                            painter.drawRoundedRect(
+                                QRectF(area.x(), area.y() + line * 16, area.width() * fraction, 7),
+                                3,
+                                3,
+                            )
+                    else:
+                        painter.setFont(font(10))
+                        painter.drawText(area, Qt.TextFlag.TextWordWrap, preview)
+            bottom += height
         if message.replies and self.view.allow_threads:
             painter.setFont(font(11, True))
             painter.setPen(QColor(t.accent))
@@ -430,6 +485,8 @@ class MessageView(QListView):
         self.agent_visible = False
         self.agent_anchor = None
         self.source_messages = []
+        self.text_selection = None  # message ID, UTF-16 anchor, UTF-16 position
+        self.selecting_text = False
         self.allow_threads = allow_threads
         self.setObjectName("Messages")
         self.setAccessibleName("Conversation messages")
@@ -488,7 +545,126 @@ class MessageView(QListView):
                 self.files_dropped.emit(paths)
                 event.acceptProposedAction()
 
+    def text_hit(self, point, *, clamp=False):
+        index = self.indexAt(point)
+        if not index.isValid() or index.data(MESSAGE_ROLE).id == self.agent_message_id:
+            return None
+        rect = self.visualRect(index)
+        document = self.delegate.document(index.data(MESSAGE_ROLE), rect.width() - 94)
+        local = QPointF(
+            point.x() - rect.x() - 74, point.y() - rect.top() - self.delegate.body_offset(index)
+        )
+        if not clamp and not QRectF(0, 0, document.textWidth(), document.size().height()).contains(
+            local
+        ):
+            return None
+        position = document.documentLayout().hitTest(local, Qt.HitTestAccuracy.FuzzyHit)
+        return index, document, max(0, min(position, document.characterCount() - 1))
+
+    def mousePressEvent(self, event):  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton:
+            hit = self.text_hit(event.position().toPoint())
+            self.selecting_text = hit is not None
+            if hit:
+                index, _, position = hit
+                anchor = (
+                    self.text_selection[1]
+                    if self.text_selection
+                    and self.text_selection[0] == index.data(MESSAGE_ROLE).id
+                    and event.modifiers() & Qt.KeyboardModifier.ShiftModifier
+                    else position
+                )
+                self.text_selection = (index.data(MESSAGE_ROLE).id, anchor, position)
+            else:
+                self.text_selection = None
+            self.viewport().update()
+        super().mousePressEvent(event)
+
+    def mouseDoubleClickEvent(self, event):  # noqa: N802
+        hit = self.text_hit(event.position().toPoint())
+        if hit and event.button() == Qt.MouseButton.LeftButton:
+            index, document, position = hit
+            cursor = QTextCursor(document)
+            cursor.setPosition(position)
+            cursor.select(QTextCursor.SelectionType.WordUnderCursor)
+            self.text_selection = (index.data(MESSAGE_ROLE).id, cursor.anchor(), cursor.position())
+            self.selecting_text = True
+            self.viewport().update()
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
+
+    def selection_cursor(self):
+        if not self.text_selection:
+            return None
+        identifier, anchor, position = self.text_selection
+        for row, message in enumerate(self.model().messages):
+            if message.id == identifier:
+                index = self.model().index(row)
+                document = self.delegate.document(message, self.visualRect(index).width() - 94)
+                cursor = QTextCursor(document)
+                cursor.setPosition(min(anchor, document.characterCount() - 1))
+                cursor.setPosition(
+                    min(position, document.characterCount() - 1), QTextCursor.MoveMode.KeepAnchor
+                )
+                return cursor
+        self.text_selection = None
+        return None
+
+    def paint_text_selection(self, painter, message, document):
+        if not self.text_selection or self.text_selection[0] != message.id:
+            return
+        start, end = sorted(self.text_selection[1:])
+        if start == end:
+            return
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(self.delegate.theme.accent_bg))
+        block = document.findBlock(start)
+        while block.isValid() and block.position() < end:
+            bounds = document.documentLayout().blockBoundingRect(block)
+            layout = block.layout()
+            for n in range(layout.lineCount()):
+                line = layout.lineAt(n)
+                first = max(start - block.position(), line.textStart())
+                last = min(end - block.position(), line.textStart() + line.textLength())
+                if first >= last:
+                    continue
+                x1, x2 = line.cursorToX(first)[0], line.cursorToX(last)[0]
+                painter.drawRoundedRect(
+                    QRectF(
+                        bounds.x() + min(x1, x2) - 2,
+                        bounds.y() + line.y() - 1,
+                        abs(x2 - x1) + 4,
+                        line.height() + 2,
+                    ),
+                    3,
+                    3,
+                )
+            block = block.next()
+
     def mouseReleaseEvent(self, event):  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton and self.selecting_text:
+            self.selecting_text = False
+            cursor = self.selection_cursor()
+            if cursor and cursor.hasSelection():
+                event.accept()
+                return
+            # Links keep their normal single-click behavior; ordinary body clicks
+            # place a text caret instead of unexpectedly opening a thread.
+            hit = self.text_hit(event.position().toPoint())
+            if hit:
+                index, document, _ = hit
+                rect = self.visualRect(index)
+                link = document.documentLayout().anchorAt(
+                    QPointF(
+                        event.position().x() - rect.x() - 74,
+                        event.position().y() - rect.y() - self.delegate.body_offset(index),
+                    )
+                )
+                if link and urlsplit(link).scheme in ("https", "http"):
+                    self.link_requested.emit(link)
+            event.accept()
+            return
         self._click_position = event.position().toPoint()
         super().mouseReleaseEvent(event)
 
@@ -499,7 +675,9 @@ class MessageView(QListView):
         rect = self.visualRect(index)
         document = self.delegate.document(message, rect.width() - 94)
         top = rect.top() + self.delegate.body_offset(index)
-        top += document.size().height() + (58 if message.attachment else 0)
+        top += document.size().height() + (
+            preview_height(message.attachment) if message.attachment else 0
+        )
         top += 30 if message.replies and self.allow_threads else 8
         point = getattr(self, "_click_position", QPoint(-1, -1))
         for box, reaction, _ in reaction_chips(message, rect.width(), top):
@@ -515,7 +693,7 @@ class MessageView(QListView):
             message.attachment_id
             and body_top + document.size().height()
             <= point.y()
-            <= body_top + document.size().height() + 58
+            <= body_top + document.size().height() + preview_height(message.attachment)
         ):
             self.action_requested.emit("attachment", message.id)
             return
@@ -536,6 +714,17 @@ class MessageView(QListView):
             self.react(identifier, emoji)
 
     def mouseMoveEvent(self, event):  # noqa: N802
+        if (
+            self.selecting_text
+            and self.text_selection
+            and event.buttons() & Qt.MouseButton.LeftButton
+        ):
+            hit = self.text_hit(event.position().toPoint(), clamp=True)
+            if hit and hit[0].data(MESSAGE_ROLE).id == self.text_selection[0]:
+                self.text_selection = (*self.text_selection[:2], hit[2])
+                self.viewport().update()
+            self.reaction_bar.hide()
+            return
         super().mouseMoveEvent(event)
         index = self.indexAt(event.position().toPoint())
         if not index.isValid():
@@ -568,16 +757,55 @@ class MessageView(QListView):
             self.thread_requested.emit(index.data(MESSAGE_ROLE).id)
 
     def keyPressEvent(self, event):  # noqa: N802
-        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+        moves = {
+            Qt.Key.Key_Left: QTextCursor.MoveOperation.PreviousCharacter,
+            Qt.Key.Key_Right: QTextCursor.MoveOperation.NextCharacter,
+            Qt.Key.Key_Up: QTextCursor.MoveOperation.Up,
+            Qt.Key.Key_Down: QTextCursor.MoveOperation.Down,
+            Qt.Key.Key_Home: QTextCursor.MoveOperation.StartOfLine,
+            Qt.Key.Key_End: QTextCursor.MoveOperation.EndOfLine,
+        }
+        if (
+            self.text_selection
+            and event.key() in moves
+            and (event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+        ):
+            cursor = self.selection_cursor()
+            if cursor:
+                cursor.movePosition(moves[event.key()], QTextCursor.MoveMode.KeepAnchor)
+                self.text_selection = (self.text_selection[0], cursor.anchor(), cursor.position())
+                self.viewport().update()
+                event.accept()
+                return
+        if event.matches(QKeySequence.StandardKey.SelectAll) and self.currentIndex().isValid():
+            index = self.currentIndex()
+            document = self.delegate.document(
+                index.data(MESSAGE_ROLE), self.visualRect(index).width() - 94
+            )
+            self.text_selection = (index.data(MESSAGE_ROLE).id, 0, document.characterCount() - 1)
+            self.viewport().update()
+            event.accept()
+        elif event.key() == Qt.Key.Key_Escape and self.text_selection:
+            self.text_selection = None
+            self.viewport().update()
+            event.accept()
+        elif event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self._request_thread(self.currentIndex())
             event.accept()
         elif event.matches(QKeySequence.StandardKey.Copy):
             self.copy_current()
             event.accept()
         else:
+            if event.key() in moves:
+                self.text_selection = None
+                self.viewport().update()
             super().keyPressEvent(event)
 
     def copy_current(self):
+        cursor = self.selection_cursor()
+        if cursor and cursor.hasSelection():
+            QApplication.clipboard().setText(cursor.selectedText().replace("\u2029", "\n"))
+            return
         if self.currentIndex().isValid():
             QApplication.clipboard().setText(self.currentIndex().data(MESSAGE_ROLE).body)
 
@@ -586,6 +814,8 @@ class MessageView(QListView):
         if not index.isValid():
             return
         self.setCurrentIndex(index)
+        if self.text_selection and self.text_selection[0] != index.data(MESSAGE_ROLE).id:
+            self.text_selection = None
         menu = AppMenu(self)
         if self.allow_threads and index.data(MESSAGE_ROLE).id != self.agent_message_id:
             menu.addAction("Reply in thread", lambda: self._request_thread(index))
@@ -616,7 +846,10 @@ class MessageView(QListView):
                 )
             if message.attachment_id:
                 menu.addAction(
-                    "Open attachment…", lambda: self.action_requested.emit("attachment", message.id)
+                    "Play / pause voice message"
+                    if message.attachment.lower().endswith(".wav")
+                    else "Open attachment…",
+                    lambda: self.action_requested.emit("attachment", message.id),
                 )
             if message.mine:
                 menu.addAction(
@@ -625,7 +858,10 @@ class MessageView(QListView):
                 menu.addAction(
                     "Delete / unsend message", lambda: self.unsend_requested.emit(message.id)
                 )
-        menu.addAction("Copy message", self.copy_current)
+        cursor = self.selection_cursor()
+        if cursor and cursor.hasSelection():
+            menu.addAction("Copy selection", self.copy_current)
+        menu.addAction("Copy message", lambda: QApplication.clipboard().setText(message.body))
         menu.exec(self.viewport().mapToGlobal(position))
 
     def _choose_for(self, identifier):
@@ -888,6 +1124,18 @@ class Composer(QFrame):
         self.suggestion.clicked.connect(self.complete_mention)
         self.editor.completion = self.completion_key
         self.editor.cursorPositionChanged.connect(self.update_suggestion)
+        self.mention_list = QListWidget(self)
+        self.mention_list.setObjectName("MentionPicker")
+        self.mention_list.setAccessibleName(
+            "Mention suggestions. Agents, Buds, people and channel."
+        )
+        self.mention_list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.mention_list.setIconSize(QSize(30, 30))
+        self.mention_list.setTextElideMode(Qt.TextElideMode.ElideRight)
+        self.mention_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.mention_list.hide()
+        self.mention_list.currentItemChanged.connect(self._select_mention)
+        self.mention_list.itemClicked.connect(lambda _: self.complete_mention())
         layout.addWidget(self.suggestion)
         layout.addWidget(self.editor)
         bottom = QHBoxLayout()
@@ -935,11 +1183,43 @@ class Composer(QFrame):
             self.editor.textCursor().insertText(emoji)
             self.editor.setFocus()
 
+    def resizeEvent(self, event):  # noqa: N802
+        super().resizeEvent(event)
+        if hasattr(self, "hint"):
+            self.hint.setVisible(self.width() >= 650)
+            self.mention.setText("Ask " + self.agent_name if self.width() >= 500 else "")
+            self._position_mentions()
+
+    def moveEvent(self, event):  # noqa: N802
+        super().moveEvent(event)
+        if hasattr(self, "mention_list"):
+            self._position_mentions()
+
+    def hideEvent(self, event):  # noqa: N802
+        if hasattr(self, "mention_list"):
+            self.mention_list.hide()
+            self.suggestion.hide()
+        super().hideEvent(event)
+
+    def _position_mentions(self):
+        if self.mention_list.isHidden():
+            return
+        host = self.window()
+        anchor = self.mapTo(host, QPoint(0, 0))
+        height = self.mention_list.height()
+        self.mention_list.setGeometry(
+            anchor.x(), max(0, anchor.y() - height - 6), self.width(), height
+        )
+        self.mention_list.raise_()
+
     def _focus_changed(self, focused):
         self.setProperty("focused", focused)
         self.style().unpolish(self)
         self.style().polish(self)
         self.update()
+        if not focused:
+            self.mention_list.hide()
+            self.suggestion.hide()
 
     def _resize_editor(self, size):
         # QPlainTextDocumentLayout reports height in visual lines, including wrapping.
@@ -965,62 +1245,149 @@ class Composer(QFrame):
         self.mention.setToolTip(f"Insert {mention} · ask your agent to build")
         self.update_suggestion()
 
-    def mention_start(self):
+    def mention_entries(self):
+        """One catalog for typed completion and the toolbar; preserve routing tokens."""
+        entries = [("Agents", self.agent_name, "@" + self.agent_name, "Build with your team", None)]
+        entries += [
+            (
+                "Agents",
+                r["config"]["name"],
+                "<@ai:" + r["id"] + "|" + r["config"]["name"] + ">",
+                r["config"].get("role", "AI teammate"),
+                None,
+            )
+            for r in self.ai_teammates
+            if not r["paused"]
+        ]
+        entries += [
+            (
+                "Buds",
+                r["name"],
+                "<@dot:" + r["id"] + "|" + r["name"] + ">",
+                r.get("role", "Your AI teammate"),
+                r,
+            )
+            for r in self.dots
+        ]
+        entries += [
+            (
+                "People",
+                p["display_name"],
+                "<@" + p["user_id"] + "|" + p["display_name"] + ">",
+                p.get("custom_status") or p.get("availability", "Teammate"),
+                p,
+            )
+            for p in self.people
+        ]
+        entries += [
+            ("Notify channel", n, "@" + n, d, None)
+            for n, d in (("channel", "Notify this channel"), ("everyone", "Notify everyone"))
+        ]
+        return entries
+
+    def _mention_match(self):
         cursor = self.editor.textCursor()
         if cursor.hasSelection():
-            return None
+            return None, ""
         prefix = (
             self.editor.toPlainText()
             .encode("utf-16-le")[: cursor.position() * 2]
             .decode("utf-16-le")
         )
         match = re.search(r"(?<!\S)@([^@\n]*)$", prefix)
-        self.mention_choice = None
-        if match:
-            choices = (
-                [
-                    (self.agent_name, "@" + self.agent_name),
-                    ("channel", "@channel"),
-                    ("everyone", "@everyone"),
-                ]
-                + [(r["name"], "<@dot:" + r["id"] + "|" + r["name"] + ">") for r in self.dots]
-                + [
-                    (r["config"]["name"], "<@ai:" + r["id"] + "|" + r["config"]["name"] + ">")
-                    for r in self.ai_teammates
-                    if not r["paused"]
-                ]
-                + [
-                    (p["display_name"], "<@" + p["user_id"] + "|" + p["display_name"] + ">")
-                    for p in self.people
-                ]
-                + [
-                    (p["username"], "<@" + p["user_id"] + "|" + p["username"] + ">")
-                    for p in self.people
-                    if p.get("username")
-                ]
-            )
-            hits = [
-                (name, token)
-                for name, token in choices
-                if name.casefold().startswith(match[1].casefold())
-            ]
-            if hits:
-                self.mention_choice = hits[0]
-        if match and self.mention_choice:
-            return len(prefix[: match.start()].encode("utf-16-le")) // 2
-        return None
+        if not match:
+            return None, ""
+        return len(prefix[: match.start()].encode("utf-16-le")) // 2, match[1].casefold()
+
+    def mention_start(self):
+        start, _ = self._mention_match()
+        return start if self.mention_choice else None
+
+    def _select_mention(self, item, previous=None):
+        choice = item.data(Qt.ItemDataRole.UserRole) if item else None
+        if not choice:
+            return
+        self.mention_choice = choice
+        suffix = " · Bud" if choice[1].startswith("<@dot:") else ""
+        self.suggestion.setText("@" + choice[0] + suffix + "    ·    Tab or ↵")
+        self.suggestion.setAccessibleName("Insert @" + choice[0] + ". Tab or Return.")
 
     def update_suggestion(self):
-        self.suggestion.setVisible(self.mention_start() is not None)
-        if self.mention_choice:
-            suffix = " · Bud" if self.mention_choice[1].startswith("<@dot:") else ""
-            self.suggestion.setText("@" + self.mention_choice[0] + suffix + "    ·    Tab or ↵")
+        start, query = self._mention_match()
+        selected = self.mention_choice
+        self.mention_list.blockSignals(True)
+        self.mention_list.clear()
+        self.mention_choice = None
+        if start is None:
+            self.mention_list.blockSignals(False)
+            self.mention_list.hide()
+            self.suggestion.hide()
+            return
+        first = chosen = None
+        group = None
+        for section, name, token, detail, config in self.mention_entries():
+            aliases = [name, (config or {}).get("username", "")]
+            if query and not any(query in str(alias).casefold() for alias in aliases):
+                continue
+            if section == "People" and query and query not in name.casefold():
+                # Preserve the existing username mention syntax when searching by handle.
+                name = config["username"]
+                token = "<@" + config["user_id"] + "|" + name + ">"
+            if group != section:
+                header = QListWidgetItem(section)
+                header.setFlags(Qt.ItemFlag.NoItemFlags)
+                header.setSizeHint(QSize(0, 24))
+                self.mention_list.addItem(header)
+                group = section
+            item = QListWidgetItem("@" + name + "  ·  " + str(detail or "Teammate"))
+            item.setData(Qt.ItemDataRole.UserRole, (name, token))
+            item.setToolTip("@" + name + " · " + str(detail or "Teammate"))
+            item.setSizeHint(QSize(0, 38))
+            if section == "Buds":
+                from aedrova.desktop.bud_art import appearance, sprite
+
+                item.setIcon(QIcon(sprite(appearance(config), str(config.get("color", "")))))
+            self.mention_list.addItem(item)
+            if first is None:
+                first = item
+            if selected == (name, token):
+                chosen = item
+        self.mention_list.blockSignals(False)
+        visible = start is not None and first is not None
+        if self.mention_list.parentWidget() is not self.window():
+            self.mention_list.setParent(self.window())
+        self.mention_list.setVisible(visible)
+        self.suggestion.setVisible(visible)
+        if visible:
+            self.mention_list.setFixedHeight(
+                min(
+                    224,
+                    sum(
+                        self.mention_list.item(i).sizeHint().height()
+                        for i in range(self.mention_list.count())
+                    )
+                    + 8,
+                )
+            )
+            self._position_mentions()
+            self.mention_list.setCurrentItem(chosen or first)
+            self._select_mention(chosen or first)
 
     def completion_key(self, event):
         if self.suggestion.isHidden():
             return False
         if event.key() == Qt.Key.Key_Escape:
             self.suggestion.hide()
+            self.mention_list.hide()
+        elif event.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down) and not event.modifiers():
+            rows = [
+                i
+                for i in range(self.mention_list.count())
+                if self.mention_list.item(i).data(Qt.ItemDataRole.UserRole)
+            ]
+            current = rows.index(self.mention_list.currentRow())
+            step = 1 if event.key() == Qt.Key.Key_Down else -1
+            self.mention_list.setCurrentRow(rows[(current + step) % len(rows)])
         elif (
             event.key() in (Qt.Key.Key_Tab, Qt.Key.Key_Return, Qt.Key.Key_Enter)
             and not event.modifiers()
@@ -1035,15 +1402,16 @@ class Composer(QFrame):
         start = self.mention_start()
         if start is None:
             return
+        name, token = self.mention_choice
         cursor = self.editor.textCursor()
         cursor.setPosition(start, QTextCursor.MoveMode.KeepAnchor)
-        name, token = self.mention_choice
         if token.startswith("<@"):
             self.mention_tokens[name] = token
         cursor.insertText("@" + name + " ")
         self.editor.setTextCursor(cursor)
         self.editor.setFocus()
         self.suggestion.hide()
+        self.mention_list.hide()
 
     def insert_mention(self):
         cursor = self.editor.textCursor()
@@ -1057,21 +1425,46 @@ class Composer(QFrame):
     def _changed(self):
         self.update_suggestion()
         text = self.editor.toPlainText().strip()
-        self.send.setEnabled(bool(text) and len(text) <= 10_000)
+        self.send.setEnabled(
+            (bool(text) or bool(getattr(self, "attachment_drafts", []))) and len(text) <= 10_000
+        )
         if len(text) > 10_000:
             self.hint.setText("Limit: 10,000 characters")
         else:
             self.hint.setText("↵ send  ·  ⇧↵ new line")
 
     def _submit(self):
-        text = self.editor.toPlainText().strip()
+        for card, publish in list(getattr(self, "attachment_drafts", [])):
+            publish()
+            card.deleteLater()
+        self.attachment_drafts = []
+        self._changed()
+        text = self.submission_text()
         if text and len(text) <= 10_000:
-            for name, token in self.mention_tokens.items():
-                text = re.sub(
-                    r"(?<!\S)@" + re.escape(name) + r"(?=$|[\s.,!?])", lambda _, t=token: t, text
-                )
+            if hasattr(self, "dictation"):
+                self.dictation.cancel()
+            self.submission = (text, self.editor.document().revision())
             self.submitted.emit(text)
 
+    def submission_text(self):
+        text = self.editor.toPlainText().strip()
+        for name, token in self.mention_tokens.items():
+            text = re.sub(
+                r"(?<!\S)@" + re.escape(name) + r"(?=$|[\s.,!?])", lambda _, t=token: t, text
+            )
+        return text
+
+    def clear_submission(self, text):
+        """Clear only the accepted revision, comparing the actual wire mentions."""
+        sent = getattr(self, "submission", None)
+        if self.submission_text() != text.strip():
+            return False
+        if sent and sent != (text.strip(), self.editor.document().revision()):
+            return False
+        self.clear()
+        return True
+
     def clear(self):
+        self.submission = None
         self.editor.clear()
         QTimer.singleShot(0, self.editor.setFocus)

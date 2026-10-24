@@ -14,6 +14,14 @@ from aedrova.delivery import installer
 from aedrova.desktop.github_setup import GitHubSetup
 
 
+@pytest.fixture(autouse=True)
+def offline_github(monkeypatch):
+    def unavailable(*args, **kwargs):
+        raise ValueError("Sign in to GitHub to continue.")
+
+    monkeypatch.setattr("aedrova.desktop.github_setup.GitHub.api", unavailable)
+
+
 def archive(binary=b"verified binary", *, linked=False):
     data = io.BytesIO()
     prefix = f"gh_{installer.VERSION}_macOS_arm64"
@@ -107,7 +115,11 @@ def test_setup_install_button_and_completion(qtbot, tmp_path, monkeypatch):
     assert not dialog.continue_button.isEnabled()
     dialog.install_button.click()
     qtbot.waitUntil(lambda: dialog.job is None)
-    assert dialog.login_button.isEnabled() and dialog.continue_button.isEnabled()
+    assert dialog.login_button.isEnabled() and not dialog.continue_button.isEnabled()
+    dialog.verified({"value": "test-user"})
+    assert dialog.heading.text() == "GitHub is connected."
+    assert dialog.login_button.isHidden() and dialog.cancel_button.isHidden()
+    assert dialog.continue_button.isEnabled()
     dialog.continue_button.click()
     assert window.settings.value("githubHelperOnboarded", type=bool)
 
@@ -136,6 +148,7 @@ def test_login_failure_does_not_expose_process_output(qtbot, tmp_path, monkeypat
     monkeypatch.setattr("aedrova.desktop.github_setup.gh_path", lambda: "/missing/executable")
     dialog = GitHubSetup(window)
     qtbot.addWidget(dialog)
+    qtbot.waitUntil(lambda: dialog.job is None)
     dialog.login()
     qtbot.waitUntil(lambda: dialog.process is None)
     assert "did not complete" in dialog.status.text()
@@ -169,6 +182,7 @@ def test_login_code_is_parsed_and_signout_cancels(qtbot, tmp_path, monkeypatch, 
         monkeypatch.setattr(QProcess, "start", launch)
     dialog = GitHubSetup(window)
     qtbot.addWidget(dialog)
+    qtbot.waitUntil(lambda: dialog.job is None)
     dialog.login()
     qtbot.waitUntil(lambda: dialog.code.text() == "ABCD-1234")
     window.account_dialog.session_closed.emit()
@@ -188,3 +202,16 @@ def test_first_dashboard_offers_setup_once(qtbot, tmp_path, monkeypatch):
     window.open_dashboard()
     qtbot.wait(30)
     assert len(calls) == 1
+
+
+def test_existing_authorization_opens_confirmation(qtbot, tmp_path, monkeypatch):
+    window, _ = setup(qtbot, tmp_path)
+    monkeypatch.setattr("aedrova.desktop.github_setup.gh_path", lambda: "/verified/gh")
+    monkeypatch.setattr("aedrova.desktop.github_setup.GitHub.api", lambda *a: {"login": "existing"})
+    dialog = GitHubSetup(window)
+    qtbot.addWidget(dialog)
+    qtbot.waitUntil(lambda: dialog.connected_login == "existing")
+    assert dialog.continue_button.isEnabled()
+    assert all(widget.isHidden() for widget in dialog.setup_widgets)
+    dialog.complete()
+    assert window.settings.value("githubHelperOnboarded", type=bool)

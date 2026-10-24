@@ -1,11 +1,96 @@
 # Final Beta and public launch plan
 
 Status: Phase 1 closed by owner confirmation of desktop acceptance and both
-main-branch rulesets. Phase 2 approved and started — October 10, 2026. Later phases
-remain planned and require separate approval. M14 remains deferred until product
+main-branch rulesets. Phases 2 and 3 have outstanding live acceptance gates.
+Phase 4 approved October 12, 2026; UI implementation and acceptance are tracked in
+[Phase 4 UX](final-beta-phase-4.md). Phase 5 implementation is delivered with legal/business and data-operation gates still open. Owner authorized pre-Apple launch checks on October 13, including Phase 6/7 engineering verification; public activation and gated owner actions remain separate. See pre-apple-launch-gates.md. M14 remains deferred until product
 completion. Current evidence, frozen scope and exact staging handoffs are saved in
 [Phase 1 baseline](final-beta-phase-1.md). Waitlist and public billing/download gates
 remain unchanged. The owner-supplied proposal is preserved in release-plan-source.md.
+
+## Required sequence — owner correction, October 16, 2026
+
+**Step 10 has not started. Close the pre-production launch gates first.**
+Complete all remaining requested engineering and setup, apply the exact changes to
+staging, and pass staging acceptance before starting production promotion/release.
+Saved, deferred, pushed, mocked or unit-tested is not the same as a closed gate.
+This applies across the whole product, including connectors, AI, meetings, privacy/
+legal/data controls, security/RLS/rate limits, billing lifecycle, operational recovery,
+website/onboarding and signed release-candidate installer acceptance. Use the existing
+phase/gate documents and requirement registers; do not silently narrow scope or
+waive requirements to advance the roadmap.
+
+For each gate record its implementation, staging app/backend/schema/config versions,
+test evidence, remaining owner actions and explicit closure result. Run the combined
+regression and real account/device flows on the final staging candidate after the
+individual fixes. Failed or unverified gates remain open. Then report the completed
+acceptance evidence and obtain owner approval to begin Step 10.
+
+Release-candidate packaging/signing/clean-machine checks belong before promotion.
+Actual production deployment/smoke checks necessarily occur during Step 10 and must
+pass before public downloads/billing/launch; they cannot be used to bypass a missing
+staging prerequisite or be marked passed in advance. No Step 10 preparation or audit
+is authorized merely by this sequencing correction. Existing private-account,
+consent, owner-submitted payments and physical-device requirements still apply.
+
+## Deferred meeting launch gates — October 16, 2026
+
+Owner requested that remaining meeting engineering, paid staging API/guard setup,
+two-account physical acceptance and production/installer parity be saved as
+[explicit launch gates](meeting-launch-gates.md). All remain open. No immediate
+owner action or purchase is required; deferral does not mark Step 8 complete or
+remove any requested feature. Resolve these gates before advertising/releasing
+the corresponding meeting functionality.
+
+## Step 9 progress — October 16, 2026
+
+Owner approved advanced meeting work. First batch adds native window capture,
+pause/resume sharing, sharer annotations, pinning, video receive/self-view choices
+and basic outgoing camera treatments. This is partial delivery with original
+advanced requirements and launch gates retained. See [Step 9 evidence and limits](meeting-step-9.md).
+
+## Current repair roadmap — October 15, 2026
+
+Step 2 responsiveness implementation and real hosted OpenAI conversational acceptance
+are delivered. Owner elected to retain the existing key after the exposure notice;
+the mitigation and remaining limitation are documented in
+[Step 3](workspace-ai-setup-step-3.md). Optional Claude funding, production and
+installer acceptance remain separate. Step 3 desktop creation/consent and dashboard
+dismissal are implemented; website/API-wide enforcement is outside this batch.
+See [Step 2 evidence](ai-responsiveness-step-2.md).
+
+Step 4 messaging and the People/Buds DM picker are implemented in desktop source.
+Real staging private Bud replies/save/reopen and distinct-account denial passed;
+see [Step 4 evidence and boundaries](messaging-step-4.md). Step 5 connector UX
+requires next approval. Production and installed binaries remain separate.
+
+Step 5 single-action connector UI is implemented; see
+[connector UX evidence](connector-ux-step-5.md). Post-login resource choice remains
+where providers require it. Step 6 live provider lifecycle/certification is next
+and requires approval; nine-provider completion is not claimed by UI tests.
+
+Step 6 is approved and in progress. Approved staging callback/credential setup for
+GitHub/Supabase/Figma/Notion is complete, preserving existing settings. Render
+da30ebf is Live; fresh authenticated catalog confirms all four plus Instagram/TikTok
+OAuth enabled. Four real provider callback/read/local-disconnect checks now pass, with GitHub
+reconnect accepted. Instagram/TikTok need signed-in test sessions; live renewal,
+provider-global revocation and remaining isolated-account checks remain open.
+Stripe/Vercel/Search retain setup gates. See [current certification and owner handoff](connector-certification-step-6.md).
+
+Step 7 core repair is implemented: independent heartbeats prevent video stalls;
+native audio selection, default mute, noise reduction, push-to-talk and device
+refresh have controlled checks. Generated RTC/forced TURN relay passed. Hosted
+staging meetings remain unavailable pending deferred always-on API/guard setup;
+physical/two-account acceptance remains open. Full feature list retained through
+Steps 8–9. See [Step 7 evidence and owner actions](meeting-step-7.md).
+
+The owner authorized Step 1 inventory only of the new repair roadmap. See the
+[complete current baseline](release-baseline-2026-10-15.md) and its
+[machine-readable requirement register](release-baseline-2026-10-15.json).
+These step numbers are separate from the historical Beta phase numbers below.
+All owner interventions are consolidated at the end; no setup action is required
+for this baseline. Implementation, account changes and promotion require the next
+approved batch.
 
 ## Phase 1 — Establish the release baseline
 
@@ -169,3 +254,67 @@ Aedrova wording, grounded in Aedrova's actual data flows, features, AI providers
 business details. Do not copy their legal promises or invent business facts. Review
 all corresponding Aedrova footer destinations, coverage, navigation and readability.
 This review is explicitly deferred; do not perform it before Phase 5 approval.
+
+
+## October 11 — owner defers remaining Stripe setup
+
+Owner explicitly deferred remaining Stripe account/bank configuration until release
+preparation, immediately before packaging and launch. Stop recurring bank-setup
+prompts until that gate. Continue non-Stripe connector/provider work under existing
+Phase 2 authorization; this deferral does not certify their outstanding live
+acceptance or mark Phase 2 complete. Stripe Bud external-customer acceptance remains
+a distinct deferred gate from Aedrova subscription billing. Complete both at the
+release-preparation checkpoint, alongside Phase 6 billing lifecycle acceptance,
+before Phase 8 final packaging/release sign-off or Phase 9 paid launch. Public
+checkout and downloads remain gated and the website stays waitlist-only. Phase 3
+(meetings, voice and file context) remains the next major phase and requires owner
+authorization before implementation starts.
+
+
+## October 12 — credit-conscious path to Mac and Windows downloads
+
+Owner requests prioritizing both website downloads within the remaining weekly
+credits. This is sequencing and scope planning, not approval to bypass release gates.
+Do not guarantee a credit budget or publication date before owner dependencies clear.
+
+1. Complete current Search Console submission and obtain the actual legal operator
+   name. Keep Phase 6 approval separate; live Stripe remains deferred to release
+   preparation as requested.
+2. Prioritize distribution preparation ahead of optional media studio, migration,
+   and additional design work: audit the existing macOS packager/DMG path; add a
+   reproducible Windows packaging job on a Windows runner and versioned artifacts.
+   Existing Windows regression success is not installer or hardware acceptance.
+3. Prepare one website download section with Mac/Windows choices, architecture,
+   version, checksums and installation/support links. Enable only links to verified
+   release artifacts; never publish staging credentials or falsely available files.
+4. Complete signing and clean-machine install/launch/login/chat/upload/voice/provider
+   smoke checks once; rerun only affected checks after repairs. Preserve existing CI
+   and security checks. Test updates/recovery/uninstall and supported architectures.
+5. Close the remaining live connector/provider, meeting/transcript/isolation,
+   legal/data controls, billing lifecycle, server caps/security and monitoring/restore
+   gates before official launch. Use a single final candidate and go/no-go review;
+   activate paid downloads only after explicit owner approval.
+
+Read-only local signing inventory on October 12 found one Apple Development identity
+and no Developer ID Application identity. Public notarized Mac distribution is blocked
+until owner completes Apple Developer enrollment and creates/imports Developer ID
+Application via Apple Developer Certificates/Keychain, then configures a private
+notarytool Keychain profile. Never request the private key/password in chat.
+Windows signing enrollment and a Windows test device/VM remain required at release
+preparation. Always-on backend/meeting hosting remains a paid owner gate; prior Render
+upgrade was deferred. These owner dependencies cannot be solved by reducing credits.
+No packaging, purchase, signing enrollment or public-download activation performed
+as part of this planning update. Full codebase walkthrough remains after deployment.
+
+
+### October 12 — legal operator deliberately pending
+
+Owner confirms Aedrova currently operates under its brand name; no registered legal
+entity or ownership structure is confirmed. Keep the internal legal operator field
+as [Legal operator — to be confirmed]. Do not infer a company, individual contracting
+party, incorporation status or ownership from the brand or founder account. Finalize
+Privacy/Terms against the actual operator after the owner confirms registration and
+ownership. Stop repeating the legal-name question until that information is available.
+This does not prevent release-candidate engineering; legal/business sign-off remains
+a public paid-launch gate. Next proposed work is Mac/Windows release-candidate
+packaging and website download preparation, with public distribution still gated.

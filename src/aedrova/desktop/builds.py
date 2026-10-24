@@ -32,6 +32,7 @@ from aedrova.desktop.dialogs import button, label
 
 class Signals(QObject):
     progress = Signal(str)
+    reply = Signal(str)
     permission = Signal(object)
     finished = Signal(object)
 
@@ -161,6 +162,57 @@ class BuildJob(QRunnable):
         try:
             if self.runner.cancelled.is_set():
                 raise BuildCancelled()
+            if self.provider == "auto":
+                from aedrova.agents.routing import choose, runtime_candidates
+
+                candidates = runtime_candidates(managed=self.managed_client is not None)
+                if self.managed_client:
+                    balance = self.managed_client.balance(self.context.workspace_id)
+                    if (
+                        type(balance.get("available")) not in {int, float}
+                        or balance["available"] <= 0
+                    ):
+                        raise ValueError(
+                            "Your Space has no available AI credit. Check team billing."
+                        )
+                    configured = {row["provider"] for row in balance.get("coding_providers", [])}
+                    if not configured:
+                        raise ValueError(
+                            "Routing preflight unavailable. Update the server or select a provider."
+                        )
+                    from dataclasses import replace as candidate_replace
+
+                    candidates = [
+                        candidate_replace(
+                            row, available=row.available and row.provider in configured
+                        )
+                        for row in candidates
+                    ]
+                import os
+                import sys
+
+                from aedrova.agents.routing import category, reviewed_candidates
+
+                evaluation = (
+                    ""
+                    if getattr(sys, "frozen", False)
+                    else os.getenv("AEDROVA_ROUTING_EVALUATION_FILE", "")
+                )
+                if evaluation:
+                    candidates = reviewed_candidates(
+                        evaluation,
+                        candidates,
+                        task_category=category(self.task),
+                        configuration="aedrova-local-harness-v1",
+                    )
+                decision = choose(self.task, candidates)
+                if decision.provider is None:
+                    raise ValueError("This is a conversation request. Ask Aedrova in chat.")
+                self.provider = decision.provider
+                self.routing_decision = decision.record()
+                self.signals.progress.emit(
+                    "Aedrova selected " + self.provider + ": " + decision.reason
+                )
             if self.teammate:
                 from aedrova.connectors.service import evidence
 
@@ -221,6 +273,11 @@ class BuildJob(QRunnable):
                     "Bud profile (data): "
                     + json.dumps({k: self.bud.get(k, "") for k in ("name", "role", "instructions")})
                 )
+            if self.bud:
+                from aedrova.dots.personality import guidance, progress_emitter
+
+                prompt += guidance(self.bud)
+                self.runner.emit = progress_emitter(self.runner.emit, self.bud)
             if self.teammate:
                 from aedrova.teammates.model import EFFORT
                 from aedrova.teammates.model import prompt as teammate_prompt
@@ -249,7 +306,11 @@ class BuildJob(QRunnable):
                     retrieval_record(self.context, self.task) + "\n" + self.context.text,
                     encoding="utf-8",
                 )
-            result = self.runner.run(self.provider, self.project, prompt, plan=self.plan)
+            from aedrova.agents.routing import CodingAdapter
+
+            result = CodingAdapter(self.provider, self.runner).execute(
+                self.project, prompt, plan=self.plan
+            )
             if self.dot_client:
                 from aedrova.dots.client import recheck
 
@@ -302,6 +363,18 @@ class BuildJob(QRunnable):
                     )
                 self.runner.managed = None
         if self.ledger and self.run_id:
+            decision = getattr(self, "routing_decision", None)
+            if decision:
+                self.ledger.record_route(
+                    self.run_id,
+                    "planning" if self.plan else "building",
+                    decision,
+                    "cancelled"
+                    if self.runner.cancelled.is_set()
+                    else "completed"
+                    if outcome.get("ok")
+                    else "failed",
+                )
             self.ledger.record_usage(
                 self.run_id,
                 "planning" if self.plan else "building",
@@ -309,6 +382,17 @@ class BuildJob(QRunnable):
                 time.monotonic() - started,
                 self.runner.usage,
             )
+        if self.ledger and self.run_id and getattr(self, "interactive_telemetry", False):
+            self.ledger.update(
+                self.run_id,
+                "cancelled"
+                if self.runner.cancelled.is_set()
+                else "completed"
+                if outcome.get("ok")
+                else "failed",
+            )
+        outcome["provider"] = self.provider
+        outcome["routing"] = getattr(self, "routing_decision", None)
         outcome["commands"] = self.runner.command_results
         if not self.plan and self.project:
             try:
@@ -728,6 +812,23 @@ class BuildDialog(AppDialog):
                 self.job.ledger = self.execution_queue.ledger
                 self.job.run_id = self.run_id
                 self.job.runner.lease_fd = self.execution_queue.lease.fileno()
+            if self.job.ledger is None:
+                from PySide6.QtCore import QSettings
+
+                from aedrova.agents.ledger import RunLedger
+
+                directory = Path.home() / "Library/Application Support/Aedrova/execution"
+                if self.window.settings.format() == QSettings.Format.IniFormat:
+                    directory = Path(self.window.settings.fileName()).parent / "execution"
+                self.job.ledger = RunLedger(directory)
+                self.job.run_id, _ = self.job.ledger.enqueue(
+                    self.user,
+                    self.workspace,
+                    "Interactive build phase",
+                    {"request": str(uuid4()), "provider": self.provider.currentData()},
+                )
+                self.job.ledger.update(self.job.run_id, "running")
+            self.job.interactive_telemetry = not bool(self.execution_queue and self.run_id)
             self.job.signals.progress.connect(self.progress)
             self.job.signals.permission.connect(self.permission)
             self.job.signals.finished.connect(self.phase_finished)
@@ -814,6 +915,10 @@ class BuildDialog(AppDialog):
             request["event"].set()
 
     def finished(self, result, plan):
+        if result.get("provider") in {"codex", "claude_code"}:
+            self.provider.blockSignals(True)
+            self.provider.setCurrentIndex(self.provider.findData(result["provider"]))
+            self.provider.blockSignals(False)
         if self.job and self.job.runner.cancelled.is_set():
             result = {**result, "ok": False, "text": "Cancelled. Review any partial local changes."}
         self.job = None
@@ -1035,16 +1140,28 @@ class BuildDialog(AppDialog):
             super().closeEvent(event)
 
 
-def open_build(window, task=""):
+def open_build(window, task="", *, bud=None):
     from aedrova.desktop.projects import binding
 
     if task and binding(window).get("background_build"):
-        start_background_build(window, task)
-        return
+        return (
+            start_background_build(window, task, bud=bud)
+            if bud
+            else start_background_build(window, task)
+        )
     existing = getattr(window, "build_dialog", None)
+    if existing and existing.pending:
+        existing.show()
+        existing.raise_()
+        window.notify(
+            "Your agent is already working. Wait or stop it before starting another build."
+        )
+        return False
     if existing and not existing.invalidated:
-        if existing.pending or (
-            existing.workspace == window.workspace_id and not getattr(existing, "teammate", None)
+        if (
+            existing.workspace == window.workspace_id
+            and not getattr(existing, "teammate", None)
+            and getattr(existing, "bud", None) == bud
         ):
             if task and not existing.pending:
                 existing.request.setPlainText(task)
@@ -1057,16 +1174,19 @@ def open_build(window, task=""):
             if task and not existing.pending and saved.get("folder", "") != existing.binding_folder:
                 existing.binding_folder = saved.get("folder", "")
                 existing.repository.setText(existing.binding_folder)
-            return
+            return True
     if existing:
         existing.invalidate()
         if not existing.job:
             existing.deleteLater()
     dialog = BuildDialog(window, task)
-    window.agent_feed.character_config = None
+    dialog.bud = bud
+    from aedrova.desktop.dots import shelf_rows
+
+    window.agent_feed.character_config = shelf_rows([bud])[0]["config"] if bud else None
     window.build_dialog = dialog
     dialog.show()
-    from aedrova.desktop.projects import binding
+    return True
 
 
 def start_background_build(window, task, *, bud=None):

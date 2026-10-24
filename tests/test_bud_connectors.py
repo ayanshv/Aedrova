@@ -90,7 +90,10 @@ def test_gallery_hierarchy_filters_and_native_themes(gallery, qtbot):
     dialog.filter.setCurrentIndex(dialog.filter.findData("all"))
     assert len(dialog.cards) == 6
     dialog.filter.setCurrentIndex(dialog.filter.findData("designer"))
-    assert {card.accessibleName() for card in dialog.cards} == {"Connect Figma", "Connect Notion"}
+    assert {card.accessibleName() for card in dialog.cards} == {
+        "View setup Figma",
+        "View setup Notion",
+    }
     dialog.search.setText("figma")
     assert len(dialog.cards) == 1
     for theme in [LIGHT, DARK]:
@@ -121,7 +124,7 @@ def test_verify_flow_clears_password_and_reloads_real_connection(gallery):
     assert "Orbit" in dialog.success_copy.text()
     assert len(rows[0]["connections"]) == 1
     dialog.disconnect_tool(rows[0]["connections"][0])
-    assert "Revoke the token" in dialog.status.text()
+    assert "revoke Aedrova" in dialog.status.text()
     assert rows[0]["connections"] == []
 
 
@@ -164,7 +167,7 @@ def test_selected_bud_defaults_to_role_tools(gallery, role):
     assert dialog.filter.currentData() == role
     assert all(card.property("providerAvailable") for card in dialog.cards)
     expected = {p["name"] for p in dialog.providers if p["id"] in recommendation_set(role)}
-    assert {card.accessibleName().removeprefix("Connect ") for card in dialog.cards} == expected
+    assert {card.accessibleName().removeprefix("View setup ") for card in dialog.cards} == expected
     dialog.filter.setCurrentIndex(dialog.filter.findData("all"))
     dialog.refresh()
     assert dialog.filter.currentData() == "all"
@@ -172,6 +175,10 @@ def test_selected_bud_defaults_to_role_tools(gallery, role):
 
 def test_confirmation_stays_inline_and_readable_in_both_themes(gallery, qtbot, tmp_path):
     dialog, _, _, providers = gallery
+    dialog.rows[0]["connections"] = [
+        dict(id="verified", provider=providers[1]["id"], resource="file", status="Connected")
+    ]
+    dialog.open_provider(providers[1])
     for theme in (LIGHT, DARK):
         dialog.setStyleSheet(stylesheet(theme))
         dialog.setPalette(palette(theme))
@@ -208,7 +215,8 @@ def test_resource_lookup_help_covers_every_supported_connector(gallery):
     }
     dialog.open_provider(supabase)
     assert "Paste your Supabase dashboard project link" in dialog.resource_help.text()
-    assert "HTTPS" in dialog.oauth_hint.text()
+    assert "not available yet" in dialog.oauth_hint.text()
+    assert "token" not in dialog.oauth_hint.text()
     assert not dialog.oauth.isEnabled()
 
 
@@ -356,3 +364,15 @@ def test_success_content_never_overlaps_when_height_is_constrained(gallery, qtbo
     dialog.resize(900, 800)
     qtbot.wait(50)
     dialog.grab().save("work/connector-confirmation-fixed.png")
+
+
+def test_failed_oauth_poll_restores_login_action(gallery):
+    dialog, _, _, providers = gallery
+    provider = dict(providers[0], oauth_available=True)
+    dialog.open_provider(provider)
+    dialog.oauth_state = "pending-state"
+    dialog.oauth_timer.start()
+    dialog.request_failed()
+    assert not dialog.oauth_state and not dialog.oauth_timer.isActive()
+    assert dialog.oauth.text() == "Connect your account"
+    assert dialog.oauth.isEnabled()

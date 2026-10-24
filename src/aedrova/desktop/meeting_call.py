@@ -3,12 +3,16 @@
 import time
 
 from PySide6.QtCore import QEvent, QSize, Qt, QTimer
-from PySide6.QtGui import QImage, QPainter, QPalette
+from PySide6.QtGui import QImage, QPainter, QPalette, QTransform
 from PySide6.QtWidgets import (
+    QAbstractSpinBox,
     QApplication,
+    QCheckBox,
+    QComboBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
+    QLineEdit,
     QScrollArea,
     QSizePolicy,
     QToolButton,
@@ -19,8 +23,10 @@ from PySide6.QtWidgets import (
 from aedrova.agents.managed import application_origin
 from aedrova.desktop.brand import BrandMark
 from aedrova.desktop.controls import AppDialog, ChoiceBox
+from aedrova.desktop.design_system import FlowActions
 from aedrova.desktop.dialogs import button, label
 from aedrova.desktop.meeting_icons import meeting_icon
+from aedrova.desktop.meeting_presentation import SharingCanvas, annotate, camera_look
 from aedrova.desktop.meeting_setup import FramePreview
 from aedrova.desktop.theme import palette
 from aedrova.meetings.access import MeetingClient
@@ -60,14 +66,32 @@ def toolbar_control(text):
 
 class MeetingCall(AppDialog):
     def __init__(
-        self, parent, worker, *, devices=None, channel_name="Team channel", initial_mode=None
+        self, parent, worker, *, devices=None, channel_name="Team channel", initial_mode=None,
+        channel_chat=None,
     ):
         super().__init__(parent)
         if parent is not None and hasattr(parent, "theme"):
             self.setPalette(palette(parent.theme))
         self.worker = worker
+        self.channel_chat = channel_chat
+        self.text_dialogs = {}
+        self.presentation_dialog = None
+        self.receive_video = True
+        self.show_self = True
+        self.mirror_preview = False
+        self.monochrome = False
+        self.soft_light = 0
+        self.pinned_key = None
+        self.share_paused = False
+        self.annotating = False
+        self.annotation_color = "#2979FF"
+        self.strokes = []
+        self.accepting_stroke = False
+        self.pin_buttons = {}
+        self.share_base = None
         self.initial_mode = initial_mode
         self.initial_media_applied = False
+        self.push_to_talk_active = False
         self.devices = devices or DeviceCheck(self)
         self.connected = False
         self.closed = False
@@ -110,7 +134,8 @@ class MeetingCall(AppDialog):
         summary.addWidget(self.join)
         layout.addLayout(summary)
         self.stage_row = QHBoxLayout()
-        self.stage = FramePreview("Waiting for the speaker’s video")
+        self.stage = SharingCanvas("Waiting for the speaker’s video")
+        self.stage.point.connect(self.annotation_point)
         self.stage.setMinimumHeight(220)
         self.stage.setVisible(False)
         self.stage_row.addWidget(self.stage, 3)
@@ -148,28 +173,58 @@ class MeetingCall(AppDialog):
         self.device_panel = QFrame()
         device_layout = QVBoxLayout(self.device_panel)
         device_layout.setContentsMargins(12, 8, 12, 8)
+        audio_choices = QGridLayout()
+        self.audio_choices = {}
+        for column, kind in enumerate(("microphone", "speaker")):
+            choice = ChoiceBox(self)
+            choice.addItem("System default", "")
+            choice.setAccessibleName("Call " + kind + " device")
+            choice.setEnabled(False)
+            choice.currentIndexChanged.connect(lambda _, kind=kind: self.select_audio(kind))
+            audio_choices.addWidget(label(kind.title(), "muted"), 0, column)
+            audio_choices.addWidget(choice, 1, column)
+            self.audio_choices[kind] = choice
+        device_layout.addLayout(audio_choices)
+        self.voice_isolation = QCheckBox("Reduce background noise")
+        self.voice_isolation.setChecked(True)
+        self.voice_isolation.setEnabled(False)
+        self.voice_isolation.toggled.connect(self.set_noise_suppression)
+        device_layout.addWidget(self.voice_isolation)
+        self.join_muted = QCheckBox("Mute microphone when joining this meeting")
+        self.join_muted.setChecked(True)
+        self.join_muted.setVisible(initial_mode != "audio")
+        device_layout.addWidget(self.join_muted)
+        self.push_to_talk = QCheckBox("Hold Space to talk while muted")
+        self.push_to_talk.toggled.connect(
+            lambda enabled: None if enabled else self.release_push_to_talk()
+        )
+        device_layout.addWidget(self.push_to_talk)
         choices = QHBoxLayout()
         self.camera_choice, self.screen_choice = ChoiceBox(self), ChoiceBox(self)
         for kind, choice in [("camera", self.camera_choice), ("screen", self.screen_choice)]:
-            for device in self.devices.backend.list(kind):
-                name = device.name() if kind == "screen" else device.description()
-                choice.addItem(name, device)
-            if not choice.count():
-                choice.addItem("No " + kind + " available", None)
             choice.setAccessibleName("Call " + kind + " device")
             choice.currentIndexChanged.connect(lambda _, kind=kind: self.disable(kind))
             choices.addWidget(choice)
+        self.populate_video_choices()
         device_layout.addLayout(choices)
+        refresh_targets = button("Refresh share targets", role="outline")
+        refresh_targets.clicked.connect(self.refresh_share_targets)
+        device_layout.addWidget(refresh_targets)
         device_layout.addWidget(
             label(
-                "Microphone and speakers use your system default. "
-                "Screen sharing includes the entire selected screen.",
+                "Changing microphone or noise reduction mutes you; unmute when ready. "
+                "Share a display or an application window. Shared audio is not included.",
                 "muted",
                 wrap=True,
             )
         )
-        self.device_panel.hide()
-        layout.addWidget(self.device_panel)
+        self.device_scroll = QScrollArea()
+        self.device_scroll.setWidgetResizable(True)
+        self.device_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        self.device_scroll.setMaximumHeight(280)
+        self.device_scroll.setWidget(self.device_panel)
+        self.device_scroll.hide()
+        layout.addWidget(self.device_scroll)
         self.toolbar = QFrame()
         self.toolbar.setObjectName("CallToolbar")
         controls = QGridLayout(self.toolbar)
@@ -194,7 +249,7 @@ class MeetingCall(AppDialog):
         self.toolbar_buttons.append(self.participants_button)
         self.settings_button = toolbar_control("Devices")
         self.settings_button.setCheckable(True)
-        self.settings_button.toggled.connect(self.device_panel.setVisible)
+        self.settings_button.toggled.connect(self.device_scroll.setVisible)
         self.toolbar_buttons.append(self.settings_button)
         leave = toolbar_control("Leave")
         leave.setProperty("danger", True)
@@ -203,11 +258,27 @@ class MeetingCall(AppDialog):
         self.toolbar_buttons.append(leave)
         self.arrange_toolbar()
         layout.addWidget(self.toolbar)
-        footer = QHBoxLayout()
+        footer = FlowActions()
+        self.presentation_button = button("Presentation", role="outline")
+        self.presentation_button.clicked.connect(self.show_presentation)
+        footer.addWidget(self.presentation_button)
+        self.pause_share_button = button("Pause sharing", role="outline")
+        self.pause_share_button.hide()
+        self.pause_share_button.clicked.connect(self.pause_share)
+        footer.addWidget(self.pause_share_button)
         self.privacy_status = label(
             "No recording · No transcription · No AI meeting access", "muted", wrap=True
         )
         layout.addWidget(self.privacy_status)
+        self.chat_button = button("Channel chat", role="outline")
+        self.chat_button.setVisible(channel_chat is not None)
+        self.chat_button.setEnabled(False)
+        self.chat_button.clicked.connect(self.show_chat)
+        footer.addWidget(self.chat_button)
+        self.captions_button = button("Captions", role="outline")
+        self.captions_button.hide()
+        self.captions_button.clicked.connect(self.show_captions)
+        footer.addWidget(self.captions_button)
         self.last_consent_snapshot = None
         self.meeting_text_enabled = False
         self.audio_transcription_enabled = False
@@ -248,6 +319,9 @@ class MeetingCall(AppDialog):
         worker.roster.connect(self.render_roster)
         worker.problem.connect(self.status.setText)
         worker.media.connect(self.media_state)
+        if hasattr(worker, "audio_devices"):
+            worker.audio_devices.connect(self.audio_inventory)
+            worker.audio_selected.connect(self.audio_selected)
         worker.ended.connect(self.call_ended)
         if hasattr(worker, "speaker"):
             worker.speaker.connect(self.speaker_changed)
@@ -257,6 +331,31 @@ class MeetingCall(AppDialog):
         self.timer.start()
         self.finished.connect(self.shutdown)
         QApplication.instance().aboutToQuit.connect(self.shutdown)
+        for target in self.findChildren(QWidget):
+            target.installEventFilter(self)
+
+    def release_push_to_talk(self):
+        if self.push_to_talk_active:
+            self.push_to_talk_active = False
+            self.disable("microphone")
+
+    def event(self, event):
+        if event.type() == QEvent.Type.WindowDeactivate and hasattr(self, "push_to_talk_active"):
+            self.release_push_to_talk()
+        return super().event(event)
+
+    def eventFilter(self, target, event):
+        if (event.type() in {QEvent.Type.KeyPress, QEvent.Type.KeyRelease}
+                and event.key() == Qt.Key.Key_Space and self.push_to_talk.isChecked()
+                and not isinstance(target, (QComboBox, QLineEdit, QAbstractSpinBox, QCheckBox))):
+            if not event.isAutoRepeat():
+                if event.type() == QEvent.Type.KeyRelease:
+                    self.release_push_to_talk()
+                elif self.connected and not self.closed and not self.states["microphone"]:
+                    self.push_to_talk_active = True
+                    self.toggle("microphone")
+            return True
+        return super().eventFilter(target, event)
 
     def join_call(self):
         if self.closed or self.connected:
@@ -270,22 +369,77 @@ class MeetingCall(AppDialog):
         self.status.setText(state)
         self.connected = state.startswith(("Connected", "Reconnected"))
         self.end.setEnabled(self.connected)
+        self.chat_button.setEnabled(self.connected)
+        self.captions_button.setEnabled(self.connected)
         self.privacy_button.setEnabled(self.connected)
         for kind, control in self.controls.items():
             control.setEnabled(self.connected)
             if not self.connected:
                 self.disable(kind)
+        for choice in self.audio_choices.values():
+            choice.setEnabled(self.connected and choice.count() > 1)
+        self.voice_isolation.setEnabled(self.connected)
+        self.join_muted.setEnabled(not self.connected)
         self.join.setVisible(not self.connected)
         if self.connected and self.initial_mode and not self.initial_media_applied:
             self.initial_media_applied = True
-            self.toggle("microphone")
+            if self.initial_mode == "audio" or not self.join_muted.isChecked():
+                self.toggle("microphone")
             if self.initial_mode == "video":
                 self.toggle("camera")
+        if self.connected and not self.receive_video:
+            self.worker.command("receive_video", False)
         if self.meeting_text_enabled:
             self.consent_changed(self.last_consent_snapshot or {})
 
+    def audio_inventory(self, inventory):
+        if self.closed:
+            return
+        for kind, choice in self.audio_choices.items():
+            selected = choice.currentData()
+            choice.blockSignals(True)
+            choice.clear()
+            choice.addItem("System default", "")
+            choice.model().item(0).setEnabled(False)
+            for device in inventory.get(kind, []):
+                choice.addItem(device["name"], device["id"])
+            index = choice.findData(selected)
+            choice.setCurrentIndex(max(0, index))
+            choice.blockSignals(False)
+            choice.setEnabled(self.connected and choice.count() > 1)
+
+    def select_audio(self, kind):
+        if self.closed or not self.connected:
+            return
+        identifier = self.audio_choices[kind].currentData()
+        if not identifier:
+            return
+        if kind == "microphone":
+            self.disable("microphone")
+        self.worker.command(kind + "_device", identifier)
+
+    def audio_selected(self, kind, identifier):
+        if kind == "noise_suppression":
+            self.voice_isolation.blockSignals(True)
+            self.voice_isolation.setChecked(identifier == "true")
+            self.voice_isolation.blockSignals(False)
+            return
+        choice = self.audio_choices.get(kind)
+        if self.closed or choice is None:
+            return
+        index = choice.findData(identifier)
+        choice.blockSignals(True)
+        choice.setCurrentIndex(max(0, index))
+        choice.blockSignals(False)
+
+    def set_noise_suppression(self, enabled):
+        if self.connected and not self.closed:
+            self.disable("microphone")
+            self.worker.command("noise_suppression", enabled)
+
     def text_capability(self, enabled):
         self.meeting_text_enabled = enabled
+        self.captions_button.setVisible(enabled)
         self.privacy_button.setVisible(enabled)
         self.transcript_button.setVisible(enabled)
         self.privacy_button.setEnabled(self.connected)
@@ -333,6 +487,39 @@ class MeetingCall(AppDialog):
             and permit is not None
             and self.states["microphone"]
         )
+
+    def open_text_surface(self, key, factory):
+        if not self.connected or self.closed:
+            return
+        current = self.text_dialogs.get(key)
+        if current and not current.closed:
+            current.raise_()
+            current.activateWindow()
+            return
+        dialog = factory()
+        self.text_dialogs[key] = dialog
+        dialog.show()
+
+    def show_chat(self):
+        if self.channel_chat is not None:
+            from aedrova.desktop.meeting_communication import MeetingChat
+
+            self.open_text_surface("chat", lambda: MeetingChat(
+                self, **self.channel_chat, names=self.names,
+            ))
+
+    def show_captions(self):
+        if self.meeting_text_enabled:
+            from aedrova.desktop.meeting_communication import MeetingCaptions
+
+            self.open_text_surface("captions", lambda: MeetingCaptions(
+                self, self.worker, people=lambda: self.people, names=lambda: self.names,
+            ))
+
+    def close_text_surfaces(self):
+        for dialog in self.text_dialogs.values():
+            dialog.reject()
+        self.text_dialogs.clear()
 
     def show_privacy(self):
         if self.connected and self.meeting_text_enabled:
@@ -385,6 +572,12 @@ class MeetingCall(AppDialog):
         self.states[kind] = False
         if kind == "microphone":
             self.mic_epoch += 1
+        elif kind == "screen":
+            self.share_paused = False
+            self.strokes.clear()
+            self.share_base = None
+            self.pause_share_button.hide()
+            self.devices.stop(kind)
         else:
             self.devices.stop(kind)
         self.worker.clear_frame(kind)
@@ -423,7 +616,18 @@ class MeetingCall(AppDialog):
             return
         if kind not in self.states:
             return
+        if kind == "screen" and self.share_paused:
+            if not enabled:
+                self.pause_share_button.setEnabled(self.connected)
+            return
         self.states[kind] = enabled
+        if kind == "screen" and enabled:
+            self.share_paused = False
+            self.pause_share_button.setEnabled(True)
+            self.pause_share_button.setText("Pause sharing")
+            self.pause_share_button.setVisible(True)
+        if self.connected:
+            self.status.setText("Connected")
         self.consent_changed(self.last_consent_snapshot)
         if not enabled:
             self.disable(kind, notify_worker=False)
@@ -438,18 +642,123 @@ class MeetingCall(AppDialog):
                 self.disable(kind)
         self.status.setText(message)
 
+    def populate_video_choices(self, *, include_camera=True):
+        choices = [("screen", self.screen_choice)]
+        if include_camera:
+            choices.insert(0, ("camera", self.camera_choice))
+        for kind, choice in choices:
+            choice.blockSignals(True)
+            choice.clear()
+            for device in self.devices.backend.list(kind):
+                name = device.name() if kind == "screen" else device.description()
+                choice.addItem(("Display · " if kind == "screen" else "") + name, device)
+            if kind == "screen":
+                try:
+                    windows = self.devices.backend.list("window")
+                except (KeyError, RuntimeError, NotImplementedError):
+                    windows = []
+                for window in windows:
+                    choice.addItem("Window · " + window.description(), window)
+            if not choice.count():
+                choice.addItem("No " + kind + " available", None)
+            choice.blockSignals(False)
+        self.screen_choice.setAccessibleName("Share a display or application window")
+
+    def refresh_share_targets(self):
+        self.disable("screen")
+        self.populate_video_choices(include_camera=False)
+        self.status.setText("Sharing stopped. Choose a display or application window.")
+
+    def show_presentation(self):
+        from aedrova.desktop.meeting_presentation import MeetingPresentation
+
+        if self.presentation_dialog and self.presentation_dialog.isVisible():
+            self.presentation_dialog.raise_()
+            self.presentation_dialog.activateWindow()
+        else:
+            self.presentation_dialog = MeetingPresentation(self)
+            self.presentation_dialog.show()
+
+    def set_receive_video(self, enabled):
+        self.receive_video = enabled
+        self.worker.command("receive_video", enabled)
+        if not enabled:
+            for key, (_, preview) in self.tiles.items():
+                if key.split("/")[0] != self.worker.user:
+                    preview.clear()
+                    self.last_images.pop(key, None)
+            self.stage.clear()
+        self.arrange()
+
+    def set_self_view(self, enabled):
+        self.show_self = enabled
+        self.arrange()
+
+    def set_annotating(self, enabled):
+        self.annotating = enabled
+        self.arrange()
+
+    def annotation_point(self, point, new):
+        if (not self.connected or not self.states["screen"] or not self.annotating
+                or self.focused != self.worker.user + "/screen"):
+            return
+        if new:
+            self.accepting_stroke = False
+            if len(self.strokes) >= 64:
+                self.status.setText("Drawing limit reached. Clear drawings to continue.")
+                return
+            self.strokes.append((self.annotation_color, [point]))
+            self.accepting_stroke = True
+        elif self.accepting_stroke and self.strokes and len(self.strokes[-1][1]) < 2048:
+            self.strokes[-1][1].append(point)
+        self.render_shared_frame()
+
+    def clear_annotations(self):
+        self.accepting_stroke = False
+        self.strokes.clear()
+        self.render_shared_frame()
+
+    def pause_share(self):
+        if self.closed or not self.connected:
+            return
+        if self.share_paused:
+            self.share_paused = False
+            self.pause_share_button.hide()
+            self.toggle("screen")
+        elif self.states["screen"]:
+            self.disable("screen")
+            self.share_paused = True
+            self.pause_share_button.setEnabled(False)
+            self.pause_share_button.setText("Resume sharing")
+            self.pause_share_button.show()
+            self.status.setText("Sharing paused · screen capture is off. Audio stays connected.")
+
+    def render_shared_frame(self):
+        if self.share_base is not None and self.states["screen"] and not self.closed:
+            self.present_local("screen", annotate(self.share_base, self.strokes))
+
     def local_frame(self, kind, image):
         if self.connected and not self.closed and self.states.get(kind):
             frame = encode_image(image, fill=kind == "camera")
-            self.worker.frame(kind, frame)
-            key = self.worker.user + ("/screen" if kind == "screen" else "/camera")
-            self.tile(key, "Your screen" if kind == "screen" else "You")[1].display(frame)
-            self.last_images[key] = frame
-            if kind == "screen":
-                self.focused = key
-                self.arrange()
-            if key == self.focused:
-                self.stage.display(frame)
+            if kind == "camera":
+                frame = camera_look(frame, monochrome=self.monochrome, light=self.soft_light)
+                self.present_local(kind, frame)
+            else:
+                self.share_base = frame
+                self.render_shared_frame()
+
+    def present_local(self, kind, frame):
+        self.worker.frame(kind, frame)
+        key = self.worker.user + ("/screen" if kind == "screen" else "/camera")
+        preview = (frame.transformed(QTransform().scale(-1, 1))
+                   if kind == "camera" and self.mirror_preview else frame)
+        self.tile(key, "Your screen" if kind == "screen" else "You")[1].display(preview)
+        self.last_images[key] = preview
+        if kind == "screen" and not self.pinned_key:
+            self.focused = key
+            self.arrange()
+        if key == self.focused:
+            self.stage.display(preview)
 
     def tile(self, key, name):
         if key not in self.tiles:
@@ -472,10 +781,22 @@ class MeetingCall(AppDialog):
             layout.addWidget(
                 caption, 0, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom
             )
+            pin = button("Pin", role="outline")
+            pin.setAccessibleName("Pin or unpin video for " + name)
+            pin.setMaximumWidth(70)
+            pin.clicked.connect(lambda: self.pin_video(key))
+            self.pin_buttons[key] = pin
+            layout.addWidget(pin, 0, 0, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
             index = len(self.tiles)
             self.grid.addWidget(box, index // 2, index % 2)
             self.tiles[key] = box, preview
         return self.tiles[key]
+
+    def pin_video(self, key):
+        self.pinned_key = None if self.pinned_key == key else key
+        if self.pinned_key:
+            self.focused = key
+        self.arrange()
 
     def render_roster(self, people):
         if self.closed:
@@ -500,6 +821,7 @@ class MeetingCall(AppDialog):
         for key in list(self.tiles):
             if key.split("/")[0] not in ids:
                 box, _ = self.tiles.pop(key)
+                self.pin_buttons.pop(key, None)
                 self.grid.removeWidget(box)
                 box.deleteLater()
                 self.last_images.pop(key, None)
@@ -511,13 +833,15 @@ class MeetingCall(AppDialog):
         if self.closed:
             return
         for key, image in self.worker.take_remote_frames().items():
+            if not self.receive_video:
+                continue
             if key.split("/")[0] not in self.people:
                 continue
             if len(self.tiles) < 32 or key in self.tiles:
                 name = "Shared screen" if key.endswith("/screen") else "Teammate"
                 self.tile(key, name)[1].display(image)
                 self.last_images[key] = image
-                if key.endswith("/screen"):
+                if key.endswith("/screen") and not self.pinned_key:
                     self.focused = key
                     self.arrange()
                 if key == self.focused:
@@ -527,8 +851,13 @@ class MeetingCall(AppDialog):
         if not hasattr(self, "gallery"):
             return
         screen = next((key for key in self.last_images if key.endswith("/screen")), None)
-        spotlight = self.view_choice.currentIndex() == 1 or screen is not None
-        if screen:
+        if self.pinned_key not in self.tiles:
+            self.pinned_key = None
+        spotlight = (self.view_choice.currentIndex() == 1 or screen is not None
+                     or self.pinned_key is not None)
+        if self.pinned_key:
+            self.focused = self.pinned_key
+        elif screen:
             self.focused = screen
         if self.focused.split("/")[0] not in self.people:
             self.focused = self.worker.user + "/camera"
@@ -536,17 +865,28 @@ class MeetingCall(AppDialog):
         self.stage.setVisible(spotlight)
         self.gallery.setMaximumWidth(280 if spotlight else 16777215)
         columns = 1 if spotlight else 2
-        for index, (box, _) in enumerate(self.tiles.values()):
+        visible = [(key, box) for key, (box, _) in self.tiles.items()
+                   if self.show_self or key != self.worker.user + "/camera"]
+        for key, (box, _) in self.tiles.items():
+            self.pin_buttons[key].setText("Unpin" if self.pinned_key == key else "Pin")
+            box.setVisible(any(candidate == key for candidate, _ in visible))
+        for index, (_, box) in enumerate(visible):
             self.grid.addWidget(box, index // columns, index % columns)
+        self.stage.drawing = (self.annotating and self.states.get("screen", False)
+                              and self.focused == self.worker.user + "/screen")
+        self.stage.setCursor(Qt.CursorShape.CrossCursor if self.stage.drawing
+                             else Qt.CursorShape.ArrowCursor)
         if spotlight:
-            image = self.last_images.get(self.focused)
+            hidden_self = not self.show_self and self.focused == self.worker.user + "/camera"
+            image = None if hidden_self else self.last_images.get(self.focused)
             if image is not None:
                 self.stage.display(image)
             else:
                 self.stage.clear()
 
     def speaker_changed(self, user):
-        if user in self.people and not any(key.endswith("/screen") for key in self.last_images):
+        if (not self.pinned_key and user in self.people
+                and not any(key.endswith("/screen") for key in self.last_images)):
             self.focused = user + "/camera"
             self.arrange()
 
@@ -593,9 +933,17 @@ class MeetingCall(AppDialog):
     def devices_changed(self):
         for kind in self.states:
             self.disable(kind)
-        self.status.setText("Devices changed. Leave and rejoin to refresh device choices.")
+        self.populate_video_choices()
+        self.worker.command("refresh_audio_devices", True)
+        self.status.setText("Devices changed. Your microphone and camera are off; choose a device.")
 
     def call_ended(self):
+        self.presentation_button.setEnabled(False)
+        if self.presentation_dialog:
+            self.presentation_dialog.reject()
+        self.close_text_surfaces()
+        self.chat_button.setEnabled(False)
+        self.captions_button.setEnabled(False)
         self.connected = False
         self.devices.close()
         for kind in self.states:
@@ -615,6 +963,11 @@ class MeetingCall(AppDialog):
         if self.closed:
             return
         self.closed = True
+        self.strokes.clear()
+        self.share_base = None
+        if self.presentation_dialog:
+            self.presentation_dialog.reject()
+        self.close_text_surfaces()
         self.mic_epoch += 1
         self.devices.close()
         self.timer.stop()
@@ -634,17 +987,20 @@ class AudioCall(MeetingCall):
     """Phone presentation sharing the same authenticated, consent-aware transport."""
 
     def __init__(
-        self, parent, worker, *, devices=None, channel_name="Team channel", initial_mode="audio"
+        self, parent, worker, *, devices=None, channel_name="Team channel", initial_mode="audio",
+        channel_chat=None,
     ):
         self.audio_started = None
         self.audio_cards = {}
         super().__init__(
-            parent, worker, devices=devices, channel_name=channel_name, initial_mode="audio"
+            parent, worker, devices=devices, channel_name=channel_name, initial_mode="audio",
+            channel_chat=channel_chat
         )
         self.setWindowTitle("Aedrova · " + channel_name + " audio call")
         self.resize(760, 660)
         self.setMinimumSize(580, 540)
         self.view_choice.hide()
+        self.presentation_button.hide()
         self.stage.hide()
         self.gallery.hide()
         self.controls["camera"].hide()
@@ -802,8 +1158,16 @@ def open_channel_call(window, *, mode=None):
         worker,
         channel_name=window.workspace.name + " / " + window.channel.name,
         initial_mode=mode,
+        channel_chat=dict(
+            service=service, channel=window.channel_id, user=str(service.user.id),
+            valid=lambda: not dialog.closed and window.account_dialog.service is service,
+        ),
     )
     window.meeting_call = dialog
+    from aedrova.desktop.meeting_wrapup import offer_wrapup
+
+    if hasattr(worker, "review_ready"):
+        worker.review_ready.connect(lambda status: offer_wrapup(window, worker, status))
     window.account_dialog.session_closed.connect(dialog.reject)
     # A local setup preview cannot compete with call capture for the same device.
     setup = getattr(window, "meeting_setup", None)

@@ -1,0 +1,220 @@
+Video call currently isnt working, heres all the features which should be implemented as well :
+1. Audio and video
+- Turn microphone on/off (mute/unmute)
+- Turn camera on/off
+- Select microphone, speaker, and camera devices
+- Adjust audio settings and microphone modes
+- Computer audio or telephone dial-in
+- Speaker view and gallery view
+- Hide or stop incoming participant videos
+- Virtual backgrounds
+- Video filters and appearance effects
+- Portrait lighting and other supported video enhancements
+- Share a second camera
+- Share video with optimized playback and audio
+- Push-to-talk
+- Automatically mute when joining
+- Display names and profile pictures
+- Show or hide pronouns
+- Immersive view
+- Dual-monitor support
+2. Participant communication
+- In-meeting group chat
+- Direct or private chat between participants, where permitted
+- Send messages to everyone or selected recipients
+- Share files in chat, where enabled
+- Share links
+- Save meeting chat, where supported
+- Emoji reactions
+- Raise hand
+- Nonverbal feedback
+- Respond to polls and quizzes
+- Change your display name
+- Add or edit your profile picture
+- View the participant list
+- Invite other participants
+- View meeting information and joining details
+These features help people communicate without interrupting the speaker. 
+
+Zoom
++1
+
+
+
+3. Screen sharing and interactive collaboration
+- Share the entire desktop
+- Share a specific application window
+- Share a browser tab or supported content
+- Share computer audio
+- Share video content
+- Share slides as a virtual background
+- Share a second camera
+- Pause and resume screen sharing
+- Annotate shared content
+- Draw, highlight, and add text to shared content
+- Let participants annotate, when permitted
+- Give another participant remote control
+- Request remote control of a shared screen
+- Share multiple screens simultaneously, when enabled
+- Side-by-side screen-sharing layouts
+- Share a whiteboard
+- Create and edit collaborative whiteboards
+- Open or create Zoom Docs during a meeting
+- Co-edit documents with other participants
+
+
+Zoom
++1
+
+
+4. AI features and meeting intelligence
+Zoom's AI features depend on the account, licensing, and administrator settings.
+- AI Companion meeting questions and assistance
+- Meeting summaries
+- Automated action-item extraction
+- Key discussion points and highlights
+- Live meeting transcription
+- Searchable meeting transcripts
+- Automated captions
+- Translated captions
+- Meeting language translation, where supported
+- Ask questions about meeting content through supported AI features
+- Smart recording and recording highlights, where available
+- Personalized AI meeting notes through supported features
+These are not all enabled by default or available on every Zoom plan.
+5. Recording and meeting history
+- Start and stop local recording
+- Start and stop cloud recording
+- Request that the host starts cloud recording
+- Allow selected participants to record locally
+- Pause and resume recording
+- Record audio and video
+- Record shared-screen content
+- Generate transcripts for supported recordings
+- Save and review meeting recordings
+- Access supported recording highlights and summaries
+- View and search meeting transcripts
+Recording permissions and storage depend on the meeting configuration and account. 
+
+Zoom
++1
+
+
+
+6. Breakout rooms and small-group collaboration
+- Create breakout rooms
+- Automatically distribute participants
+- Manually assign participants
+- Allow participants to choose their own rooms, where enabled
+- Rename breakout rooms
+- Move participants between rooms
+- Open and close rooms
+- Broadcast messages to all breakout rooms
+- Broadcast voice messages, where supported
+- Allow participants to return to the main session
+- Visit breakout rooms as the host
+- Share screens with breakout rooms
+- Set timers and countdowns
+- Preassign participants to rooms
+7. Polls, quizzes, and audience engagement
+- Launch live polls
+- Create multiple-choice polls
+- Create advanced polls
+- Run quizzes
+- Collect participant responses
+- Display poll results
+- Download poll reports
+- Use reactions to gather instant feedback
+- Let participants raise hands to speak
+- Use nonverbal feedback
+- Run structured Q&A in supported meeting formats
+8. Host and co-host controls
+- Mute individual participants
+- Mute all participants
+- Request participants to unmute
+- Stop a participant's video
+- Control who can share screens
+- Control who can use chat
+- Control who can unmute or rename themselves
+- Assign co-hosts
+- Transfer host privileges
+- Rename participants
+- Put participants on hold, where supported
+- Remove participants
+- Lock the meeting
+- Enable and manage the waiting room
+- Admit participants from the waiting room
+- Configure join and leave sounds
+- Control recording permissions
+- Control whiteboard permissions
+- Manage captions and transcription settings
+- Report inappropriate behavior
+
+
+Zoom
++1
+
+
+9. Security and access controls
+- Meeting passcodes
+- Waiting rooms
+- Lock meetings
+- Restrict who can join
+- Remove unwanted participants
+- Control participant permissions
+- Restrict screen sharing
+- Restrict chat and file sharing
+- Manage recording access
+- Meeting encryption
+- End-to-end encryption for supported configurations
+- Report participants
+- Manage participant entry and exit
+10. Accessibility and language
+- Automated captions
+- Manual captions
+- Live transcription
+- Translated captions, where supported
+- Language interpretation
+- Caption font size and type customization
+- Caption position settings
+- Keyboard navigation and shortcuts
+- Screen-reader support
+- Accessibility settings for meeting controls
+11. Zoom Apps and integrations
+- Open Zoom Apps inside a meeting
+- Use supported third-party apps
+- Collaborate through integrated tools
+- Open collaborative documents
+- Use whiteboards
+- Access supported scheduling and productivity integrations
+- Share supported app content during the call
+- Receive notifications when certain apps are active
+12. Live streaming and broadcast
+- Stream meetings to supported platforms
+- Custom RTMP live streaming, where enabled
+- Broadcast presentations to external audiences
+- Share audio with the broadcast
+- Manage webinar Q&A when using supported webinar functionality
+13. Meeting layout and personal settings
+- Switch between gallery and speaker views
+- Change display names
+- Configure video backgrounds and effects
+- Customize toolbar placement
+- Change the meeting interface theme, where supported
+- Configure chat previews
+- Keep meeting controls visible
+- Adjust accessibility settings
+- Configure screen-sharing behavior
+- Adjust audio and video preferences
+- Switch supported display layouts
+14. Joining, leaving, and call management
+- Invite participants
+- Copy meeting invitation information
+- View meeting ID and joining details
+- Join using computer audio
+- Join by telephone
+- Leave a meeting
+- End the meeting for everyone (host)
+- Transfer a meeting to a Zoom Room
+- View invited participants who have not joined, where supported
+- Reclaim host privileges, where supported

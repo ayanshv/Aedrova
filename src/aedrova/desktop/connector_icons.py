@@ -16,7 +16,7 @@ COLORS = {
     "stripe": "#635BFF",
     "instagram": "#E4405F",
     "tiktok": "#000000",
-    "search": "#FB542B",
+    "search": "#64748B",
     "vercel": "#000000",
 }
 ASSETS = Path(__file__).parent / "assets" / "connectors"

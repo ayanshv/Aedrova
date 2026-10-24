@@ -80,6 +80,18 @@ class SettingsDialog(AppDialog):
             connectors = button("Manage connectors…", role="outline")
             connectors.clicked.connect(lambda: open_connectors(window))
             layout.addWidget(connectors)
+        if self.user:
+            layout = section(
+                root_layout,
+                "Data & AI privacy",
+                "Review what reaches AI, disconnect tools, or request a copy or removal.",
+            )
+            privacy = button("Review data controls…", role="outline")
+            privacy.setAccessibleName("Review Aedrova data and AI privacy controls")
+            privacy.clicked.connect(
+                lambda: QDesktopServices.openUrl(QUrl("https://aedrova.com/data-controls"))
+            )
+            layout.addWidget(privacy)
         layout = section(root_layout, "Appearance", "Choose a comfortable way to work.")
         self.appearance = ChoiceBox()
         self.appearance.setAccessibleName("Appearance")
@@ -152,7 +164,13 @@ class SettingsDialog(AppDialog):
         layout = root_layout
         self.status = label("Preferences are saved on this Mac.", "muted", wrap=True)
         layout.addWidget(self.status)
+        footer = QWidget()
+        footer.setObjectName("SettingsFooter")
+        footer_layout = QVBoxLayout(footer)
+        footer_layout.setContentsMargins(24, 16, 24, 16)
         actions = FlowActions()
+        footer_layout.addLayout(actions)
+        outer.addWidget(footer)
         if self.user:
             workspace = button("Workspace settings", role="outline")
             workspace.clicked.connect(self.workspace_settings)
@@ -164,7 +182,6 @@ class SettingsDialog(AppDialog):
         done = button("Done", role="primary")
         done.clicked.connect(self.accept)
         actions.addWidget(done)
-        layout.addLayout(actions)
 
     def load_balance(self):
         if not self.user or not self.billing_origin or not self.window.connected:

@@ -86,10 +86,12 @@ def test_new_google_user_gets_onboarding(qtbot, tmp_path):
 def test_onboarding_sends_shared_nickname_and_provider(qtbot, tmp_path):
     widget = dialog(qtbot, tmp_path)
     calls = []
-    widget.mutate = lambda name, data: calls.append((name, data))
+    widget.mutate = lambda name, data, **kwargs: calls.append((name, data))
     widget.onboarding_workspace.setText("Our team")
     widget.onboarding_nickname.setText("Sparky")
     widget.onboarding_provider.setCurrentIndex(1)
+    widget.review_ai_setup()
+    widget.onboarding_ack.setChecked(True)
     widget.complete_onboarding()
     assert calls == [
         (
@@ -199,6 +201,8 @@ def test_wizard_finishes_once_without_returning_to_create(qtbot, tmp_path):
     widget.onboarding_workspace.setText("Our team")
     widget.name_continue.click()
     assert widget.onboarding_steps.currentIndex() == 1
+    widget.provider_continue.click()
+    widget.onboarding_ack.setChecked(True)
     widget.finish_onboarding.click()
     widget.finish_onboarding.click()  # Disabled while request is running.
     qtbot.waitUntil(lambda: not widget.busy)
@@ -218,6 +222,8 @@ def test_successful_create_with_failed_refresh_is_not_reported_as_failed(qtbot, 
     widget.begin_onboarding()
     widget.onboarding_workspace.setText("Our team")
     widget.advance_onboarding()
+    widget.review_ai_setup()
+    widget.onboarding_ack.setChecked(True)
     widget.finish_onboarding.click()
     qtbot.waitUntil(lambda: not widget.busy)
     assert len(calls) == 1
@@ -260,9 +266,11 @@ def test_failed_creation_preserves_draft_and_step(qtbot, tmp_path):
     widget.onboarding_workspace.setText("Keep this name")
     widget.onboarding_nickname.setText("Atlas")
     widget.advance_onboarding()
+    widget.review_ai_setup()
+    widget.onboarding_ack.setChecked(True)
     widget.finish_onboarding.click()
     qtbot.waitUntil(lambda: not widget.busy)
-    assert widget.onboarding_steps.currentIndex() == 1
+    assert widget.onboarding_steps.currentIndex() == widget.ai_review_step
     assert widget.onboarding_workspace.text() == "Keep this name"
     assert widget.onboarding_nickname.text() == "Atlas"
     assert "private-server-detail" not in widget.status.text()

@@ -125,7 +125,9 @@ def test_dot_completion_retains_source_id_and_click_opens_profile(qtbot, tmp_pat
     assert mention("Hey @GitHub what changed?", [row]) == row
     window, _ = setup(qtbot, tmp_path)
     opened = []
-    monkeypatch.setattr("aedrova.desktop.dots.open_dots", lambda window, key: opened.append(key))
+    monkeypatch.setattr(
+        "aedrova.desktop.bud_chat.open_bud_chat", lambda window, key: opened.append(key)
+    )
     window.ai_team_section.sync([row], "w")
     window.ai_team_section.habitat.wake(row["id"])
     assert opened == [row["id"]]
@@ -271,6 +273,11 @@ def test_cross_source_query_job_selects_fetches_and_answers_with_citations(
     from aedrova.desktop.dot_analysis import QueryJob
 
     row = dot()
+    from aedrova.dots.personality import DEFAULTS, pack
+
+    row["instructions"] = pack(
+        "Use verified changes.", {**DEFAULTS, "warmth": 83}, "Candid, dry wit."
+    )
     citation = "dot:" + row["id"] + ":changes"
     context = WorkspaceContext("w", "u", frozenset({"c"}), "", 0, "Aedrova", "codex")
     monkeypatch.setattr("aedrova.desktop.dot_analysis.gather", lambda *a, **k: context)
@@ -305,7 +312,12 @@ def test_cross_source_query_job_selects_fetches_and_answers_with_citations(
         assert plan is True
         if len(calls) == 1:
             return json.dumps({"calls": [{"dot": row["id"], "tool": "changes"}]})
-        assert ("Respond as the addressed Bud" if addressed_bud else "central Aedrova") in prompt
+        assert ("Respond as the addressed Bud" if addressed_bud else "You are Aedrova") in prompt
+        if addressed_bud:
+            assert '"warmth": 83' in prompt and "Candid, dry wit." in prompt
+            assert "never override safety" in prompt
+        else:
+            assert "Apply this workspace-admin-configured Bud working style" not in prompt
         evidence = (project / "context.jsonl").read_text()
         assert "Updated sign in" in evidence and "untrusted" in evidence
         return "Sign in changed. [" + citation + "]"

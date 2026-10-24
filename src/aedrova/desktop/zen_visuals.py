@@ -1,13 +1,12 @@
-"""Native onboarding visuals: real theme captures and clearly illustrative setup diagrams."""
+"""Native onboarding visuals: minimal theme windows and illustrative setup diagrams."""
 
 import math
 from pathlib import Path
 
 from PySide6.QtCore import QRectF, Qt
-from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QAbstractButton, QWidget
 
-from aedrova.desktop.brand import ASSETS
 from aedrova.desktop.materials import system_font
 from aedrova.desktop.zen_theme import tone, visual_theme
 
@@ -37,15 +36,11 @@ class ThemePhoto(QAbstractButton):
                 "dark": "Dark appearance",
             }[mode]
         )
-        self.photos = {
-            m: QPixmap(str(ASSETS / "onboarding" / f"{m}.png")) for m in ("light", "dark")
-        }
 
     def paintEvent(self, event):  # noqa: N802
         theme = visual_theme(self)
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         frame = QRectF(self.rect()).adjusted(3, 3, -3, -3)
         p.setPen(
             QPen(
@@ -56,12 +51,17 @@ class ThemePhoto(QAbstractButton):
         p.setBrush(QColor(tone(theme, "#EDF5FF" if self.isChecked() else "white")))
         p.drawRoundedRect(frame, 18, 18)
         image_rect = frame.adjusted(8, 8, -8, -44)
+        desktop = QRectF(
+            image_rect.left() + image_rect.width() * 0.12,
+            image_rect.top() + image_rect.height() * 0.17,
+            image_rect.width() * 1.16,
+            image_rect.height() * 1.08,
+        )
         clip = QPainterPath()
         clip.addRoundedRect(image_rect, 10, 10)
         p.save()
         p.setClipPath(clip)
         for mode in ("light", "dark") if self.mode == "system" else (self.mode,):
-            photo = self.photos[mode]
             p.save()
             if self.mode == "system":
                 half = QRectF(image_rect)
@@ -69,10 +69,46 @@ class ThemePhoto(QAbstractButton):
                 if mode == "dark":
                     half.moveLeft(image_rect.center().x())
                 p.setClipRect(half, Qt.ClipOperation.IntersectClip)
-            if photo.isNull():
-                p.fillRect(image_rect, QColor("#F5F5F7" if mode == "light" else "#1C1C1E"))
-            else:
-                p.drawPixmap(image_rect.toRect(), photo)
+            light = mode == "light"
+            p.setPen(QPen(QColor("#D5DAE2" if light else "#393C42"), 1))
+            p.setBrush(QColor("#EFF1F5" if light else "#17181B"))
+            p.drawRoundedRect(desktop, 12, 12)
+            dot = 3.2
+            p.setPen(Qt.PenStyle.NoPen)
+            for index, color in enumerate(("#FF6058", "#FFBD2E", "#28C840")):
+                p.setBrush(QColor(color))
+                p.drawEllipse(
+                    QRectF(
+                        desktop.left() + 10 + index * 5.5,
+                        desktop.top() + 9,
+                        dot,
+                        dot,
+                    )
+                )
+            for x, y, size, fill in (
+                (0.39, 0.22, 0.48, "#FAFBFD" if light else "#2B2E34"),
+                (0.15, 0.40, 0.56, "#FFFFFF" if light else "#42464E"),
+            ):
+                window = QRectF(
+                    desktop.left() + desktop.width() * x,
+                    desktop.top() + desktop.height() * y,
+                    desktop.height() * size,
+                    desktop.height() * size,
+                )
+                p.setPen(QPen(QColor("#D2D7DF" if light else "#595E68"), 1))
+                p.setBrush(QColor(fill))
+                p.drawRoundedRect(window, 7, 7)
+                p.setPen(Qt.PenStyle.NoPen)
+                p.setBrush(QColor("#B9C0CB" if light else "#969EAA"))
+                for index in range(3):
+                    p.drawEllipse(
+                        QRectF(
+                            window.left() + 6 + index * 4,
+                            window.top() + 6,
+                            2,
+                            2,
+                        )
+                    )
             p.restore()
         p.restore()
         caption(
@@ -190,6 +226,15 @@ class ProjectPicker(QAbstractButton):
         self.refresh()
 
     def paintEvent(self, event):  # noqa: N802
+        theme = visual_theme(self)
+        surface = QColor(theme.text)
+        surface.setAlpha(12)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(surface)
+        painter.drawRoundedRect(QRectF(self.rect()).adjusted(1, 1, -1, -1), 24, 24)
+        painter.end()
         if self.hasFocus():
             theme = visual_theme(self)
             p = QPainter(self)

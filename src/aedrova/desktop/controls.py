@@ -122,6 +122,7 @@ class CodingProviderChoice(ChoiceBox):
         self.setIconSize(QSize(28, 28))
         for key, name in (("codex", "Codex"), ("claude_code", "Claude Code")):
             self.addItem(QIcon(connector_pixmap(key, 28)), name, key)
+        self.addItem("Auto · Aedrova chooses", "auto")
 
 
 def choose_project(parent, initial=""):

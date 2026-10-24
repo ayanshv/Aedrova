@@ -55,7 +55,18 @@ class Character(QWidget):
         self.timer.stop()
         super().hideEvent(event)
 
+    def set_reduced_motion(self, reduced):
+        self.reduced_motion = reduced
+        if reduced:
+            self.timer.stop()
+            self.blink = False
+        elif self.isVisible():
+            self.timer.start()
+        self.update()
+
     def animate(self):
+        if self.visibleRegion().isEmpty():
+            return
         self.phase += 0.033
         self.blink = self.phase % 4.4 < 0.13
         self.update()

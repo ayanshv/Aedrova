@@ -1,8 +1,9 @@
 """Reference-led Bud configuration: a quiet native setup panel, one decision at a time."""
 
-from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QRectF, QSize, Qt
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import QIcon, QPainter
 from PySide6.QtWidgets import (
+    QApplication,
     QFrame,
     QGraphicsOpacityEffect,
     QGridLayout,
@@ -19,7 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from aedrova.desktop.ai_teammates import Character
-from aedrova.desktop.bud_art import LABELS, LOOKS, sprite
+from aedrova.desktop.bud_art import LABELS, LOOKS, blinking_sprite, paint_bud, sprite
 from aedrova.desktop.controls import ChoiceBox
 from aedrova.desktop.dialogs import button, label
 from aedrova.dots.roles import ROLES
@@ -39,10 +40,29 @@ COLORS = [
 class BudLineup(QWidget):
     """The actual bundled characters, without mock participants or fake connection states."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, reduced_motion=False):
         super().__init__(parent)
+        self.reduced_motion = reduced_motion
+        self.phase = 1.0
+        self.timer = QTimer(self)
+        self.timer.setInterval(80)
+        self.timer.timeout.connect(self.animate)
         self.setFixedHeight(142)
         self.setAccessibleName("Builder, Designer, Marketing, Finance, Research and Product Buds")
+
+    def animate(self):
+        self.phase += 0.08
+        self.reduced_motion = QApplication.instance().property("reduceMotion") is True
+        self.update()
+
+    def showEvent(self, event):
+        if not self.reduced_motion:
+            self.timer.start()
+        super().showEvent(event)
+
+    def hideEvent(self, event):
+        self.timer.stop()
+        super().hideEvent(event)
 
     def paintEvent(self, event):  # noqa: N802
         painter = QPainter(self)
@@ -51,16 +71,16 @@ class BudLineup(QWidget):
         step = side * 0.82
         left = (self.width() - (5 * step + side)) / 2
         for index, look in enumerate(LOOKS):
-            art = sprite(look)
-            painter.drawPixmap(
+            paint_bud(
+                painter,
                 QRectF(
                     left + index * step,
                     (self.height() - side) / 2 + (side * 0.10 if index >= 3 else 0),
                     side,
                     side,
                 ),
-                art,
-                QRectF(art.rect()),
+                {"appearance": look},
+                blink=not self.reduced_motion and (self.phase + index * 0.71) % 4.4 < 0.16,
             )
 
 
@@ -98,11 +118,15 @@ def build_setup(d, window):
     navigation.addWidget(d.progress)
     navigation.addStretch()
     d.exit_button = button("Finish later")
-    d.exit_button.clicked.connect(d.reject)
+    d.exit_button.clicked.connect(d.finish_later)
     navigation.addWidget(d.exit_button)
     column.addLayout(navigation)
     d.back = button("‹  Back")
-    d.back.clicked.connect(lambda: d.show_step(max(0, d.pages.currentIndex() - 1)))
+    d.back.clicked.connect(
+        lambda: d.show_step(
+            3 if d.pages.currentIndex() == 5 else max(0, d.pages.currentIndex() - 1)
+        )
+    )
     column.addWidget(d.back, alignment=Qt.AlignmentFlag.AlignLeft)
     d.pages = QStackedWidget(panel)
     column.addWidget(d.pages, 1)
@@ -142,7 +166,7 @@ def build_setup(d, window):
         centered=True,
     )
     welcome.addStretch(1)
-    welcome.addWidget(BudLineup(panel))
+    welcome.addWidget(BudLineup(panel, reduced_motion=window.reduced_motion))
     welcome.addWidget(d.summary)
     welcome.addStretch(2)
 
@@ -176,9 +200,28 @@ def build_setup(d, window):
         tile.setIconSize(QSize(52, 52))
         tile.setMinimumHeight(86)
         tile.setAccessibleName("Choose " + title + " appearance")
-        tile.clicked.connect(lambda checked=False, v=value: choose_look(d, v))
+        # Native accessibility activates checkable buttons through their checked
+        # state. Listen to that state so keyboard/assistive selection also updates
+        # the actual specialty and connector recommendations.
+        tile.toggled.connect(lambda checked, v=value: choose_look(d, v) if checked else None)
         grid.addWidget(tile, index // 3, index % 3)
         d.appearance_buttons.append((tile, value))
+    if not window.reduced_motion:
+        d.appearance_blink = QTimer(d)
+        d.appearance_blink.setInterval(90)
+        d.appearance_blink_phase = 1.0
+
+        def blink_tiles():
+            if not d.isVisible() or d.pages.currentIndex() != 1 or window.reduced_motion:
+                return
+            d.appearance_blink_phase += 0.09
+            for index, (tile, value) in enumerate(d.appearance_buttons):
+                closed = (d.appearance_blink_phase + index * 0.71) % 4.4 < 0.18
+                tile.setIcon(QIcon((blinking_sprite if closed else sprite)(value)))
+
+        d.appearance_blink.timeout.connect(blink_tiles)
+        d.appearance_blink.start()
+        d.finished.connect(d.appearance_blink.stop)
     looks.addLayout(grid)
     looks.addStretch()
 
@@ -244,6 +287,14 @@ def build_setup(d, window):
     purpose.addWidget(d.instructions)
     purpose.addStretch()
 
+    personality = page(
+        "How should your Bud work?",
+        "A working style, tuned to you. Slide anywhere between the extremes.",
+    )
+    from aedrova.desktop.bud_personality import build_personality
+
+    build_personality(d, personality)
+
     # Keep profile fields as state holders for existing save/version semantics.
     # The user-facing tool step is the shared connector gallery, mounted inline.
     tools = QWidget(panel)
@@ -285,7 +336,7 @@ def build_setup(d, window):
     ready.addStretch(1)
     final_art = QVBoxLayout()
     ready.addLayout(final_art)
-    d.character_layouts[5] = final_art
+    d.character_layouts[6] = final_art
     d.ready_copy = label("", "title", wrap=True)
     d.ready_copy.setAlignment(Qt.AlignmentFlag.AlignCenter)
     ready.addWidget(d.ready_copy)

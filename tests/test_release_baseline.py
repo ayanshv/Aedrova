@@ -17,6 +17,10 @@ def test_pulse_is_not_exposed_and_primary_navigation_survives(qtbot, tmp_path):
     for i in range(4):
         window.select_tab(i)
         assert window.pages.currentIndex() == i
+    for i in (0, 2, 1, 3):
+        window.tab_buttons[i].setChecked(True)
+        assert window.pages.currentIndex() == i
+        assert [tab.isChecked() for tab in window.tab_buttons] == [j == i for j in range(4)]
     window.set_theme("dark", persist=False)
     window.set_theme("light", persist=False)
 
@@ -52,3 +56,19 @@ def test_staging_launcher_rejects_production_fallback_and_private_keys():
     ):
         with pytest.raises(ValueError):
             validate(config | change)
+
+
+def test_reopening_account_leaves_old_creation_confirmation_before_network(
+    qtbot, tmp_path, monkeypatch
+):
+    from test_connected import setup
+
+    window, _ = setup(qtbot, tmp_path)
+    account = window.account_dialog
+    account.pages.setCurrentIndex(2)
+    account.onboarding_steps.setCurrentIndex(4)
+    monkeypatch.setattr(account, "refresh", lambda: None)
+    window.show_account()
+    assert account.pages.currentIndex() == 4
+    window.show_account("manage")
+    assert account.pages.currentIndex() == 1

@@ -94,6 +94,7 @@ class ZenCanvas(QWidget):
                 QRectF(w / 2 - 52, area.top() + 30, 104, 104),
                 {"color": "#4388F5", "shape": "round"},
                 phase=0 if f.reduced else elapsed,
+                blink=not f.reduced and elapsed % 4.4 < 0.14,
             )
             text(
                 QRectF(w / 2 - 190, area.top() + 145, 380, 48),
@@ -286,7 +287,14 @@ class ZenOnboarding(AppDialog):
         self.primary.setEnabled(True)
         if stage == 2:
             self.processing = 0
-        self.canvas.setAccessibleName(self.primary.text() + " · Simulated product preview")
+        if 4 <= stage < LAST_STAGE:
+            title, subtitle, _ = SETUP_STEPS[stage - 4]
+            self.canvas.setAccessibleName(title + " · " + subtitle)
+        else:
+            self.canvas.setAccessibleName(
+                self.primary.text()
+                + (" · Simulated product preview" if stage < 4 else " · Settings saved")
+            )
         self.primary.setFocus()
         self.canvas.update()
 
@@ -452,9 +460,16 @@ class ZenOnboarding(AppDialog):
             self.hide()
 
             def bud_finished(result):
+                deferred = getattr(self.buds_dialog, "deferred_setup", False)
                 self.buds_dialog = None
                 if result == self.DialogCode.Accepted:
                     self.bud_setup_completed = True
+                    self.complete()
+                elif deferred:
+                    self.window.settings.setValue(self.prefix + "/budsDeferred", True)
+                    self.bud_setup_completed = (
+                        True  # This handoff may proceed; setup remains deferred.
+                    )
                     self.complete()
                 else:
                     self.show_stage(LAST_STAGE - 1)

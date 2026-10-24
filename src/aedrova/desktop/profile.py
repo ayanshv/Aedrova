@@ -94,7 +94,7 @@ class Avatar(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         path = QPainterPath()
-        path.addEllipse(QRectF(self.rect()))
+        path.addRoundedRect(QRectF(self.rect()), 12, 12)
         painter.setClipPath(path)
         if not self.pixmap.isNull():
             pixmap = self.pixmap.scaled(
@@ -115,7 +115,7 @@ class Avatar(QWidget):
 class ProfileDialog(AppDialog):
     state_changed = Signal()
 
-    def __init__(self, window, account, *, onboarding=False, continued=None):
+    def __init__(self, window, account, *, onboarding=False, continued=None, embedded=False):
         super().__init__(account if onboarding else window)
         self.window, self.account = window, account
         self.onboarding, self.continued = onboarding, continued
@@ -145,11 +145,14 @@ class ProfileDialog(AppDialog):
             layout.setSpacing(18)
             layout.addWidget(label(title, "heading"))
             layout.addWidget(label(subtitle, "muted", wrap=True))
-            scroll = QScrollArea()
-            scroll.setWidgetResizable(True)
-            scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-            scroll.setWidget(content)
-            self.stack.addWidget(scroll)
+            if embedded:
+                self.stack.addWidget(content)
+            else:
+                scroll = QScrollArea()
+                scroll.setWidgetResizable(True)
+                scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+                scroll.setWidget(content)
+                self.stack.addWidget(scroll)
             self.steps.append(content)
             return layout
 
@@ -354,7 +357,7 @@ class ProfileDialog(AppDialog):
         self.progress.setText(f"YOUR PROFILE   ·   {index + 1} / 3")
         self.back.setVisible(index > 0)
         self.next.setText(
-            "Save & continue"
+            "Continue"
             if index == 2 and self.onboarding
             else "Save profile"
             if index == 2
@@ -427,7 +430,7 @@ class ProfileDialog(AppDialog):
             self.saving = False
             self.next.setEnabled(True)
             self.back.setEnabled(True)
-            self.next.setText("Save & continue" if self.onboarding else "Save profile")
+            self.next.setText("Continue" if self.onboarding else "Save profile")
             self.state_changed.emit()
             if (
                 not self.account.service
@@ -458,14 +461,14 @@ class ProfileDialog(AppDialog):
                 self.saving = False
                 self.next.setEnabled(True)
                 self.back.setEnabled(True)
-                self.next.setText("Save & continue" if self.onboarding else "Save profile")
+                self.next.setText("Continue" if self.onboarding else "Save profile")
                 self.state_changed.emit()
                 self.show_error("Connection busy. Try again shortly.")
         elif self.account.busy:
             self.saving = False
             self.next.setEnabled(True)
             self.back.setEnabled(True)
-            self.next.setText("Save & continue" if self.onboarding else "Save profile")
+            self.next.setText("Continue" if self.onboarding else "Save profile")
             self.state_changed.emit()
             self.show_error("Connection busy. Try again shortly.")
         else:

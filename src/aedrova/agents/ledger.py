@@ -29,6 +29,12 @@ class RunLedger:
                     state TEXT NOT NULL, created REAL NOT NULL, updated REAL NOT NULL,
                     project TEXT NOT NULL DEFAULT '', baseline TEXT NOT NULL DEFAULT ''
                 );
+                CREATE TABLE IF NOT EXISTS routing (
+                    run_id TEXT NOT NULL, phase TEXT NOT NULL,
+                    provider TEXT NOT NULL, category TEXT NOT NULL,
+                    state TEXT NOT NULL, policy_version TEXT NOT NULL,
+                    PRIMARY KEY(run_id, phase)
+                );
                 CREATE TABLE IF NOT EXISTS usage (
                     run_id TEXT NOT NULL, phase TEXT NOT NULL, provider TEXT NOT NULL,
                     seconds REAL NOT NULL, input_tokens INTEGER, output_tokens INTEGER,
@@ -170,5 +176,34 @@ class RunLedger:
                     "SELECT usage.* FROM usage JOIN runs ON runs.id=usage.run_id "
                     "WHERE run_id=? AND user=? AND workspace=?",
                     (run_id, user, workspace),
+                )
+            ]
+
+    def record_route(self, run_id, phase, decision, state):
+        # Store allowlisted metadata only, never prompts, exceptions or provider payloads.
+        if decision.get("provider") not in {"codex", "claude_code"}:
+            raise ValueError("Invalid routing provider")
+        if decision.get("category") not in {"repair", "testing", "refactor", "implementation"}:
+            raise ValueError("Invalid routing category")
+        if phase not in {"planning", "building"} or state not in {
+            "completed",
+            "failed",
+            "cancelled",
+        }:
+            raise ValueError("Invalid routing outcome")
+        with self.connect() as db:
+            db.execute(
+                "INSERT OR REPLACE INTO routing VALUES (?,?,?,?,?,?)",
+                (run_id, phase, decision["provider"], decision["category"], state, "1"),
+            )
+
+    def routing_outcomes(self, user, workspace):
+        with self.connect() as db:
+            return [
+                dict(row)
+                for row in db.execute(
+                    "SELECT routing.* FROM routing JOIN runs ON runs.id=routing.run_id "
+                    "WHERE runs.user=? AND runs.workspace=?",
+                    (user, workspace),
                 )
             ]

@@ -46,6 +46,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--check-only", action="store_true")
+    parser.add_argument(
+        "--settings-file",
+        type=Path,
+        default=ROOT / "work/staging/app.ini",
+        help="Separate local preferences for a fresh-user audit; never changes hosted accounts.",
+    )
+    parser.add_argument(
+        "--meeting-context",
+        action="store_true",
+        help="Enable consented meeting history in the internal staging source.",
+    )
     args = parser.parse_args()
     config = validate(json.loads(args.config.read_text()))
     if args.check_only:
@@ -59,17 +70,24 @@ def main():
             "AEDROVA_MANAGED_ORIGIN": config["managed_origin"],
             "AEDROVA_CONNECTOR_ORIGIN": config["connector_origin"],
             "AEDROVA_AI_ACCESS_MODE": "included",
+            "AEDROVA_DEPLOYMENT_ENVIRONMENT": "staging",
+            "AEDROVA_MEETING_CONTEXT_ENABLED": "true" if args.meeting_context else "false",
         }
     )
+    interpreter = sys.executable
+    if sys.platform == "darwin":
+        from staging_macos import prepare
+
+        interpreter = str(prepare(ROOT, environment))
     # Separate persisted preferences/project bindings; login sessions stay in memory.
     subprocess.run(
         [
-            sys.executable,
+            interpreter,
             "-m",
             "aedrova.desktop.app",
             "--account",
             "--settings-file",
-            str(ROOT / "work/staging/app.ini"),
+            str(args.settings_file.resolve()),
         ],
         cwd=ROOT,
         env=environment,

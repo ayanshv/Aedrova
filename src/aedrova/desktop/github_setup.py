@@ -33,6 +33,7 @@ class GitHubSetup(AppDialog):
         self.job = self.process = None
         self.cancelled = threading.Event()
         self.output = ""
+        self.connected_login = ""
         self.executable = None
         self.setWindowTitle("Aedrova · Connect GitHub")
         self.setMinimumSize(590, 620)
@@ -45,12 +46,14 @@ class GitHubSetup(AppDialog):
         content.setObjectName("AccountPage")
         scroll.setWidget(content)
         outer.addWidget(scroll)
-        layout = QVBoxLayout(content)
+        layout = self.content_layout = QVBoxLayout(content)
         layout.setContentsMargins(32, 30, 32, 30)
         layout.setSpacing(18)
         self.brand = BrandMark(58)
         layout.addWidget(self.brand)
-        layout.addWidget(label("Your code. Ready to go.", "heading"))
+        self.heading = label("Your code. Ready to go.", "heading")
+        layout.addWidget(self.heading)
+        self.setup_start = layout.count()
         layout.addWidget(
             label(
                 "A small helper connects Aedrova to GitHub, so you can publish reviewed "
@@ -98,12 +101,15 @@ class GitHubSetup(AppDialog):
         self.browser_button.clicked.connect(self.open_browser)
         self.browser_button.hide()
         layout.addWidget(self.browser_button)
+        self.setup_widgets = [
+            layout.itemAt(i).widget() for i in range(self.setup_start, layout.count())
+        ]
         self.status = label("", "muted", wrap=True)
         layout.addWidget(self.status)
         row = QHBoxLayout()
         self.cancel_button = button("Cancel", role="outline")
         self.cancel_button.clicked.connect(self.reject)
-        self.continue_button = button("Continue to workspace", role="primary")
+        self.continue_button = button("Continue", role="primary")
         self.continue_button.clicked.connect(self.complete)
         row.addWidget(self.cancel_button)
         row.addWidget(self.continue_button)
@@ -120,6 +126,15 @@ class GitHubSetup(AppDialog):
             if caption.wordWrap():
                 caption.setMinimumHeight(max(0, caption.heightForWidth(526)))
         self.detect()
+        if self.executable:
+            self.verify_account()
+
+    def verify_account(self):
+        self.set_busy(True)
+        self.status.setText("Checking your GitHub connection…")
+        self.job = Job(lambda: GitHub().api("GET", "user")["login"])
+        self.job.signals.finished.connect(self.verified)
+        QThreadPool.globalInstance().start(self.job)
 
     def detect(self):
         try:
@@ -129,7 +144,7 @@ class GitHubSetup(AppDialog):
         self.install_button.setEnabled(not bool(self.executable))
         self.install_button.setText("Helper ready" if self.executable else "Install GitHub CLI")
         self.login_button.setEnabled(bool(self.executable))
-        self.continue_button.setEnabled(bool(self.executable))
+        self.continue_button.setEnabled(bool(self.connected_login))
         self.status.setText(
             "GitHub CLI detected. Sign in to enable repository access."
             if self.executable
@@ -139,7 +154,7 @@ class GitHubSetup(AppDialog):
     def set_busy(self, busy):
         self.install_button.setEnabled(not busy and not bool(self.executable))
         self.login_button.setEnabled(not busy and bool(self.executable))
-        self.continue_button.setEnabled(not busy and bool(self.executable))
+        self.continue_button.setEnabled(not busy and bool(self.connected_login))
         self.progress_bar.setVisible(busy)
 
     def install_helper(self):
@@ -245,9 +260,7 @@ class GitHubSetup(AppDialog):
             self.status.setText("GitHub sign-in did not complete. Try again when you're ready.")
             return
         self.status.setText("Checking the authorized GitHub account…")
-        self.job = Job(lambda: GitHub().api("GET", "user")["login"])
-        self.job.signals.finished.connect(self.verified)
-        QThreadPool.globalInstance().start(self.job)
+        self.verify_account()
 
     @Slot(object)
     def verified(self, result):
@@ -258,13 +271,24 @@ class GitHubSetup(AppDialog):
         if "error" in result:
             self.status.setText(result["error"])
         else:
+            self.connected_login = result["value"]
+            self.heading.setText("GitHub is connected.")
             self.status.setText(
-                "Connected as " + result["value"] + ". Choose your repo in Projects."
+                "Connected as "
+                + self.connected_login
+                + ". Choose your repository in Projects when you’re ready to build. "
+                "Publishing always asks for your approval."
             )
-            self.login_button.setText("Sign in again")
+            for widget in self.setup_widgets:
+                widget.hide()
+            self.cancel_button.hide()
+            self.continue_button.setEnabled(True)
+            self.content_layout.insertStretch(self.content_layout.count() - 1, 1)
+            self.setMinimumSize(590, 420)
+            self.resize(620, 480)
 
     def complete(self):
-        if self.job or self.process or not self.executable:
+        if self.job or self.process or not self.connected_login:
             return
         self.window.settings.setValue("githubHelperOnboarded", True)
         self.window.settings.sync()

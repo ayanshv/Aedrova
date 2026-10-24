@@ -38,6 +38,8 @@ def button(text, accessible="", role=""):
     widget = SpringButton(visible)
     widget.setAccessibleName(accessible or text.replace("&&", "&"))
     widget.setCursor(Qt.CursorShape.PointingHandCursor)
+    if role == "icon" and accessible:
+        widget.setToolTip(accessible)
     if role:
         widget.setProperty("role", role)
     from aedrova.desktop.icons import SYMBOLS, assign
@@ -45,6 +47,7 @@ def button(text, accessible="", role=""):
     if text in SYMBOLS:
         assign(widget, SYMBOLS[text])
         widget.setText("")
+        widget.setToolTip(accessible or SYMBOLS[text].replace("_", " ").title())
     return widget
 
 
