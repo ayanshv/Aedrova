@@ -133,6 +133,7 @@ def test_reviewed_cohort_requires_exact_category_and_configuration(tmp_path):
 
 def test_claude_sdk_preflight_does_not_require_separate_cli(monkeypatch):
     import importlib.util
+
     from aedrova.agents.routing import runtime_candidates
 
     monkeypatch.setattr(importlib.util, "find_spec", lambda _: object())
