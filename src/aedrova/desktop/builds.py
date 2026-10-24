@@ -162,6 +162,17 @@ class BuildJob(QRunnable):
         try:
             if self.runner.cancelled.is_set():
                 raise BuildCancelled()
+            if self.provider == "auto":
+                from aedrova.agents.routing import choose, runtime_candidates
+
+                decision = choose(self.task, runtime_candidates())
+                if decision.provider is None:
+                    raise ValueError("This is a conversation request. Ask Aedrova in chat.")
+                self.provider = decision.provider
+                self.routing_decision = decision.record()
+                self.signals.progress.emit(
+                    "Aedrova selected " + self.provider + ": " + decision.reason
+                )
             if self.teammate:
                 from aedrova.connectors.service import evidence
 
@@ -255,7 +266,11 @@ class BuildJob(QRunnable):
                     retrieval_record(self.context, self.task) + "\n" + self.context.text,
                     encoding="utf-8",
                 )
-            result = self.runner.run(self.provider, self.project, prompt, plan=self.plan)
+            from aedrova.agents.routing import CodingAdapter
+
+            result = CodingAdapter(self.provider, self.runner).execute(
+                self.project, prompt, plan=self.plan
+            )
             if self.dot_client:
                 from aedrova.dots.client import recheck
 
@@ -308,6 +323,18 @@ class BuildJob(QRunnable):
                     )
                 self.runner.managed = None
         if self.ledger and self.run_id:
+            decision = getattr(self, "routing_decision", None)
+            if decision:
+                self.ledger.record_route(
+                    self.run_id,
+                    "planning" if self.plan else "building",
+                    decision,
+                    "cancelled"
+                    if self.runner.cancelled.is_set()
+                    else "completed"
+                    if outcome.get("ok")
+                    else "failed",
+                )
             self.ledger.record_usage(
                 self.run_id,
                 "planning" if self.plan else "building",
@@ -315,6 +342,8 @@ class BuildJob(QRunnable):
                 time.monotonic() - started,
                 self.runner.usage,
             )
+        outcome["provider"] = self.provider
+        outcome["routing"] = getattr(self, "routing_decision", None)
         outcome["commands"] = self.runner.command_results
         if not self.plan and self.project:
             try:
@@ -384,6 +413,7 @@ class BuildDialog(AppDialog):
         row.addWidget(self.repository, 1)
         row.addWidget(self.choose)
         self.provider = CodingProviderChoice()
+        self.provider.addItem("Auto · Aedrova chooses", "auto")
         self.provider.setCurrentIndex(1 if pref.get("provider") == "claude_code" else 0)
         row.addWidget(self.provider)
         layout.addLayout(row)
@@ -820,6 +850,10 @@ class BuildDialog(AppDialog):
             request["event"].set()
 
     def finished(self, result, plan):
+        if result.get("provider") in {"codex", "claude_code"}:
+            self.provider.blockSignals(True)
+            self.provider.setCurrentIndex(self.provider.findData(result["provider"]))
+            self.provider.blockSignals(False)
         if self.job and self.job.runner.cancelled.is_set():
             result = {**result, "ok": False, "text": "Cancelled. Review any partial local changes."}
         self.job = None

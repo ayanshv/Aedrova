@@ -3069,3 +3069,18 @@ Owner also requested Preferred Source badge: Google selector currently returns
 No results for aedrova.com. Markup prepared but not displayed as working/endorsed.
 Activate only once Google offers domain; no owner setting can force eligibility.
 Details: ../Aedrova_site/docs/search-console-2026-10-22.md.
+
+### October 23 — Intelligent coding router foundation (not production completion)
+
+Owner requested full provider-aware routing. Audited chat/build/context, runtime,
+queue/ledger and managed reservations; official Codex and Claude harness docs read.
+Build Room now has opt-in Auto, deterministic classifier/policy, common adapter,
+explicit no-fallback behavior and provider pinning after planning. Existing saved
+manual settings unchanged. Private queued routing metadata joins owner/Space runs.
+105 focused router/build/queue/managed tests passed; Ruff and diff checks passed.
+No live provider invocation, hosted deployment, price or credential change.
+Remaining gates and setup assumptions: docs/agents/intelligent-router.md. Especially
+backend preflight capabilities/credits, authenticated Space-level default admin UI,
+reviewed category/config cohorts, durable interactive metrics and live acceptance.
+No owner action required now. This milestone remains incomplete; do not label the
+full request production-ready or infer objective provider superiority.
