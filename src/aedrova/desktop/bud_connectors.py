@@ -201,6 +201,10 @@ class ConnectorsDialog(AppDialog):
         header = QHBoxLayout()
         header.addWidget(label("Connectors", "heading"))
         header.addStretch()
+        from aedrova.desktop.spinner import Spinner
+
+        self.loading_spinner = Spinner(self)
+        header.addWidget(self.loading_spinner)
         refresh = button("Refresh")
         refresh.clicked.connect(self.refresh)
         header.addWidget(refresh)
@@ -419,6 +423,7 @@ class ConnectorsDialog(AppDialog):
                 self.embedded_owner and (self.embedded_owner.pending or self.embedded_owner.job)
             )
         )
+        self.loading_spinner.set_active(busy)
         self.bud.setEnabled(not busy)
         can_connect = bool(self.bud.currentData()) or bool(
             self.embedded_owner and self.embedded_owner.admin()
