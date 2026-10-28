@@ -1,5 +1,15 @@
 # Final Beta and public launch plan
 
+## Payment timing — owner correction, October 24, 2026
+
+Defer all setup that would charge the owner to the consolidated
+[final paid launch gates](final-paid-launch-gates.md). Finish payment-free
+engineering, configuration preparation and tests first. No payment is required
+now and no payment may be submitted on the owner's behalf. Then the owner funds
+the required items personally, and the dependent live acceptance must pass before
+production promotion/public launch. This supersedes earlier immediate payment
+handoffs without waiving any staging, signing, security or release gate.
+
 Status: Phase 1 closed by owner confirmation of desktop acceptance and both
 main-branch rulesets. Phases 2 and 3 have outstanding live acceptance gates.
 Phase 4 approved October 12, 2026; UI implementation and acceptance are tracked in
