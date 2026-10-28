@@ -1,5 +1,6 @@
 """Execution permission gates, scoped persistence and real stdio request/reply tests."""
 
+import subprocess
 import sys
 import threading
 from types import SimpleNamespace
@@ -149,6 +150,17 @@ sys.stdin.read()
     binary.write_text(f"#!{sys.executable}\n" + body)
     binary.chmod(0o700)
     monkeypatch.setattr("aedrova.agents.runtime.executable", lambda _: str(binary))
+    # Windows cannot execute a POSIX shebang script directly. Keep real stdio,
+    # process-tree cleanup and permission exchange under test through Python.
+    original = subprocess.Popen
+
+    def launch(command, *args, **kwargs):
+        if command[0] == str(binary):
+            command = [sys.executable, *command]
+        return original(command, *args, **kwargs)
+
+    monkeypatch.setattr("aedrova.agents.codex_approvals.subprocess.Popen", launch)
+
 
 
 @pytest.mark.parametrize("allow", [True, False])

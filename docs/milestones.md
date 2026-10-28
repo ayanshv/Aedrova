@@ -3651,3 +3651,11 @@ CLIs through its new Auto default. Its routing fixture now supplies a synthetic
 available provider alongside the synthetic runner; 61 build-flow checks passed.
 Required hosted CI must pass before merging PR4. No branch protection was disabled.
 Stage 1 external approvals/audio and deferred paid gates remain unchanged.
+
+Windows hosted CI additionally found that the approval-transport test fixture tried
+to execute a POSIX shebang script as a native Windows program (WinError193). The
+fixture now launches its synthetic server through the current Python interpreter
+on every platform, retaining actual stdio, approval denial/acceptance, cancellation
+and managed-auth isolation assertions. 73 permission/build tests passed locally.
+Linux/macOS and RLS hosted checks passed on the preceding fixture fix; the final
+cross-platform rerun remains the merge gate. Runtime permissions were not relaxed.
