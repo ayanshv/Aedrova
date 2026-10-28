@@ -133,8 +133,13 @@ def instructions(task, context_file, *, plan, approved_plan=""):
         "underspecified requirements rather than silently choosing the newest message. "
         "Never claim tests passed unless you actually ran them.\n"
         + (
-            "PLAN ONLY: inspect the repository and evidence, then propose a concrete plan, "
-            "acceptance criteria and test commands. Do not edit files or execute project scripts.\n"
+            "PLAN ONLY: perform read-only inspection of the repository and evidence NOW, "
+            "then return a concrete plan, acceptance criteria and proposed test commands. "
+            "Reading files with safe shell commands is permitted; do not edit files or "
+            "execute project scripts or tests during planning. Implementation and test "
+            "requests below describe the future approved build, not a conflict with planning. "
+            "A plan that postpones inspecting evidence is incomplete. Include actual exact "
+            "source identifiers you inspected, never message:<id> placeholders.\n"
             if plan
             else "IMPLEMENT the approved plan, run relevant tests, and report modified "
             "files, actual test results, failures and remaining setup.\nApproved plan:\n"
@@ -314,6 +319,7 @@ class LocalRunner:
         self.command_results = []
         self.lease_fd = None
         self.managed = None
+        self.permission_mode = None
 
     def cancel(self):
         self.cancelled.set()
@@ -373,6 +379,10 @@ class LocalRunner:
         return self._codex(project, prompt, plan=plan)
 
     def _codex(self, project, prompt, *, plan, managed_home=None):
+        if self.permission_mode is not None:
+            from aedrova.agents.permissions import normalize
+
+            self.permission_mode = normalize(self.permission_mode)
         if self.managed and self.managed.provider != "codex":
             raise ValueError("Managed provider does not match this build.")
         command = [
@@ -410,7 +420,9 @@ class LocalRunner:
             str(project),
             "-",
         ]
-        command[2:2] = codex_permissions(project, plan=plan)
+        command[2:2] = codex_permissions(
+            project, plan=plan or self.permission_mode in {"ask", "auto"}
+        )
         for feature in ("hooks", "plugins", "multi_agent", "multi_agent_v2", "apps", "browser_use"):
             command[2:2] = ["-c", "features." + feature + "=false"]
         command[2:2] = ["-c", 'web_search="disabled"']
@@ -440,6 +452,10 @@ class LocalRunner:
                 command[2:2] = ["-c", key + "=" + json.dumps(value)]
             provider_env["AEDROVA_BUILD_TOKEN"] = access.token
             provider_env["CODEX_HOME"] = managed_home
+        if self.permission_mode is not None:
+            from aedrova.agents.codex_approvals import run
+
+            return run(self, project, prompt, plan=plan, command=command, env=provider_env)
         started, final, completed = time.monotonic(), "", False
         process = subprocess.Popen(
             command,
@@ -673,6 +689,11 @@ class LocalRunner:
                     "ANTHROPIC_BASE_URL": self.managed.base_url,
                     "ANTHROPIC_AUTH_TOKEN": "",
                     "DISABLE_NONESSENTIAL_TRAFFIC": "1",
+                    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+                    # Keep a CLI update from silently adding unreviewed gateway
+                    # capabilities or new billable hosted tools.
+                    "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS": "1",
+                    "CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK": "1",
                 }
             )
             managed_options["model"] = self.managed.model

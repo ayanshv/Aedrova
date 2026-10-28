@@ -48,6 +48,29 @@ class ContextIndex:
             (r["product_memory_snapshot"] for r in records if "product_memory_snapshot" in r), {}
         )
         for record in records:
+            local = record.get("project_file")
+            if local is None:
+                continue
+            expected = (
+                "project:"
+                + hashlib.sha256((local["path"] + "\0" + local["text"]).encode()).hexdigest()[:24]
+            )
+            if local.get("citation") != expected:
+                raise PermissionError("Invalid project evidence citation.")
+            self._add(
+                Source(
+                    expected,
+                    expected,
+                    "Connected project · " + local["path"],
+                    local["text"],
+                    None,
+                    "",
+                    "local_untrusted",
+                    "",
+                    expected,
+                )
+            )
+        for record in records:
             if "connector_source" not in record:
                 continue
             from aedrova.connectors.service import resource_id
@@ -77,10 +100,17 @@ class ContextIndex:
                 continue
             from uuid import UUID
 
-            if (
-                dot.get("untrusted") is not True
-                or dot.get("citation") != "dot:" + str(UUID(dot["dot"])) + ":" + dot["tool"]
-            ):
+            expected = "dot:" + str(UUID(dot["dot"])) + ":" + dot["tool"]
+            if dot.get("connection_id"):
+                expected = (
+                    "bud:"
+                    + str(UUID(dot["dot"]))
+                    + ":"
+                    + str(UUID(dot["connection_id"]))
+                    + ":"
+                    + dot["tool"]
+                )
+            if dot.get("untrusted") is not True or dot.get("citation") != expected:
                 raise PermissionError("Invalid Dot evidence citation.")
             body = dot["coverage"] + "\n" + json.dumps(dot["records"])
             self._add(
@@ -263,7 +293,8 @@ def validate_citations(context, plan):
             re.findall(
                 r"(?:message|attachment|meeting|memory):[A-Za-z0-9_-]+"
                 r"|connector:(?:github|figma|notion):[A-Za-z0-9_./-]+"
-                r"|dot:[a-f0-9-]{36}:[a-z_]+",
+                r"|bud:[a-f0-9-]{36}:[a-f0-9-]{36}:[a-z_]+"
+                r"|dot:[a-f0-9-]{36}:[a-z_]+|project:[a-f0-9]{24}",
                 plan,
             )
         )

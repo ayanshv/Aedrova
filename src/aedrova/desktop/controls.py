@@ -1,7 +1,7 @@
 """Themed, keyboard-accessible choices, including macOS popup menus."""
 
 from PySide6.QtCore import QRectF, QSize, Qt
-from PySide6.QtGui import QIcon, QPainter, QPainterPath, QPalette, QPen, QRegion
+from PySide6.QtGui import QIcon, QPainter, QPainterPath, QPalette, QPen, QPixmap, QRegion
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -117,12 +117,14 @@ class CodingProviderChoice(ChoiceBox):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        from aedrova.desktop.brand import brand_image
         from aedrova.desktop.connector_icons import connector_pixmap
 
         self.setIconSize(QSize(28, 28))
         for key, name in (("codex", "Codex"), ("claude_code", "Claude Code")):
             self.addItem(QIcon(connector_pixmap(key, 28)), name, key)
-        self.addItem("Auto · Aedrova chooses", "auto")
+        self.addItem(QIcon(QPixmap.fromImage(brand_image())), "Auto · Aedrova chooses", "auto")
+        self.setCurrentIndex(self.findData("auto"))
 
 
 def choose_project(parent, initial=""):

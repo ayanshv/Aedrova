@@ -217,6 +217,18 @@ class IdentityService:
         self._authenticated()
         return self.client.rpc("save_workspace_dot", parameters).execute().data
 
+    def bud_capacity(self, workspace):
+        self._authenticated()
+        try:
+            return (
+                self.client.rpc("workspace_bud_capacity", {"p_workspace": workspace}).execute().data
+            )
+        except Exception as error:
+            if getattr(error, "code", None) == "PGRST202":
+                # Older hosts must not show an invented plan or allowance.
+                return None
+            raise
+
     def save_bud(self, parameters):
         self._authenticated()
         appearance = parameters.get("p_appearance", "auto")

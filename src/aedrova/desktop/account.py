@@ -18,6 +18,7 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
+    QFrame,
     QGridLayout,
     QHBoxLayout,
     QLineEdit,
@@ -34,7 +35,7 @@ from shiboken6 import isValid
 
 from aedrova.desktop.brand import BrandMark
 from aedrova.desktop.controls import AppDialog, ChoiceBox, CodingProviderChoice
-from aedrova.desktop.dialogs import button, label
+from aedrova.desktop.dialogs import button, icon_button, label
 from aedrova.desktop.welcome_surface import WelcomeSurface
 from aedrova.identity.oauth import google_sign_in
 from aedrova.identity.service import Connection, IdentityService
@@ -97,6 +98,7 @@ class AccountDialog(AppDialog):
             "invitations": [],
             "agent_preferences": [],
         }
+        self.setObjectName("AccountDialog")
         self.setWindowTitle("Aedrova · Account & workspaces")
         self.resize(720, 780)
         self.setMinimumSize(600, 540)
@@ -124,7 +126,7 @@ class AccountDialog(AppDialog):
         self.cancel_login.hide()
         self.cancel_login.clicked.connect(self.cancel_google)
         layout.addWidget(self.cancel_login)
-        close = button("Close")
+        close = self.workspace_icon("close", "Close")
         close.clicked.connect(self.accept)
         layout.addWidget(close, alignment=Qt.AlignmentFlag.AlignRight)
         for control in self.findChildren(QPushButton):
@@ -134,6 +136,7 @@ class AccountDialog(AppDialog):
     def add_page(self, page):
         page.setObjectName("AccountPage")
         scroll = QScrollArea()
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.setWidgetResizable(True)
         scroll.setWidget(page)
         self.pages.addWidget(scroll)
@@ -215,24 +218,28 @@ class AccountDialog(AppDialog):
             self.status.setText("Cancelling sign-in…")
 
     def _workspace_page(self):
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setSpacing(12)
-        back = button("Back to workspace")
-        back.clicked.connect(self.finish_setup)
-        layout.addWidget(back)
-        self.account_label = label("", "title", wrap=True)
-        layout.addWidget(self.account_label)
+        from aedrova.desktop.workspace_settings import WorkspaceSettingsView
+
+        self.workspace_settings = WorkspaceSettingsView()
+        page = self.workspace_settings
         self.workspaces = ChoiceBox()
         self.workspaces.setAccessibleName("Your connected workspaces")
         self.workspaces.currentIndexChanged.connect(self.render_workspace)
-        layout.addWidget(self.workspaces)
-        layout.addWidget(label("Your team’s agent", "title"))
-        agent_row = QVBoxLayout()
+        page.workspace_slot.addWidget(self.workspaces)
+        self.account_label = label("", "muted", wrap=True)
+        # Account identity belongs in its own section, rather than above every form.
+        agent = page.add_section(
+            "agent", "Your agent", "Choose how Aedrova builds with your team.", "work"
+        )
+        agent.addSpacing(8)
+        agent.addWidget(label("Agent name", "muted"))
         self.agent_name = self.field("Agent nickname")
         self.agent_name.setMaxLength(32)
+        agent.addWidget(self.agent_name)
+        agent.addWidget(label("Powered by", "muted"))
         self.agent_provider = self.provider_choice()
-        self.save_agent = button("Save agent name")
+        agent.addWidget(self.agent_provider)
+        self.save_agent = button("Save agent", role="primary")
         self.save_agent.clicked.connect(
             lambda: self.mutate(
                 "set_agent_preferences",
@@ -243,41 +250,23 @@ class AccountDialog(AppDialog):
                 },
             )
         )
-        agent_row.addWidget(self.agent_name)
-        agent_row.addWidget(self.agent_provider)
-        layout.addLayout(agent_row)
-        layout.addWidget(self.save_agent)
-        layout.addWidget(
-            label(
-                "A shared name for your team. Aedrova is still your workspace.", "muted", wrap=True
-            )
+        agent.addWidget(self.save_agent)
+        agent.addStretch(1)
+
+        channels = page.add_section(
+            "channels", "Channels", "Give each conversation a place.", "context"
         )
-        row = QHBoxLayout()
-        create = button("Create workspace")
-        create.clicked.connect(self.begin_onboarding)
-        row.addWidget(create)
-        layout.addLayout(row)
-        row = QHBoxLayout()
-        self.invite_code = self.field("Invitation code", password=True)
-        row.addWidget(self.invite_code)
-        join = button("Join workspace")
-        join.clicked.connect(
-            lambda: self.mutate("accept_invitation", {"p_token": self.invite_code.text().strip()})
-        )
-        row.addWidget(join)
-        layout.addLayout(row)
-        layout.addWidget(label("Channels", "title"))
         self.channels = QListWidget()
         self.channels.setProperty("accountList", True)
         self.channels.setAccessibleName("Authorized channels")
-        self.channels.setFixedHeight(110)
-        layout.addWidget(self.channels)
-        row = QHBoxLayout()
+        self.channels.setMinimumHeight(110)
+        channels.addWidget(self.channels, 1)
         self.channel_name = self.field("New channel name")
-        self.private = QCheckBox("Private")
-        row.addWidget(self.channel_name)
-        row.addWidget(self.private)
-        create_channel = button("Create channel")
+        self.channel_name.setMaxLength(80)
+        channels.addWidget(self.channel_name)
+        self.private = QCheckBox("Private · invited members only")
+        channels.addWidget(self.private)
+        create_channel = button("Create channel", role="primary")
         create_channel.clicked.connect(
             lambda: self.mutate(
                 "create_channel",
@@ -288,92 +277,147 @@ class AccountDialog(AppDialog):
                 },
             )
         )
-        row.addWidget(create_channel)
-        layout.addLayout(row)
-        layout.addWidget(label("Members & access", "title"))
+        channels.addWidget(create_channel)
+
+        people = page.add_section(
+            "people", "People & access", "Select a teammate to manage their access.", "smile"
+        )
         self.members = QListWidget()
         self.members.setProperty("accountList", True)
         self.members.setAccessibleName("Workspace members")
-        self.members.setFixedHeight(100)
-        layout.addWidget(self.members)
-        row = QGridLayout()
+        self.members.setMinimumHeight(140)
+        people.addWidget(self.members, 1)
         self.role = ChoiceBox()
         self.role.addItems(["member", "guest", "admin"])
         self.role.setAccessibleName("Member or invitation role")
-        row.addWidget(self.role, 0, 0, 1, 2)
-        for index, (title, operation) in enumerate(
-            [
-                ("Change role", "role"),
-                ("Remove member", "remove"),
-                ("Grant channel", "grant"),
-                ("Revoke channel", "revoke"),
-            ]
-        ):
-            control = button(title)
-            control.clicked.connect(lambda checked=False, op=operation: self.member_action(op))
-            row.addWidget(control, 1 + index // 2, index % 2)
-        layout.addLayout(row)
-        layout.addWidget(
-            label(
-                "Select a member and channel to change access.\nOnly owners can change roles.",
-                "muted",
-                wrap=True,
-            )
+        people.addWidget(self.role)
+        change = button("Update role", role="primary")
+        self.update_member_role_button = change
+        change.setEnabled(False)
+        self.members.currentItemChanged.connect(
+            lambda current, _previous: change.setEnabled(bool(current) and self.can_manage_roles)
         )
-        row = QHBoxLayout()
+        change.clicked.connect(lambda: self.member_action("role"))
+        people.addWidget(change)
+        from PySide6.QtWidgets import QGroupBox
+
+        advanced = QGroupBox("More access controls")
+        advanced.setCheckable(True)
+        advanced.setChecked(False)
+        tools = QWidget()
+        row = QGridLayout(tools)
+        self.access_channel = ChoiceBox()
+        self.access_channel.setAccessibleName("Channel access to manage")
+        row.addWidget(self.access_channel, 0, 0)
+        for index, (title, operation) in enumerate(
+            [("Remove member", "remove"), ("Grant channel", "grant"), ("Revoke channel", "revoke")]
+        ):
+            control = button(title, role="outline")
+            control.clicked.connect(lambda checked=False, op=operation: self.member_action(op))
+            row.addWidget(control, index + 1, 0)
+        advanced_layout = QVBoxLayout(advanced)
+        advanced_layout.addWidget(tools)
+        tools.setVisible(False)
+        advanced.toggled.connect(tools.setVisible)
+        people.addWidget(advanced)
+
+        invites = page.add_section(
+            "invitations", "Invitations", "Bring a teammate into this workspace.", "mention"
+        )
         self.invite_email = self.field("Teammate email")
-        row.addWidget(self.invite_email)
-        layout.addWidget(label("Invite teammates", "title"))
-        invite = button("Create invitation")
-        self.create_invitation_button = invite
-        invite.clicked.connect(
+        invites.addWidget(self.invite_email)
+        self.invite_role = ChoiceBox()
+        for title, role in (("Teammate", "member"), ("Guest", "guest"), ("Administrator", "admin")):
+            self.invite_role.addItem(title, role)
+        self.invite_role.setAccessibleName("Invitation role")
+        invites.addWidget(self.invite_role)
+        self.create_invitation_button = button("Create invitation", role="primary")
+        self.create_invitation_button.clicked.connect(
             lambda: self.mutate(
                 "create_invitation",
                 {
                     "p_workspace": self.workspace_id(),
                     "p_email": self.invite_email.text().strip(),
-                    "p_role": self.role.currentText(),
+                    "p_role": self.invite_role.currentData(),
                 },
             )
         )
-        row.addWidget(invite)
-        layout.addLayout(row)
+        invites.addWidget(self.create_invitation_button)
         self.generated_code = self.field("Invitation code appears here once")
         self.generated_code.setReadOnly(True)
-        layout.addWidget(self.generated_code)
-        self.copy_invitation = button("Copy invitation code")
+        self.generated_code.hide()
+        invites.addWidget(self.generated_code)
+        self.copy_invitation = button("Copy invitation code", role="outline")
         self.copy_invitation.setEnabled(False)
+        self.copy_invitation.hide()
+        self.generated_code.textChanged.connect(
+            lambda text: self.generated_code.setVisible(bool(text))
+        )
+        self.generated_code.textChanged.connect(
+            lambda text: self.copy_invitation.setVisible(bool(text))
+        )
         self.generated_code.textChanged.connect(
             lambda text: self.copy_invitation.setEnabled(bool(text))
         )
         self.copy_invitation.clicked.connect(
             lambda: QApplication.clipboard().setText(self.generated_code.text())
         )
-        layout.addWidget(self.copy_invitation)
-        layout.addWidget(
-            label(
-                "Share this single-use code with the named teammate.\n"
-                "It expires in seven days; no email is sent.",
-                "muted",
-                wrap=True,
-            )
+        invites.addWidget(self.copy_invitation)
+        self.invitation_note = label(
+            "Share the single-use code. Expires in seven days; no email is sent.",
+            "muted",
+            wrap=True,
         )
+        self.invitation_note.hide()
+        self.generated_code.textChanged.connect(
+            lambda text: self.invitation_note.setVisible(bool(text))
+        )
+        invites.addWidget(self.invitation_note)
         self.invitations = QListWidget()
         self.invitations.setProperty("accountList", True)
         self.invitations.setAccessibleName("Pending invitations")
-        self.invitations.setFixedHeight(85)
-        layout.addWidget(self.invitations)
-        row = QGridLayout()
-        revoke = button("Revoke selected invitation")
+        self.invitations.setMinimumHeight(100)
+        invites.addWidget(self.invitations, 1)
+        revoke = button("Revoke selected invitation", role="outline")
+        self.revoke_invitation_button = revoke
         revoke.clicked.connect(self.revoke_invitation)
-        row.addWidget(revoke, 0, 0, 1, 2)
-        refresh = button("Refresh")
+        invites.addWidget(revoke)
+
+        account = page.add_section(
+            "account", "Account", "Manage your session and workspaces.", "spaces"
+        )
+        account.addWidget(self.account_label)
+        actions = QHBoxLayout()
+        create = icon_button("plus", "Create a workspace")
+        create.clicked.connect(self.begin_onboarding)
+        actions.addWidget(create)
+        refresh = icon_button("refresh", "Refresh workspace")
         refresh.clicked.connect(self.refresh)
-        row.addWidget(refresh, 1, 0)
-        signout = button("Sign out")
+        actions.addWidget(refresh)
+        actions.addStretch()
+        signout = icon_button("logout", "Sign out")
         signout.clicked.connect(self.sign_out)
-        row.addWidget(signout, 1, 1)
-        layout.addLayout(row)
+        actions.addWidget(signout)
+        back = icon_button("enter", "Back to workspace", primary=True)
+        back.clicked.connect(self.finish_setup)
+        actions.addWidget(back)
+        actions.setContentsMargins(0, 0, 0, 0)
+        actions.setSpacing(8)
+        account.addSpacing(8)
+        account.addWidget(label("Join a workspace", "title"))
+        join_row = QHBoxLayout()
+        join_row.setSpacing(12)
+        self.invite_code = self.field("Invitation code", password=True)
+        join_row.addWidget(self.invite_code, 1)
+        join = icon_button("enter", "Join workspace")
+        join.clicked.connect(
+            lambda: self.mutate("accept_invitation", {"p_token": self.invite_code.text().strip()})
+        )
+        join_row.addWidget(join)
+        account.addLayout(join_row)
+        account.addSpacing(8)
+        account.addLayout(actions)
+        account.addStretch(1)
         self.add_page(page)
 
     def provider_choice(self):
@@ -578,64 +622,80 @@ class AccountDialog(AppDialog):
         join_layout.addStretch()
         self.add_page(join_page)
 
+    def workspace_icon(self, name, title, *, primary=False):
+        return icon_button(name, title, primary=primary)
+
     def _home_page(self):
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(20)
-        layout.addStretch()
-        layout.addWidget(label("YOUR WORKSPACES", "section"))
-        layout.addWidget(label("Welcome home.", "heading"))
+        content = QWidget()
+        content.setMinimumWidth(0)
+        content.setMaximumWidth(720)
+        content.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
+        body = QVBoxLayout(content)
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(20)
+        heading = QHBoxLayout()
+        heading.addWidget(label("Your workspaces", "heading"))
+        heading.addStretch()
+        create = self.workspace_icon("plus", "Create a workspace")
+        create.clicked.connect(self.begin_onboarding)
+        heading.addWidget(create)
+        body.addLayout(heading)
+
+        row = QHBoxLayout()
+        row.setSpacing(12)
         self.home_workspaces = ChoiceBox()
         self.home_workspaces.setAccessibleName("Choose your workspace")
+        self.home_workspaces.setFixedHeight(44)
         self.home_workspaces.currentIndexChanged.connect(self.workspaces.setCurrentIndex)
         self.workspaces.currentIndexChanged.connect(self.home_workspaces.setCurrentIndex)
-        layout.addWidget(self.home_workspaces)
-        self.home_dashboard = button("Go to dashboard", role="primary")
-        self.home_dashboard.setMinimumHeight(48)
+        row.addWidget(self.home_workspaces, 1)
+        self.home_dashboard = self.workspace_icon("enter", "Open workspace", primary=True)
         self.home_dashboard.clicked.connect(self.open_dashboard)
-        layout.addWidget(self.home_dashboard)
-        invite = button("Invite teammates", role="primary")
-        invite.clicked.connect(self.show_simple_invite)
-        layout.addWidget(invite)
-        settings = button("Workspace settings")
-        settings.clicked.connect(lambda: self.pages.setCurrentIndex(1))
-        layout.addWidget(settings)
-        self.archive_workspace = button("Archive for me…")
+        row.addWidget(self.home_dashboard)
+        body.addLayout(row)
+
+        actions = QHBoxLayout()
+        actions.setSpacing(8)
+        self.home_invite = self.workspace_icon("invite", "Invite teammates")
+        self.home_invite.clicked.connect(self.show_simple_invite)
+        actions.addWidget(self.home_invite)
+        self.home_settings = self.workspace_icon("settings", "Workspace settings")
+        self.home_settings.clicked.connect(lambda: self.pages.setCurrentIndex(1))
+        actions.addWidget(self.home_settings)
+        actions.addStretch()
+        self.archive_workspace = self.workspace_icon("archive", "Archive workspace for me")
         self.archive_workspace.clicked.connect(self.confirm_archive)
-        layout.addWidget(self.archive_workspace)
+        actions.addWidget(self.archive_workspace)
+        body.addLayout(actions)
+
         self.archived_section = QWidget()
         archived_layout = QVBoxLayout(self.archived_section)
-        archived_layout.setContentsMargins(0, 0, 0, 0)
-        archived_layout.setSpacing(12)
-        archived_layout.addWidget(label("ARCHIVED FOR YOU", "section"))
+        archived_layout.setContentsMargins(0, 24, 0, 0)
+        archived_layout.setSpacing(10)
+        archived_layout.addWidget(label("Archived", "muted"))
+        archived_row = QHBoxLayout()
+        archived_row.setSpacing(12)
         self.archived_workspaces = ChoiceBox()
         self.archived_workspaces.setAccessibleName("Your archived workspaces")
-        archived_layout.addWidget(self.archived_workspaces)
-        self.restore_workspace = button("Restore workspace")
+        self.archived_workspaces.setFixedHeight(44)
+        archived_row.addWidget(self.archived_workspaces, 1)
+        self.restore_workspace = self.workspace_icon("restore", "Restore workspace")
         self.restore_workspace.clicked.connect(self.restore_archived)
-        archived_layout.addWidget(self.restore_workspace)
-        archived_layout.addWidget(
-            label(
-                "Archiving only hides a workspace for you. "
-                "Your team, files and subscription stay intact.",
-                "muted",
-                wrap=True,
-            )
-        )
+        archived_row.addWidget(self.restore_workspace)
+        archived_layout.addLayout(archived_row)
         self.archived_section.hide()
-        layout.addWidget(self.archived_section)
-        create = button("Create another workspace")
-        create.clicked.connect(self.begin_onboarding)
-        layout.addWidget(create)
-        layout.addWidget(
-            label(
-                "Your team is set up. Open your dashboard to start a conversation.",
-                "muted",
-                wrap=True,
-            )
-        )
-        layout.addStretch()
+        body.addWidget(self.archived_section)
+        centered = QHBoxLayout()
+        centered.setContentsMargins(0, 0, 0, 0)
+        centered.addStretch()
+        centered.addWidget(content, 1)
+        centered.addStretch()
+        layout.addStretch(1)
+        layout.addLayout(centered)
+        layout.addStretch(2)
         self.add_page(page)
 
     def confirm_archive(self):
@@ -710,7 +770,7 @@ class AccountDialog(AppDialog):
         self.creation_workspace = None
         self.onboarding_workspace.clear()
         self.onboarding_nickname.setText("Aedrova")
-        self.onboarding_provider.setCurrentIndex(0)
+        self.onboarding_provider.setCurrentIndex(self.onboarding_provider.findData("auto"))
         self.onboarding_workflow.setCurrentIndex(0)
         self.onboarding_ack.setChecked(False)
         self.finish_onboarding.setText("Create workspace")
@@ -747,9 +807,7 @@ class AccountDialog(AppDialog):
             "authorize the workflow. Automatic execution stays off."
         )
 
-        self.onboarding_permission.setMinimumHeight(
-            self.onboarding_permission.sizeHint().height()
-        )
+        self.onboarding_permission.setMinimumHeight(self.onboarding_permission.sizeHint().height())
 
     def review_ai_setup(self):
         if not self.onboarding_nickname.text().strip():
@@ -792,7 +850,7 @@ class AccountDialog(AppDialog):
                 self.creation_workspace = self.workspace_id()
                 self.onboarding_nickname.setText(data.get("agent_nickname", "Aedrova"))
                 self.onboarding_provider.setCurrentIndex(
-                    self.onboarding_provider.findData(data.get("provider", "codex"))
+                    self.onboarding_provider.findData(data.get("provider", "auto"))
                 )
                 self.onboarding_workflow.setCurrentIndex(
                     self.onboarding_workflow.findData(bool(data.get("background_build")))
@@ -877,12 +935,14 @@ class AccountDialog(AppDialog):
     def workspace_id(self):
         return self.workspaces.currentData()
 
-    def run(self, operation, success):
+    def run(self, operation, success, *, background=False):
         if self.busy:
             return
         self.busy = True
-        self.pages.setEnabled(False)
-        self.set_loading(self.pages, True)
+        self.background_job = background
+        if not background:
+            self.pages.setEnabled(False)
+            self.set_loading(self.pages, True)
         self.success = success
         self.job = AccountJob(operation)
         self.job.signals.finished.connect(self.finished_job)
@@ -963,13 +1023,15 @@ class AccountDialog(AppDialog):
         self.restore_workspace.setEnabled(self.archived_workspaces.count() > 0)
         self.archive_workspace.setEnabled(bool(snapshot["workspaces"]))
         self.home_dashboard.setEnabled(bool(snapshot["workspaces"]))
+        self.home_invite.setEnabled(bool(snapshot["workspaces"]))
+        self.home_settings.setEnabled(bool(snapshot["workspaces"]))
         self.render_workspace()
         self.pages.setCurrentIndex(
             4 if snapshot["workspaces"] or snapshot.get("archived_workspaces") else 2
         )
         if not snapshot["workspaces"]:
             self.onboarding_steps.setCurrentIndex(0)
-        self.status.setText("Connected · workspace access is enforced by the server.")
+        self.status.setText("Connected")
         self.apply_intent()
         self.snapshot_loaded.emit()
         if self.awaiting_sign_in_snapshot and self.service and self.service.user:
@@ -984,8 +1046,11 @@ class AccountDialog(AppDialog):
             self.begin_onboarding()
         elif intent == "manage" and self.workspace_id():
             self.pages.setCurrentIndex(1)
+            self.workspace_settings.show_section("agent")
+            self.resize(840, 690)
         elif intent == "channel" and self.workspace_id():
             self.pages.setCurrentIndex(1)
+            self.workspace_settings.show_section("channels")
             self.pages.widget(1).ensureWidgetVisible(self.channel_name)
             self.channel_name.setFocus()
         elif intent == "invite" and self.workspace_id():
@@ -1004,8 +1069,10 @@ class AccountDialog(AppDialog):
             {},
         )
         self.agent_name.setText(preference.get("nickname", ""))
-        provider_index = self.agent_provider.findData(preference.get("provider", "codex"))
-        self.agent_provider.setCurrentIndex(max(0, provider_index))
+        provider_index = self.agent_provider.findData(preference.get("provider", "auto"))
+        self.agent_provider.setCurrentIndex(
+            provider_index if provider_index >= 0 else self.agent_provider.findData("auto")
+        )
         user_id = str(self.service.user.id) if self.service and self.service.user else None
         can_edit = any(
             m["workspace_id"] == workspace
@@ -1013,6 +1080,22 @@ class AccountDialog(AppDialog):
             and m["role"] in ("owner", "admin")
             for m in self.snapshot["members"]
         )
+        self.can_manage_roles = any(
+            m["workspace_id"] == workspace and m["user_id"] == user_id and m["role"] == "owner"
+            for m in self.snapshot["members"]
+        )
+        self.role.setEnabled(self.can_manage_roles)
+        self.update_member_role_button.setEnabled(False)
+        selected_access = self.access_channel.currentData()
+        self.access_channel.clear()
+        self.access_channel.addItem("Choose a channel…", None)
+        for channel in self.snapshot["channels"]:
+            if channel["workspace_id"] == workspace:
+                self.access_channel.addItem(channel["name"], channel["id"])
+        if selected_access:
+            self.access_channel.setCurrentIndex(
+                max(0, self.access_channel.findData(selected_access))
+            )
         for control in (
             self.agent_name,
             self.agent_provider,
@@ -1051,8 +1134,43 @@ class AccountDialog(AppDialog):
                 item = QListWidgetItem(title)
                 item.setData(Qt.ItemDataRole.UserRole, value)
                 widget.addItem(item)
+        self.invitations.setVisible(self.invitations.count() > 0)
+        self.revoke_invitation_button.setVisible(self.invitations.count() > 0)
 
     def mutate(self, name, parameters, *, configuration=None, created_workspace=None):
+        if self.busy:
+            if getattr(self, "queued_settings_save", False):
+                return
+            self.queued_settings_save = True
+            service = self.service
+            user = str(service.user.id) if service and service.user else None
+            self.status.setText("Saving after the current update. Your changes are kept.")
+
+            def after_update():
+                self.operation_finished.disconnect(after_update)
+                self.queued_settings_save = False
+                if (
+                    self.service is service
+                    and service
+                    and service.user
+                    and str(service.user.id) == user
+                    and parameters.get("p_workspace", self.workspace_id()) == self.workspace_id()
+                    and self.snapshot.get("workspaces")
+                    and not getattr(self, "logout_pending", False)
+                ):
+                    self.mutate(
+                        name,
+                        parameters,
+                        configuration=configuration,
+                        created_workspace=created_workspace,
+                    )
+                else:
+                    self.status.setText(
+                        "Your session or workspace changed. Review it before saving."
+                    )
+
+            self.operation_finished.connect(after_update)
+            return
         if any(value is None for value in parameters.values()):
             self.status.setText("Choose a workspace first.")
             return
@@ -1172,7 +1290,10 @@ class AccountDialog(AppDialog):
     def member_action(self, action):
         member = self.members.currentItem()
         channel = self.channels.currentItem()
-        if not member or (action in ("grant", "revoke") and not channel):
+        channel_id = self.access_channel.currentData() or (
+            channel.data(Qt.ItemDataRole.UserRole) if channel else None
+        )
+        if not member or (action in ("grant", "revoke") and not channel_id):
             self.status.setText("Select a member and, when changing channel access, a channel.")
             return
         user = member.data(Qt.ItemDataRole.UserRole)
@@ -1180,7 +1301,7 @@ class AccountDialog(AppDialog):
             self.mutate(
                 "set_channel_member",
                 {
-                    "p_channel": channel.data(Qt.ItemDataRole.UserRole),
+                    "p_channel": channel_id,
                     "p_user": user,
                     "p_allowed": action == "grant",
                 },
@@ -1211,6 +1332,8 @@ class AccountDialog(AppDialog):
         self.archive_workspace.setEnabled(False)
         self.restore_workspace.setEnabled(False)
         self.home_dashboard.setEnabled(False)
+        self.home_invite.setEnabled(False)
+        self.home_settings.setEnabled(False)
         self.render_workspace()
         self.generated_code.clear()
         self.invite_code.clear()

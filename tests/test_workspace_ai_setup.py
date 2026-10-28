@@ -61,7 +61,7 @@ def test_creation_saves_real_execution_preferences_per_account_workspace(
     qtbot.waitUntil(lambda: not widget.busy)
     data = json.loads(widget.settings.value(binding_key("user", "new")))
     assert data["background_build"] is data["auto_plan"] is automatic
-    assert data["provider"] == "codex" and data["ai_setup_version"] == 1
+    assert data["provider"] == "auto" and data["ai_setup_version"] == 1
     assert data["model_policy"] in {"managed", "provider_default"}
     assert not data["ai_setup_pending"] and "folder" not in data
     assert widget.settings.value(binding_key("another-user", "new")) is None
@@ -96,7 +96,7 @@ def test_subspace_gets_selected_identity_and_retries_setup_without_recreating(qt
     assert [n for n, _ in calls].count("create_subspace") == 1
     assert calls[-1] == (
         "set_agent_preferences",
-        {"p_workspace": "new", "p_nickname": "Atlas", "p_provider": "codex"},
+        {"p_workspace": "new", "p_nickname": "Atlas", "p_provider": "auto"},
     )
     complete = json.loads(widget.settings.value(binding_key("user", "new")))
     assert not complete["ai_setup_pending"] and complete["background_build"]

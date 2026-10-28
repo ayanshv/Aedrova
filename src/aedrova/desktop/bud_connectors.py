@@ -22,7 +22,7 @@ from aedrova.agents.managed import connector_origin
 from aedrova.desktop.ai_teammates import Character
 from aedrova.desktop.connector_icons import connector_pixmap
 from aedrova.desktop.controls import AppDialog, ChoiceBox
-from aedrova.desktop.dialogs import button, label
+from aedrova.desktop.dialogs import button, icon_button, label
 from aedrova.desktop.dots import DotDialog
 from aedrova.dots.client import client
 from aedrova.dots.roles import ROLES, recommendation_set, role_for
@@ -114,6 +114,12 @@ GLYPHS = {
 CONNECTION_HOURS = 24
 
 
+def connector_description(provider):
+    if provider["id"] == "search":
+        return "Live web research with clickable sources · Uses your team's AI allowance"
+    return provider["description"]
+
+
 def normalize_resource(provider, value):
     """Accept ordinary provider links without widening the authorized resource scope."""
     value = value.strip()
@@ -179,7 +185,7 @@ class ConnectorsDialog(AppDialog):
         rail.setFixedWidth(180)
         navigation = QVBoxLayout(rail)
         navigation.setContentsMargins(18, 28, 18, 24)
-        back = button("‹  Back to app")
+        back = icon_button("back", "Back to app")
         back.clicked.connect(self.accept)
         navigation.addWidget(back)
         navigation.addSpacing(22)
@@ -201,11 +207,7 @@ class ConnectorsDialog(AppDialog):
         header = QHBoxLayout()
         header.addWidget(label("Connectors", "heading"))
         header.addStretch()
-        from aedrova.desktop.spinner import Spinner
-
-        self.loading_spinner = Spinner(self)
-        header.addWidget(self.loading_spinner)
-        refresh = button("Refresh")
+        refresh = icon_button("refresh", "Refresh connectors")
         refresh.clicked.connect(self.refresh)
         header.addWidget(refresh)
         main.addLayout(header)
@@ -228,6 +230,10 @@ class ConnectorsDialog(AppDialog):
         main.addLayout(controls)
         self.bud.setVisible(embedded_owner is None)
         self.pages = QStackedWidget(self)
+        from aedrova.desktop.spinner import CenteredSpinner
+
+        self.loading_overlay = CenteredSpinner(self.pages)
+        self.loading_spinner = self.loading_overlay.spinner
         self.pages.currentChanged.connect(
             lambda index: (
                 self.filter.setVisible(index == 0),
@@ -247,7 +253,7 @@ class ConnectorsDialog(AppDialog):
         form = QVBoxLayout(detail)
         form.setContentsMargins(0, 4, 0, 4)
         form.setSpacing(14)
-        back_tools = button("‹  All connectors")
+        back_tools = icon_button("back", "All connectors")
         back_tools.clicked.connect(self.back_to_gallery)
         form.addWidget(back_tools, alignment=Qt.AlignmentFlag.AlignLeft)
         self.detail_heading = label("", "heading")
@@ -391,7 +397,7 @@ class ConnectorsDialog(AppDialog):
         management = QWidget(self)
         management.setObjectName("ConnectorPage")
         management_layout = QVBoxLayout(management)
-        back_manage = button("‹  Back to connector")
+        back_manage = icon_button("back", "Back to connector")
         back_manage.clicked.connect(lambda: self.pages.setCurrentIndex(1))
         management_layout.addWidget(back_manage, alignment=Qt.AlignmentFlag.AlignLeft)
         management_layout.addWidget(label("Your connected resources", "heading"))
@@ -423,7 +429,8 @@ class ConnectorsDialog(AppDialog):
                 self.embedded_owner and (self.embedded_owner.pending or self.embedded_owner.job)
             )
         )
-        self.loading_spinner.set_active(busy)
+        self.loading_overlay.set_active(busy)
+        self.status.setVisible(not busy)
         self.bud.setEnabled(not busy)
         can_connect = bool(self.bud.currentData()) or bool(
             self.embedded_owner and self.embedded_owner.admin()
@@ -450,6 +457,10 @@ class ConnectorsDialog(AppDialog):
             card.setEnabled(not busy and bool(card.property("providerAvailable")) and can_connect)
         if self.embedded_owner:
             self.embedded_owner.update_controls()
+
+    def set_loading(self, target, active, kind="form"):
+        self.loading_overlay.set_active(active)
+        self.status.setVisible(not active)
 
     def back_to_gallery(self):
         self.stop_oauth()
@@ -591,7 +602,7 @@ class ConnectorsDialog(AppDialog):
         self.success_copy.setText(
             row["name"]
             + " can now access: "
-            + provider["description"]
+            + connector_description(provider)
             + "\nMention @"
             + row["name"]
             + " in your conversation."
@@ -628,7 +639,11 @@ class ConnectorsDialog(AppDialog):
         for provider in self.providers:
             if allowed is not None and provider["id"] not in allowed:
                 continue
-            if query and query not in (provider["name"] + " " + provider["description"]).casefold():
+            if (
+                query
+                and query
+                not in (provider["name"] + " " + connector_description(provider)).casefold()
+            ):
                 continue
             groups.setdefault(provider["group"], []).append(provider)
         recommended = recommendation_set(role_for(self.row().get("role", "")))
@@ -664,7 +679,7 @@ class ConnectorsDialog(AppDialog):
                 heading.addWidget(glyph)
                 heading.addWidget(label(provider["name"], "subheading", wrap=True), 1)
                 column.addLayout(heading)
-                copy = label(provider["description"], "muted", wrap=True)
+                copy = label(connector_description(provider), "muted", wrap=True)
                 copy.setMinimumHeight(42)
                 column.addWidget(copy)
                 connected = any(
@@ -861,7 +876,8 @@ class ConnectorsDialog(AppDialog):
             self.selection_link.setVisible(True)
             self.selection_link.setPlaceholderText("What should your Bud research?")
             self.selection_copy.setText(
-                "Choose a research topic. Aedrova handles the connection; daily usage limits apply."
+                "Choose a topic. Live research uses your team's AI allowance and daily limits. "
+                "No separate search account needed."
             )
             self.selection_submit.setText("Enable web search")
             self.selection_submit.show()

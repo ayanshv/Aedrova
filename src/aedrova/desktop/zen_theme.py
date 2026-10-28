@@ -32,7 +32,7 @@ def tone(theme, color):
     if value in {"#EDF5FF", "#EAF3FF", "#E0EFFF", "#E2EFFF", "#DCEFFF", "#DFEFFF", "#CBE5FF"}:
         return theme.accent_bg
     if value == "#E8E4FB":
-        return "#29263C"
+        return theme.surface
     if value in {"#283A52", "#1D1D1F"}:
         return theme.text
     if value in {"#176CCD", "#175FAD", "#1877DB", "#2367A7", "#1478E8", "#23558A"}:

@@ -9,18 +9,18 @@ from aedrova.desktop.window import AedrovaWindow
 def test_pulse_is_not_exposed_and_primary_navigation_survives(qtbot, tmp_path):
     window = AedrovaWindow(settings=QSettings(str(tmp_path / "ui.ini"), QSettings.Format.IniFormat))
     qtbot.addWidget(window)
-    assert window.pages.count() == 4
+    assert window.pages.count() == 5
     assert not hasattr(window, "pulse_page")
     assert not hasattr(window, "open_pulse")
     for menu in window.menuBar().findChildren(QMenu):
         assert all("Pulse" not in action.text() for action in menu.actions())
-    for i in range(4):
+    for i in range(5):
         window.select_tab(i)
         assert window.pages.currentIndex() == i
-    for i in (0, 2, 1, 3):
+    for i in (0, 2, 1, 3, 4):
         window.tab_buttons[i].setChecked(True)
         assert window.pages.currentIndex() == i
-        assert [tab.isChecked() for tab in window.tab_buttons] == [j == i for j in range(4)]
+        assert [tab.isChecked() for tab in window.tab_buttons] == [j == i for j in range(5)]
     window.set_theme("dark", persist=False)
     window.set_theme("light", persist=False)
 

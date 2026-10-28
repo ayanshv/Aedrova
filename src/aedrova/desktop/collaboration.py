@@ -7,8 +7,18 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
-from PySide6.QtCore import QEvent, QObject, Qt, QTimer, QUrl
-from PySide6.QtGui import QDesktopServices, QImageReader, QKeySequence, QPixmap, QShortcut
+from PySide6.QtCore import QEvent, QObject, QSize, Qt, QTimer, QUrl
+from PySide6.QtGui import (
+    QColor,
+    QDesktopServices,
+    QIcon,
+    QImageReader,
+    QKeySequence,
+    QPainter,
+    QPen,
+    QPixmap,
+    QShortcut,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QLabel,
@@ -23,6 +33,35 @@ from PySide6.QtWidgets import (
 from aedrova.desktop.controls import AppDialog, AppMenu, ChoiceBox
 from aedrova.desktop.conversation import SafeDocument
 from aedrova.desktop.dialogs import button, label
+
+
+def availability_label(value):
+    return {
+        "online": "Online",
+        "away": "Away",
+        "busy": "Do not disturb",
+        "offline": "Offline",
+    }.get(value, "Offline")
+
+
+def presence_icon(value):
+    """Filled availability indicators; Offline stays an unmistakable hollow ring."""
+    pixmap = QPixmap(32, 32)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    color = QColor(
+        {"online": "#238850", "away": "#B57A12", "busy": "#D54A50"}.get(value, "#87919D")
+    )
+    painter.setPen(QPen(color, 3))
+    painter.setBrush(color if value in ("online", "away", "busy") else Qt.BrushStyle.NoBrush)
+    painter.drawEllipse(5, 5, 22, 22)
+    if value == "busy":
+        painter.setPen(QPen(QColor("white"), 3))
+        painter.drawLine(10, 16, 22, 16)
+    painter.end()
+    pixmap.setDevicePixelRatio(2)
+    return QIcon(pixmap)
 
 
 def snippet(body):
@@ -56,6 +95,8 @@ class ChatPanel(AppDialog):
                 "people": "People & presence",
             }[section]
         )
+        if section == "people" and channel:
+            self.setWindowTitle("People in this conversation")
         self.resize(760, 620)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(28, 28, 28, 28)
@@ -64,12 +105,15 @@ class ChatPanel(AppDialog):
         self.search = QLineEdit()
         self.search.setPlaceholderText("Search messages, people, channels and files…")
         self.search.setAccessibleName("Search workspace")
+        if section == "people":
+            self.search.setAccessibleName("Find people")
         layout.addWidget(self.search)
         self.notice = label("", "muted", wrap=True)
         layout.addWidget(self.notice)
         self.results = QListWidget()
         self.results.setObjectName("ChatResults")
         self.results.setSpacing(6)
+        self.results.setIconSize(QSize(16, 16))
         self.results.setWordWrap(True)
         self.results.setTextElideMode(Qt.TextElideMode.ElideRight)
         self.results.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -94,10 +138,15 @@ class ChatPanel(AppDialog):
         QTimer.singleShot(0, self.load)
 
     def load_failed(self):
-        skeleton = getattr(self, "_loading_skeleton", None)
-        if skeleton is not None and skeleton.isVisible():
-            self.set_loading(self.results, False)
-            self.notice.setText("Could not load this view. Try searching again.")
+        self.generation += 1
+        self.set_loading(self.results, False)
+        self.results.clear()
+        self.notice.setText("Could not refresh this view. Check your access and try again.")
+
+    def reject(self):
+        # An embedded tab must not disappear when Escape bubbles from its search.
+        if self.isWindow():
+            super().reject()
 
     def load(self):
         if not self.isVisible():
@@ -105,8 +154,15 @@ class ChatPanel(AppDialog):
         self.generation += 1
         generation = self.generation
         self.notice.clear()
-        self.set_loading(self.results, True, "feed")
-        self.results.clear()
+        # Show authorized local results now; network inventory reconciles afterward.
+        # Never substitute local guesses for server authorization on opening content.
+        cached = self.owner.local_inventory(self.search.text(), self.section, self.channel)
+        if any(cached.get(key) for key in ("messages", "channels", "people")):
+            self.loaded(cached)
+            self.notice.setText("Updating results…")
+        else:
+            self.set_loading(self.results, True, "feed")
+            self.results.clear()
         self.owner.inventory(
             self.search.text(),
             self.section,
@@ -128,8 +184,9 @@ class ChatPanel(AppDialog):
         if self.section in ("search", "people"):
             for person in data.get("people", []):
                 self.add(
-                    f"{person['display_name']} · {person.get('availability', 'offline')}\n"
-                    f"{person.get('status') or person.get('role', 'Member')}",
+                    f"{person['display_name']} · {availability_label(person.get('availability'))}\n"
+                    f"{person.get('status_emoji') or ''} "
+                    f"{person.get('status') or person.get('role', 'Member').capitalize()}".strip(),
                     {"person": person},
                 )
         if self.section == "search":
@@ -161,6 +218,8 @@ class ChatPanel(AppDialog):
         item = QListWidgetItem(text)
         item.setData(Qt.ItemDataRole.UserRole, value)
         item.setToolTip(text)
+        if "person" in value:
+            item.setIcon(presence_icon(value["person"].get("availability")))
         self.results.addItem(item)
 
     def open_item(self, item):
@@ -242,6 +301,11 @@ class Collaboration(QObject):
             attach.setFixedSize(30, 29)
             attach.clicked.connect(lambda checked=False, c=composer: self.attach(c))
             composer.layout().itemAt(composer.layout().count() - 1).layout().insertWidget(0, attach)
+            from aedrova.desktop.agent_permissions import change
+
+            composer.permissions.currentIndexChanged.connect(
+                lambda _index, c=composer: change(window, c.permissions.currentData())
+            )
             composer.editor.textChanged.connect(lambda c=composer: self.typing(c))
             composer.editor.files_dropped.connect(
                 lambda paths, c=composer: self.drop_files(
@@ -252,13 +316,13 @@ class Collaboration(QObject):
             people_button.setFixedSize(24, 29)
             people_button.clicked.connect(lambda checked=False, c=composer: self.mention_menu(c))
             composer.layout().itemAt(composer.layout().count() - 1).layout().insertWidget(
-                2, people_button
+                3, people_button
             )
             formatting = button("Aa", "Formatting", "icon")
             formatting.setFixedSize(30, 29)
             formatting.clicked.connect(lambda checked=False, c=composer: self.format_menu(c))
             composer.layout().itemAt(composer.layout().count() - 1).layout().insertWidget(
-                3, formatting
+                4, formatting
             )
         window.search_button.clicked.disconnect(window.open_switcher)
         window.search_button.clicked.connect(
@@ -525,6 +589,12 @@ class Collaboration(QObject):
             QTimer.singleShot(0, lambda: self.open_link(link))
 
     def reset(self):
+        people = self.window.pages.widget(4)
+        if isinstance(people, ChatPanel):
+            people.generation += 1
+            people.results.clear()
+            people.search.clear()
+            people.notice.clear()
         self.previews.clear()
         if hasattr(self, "voice_playback"):
             self.voice_playback.clear()
@@ -554,8 +624,6 @@ class Collaboration(QObject):
         connected = self.connected()
         if not connected:
             return
-        if not self.window.isVisible():
-            return
         if getattr(connected.account.service, "collaboration_available", None) is not True:
             return
         now = time.monotonic()
@@ -569,13 +637,23 @@ class Collaboration(QObject):
                 ),
                 {},
             )
-            away = now - self.last_input > 300
+            away = (
+                now - self.last_input > 300
+                or not self.window.isVisible()
+                or self.window.isMinimized()
+            )
             availability = (
                 "busy"
-                if own.get("availability") == "busy"
+                if self.last_availability == "busy"
                 else ("away" if away else self.last_availability)
             )
-            self.request("profile", {"status": own.get("status", ""), "availability": availability})
+            if own.get("availability") == availability:
+                # A heartbeat must not overwrite a recently edited custom status.
+                self.request("heartbeat", {})
+            else:
+                self.request(
+                    "profile", {"status": own.get("status", ""), "availability": availability}
+                )
         if (
             self.window.composer.editor.hasFocus()
             and self.window.composer.editor.toPlainText().strip()
@@ -1044,7 +1122,7 @@ class Collaboration(QObject):
         layout.addWidget(members, 1)
         for person in data.get("people", []):
             item = QListWidgetItem(
-                f"{person['display_name']} · {person.get('availability', 'offline')} · "
+                f"{person['display_name']} · {availability_label(person.get('availability'))} · "
                 f"{person.get('role', 'member')}"
             )
             item.setData(Qt.ItemDataRole.UserRole, person)
@@ -1123,7 +1201,7 @@ class Collaboration(QObject):
             label(
                 person.get("role", "Member").capitalize()
                 + " · "
-                + person.get("availability", "offline"),
+                + availability_label(person.get("availability")),
                 "muted",
             )
         )
@@ -1196,16 +1274,32 @@ class Collaboration(QObject):
         layout.addWidget(save)
 
         def update():
-            self.last_availability = availability.currentData()
+            chosen = availability.currentData()
+            text = status.text()
+
+            def saved(_):
+                self.remember_status({"status": text, "availability": chosen})
+                dialog.accept()
+
             self.request(
                 "profile",
-                {"status": status.text(), "availability": availability.currentData()},
-                lambda _: dialog.accept(),
+                {"status": text, "availability": chosen},
+                saved,
             )
 
         save.clicked.connect(update)
         self.keep(dialog)
         dialog.show()
+
+    def remember_status(self, profile):
+        """Keep confirmed personal intent separate from automatic idle presence."""
+        self.last_availability = profile["availability"]
+        connected = self.connected()
+        if connected:
+            connected.account.snapshot.setdefault("user_profile", {}).update(profile)
+            for person in self.data.get("people", []):
+                if person["user_id"] == str(connected.account.service.user.id):
+                    person.update(profile)
 
     def preferences(self):
         dialog = AppDialog(self.window)

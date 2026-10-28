@@ -19,8 +19,10 @@ def needs_sources(question):
     return bool(
         re.search(
             r"\b(workspace|chatspace|channels?|messages?|chats?|files?|meetings?|transcripts?|"
-            r"repositories|repository|repos?|commits?|deployments?|pull requests?|issues?|"
+            r"project|codebase|folder|repositories|repository|repos?|commits?|deployments?|"
+            r"pull requests?|issues?|"
             r"github|supabase|figma|notion|stripe|instagram|tiktok|vercel|search|"
+            r"research|investigate|investigation|current|today|sources|fact.check|"
             r"revenue|balance|customers?|analytics|metrics|latest|recent|changed|updates?|"
             r"our team|our project|our product|what we|what did|that|those|above)\b",
             question,

@@ -61,9 +61,14 @@ def test_workspace_name_updates_both_composers_and_click(qtbot, tmp_path):
 def scroll_past_bottom(view):
     viewport = view.viewport()
     event = QWheelEvent(
-        QPointF(20, 20), QPointF(viewport.mapToGlobal(QPoint(20, 20))),
-        QPoint(0, -240), QPoint(0, -120), Qt.MouseButton.NoButton,
-        Qt.KeyboardModifier.NoModifier, Qt.ScrollPhase.ScrollUpdate, False,
+        QPointF(20, 20),
+        QPointF(viewport.mapToGlobal(QPoint(20, 20))),
+        QPoint(0, -240),
+        QPoint(0, -120),
+        Qt.MouseButton.NoButton,
+        Qt.KeyboardModifier.NoModifier,
+        Qt.ScrollPhase.ScrollUpdate,
+        False,
     )
     QApplication.sendEvent(viewport, event)
 
@@ -105,3 +110,75 @@ def test_transcript_shrink_resize_and_repeated_scroll_stop_at_final_message(qtbo
             else:
                 assert bar.maximum() == 0
             assert feed.height() == view.visualRect(view.model().index(0)).height()
+
+
+@pytest.mark.parametrize("pixels,angle,expected", [(0, -120, 40), (-100, 0, 55), (100, 0, -55)])
+def test_chat_wheel_is_gentle_independent_of_message_height(qtbot, pixels, angle, expected):
+    from aedrova.desktop.state import Message
+
+    view = MessageView()
+    qtbot.addWidget(view)
+    view.resize(700, 400)
+    view.show_messages(
+        [Message(str(i), "Avery", "A", "09:00", "Readable message. " * 80) for i in range(40)]
+    )
+    view.show()
+    qtbot.waitUntil(lambda: view.verticalScrollBar().maximum() > 2000)
+    bar = view.verticalScrollBar()
+    bar.setValue(1000)
+    view._scroll_target = None
+    event = QWheelEvent(
+        QPointF(20, 20),
+        QPointF(view.viewport().mapToGlobal(QPoint(20, 20))),
+        QPoint(0, pixels),
+        QPoint(0, angle),
+        Qt.MouseButton.NoButton,
+        Qt.KeyboardModifier.NoModifier,
+        Qt.ScrollPhase.ScrollUpdate,
+        False,
+    )
+    QApplication.sendEvent(view.viewport(), event)
+    assert bar.value() == 1000 + expected
+    assert event.isAccepted()
+    assert view._scroll_target is None
+
+
+def test_chat_trackpad_preserves_small_movements_and_stops_at_edges(qtbot):
+    from aedrova.desktop.state import Message
+
+    view = MessageView()
+    qtbot.addWidget(view)
+    view.resize(700, 400)
+    view.show_messages(
+        [Message(str(i), "Avery", "A", "09:00", "Readable message. " * 80) for i in range(40)]
+    )
+    view.show()
+    qtbot.waitUntil(lambda: view.verticalScrollBar().maximum() > 1000)
+    bar = view.verticalScrollBar()
+    bar.setValue(500)
+    view._scroll_target = None
+
+    def wheel(delta, phase=Qt.ScrollPhase.ScrollUpdate):
+        event = QWheelEvent(
+            QPointF(10, 10),
+            QPointF(10, 10),
+            QPoint(0, delta),
+            QPoint(),
+            Qt.MouseButton.NoButton,
+            Qt.KeyboardModifier.NoModifier,
+            phase,
+            False,
+        )
+        view.wheelEvent(event)
+
+    wheel(-1)
+    wheel(-1)
+    assert bar.value() == 501  # Fractional trackpad pixels must not disappear.
+    wheel(0, Qt.ScrollPhase.ScrollEnd)
+    assert view._wheel_remainder == 0
+    bar.setValue(0)
+    wheel(100)
+    assert bar.value() == 0 and view._wheel_remainder == 0
+    bar.setValue(bar.maximum())
+    wheel(-100)
+    assert bar.value() == bar.maximum() and view._wheel_remainder == 0

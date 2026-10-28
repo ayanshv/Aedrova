@@ -137,6 +137,19 @@ class SafeDocument(QTextDocument):
         return None
 
 
+def markdown_document(text):
+    document = SafeDocument()
+    document.setMarkdown(text, QTextDocument.MarkdownFeature.MarkdownNoHTML)
+    return document
+
+
+def markdown_html(text):
+    document = markdown_document(text)
+    # QTextDocument can retain image tags in its HTML export even when loading
+    # the resource was refused. Strip them before handing the result to QLabel.
+    return re.sub(r"<img\b[^>]*>", "", document.toHtml(), flags=re.IGNORECASE)
+
+
 class MessageDelegate(QStyledItemDelegate):
     def __init__(self, view):
         super().__init__(view)
@@ -161,7 +174,7 @@ class MessageDelegate(QStyledItemDelegate):
             )
             if message.attachment.lower().endswith(".wav") and text.startswith("Shared a file:"):
                 text = "Voice message"
-            document.setMarkdown(escape(text, quote=False))
+            document.setMarkdown(text, QTextDocument.MarkdownFeature.MarkdownNoHTML)
             previews = ""
             for url in message_urls(message.body):
                 parsed = urlsplit(url)
@@ -284,11 +297,20 @@ class MessageDelegate(QStyledItemDelegate):
             painter.setOpacity(0.4 + 0.6 * progress)
         selected = option.state & QStyle.StateFlag.State_Selected
         hovered = option.state & QStyle.StateFlag.State_MouseOver
-        if selected or hovered:
+        if (selected or hovered) and t.name == "light":
             painter.fillRect(rect, QColor(t.surface))
+        if selected and t.name == "dark":
+            painter.fillRect(
+                QRectF(rect.x() + 8, rect.y() + 12, 2, rect.height() - 24), QColor(t.accent)
+            )
         if selected and option.state & QStyle.StateFlag.State_HasFocus:
             painter.setPen(QColor(t.accent))
-            painter.drawRoundedRect(QRectF(rect).adjusted(3, 1, -3, -1), 5, 5)
+            focus = QRectF(rect).adjusted(3, 1, -3, -1)
+            if t.name == "dark":
+                focus = QRectF(rect).adjusted(20, 3, -20, -3)
+                focus.setWidth(min(focus.width(), 920))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawRoundedRect(focus, 7, 7)
         grouped = self.grouped(index)
         x, y = rect.x() + 74, rect.y() + self.body_offset(index)
         if grouped and hovered:
@@ -307,6 +329,10 @@ class MessageDelegate(QStyledItemDelegate):
             painter.setPen(QColor(t.text))
             painter.setFont(font(11, True))
             painter.drawText(QRectF(x, y, 34, 34), Qt.AlignmentFlag.AlignCenter, message.initials)
+            if message.agent:
+                from aedrova.desktop.brand import brand_image
+
+                painter.drawImage(QRectF(x, y, 34, 34), brand_image())
             photo = getattr(self.view, "avatar_images", {}).get(
                 getattr(self.view, "avatar_paths", {}).get(message.sender_id)
             )
@@ -336,7 +362,10 @@ class MessageDelegate(QStyledItemDelegate):
             name_width = max(
                 0,
                 min(
-                    QFontMetrics(font(14, True)).horizontalAdvance(message.author) + 4,
+                    QFontMetrics(font(14, True)).horizontalAdvance(
+                        message.author + (" · AI" if message.agent else "")
+                    )
+                    + 4,
                     available - time_width - badge_width - 12,
                 ),
             )
@@ -346,7 +375,9 @@ class MessageDelegate(QStyledItemDelegate):
                 QRectF(x, y, name_width, header_height - 6),
                 line_flags,
                 painter.fontMetrics().elidedText(
-                    message.author, Qt.TextElideMode.ElideRight, int(name_width)
+                    message.author + (" · AI" if message.agent else ""),
+                    Qt.TextElideMode.ElideRight,
+                    int(name_width),
                 ),
             )
             painter.setFont(font(11))
@@ -373,7 +404,9 @@ class MessageDelegate(QStyledItemDelegate):
         painter.translate(rect.x() + 74, rect.y() + self.body_offset(index))
         self.view.paint_text_selection(painter, message, document)
         context = QAbstractTextDocumentLayout.PaintContext()
-        context.palette.setColor(QPalette.ColorRole.Text, QColor(t.secondary))
+        context.palette.setColor(
+            QPalette.ColorRole.Text, QColor(t.text if t.name == "dark" else t.secondary)
+        )
         document.documentLayout().draw(painter, context)
         painter.restore()
         x = rect.x() + 74
@@ -423,6 +456,17 @@ class MessageDelegate(QStyledItemDelegate):
                         area.size().toSize(),
                         Qt.AspectRatioMode.KeepAspectRatio,
                         Qt.TransformationMode.SmoothTransformation,
+                    )
+                    # A neutral matte makes transparent dark artwork legible without
+                    # recoloring the user's image or changing its pixels.
+                    painter.fillRect(
+                        QRectF(
+                            area.x(),
+                            area.y() + (area.height() - scaled.height()) / 2,
+                            scaled.width(),
+                            scaled.height(),
+                        ),
+                        QColor(t.preview),
                     )
                     painter.drawPixmap(
                         int(area.x()), int(area.y() + (area.height() - scaled.height()) / 2), scaled
@@ -475,6 +519,7 @@ class MessageView(QListView):
     def __init__(self, parent=None, *, allow_threads=True):
         super().__init__(parent)
         self._scroll_target = None
+        self._wheel_remainder = 0.0
         self._scroll_hint = QListView.ScrollHint.EnsureVisible
         self._scroll_timer = QTimer(self)
         self._scroll_timer.setSingleShot(True)
@@ -498,6 +543,7 @@ class MessageView(QListView):
         self.setDragDropMode(QListView.DragDropMode.DropOnly)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollMode(QListView.ScrollMode.ScrollPerPixel)
+        self.verticalScrollBar().setSingleStep(16)
         self.setResizeMode(QListView.ResizeMode.Adjust)
         self.setLayoutMode(QListView.LayoutMode.Batched)
         self.setBatchSize(100)
@@ -901,7 +947,36 @@ class MessageView(QListView):
 
     def wheelEvent(self, event):  # noqa: N802
         self._scroll_target = None
-        super().wheelEvent(event)
+        # Variable-height messages make Qt's automatic wheel step enormous.
+        # Keep native trackpad momentum/phases, with gentler pixel movement;
+        # conventional wheels get a bounded 40 px step per notch.
+        pixel, angle = event.pixelDelta(), event.angleDelta()
+        if event.modifiers() & (
+            Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier
+        ):
+            super().wheelEvent(event)
+            return
+        if abs(pixel.x()) > abs(pixel.y()) or (pixel.isNull() and abs(angle.x()) > abs(angle.y())):
+            event.ignore()
+            return
+        delta = pixel.y() * 0.55 if not pixel.isNull() else angle.y() / 120 * 40
+        if delta:
+            if delta * self._wheel_remainder < 0:
+                self._wheel_remainder = 0.0
+            self._wheel_remainder += delta
+            movement = int(self._wheel_remainder)
+            self._wheel_remainder -= movement
+            bar = self.verticalScrollBar()
+            bar.setValue(bar.value() - movement)
+            if bar.value() in (bar.minimum(), bar.maximum()):
+                self._wheel_remainder = 0.0
+            self.reaction_bar.hide()
+            event.accept()
+        elif event.phase() == Qt.ScrollPhase.ScrollEnd:
+            self._wheel_remainder = 0.0
+            event.accept()
+        else:
+            super().wheelEvent(event)
 
     def animate_sent(self, identifier):
         """A short, compositor-free message pop; reduced motion stays instantaneous."""
@@ -1147,6 +1222,22 @@ class Composer(QFrame):
         self.mention.setAccessibleName("Mention Aedrova")
         self.mention.setToolTip("Insert @Aedrova · ask your agent to build")
         self.mention.clicked.connect(self.insert_mention)
+        from aedrova.agents.permissions import MODES
+        from aedrova.desktop.controls import ChoiceBox
+
+        self.permissions = ChoiceBox()
+        self.permissions.setObjectName("AgentPermissions")
+        self.permissions.setAccessibleName("Aedrova agent permissions")
+        self.permissions.setMaximumWidth(175)
+        self.permissions.setMinimumHeight(30)
+        self.permissions.setFixedHeight(30)
+        for value, (title, description) in MODES.items():
+            self.permissions.addItem(title, value)
+            self.permissions.setItemData(
+                self.permissions.count() - 1, description, Qt.ItemDataRole.ToolTipRole
+            )
+        self.permissions.setToolTip(MODES["ask"][1])
+        bottom.addWidget(self.permissions)
         bottom.addWidget(self.mention)
         self.emoji = SpringButton("☺")
         self.emoji.setProperty("role", "icon")

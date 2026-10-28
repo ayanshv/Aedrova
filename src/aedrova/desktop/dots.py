@@ -68,6 +68,7 @@ class DotDialog(AppDialog):
         self.user = str(window.current_user().id)
         self.rows, self.providers, self.job = [], [], None
         self.pending = False
+        self.capacity = None
         self.required = required
         from aedrova.desktop.bud_setup import build_setup
 
@@ -75,6 +76,17 @@ class DotDialog(AppDialog):
         self.selected_id = selected
         self.preview()
         self.refresh()
+
+    def set_loading(self, target, active, kind="form"):
+        gallery = getattr(self, "embedded_connectors", None)
+        if gallery is not None and self.pages.currentIndex() == 5:
+            skeleton = getattr(self, "_loading_skeleton", None)
+            if skeleton is not None:
+                skeleton.hide()
+            gallery.set_loading(gallery.pages, active)
+            self.status.setVisible(not active)
+            return
+        super().set_loading(target, active, kind)
 
     def run(self, operation, completed, *, recovery=False):
         if (
@@ -236,12 +248,15 @@ class DotDialog(AppDialog):
 
         def fetch(service):
             api = client(service)
-            return api.request("/api/dots/providers")["providers"], api.request(
-                "/api/dots?workspace=" + self.workspace
-            )["items"]
+            return (
+                api.request("/api/dots/providers")["providers"],
+                api.request("/api/dots?workspace=" + self.workspace)["items"],
+                service.bud_capacity(self.workspace) if hasattr(service, "bud_capacity") else None,
+            )
 
         def loaded(value):
-            self.providers, self.rows = value
+            self.providers, self.rows = value[:2]
+            self.capacity = value[2] if len(value) > 2 else None
             self.sync_connection_rows(self.rows)
             self.provider.blockSignals(True)
             self.provider.clear()
@@ -430,6 +445,11 @@ class DotDialog(AppDialog):
             self.update_controls()
 
     def new_dot(self):
+        if self.capacity and self.capacity["remaining"] <= 0:
+            self.status.setText(
+                "Your workspace has reached its Bud limit. Remove a Bud or change your plan."
+            )
+            return
         self.list.setCurrentRow(-1)
         self.selected_id = None
         self.name.setText("Orbit")
@@ -506,8 +526,6 @@ class DotDialog(AppDialog):
             self.color.setCurrentIndex(self.color.findData(value))
 
     def show_step(self, step):
-        if step == 4:
-            step = 5  # The embedded gallery replaces the legacy connector form.
         changed = self.pages.currentIndex() != step
         self.setup_panel.setMinimumWidth(500)
         self.setup_panel.setMaximumWidth(1120 if step == 5 else 560)
@@ -555,12 +573,23 @@ class DotDialog(AppDialog):
     def update_controls(self):
         if not hasattr(self, "next"):
             return
+        capacity = self.capacity
+        if capacity:
+            self.capacity_note.setText(
+                f"{capacity['used']} / {capacity['limit']} Buds · "
+                f"{capacity['plan'].title()} · shared by your team"
+            )
+        self.capacity_note.setAccessibleName("Workspace Bud capacity: " + self.capacity_note.text())
         gallery = getattr(self, "embedded_connectors", None)
         busy = (
             self.pending
             or self.job is not None
             or bool(gallery and (gallery.pending or gallery.job))
         )
+        if gallery is not None:
+            gallery.loading_overlay.set_active(busy)
+            if self.pages.currentIndex() == 5:
+                self.status.setVisible(not busy)
         self.back.setEnabled(not busy)
         self.list.setEnabled(not busy)
         local_step = self.pages.currentIndex() < 5
@@ -568,7 +597,9 @@ class DotDialog(AppDialog):
         self.next.setEnabled(
             not busy or (local_step and getattr(self, "_read_only_loading", False))
         )
-        self.new.setEnabled(self.admin() and not busy)
+        self.new.setEnabled(
+            self.admin() and not busy and (not capacity or capacity["remaining"] > 0)
+        )
         self.save.setEnabled(
             self.admin()
             and not busy
@@ -616,10 +647,10 @@ class DotDialog(AppDialog):
                 self.status.setText("Give your Bud a name first.")
                 self.name.setFocus()
                 return
-            if step == 3 and len(self.configured_instructions()) > 2000:
+            if step in (3, 4) and len(self.configured_instructions()) > 2000:
                 self.status.setText("Keep instructions under 2,000 characters.")
                 return
-            self.show_step(5 if step == 3 else step + 1)
+            self.show_step(step + 1)
         elif step == 5:
             if (
                 self.current()
@@ -671,6 +702,11 @@ class DotDialog(AppDialog):
         row = self.current()
         if not self.admin():
             self.status.setText("Only workspace owners or admins can configure Buds.")
+            return
+        if not row and self.capacity and self.capacity["remaining"] <= 0:
+            self.status.setText(
+                "Your workspace has reached its Bud limit. Remove a Bud or change your plan."
+            )
             return
         if not row and not any(
             p.get("configurable") and p["id"] == self.provider.currentData() for p in self.providers

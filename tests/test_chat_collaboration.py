@@ -194,3 +194,118 @@ def test_revoked_channels_close_collaboration_views(qtbot, tmp_path):
     assert window.collaboration.dialogs
     window.collaboration.sync({"channels": [], "chat": {"workspace_id": "w"}})
     assert not window.collaboration.dialogs
+
+
+@pytest.mark.parametrize(
+    "chosen,observed,idle,minimized,expected,action",
+    [
+        ("online", "busy", False, False, "online", "profile"),
+        ("online", "online", True, False, "away", "profile"),
+        ("online", "away", False, False, "online", "profile"),
+        ("away", "away", False, False, "away", "heartbeat"),
+        ("busy", "busy", True, False, "busy", "heartbeat"),
+        ("online", "online", False, True, "away", "profile"),
+        ("online", "online", False, False, "online", "heartbeat"),
+    ],
+)
+def test_presence_respects_manual_intent_and_idle(
+    qtbot, tmp_path, monkeypatch, chosen, observed, idle, minimized, expected, action
+):
+    window, service = setup(qtbot, tmp_path)
+    service.collaboration_available = True
+    collaboration = window.collaboration
+    collaboration.timer.stop()
+    collaboration.data = {"people": [{"user_id": "u", "availability": observed, "status": "Focus"}]}
+    collaboration.last_availability = chosen
+    collaboration.last_heartbeat = 0
+    collaboration.last_input = 600 if idle else 1000
+    monkeypatch.setattr("aedrova.desktop.collaboration.time.monotonic", lambda: 1000)
+    monkeypatch.setattr(window, "isVisible", lambda: True)
+    monkeypatch.setattr(window, "isMinimized", lambda: minimized)
+    calls = []
+    monkeypatch.setattr(collaboration, "request", lambda *args: calls.append(args))
+    collaboration.pulse()
+    assert calls[0][0] == action
+    if action == "profile":
+        assert calls[0][1] == {"status": "Focus", "availability": expected}
+    else:
+        assert calls[0][1] == {}
+    assert collaboration.last_availability == chosen
+
+
+def test_confirmed_status_updates_own_cache_only(qtbot, tmp_path):
+    window, _ = setup(qtbot, tmp_path)
+    collaboration = window.collaboration
+    collaboration.data = {
+        "people": [
+            {"user_id": "u", "availability": "busy"},
+            {"user_id": "other", "availability": "away"},
+        ]
+    }
+    collaboration.remember_status({"availability": "online", "status": "Available"})
+    assert collaboration.last_availability == "online"
+    assert collaboration.data["people"][0]["status"] == "Available"
+    assert collaboration.data["people"][1]["availability"] == "away"
+    assert window.account_dialog.snapshot["user_profile"]["availability"] == "online"
+
+
+def test_team_presence_displays_all_statuses(qtbot, tmp_path):
+    window = local(qtbot, tmp_path)
+    panel = ChatPanel(window.collaboration, "people")
+    qtbot.addWidget(panel)
+    panel.loaded(
+        {
+            "people": [
+                {"user_id": str(i), "display_name": name, "availability": value}
+                for i, (name, value) in enumerate(
+                    [("Maya", "online"), ("Sam", "away"), ("Lee", "busy"), ("Jo", "offline")]
+                )
+            ]
+        }
+    )
+    assert [panel.results.item(i).text().split("\n")[0] for i in range(4)] == [
+        "Maya · Online",
+        "Sam · Away",
+        "Lee · Do not disturb",
+        "Jo · Offline",
+    ]
+
+
+def test_people_tab_is_scoped_and_retargets_on_channel_switch(qtbot, tmp_path, monkeypatch):
+    window, _ = setup(qtbot, tmp_path)
+    calls = []
+    monkeypatch.setattr(
+        window.collaboration, "inventory", lambda q, s, c, done: calls.append((c, done))
+    )
+    window.select_tab(4)
+    qtbot.waitUntil(lambda: bool(calls))
+    page = window.pages.currentWidget()
+    assert window.tab_buttons[4].text() == "People"
+    assert page.channel == "c" and calls[-1][0] == "c"
+    calls[-1][1](
+        {"people": [{"user_id": "peer", "display_name": "Maya", "availability": "online"}]}
+    )
+    assert page.results.count() == 1
+    assert not page.results.item(0).icon().isNull()
+    stale = calls[-1][1]
+    window.select_tab(0)
+    next_channel = window.store.add_channel(window.workspace_id, "private-new")
+    window.channel_id = next_channel.id
+    window.select_tab(4)
+    assert page.channel == next_channel.id and page.results.count() == 0
+    stale({"people": [{"user_id": "old", "display_name": "Old conversation"}]})
+    assert page.results.count() == 0
+    qtbot.waitUntil(lambda: calls[-1][0] == next_channel.id)
+    window.connected.disconnect()
+    assert page.results.count() == 0
+
+
+@pytest.mark.parametrize("value", ["online", "away", "busy", "offline"])
+def test_presence_indicator_is_drawn_for_every_status(qapp, value):
+    from aedrova.desktop.collaboration import presence_icon
+
+    icon = presence_icon(value)
+    image = icon.pixmap(16, 16).toImage()
+    assert not image.isNull()
+    assert image.pixelColor(3, 8).alpha() > 0
+    assert (image.pixelColor(8, 8).alpha() == 0) == (value == "offline")

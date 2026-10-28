@@ -376,3 +376,46 @@ def test_failed_oauth_poll_restores_login_action(gallery):
     assert not dialog.oauth_state and not dialog.oauth_timer.isActive()
     assert dialog.oauth.text() == "Connect your account"
     assert dialog.oauth.isEnabled()
+
+
+@pytest.mark.parametrize("theme", [LIGHT, DARK])
+def test_loading_spinner_is_centered_visible_and_themed(gallery, qtbot, theme):
+    dialog, _, _, _ = gallery
+    dialog.setPalette(palette(theme))
+    dialog.setStyleSheet(stylesheet(theme))
+    dialog.pending = True
+    dialog.update_controls()
+    overlay, spinner = dialog.loading_overlay, dialog.loading_spinner
+    qtbot.waitUntil(lambda: overlay.isVisible() and spinner.timer.isActive())
+    assert overlay.geometry() == dialog.pages.rect()
+    center = spinner.mapTo(overlay, spinner.rect().center())
+    assert abs(center.x() - overlay.rect().center().x()) <= 1
+    assert abs(center.y() - overlay.rect().center().y()) <= 1
+    from PySide6.QtGui import QPalette
+
+    colors = spinner.window().palette()
+    assert (
+        abs(
+            colors.color(QPalette.ColorRole.Text).lightness()
+            - colors.color(QPalette.ColorRole.Base).lightness()
+        )
+        > 150
+    )
+    assert not dialog.status.isVisible()
+    dialog.resize(900, 700)
+    qtbot.waitUntil(lambda: overlay.geometry() == dialog.pages.rect())
+    dialog.pending = False
+    dialog.update_controls()
+    assert overlay.isHidden() and not spinner.timer.isActive()
+    assert dialog.status.isVisible()
+
+
+def test_web_search_description_is_provider_neutral():
+    from aedrova.desktop.bud_connectors import connector_description
+
+    assert connector_description({"id": "search", "description": "Brave Search results"}) == (
+        "Live web research with clickable sources · Uses your team's AI allowance"
+    )
+    assert connector_description({"id": "github", "description": "Repository changes"}) == (
+        "Repository changes"
+    )

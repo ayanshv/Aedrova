@@ -150,7 +150,11 @@ class BuildJob(QRunnable):
     def permission(self, tool, data):
         request = {"tool": tool, "data": data, "event": threading.Event(), "allow": False}
         self.signals.permission.emit(request)
+        deadline = time.monotonic() + self.runner.timeout
         while not request["event"].wait(0.1):
+            if time.monotonic() > deadline:
+                self.runner.cancel()
+                return False
             if self.runner.cancelled.is_set():
                 return False
         return request["allow"]
@@ -462,7 +466,7 @@ class BuildDialog(AppDialog):
         row.addWidget(self.repository, 1)
         row.addWidget(self.choose)
         self.provider = CodingProviderChoice()
-        self.provider.setCurrentIndex(1 if pref.get("provider") == "claude_code" else 0)
+        self.provider.setCurrentIndex(self.provider.findData(pref.get("provider", "auto")))
         row.addWidget(self.provider)
         layout.addLayout(row)
         layout.addWidget(label("What would you like to build?", "title"))
@@ -544,7 +548,7 @@ class BuildDialog(AppDialog):
         saved = binding(window, self.workspace)
         self.binding_folder = saved.get("folder", "")
         self.repository.setText(saved.get("folder", ""))
-        if saved.get("provider") in {"codex", "claude_code"}:
+        if saved.get("provider") in {"codex", "claude_code", "auto"}:
             self.provider.setCurrentIndex(self.provider.findData(saved["provider"]))
         if saved.get("background_build") or saved.get("auto_plan"):
             self.consent.setChecked(True)
@@ -804,6 +808,10 @@ class BuildDialog(AppDialog):
                 self.approved_plan,
                 self.baseline,
             )
+            from aedrova.desktop.agent_permissions import mode
+
+            self.job.runner.permission_mode = mode(self.window, self.workspace)
+            self.job.permission_mode = self.job.runner.permission_mode
             self.job.teammate = getattr(self, "teammate", None)
             self.job.bud = getattr(self, "bud", None)
             self.job.managed_client = result.get("managed")
@@ -879,28 +887,24 @@ class BuildDialog(AppDialog):
         try:
             if self.invalidated or not self.pending or self.job.runner.cancelled.is_set():
                 return
-            if self.background_run:
-                # Runtime gates already constrain file paths and require the sandbox.
-                # Recheck saved authority for every automatic tool approval.
-                path = Path(request["data"].get("file_path", "."))
-                if not path.is_absolute():
-                    path = self.project / path
-                scoped_edit = request["tool"] in {
-                    "Edit",
-                    "Write",
-                } and path.resolve().is_relative_to(self.project.resolve())
-                request["allow"] = self.background_authorized() and (
-                    scoped_edit
-                    or (
-                        request["tool"] == "Bash"
-                        and not request["data"].get("dangerouslyDisableSandbox")
-                    )
-                )
+            from aedrova.agents.permissions import automatic
+            from aedrova.desktop.agent_permissions import mode
+
+            selected = mode(self.window, self.workspace)
+            if selected != getattr(self.job, "permission_mode", "ask"):
                 return
+            if self.background_run and not self.background_authorized():
+                return
+            if selected == "full" or (
+                selected == "auto" and automatic(request["tool"], request["data"], self.project)
+            ):
+                request["allow"] = True
+                return
+            permission_runner = self.job.runner
             box = QMessageBox(self)
             self.permission_box = box
             self.window.agent_activity(self.workspace, "Action needs your approval")
-            box.setWindowTitle("Aedrova · Approve Claude action")
+            box.setWindowTitle("Aedrova · Approve agent action")
             box.setTextFormat(Qt.TextFormat.PlainText)
             box.setText(
                 f"Allow {request['tool']} in this build?\nReview the exact action below. "
@@ -909,7 +913,14 @@ class BuildDialog(AppDialog):
             box.setDetailedText(json.dumps(request["data"], indent=2))
             box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             box.setDefaultButton(QMessageBox.StandardButton.No)
-            request["allow"] = box.exec() == QMessageBox.StandardButton.Yes
+            box.button(QMessageBox.StandardButton.Yes).setText("Allow once")
+            box.button(QMessageBox.StandardButton.No).setText("Deny")
+            request["allow"] = (
+                box.exec() == QMessageBox.StandardButton.Yes
+                and not self.invalidated
+                and not permission_runner.cancelled.is_set()
+                and mode(self.window, self.workspace) == selected
+            )
         finally:
             self.permission_box = None
             request["event"].set()
@@ -1037,6 +1048,12 @@ class BuildDialog(AppDialog):
             self.memory_check_pending = False
 
     def verify_access(self, snapshot):
+        from aedrova.desktop.agent_permissions import mode
+
+        if self.job and hasattr(self.job, "permission_mode"):
+            if self.job.permission_mode != mode(self.window, self.workspace):
+                self.cancel()
+                return
         bud = getattr(self, "bud", None)
         if bud:
             live = next(
@@ -1261,6 +1278,7 @@ def _start_background_build(window, task, *, teammate=None, bud=None):
     window.agent_feed.character_config = (
         shelf_rows([bud])[0]["config"] if bud else teammate["config"] if teammate else None
     )
+    window.archive_finished_agent()
     window.agent_feed.clear()
     window.agent_feed.hide()
     window.last_agent_event = ""

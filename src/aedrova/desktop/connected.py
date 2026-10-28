@@ -78,17 +78,35 @@ def workspaces_from_snapshot(snapshot, user_id=None):
 def message_tree(rows, user_id, *, directory=None, attachments=None):
     directory, attachments = directory or {}, attachments or {}
     by_id = {}
-    for row in sorted(rows, key=lambda r: (bool(r.get("local")), r.get("sequence", 0))):
+    sent = {
+        r["id"]: datetime.fromisoformat(r["created_at"].replace("Z", "+00:00")).timestamp()
+        for r in rows
+    }
+    # Keep request/response causality even if a server receipt has a slightly
+    # newer timestamp than the desktop clock. Other messages retain sent order.
+    ordered = sorted(
+        rows,
+        key=lambda r: (
+            max(sent[r["id"]], sent.get(r.get("_reply_to"), 0) + 0.000001),
+            r.get("sequence", 0),
+        ),
+    )
+    for row in ordered:
         mine = row["sender_id"] == user_id
         author = (
-            "You" if mine else directory.get(row["sender_id"], "Teammate " + row["sender_id"][:6])
+            "You"
+            if mine
+            else row.get("agent_name")
+            or directory.get(row["sender_id"], "Teammate " + row["sender_id"][:6])
         )
         file = attachments.get(row["id"], {})
         by_id[row["id"]] = Message(
             row["id"],
             author,
             "".join(word[0] for word in author.split())[:2],
-            row["created_at"].replace("T", " ")[:16],
+            datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
+            .astimezone()
+            .strftime("%Y-%m-%d %H:%M"),
             row["body"],
             attachment=file.get("filename", ""),
             attachment_id=file.get("id", ""),
@@ -101,9 +119,10 @@ def message_tree(rows, user_id, *, directory=None, attachments=None):
             saved=bool(row.get("saved")),
             pinned=bool(row.get("pinned")),
             sender_id=row["sender_id"],
+            agent=bool(row.get("agent_name")),
         )
     roots = []
-    for row in sorted(rows, key=lambda r: (bool(r.get("local")), r.get("sequence", 0))):
+    for row in ordered:
         if row["parent_id"] is None:
             roots.append(by_id[row["id"]])
         elif row["parent_id"] in by_id:
@@ -121,6 +140,7 @@ class ConnectedDashboard(QObject):
         self.upload_pool = QThreadPool(self)
         self.upload_pool.setMaxThreadCount(2)
         self.outbox = {}
+        self.agent_replies = {}
         self.reaction_edits = {}
         self.reaction_jobs = set()
         self.queue = deque()
@@ -243,6 +263,9 @@ class ConnectedDashboard(QObject):
         self.stop_realtime()
         self.pending.clear()
         self.outbox.clear()
+        self.agent_replies.clear()
+        self.window.completed_agent_response = None
+        self.window.agent_request_origin = None
         self.reaction_edits.clear()
         self.reaction_jobs.clear()
         self.queue.clear()
@@ -380,7 +403,7 @@ class ConnectedDashboard(QObject):
                 if self.active:
                     QTimer.singleShot(0, self.refresh)
 
-            self.account.run(operation, done)
+            self.account.run(operation, done, background=True)
             return
         w, service = self.window, self.account.service
         workspace_id, channel_id, parent = w.workspace_id, w.channel_id, w.thread_id or None
@@ -479,7 +502,7 @@ class ConnectedDashboard(QObject):
             if len(incoming) >= PAGE_SIZE:
                 QTimer.singleShot(0, self.refresh)
 
-        self.account.run(operation, loaded)
+        self.account.run(operation, loaded, background=True)
 
     def load_older(self, parent=None):
         if not self.active:
@@ -577,7 +600,10 @@ class ConnectedDashboard(QObject):
                 if r["workspace_id"] == workspace_id
             }
             w.channel.messages = message_tree(
-                rows, str(self.account.service.user.id), directory=names, attachments=self.files
+                self.with_agent_replies(rows, workspace_id, channel_id),
+                str(self.account.service.user.id),
+                directory=names,
+                attachments=self.files,
             )
         w._populate_rail()
         w._populate_channels()
@@ -640,7 +666,10 @@ class ConnectedDashboard(QObject):
             if r["workspace_id"] == w.workspace_id
         }
         w.channel.messages = message_tree(
-            rows, str(self.account.service.user.id), directory=names, attachments=self.files
+            self.with_agent_replies(rows, w.workspace_id, w.channel_id),
+            str(self.account.service.user.id),
+            directory=names,
+            attachments=self.files,
         )
         w.messages.show_messages(w.channel.messages)
         if hasattr(w, "collaboration"):
@@ -651,7 +680,35 @@ class ConnectedDashboard(QObject):
             if parent:
                 w.thread_messages.show_messages([parent, *parent.replies])
 
-    def send(self, text, parent_id=None):
+    def with_agent_replies(self, rows, workspace, channel):
+        # Session-only answers are private to this signed-in desktop. Never upload
+        # an assistant answer disguised as a human message or leak it to another account.
+        replies = self.agent_replies.get((workspace, channel), [])
+        ids = {r["id"] for r in rows}
+        return list(rows) + [r for r in replies if r["id"] not in ids]
+
+    def complete_agent_reply(
+        self, workspace, channel, text, author, parent=None, prompt_id=None, *, sent_at=None
+    ):
+        key = (workspace, channel)
+        replies = self.agent_replies.setdefault(key, [])
+        replies.append(
+            {
+                "id": "agent-" + str(uuid4()),
+                "sender_id": "agent:" + author,
+                "agent_name": author,
+                "body": text,
+                "channel_id": channel,
+                "parent_id": parent,
+                "created_at": sent_at or datetime.now(UTC).isoformat(),
+                "sequence": 0,
+                "_reply_to": prompt_id,
+            }
+        )
+        if self.window.workspace_id == workspace and self.window.channel_id == channel:
+            self.render_local_messages()
+
+    def send(self, text, parent_id=None, *, composer=None):
         w = self.window
         if not w.channel_id or not text.strip() or len(text.strip()) > 10000:
             w.notify("Write a message of 1–10,000 characters in an available channel.")
@@ -659,7 +716,7 @@ class ConnectedDashboard(QObject):
         channel_id = w.channel_id
         key = (channel_id, parent_id, text.strip())
         message_id = self.pending.setdefault(key, str(uuid4()))
-        editor = w.thread_composer if parent_id else w.composer
+        editor = composer or (w.thread_composer if parent_id else w.composer)
         service = self.account.service
 
         def operation():
@@ -713,6 +770,7 @@ class ConnectedDashboard(QObject):
         view = w.thread_messages if parent_id else w.messages
         view.scrollToBottom()
         view.animate_sent(message_id)
+        return message_id
 
     def reaction_overlay(self, rows, channel):
         edits = [(key, value) for key, value in self.reaction_edits.items() if key[0] == channel]
@@ -837,9 +895,6 @@ class ConnectedDashboard(QObject):
                 if r["workspace_id"] == workspace and r["user_id"] != str(service.user.id)
             ]
             buds = [b for b in snapshot.get("dots", []) if b["workspace_id"] == workspace]
-            if not people and not buds:
-                self.window.notify("Invite a teammate or configure a Bud to start a conversation.")
-                return
             selected = choose_conversation(self.window, people, buds)
             if (
                 not selected
@@ -878,7 +933,10 @@ class ConnectedDashboard(QObject):
 
             self.enqueue(("dm", workspace, recipient), create, opened)
 
-        self.enqueue(("directory", workspace), service.snapshot, choose)
+        # Opening a local picker must never wait behind polling, uploads or an RPC.
+        # This snapshot is scoped to the current session; the mutation still checks
+        # current membership on the server. Normal sync refreshes the directory.
+        choose(self.account.snapshot)
 
     def upload(self, path=None, *, parent=None, voice_data=None, completed=None, cancelled=None):
         if not self.active or not self.window.channel_id:

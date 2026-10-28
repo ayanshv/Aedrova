@@ -97,6 +97,7 @@ def test_coworker_picker_creates_and_reopens_server_dm(qtbot, tmp_path, monkeypa
         {"workspace_id": "w", "user_id": "v", "display_name": "Avery"},
     ]
     service.snapshot = lambda: data
+    window.account_dialog.snapshot = data
     opened = []
 
     def rpc(name, params):

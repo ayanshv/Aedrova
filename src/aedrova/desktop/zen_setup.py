@@ -225,10 +225,14 @@ class SetupPages(QScrollArea):
             self.project_picker = ProjectPicker(self.flow, self.folder)
             self.project_picker.clicked.connect(self.choose)
             self.column.addWidget(self.project_picker)
+            self.new_project = button("＋ Start a new project", role="outline")
+            self.new_project.setAccessibleName("Start a new project")
+            self.new_project.clicked.connect(self.start_new_project)
+            self.column.addWidget(self.new_project)
             self.column.addWidget(self.folder)
             self.provider = CodingProviderChoice()
             self.provider.setCurrentIndex(
-                max(0, self.provider.findData(self.draft.get("provider", "codex")))
+                self.provider.findData(self.draft.get("provider", "auto"))
             )
             self.provider.setAccessibleName("Coding provider")
             self.column.addWidget(self.provider)
@@ -338,6 +342,13 @@ class SetupPages(QScrollArea):
         folder = choose_project(self.flow, self.folder.text())
         if folder:
             self.folder.setText(folder)
+
+    def start_new_project(self):
+        from aedrova.desktop.new_project import NewProjectDialog
+
+        dialog = NewProjectDialog(self.flow)
+        if dialog.exec() and dialog.project_path:
+            self.folder.setText(dialog.project_path)
 
     def valid(self):
         self.capture()

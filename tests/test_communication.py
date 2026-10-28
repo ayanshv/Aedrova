@@ -257,6 +257,7 @@ def test_direct_message_action_uses_selected_teammate(qtbot, tmp_path, monkeypat
     data = snapshot()
     data["directory"] = [{"workspace_id": "w", "user_id": "peer", "display_name": "Morgan"}]
     service.snapshot = lambda: data
+    window.account_dialog.snapshot = data
     calls = []
 
     def rpc(name, params):

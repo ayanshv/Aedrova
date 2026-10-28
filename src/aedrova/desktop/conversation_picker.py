@@ -38,7 +38,13 @@ class ConversationPicker(AppDialog):
         self.list.setObjectName("ConversationRecipients")
         self.list.setAccessibleName("People and Buds")
         layout.addWidget(self.list, 1)
-        self.empty = label("No matches. Try another name.", "muted", wrap=True)
+        self.empty = label(
+            "No matches. Try another name."
+            if people or buds
+            else "Invite a teammate or configure a Bud to start a conversation.",
+            "muted",
+            wrap=True,
+        )
         layout.addWidget(self.empty)
         actions = QHBoxLayout()
         cancel = button("Cancel", role="outline")
