@@ -413,6 +413,14 @@ def test_build_plan_then_approval_and_worker_cleanup(qtbot, tmp_path, monkeypatc
             else "Implemented; tests passed."
         )
 
+    # Auto routing must use the same synthetic provider as the mocked runner.
+    # CI deliberately has no installed/authenticated coding CLI.
+    from aedrova.agents.routing import Candidate
+
+    monkeypatch.setattr(
+        "aedrova.agents.routing.runtime_candidates",
+        lambda **_: [Candidate("codex", available=True)],
+    )
     monkeypatch.setattr(LocalRunner, "run", run)
     from aedrova.agents.checkout import prepare as real_prepare
 

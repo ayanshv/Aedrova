@@ -3639,3 +3639,15 @@ form/action gaps and active/archive separation at large heights, retaining list-
 checks. Light/dark normal/large screenshots inspected in work/balanced-spacing-oct27.
 No payment, backend or authorization change. Stage 1 remains OPEN for provider public
 approvals and final human audio clarity; funded Claude and reliable meetings deferred.
+
+### October 27 — main repository integration validation
+
+Owner requested all pending work in both GitHub main branches, with no manual merge
+handoff. Website combined source passed 644 service tests, 10 edge checks, lint and
+credential scans; pushed to main as 873d9b9. Desktop local full suite passed 1042
+checks and embedded PostgreSQL migration/RLS tests passed. Protected-main PR4 found
+one test-only CI dependency: the mocked plan/build journey still probed installed
+CLIs through its new Auto default. Its routing fixture now supplies a synthetic
+available provider alongside the synthetic runner; 61 build-flow checks passed.
+Required hosted CI must pass before merging PR4. No branch protection was disabled.
+Stage 1 external approvals/audio and deferred paid gates remain unchanged.
