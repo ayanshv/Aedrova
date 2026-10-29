@@ -1,6 +1,7 @@
 """Asynchronous per-reader display translation; never rewrites a stored message."""
 
 from collections import OrderedDict
+from html import escape
 
 from PySide6.QtCore import QEvent, QObject, Qt, QThreadPool, QTimer, Signal
 from PySide6.QtGui import QAction
@@ -310,6 +311,10 @@ class Localizer(QObject):
         if not source:
             return
         translated = self.text(source, interface=True)
+        if getter == "text" and isinstance(widget, QLabel):
+            widget.setTextFormat(Qt.TextFormat.PlainText)
+        if getter == "toolTip" and ("<" in translated or ">" in translated):
+            translated = "<qt>" + escape(translated).replace("\n", "<br/>") + "</qt>"
         widget.setProperty(prop, [source, translated])
         if current != translated:
             getattr(widget, setter)(translated)

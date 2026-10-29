@@ -195,3 +195,20 @@ def test_quoted_native_examples_do_not_authorize_builds():
     assert not localized_build("Translate: एक ऐप बनाओ")
     assert not localized_build("The phrase is “创建一个应用”.")
     assert localized_build("एक ऐप बनाओ")
+
+
+def test_ui_translation_is_plain_text_not_model_supplied_html(qtbot, tmp_path):
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QLabel
+
+    window, _ = setup(qtbot, tmp_path)
+    widget = QLabel("Continue", window)
+    widget.show()
+    window.localizer.configure("es", False)
+    key = (window.localizer.account_id, window.workspace_id, "es", "ui", "Continue")
+    window.localizer.cache[key] = '<img src="file:///private/example">'
+    window.localizer.apply_value(widget, "text", "setText")
+    assert widget.textFormat() == Qt.TextFormat.PlainText
+    widget.setToolTip("Continue")
+    window.localizer.apply_value(widget, "toolTip", "setToolTip")
+    assert "<img" not in widget.toolTip() and "&lt;img" in widget.toolTip()
