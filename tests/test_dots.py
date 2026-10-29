@@ -156,7 +156,7 @@ def test_dot_question_routes_to_central_analysis_and_build_keeps_existing_queue(
     assert window.start_agent_request("@GitHub what changed?")
     assert window.start_agent_request("@Aedrova explain recent deployments")
     assert requests == [
-        ("@GitHub what changed?", window.account_dialog.snapshot["dots"][0]),
+        ("what changed?", window.account_dialog.snapshot["dots"][0]),
         ("explain recent deployments", None),
     ]
     builds = []

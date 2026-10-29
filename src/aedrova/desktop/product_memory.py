@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 from aedrova.desktop.controls import AppDialog, ChoiceBox
 from aedrova.desktop.design_system import FlowActions, MasterDetail
 from aedrova.desktop.dialogs import button, label
+from aedrova.localization import choice_source
 from aedrova.memory.model import KINDS, STATES, snapshot_record
 
 
@@ -450,7 +451,7 @@ class ProductMemory(AppDialog):
     def save_entry(self):
         if self.busy:
             return
-        state = self.state.currentText()
+        state = choice_source(self.state)
         if not self.title.text().strip() or not self.body.toPlainText().strip() or not self.sources:
             self.status.setText("Add a title, details and an accessible source first.")
             return
@@ -461,7 +462,7 @@ class ProductMemory(AppDialog):
             self.status.setText("Review the evidence and check the approval box first.")
             return
         conflict = self.conflict.currentData()
-        if state == "approved" and self.kind.currentText() == "question":
+        if state == "approved" and choice_source(self.kind) == "question":
             self.status.setText("Resolve the question before marking it as approved.")
             return
         if state == "conflict" and not conflict:
@@ -475,7 +476,7 @@ class ProductMemory(AppDialog):
             "p_workspace": self.workspace,
             "p_channel": self.channel,
             "p_version": (self.entry or {}).get("version", 0),
-            "p_kind": self.kind.currentText(),
+            "p_kind": choice_source(self.kind),
             "p_title": self.title.text().strip(),
             "p_body": self.body.toPlainText().strip(),
             "p_state": state,

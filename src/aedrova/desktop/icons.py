@@ -89,6 +89,69 @@ def icon(name, color):
         path.lineTo(15, 4)
         path.lineTo(15, 13)
         p.drawPath(path)
+    elif name == "refresh":
+        p.drawArc(QRectF(4, 4, 12, 12), 35 * 16, 300 * 16)
+        p.drawLine(16, 3, 16, 8)
+        p.drawLine(12, 8, 16, 8)
+    elif name == "back":
+        p.drawLine(16, 10, 4, 10)
+        p.drawLine(9, 5, 4, 10)
+        p.drawLine(9, 15, 4, 10)
+    elif name == "logout":
+        p.drawLine(9, 3, 3, 3)
+        p.drawLine(3, 3, 3, 17)
+        p.drawLine(3, 17, 9, 17)
+        p.drawLine(8, 10, 18, 10)
+        p.drawLine(14, 6, 18, 10)
+        p.drawLine(14, 14, 18, 10)
+    elif name == "folder":
+        path = QPainterPath()
+        path.moveTo(2, 6)
+        path.lineTo(2, 16)
+        path.quadTo(2, 17, 3, 17)
+        path.lineTo(17, 17)
+        path.quadTo(18, 17, 18, 16)
+        path.lineTo(18, 6)
+        path.lineTo(10, 6)
+        path.lineTo(8, 3)
+        path.lineTo(3, 3)
+        path.quadTo(2, 3, 2, 4)
+        path.closeSubpath()
+        p.drawPath(path)
+    elif name == "check":
+        p.drawLine(4, 10, 8, 14)
+        p.drawLine(8, 14, 16, 5)
+    elif name == "link":
+        p.drawRoundedRect(QRectF(2, 7, 9, 6), 3, 3)
+        p.drawRoundedRect(QRectF(9, 7, 9, 6), 3, 3)
+    elif name == "enter":
+        p.drawLine(3, 10, 17, 10)
+        p.drawLine(12, 5, 17, 10)
+        p.drawLine(12, 15, 17, 10)
+    elif name == "invite":
+        p.drawEllipse(QRectF(4, 3, 6, 6))
+        p.drawArc(QRectF(2, 10, 10, 12), 0, 180 * 16)
+        p.drawLine(15, 8, 15, 14)
+        p.drawLine(12, 11, 18, 11)
+    elif name == "settings":
+        for y, x in ((5, 7), (10, 13), (15, 8)):
+            p.drawLine(3, y, x - 2, y)
+            p.drawLine(x + 2, y, 17, y)
+            p.drawEllipse(QRectF(x - 2, y - 2, 4, 4))
+    elif name in {"archive", "restore"}:
+        p.drawRoundedRect(QRectF(3, 4, 14, 4), 1, 1)
+        path = QPainterPath()
+        path.moveTo(4, 8)
+        path.lineTo(4, 17)
+        path.lineTo(16, 17)
+        path.lineTo(16, 8)
+        p.drawPath(path)
+        if name == "archive":
+            p.drawLine(8, 11, 12, 11)
+        else:
+            p.drawLine(10, 15, 10, 10)
+            p.drawLine(7, 13, 10, 10)
+            p.drawLine(13, 13, 10, 10)
     elif name == "work":
         p.drawRoundedRect(QRectF(3, 6, 14, 11), 2, 2)
         p.drawRoundedRect(QRectF(7, 3, 6, 4), 1, 1)

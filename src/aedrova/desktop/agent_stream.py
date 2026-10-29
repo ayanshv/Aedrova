@@ -1,9 +1,11 @@
 """Compact agent transcript: public messages and expandable tool activity."""
 
 import json
+import webbrowser
 from datetime import datetime
 from math import ceil
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from PySide6.QtCore import QSize, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
@@ -33,6 +35,7 @@ class ActivityRow(QFrame):
         pending=False,
         author="Aedrova",
         character_config=None,
+        markdown=True,
     ):
         super().__init__()
         self.sent_at = datetime.now().astimezone()
@@ -116,11 +119,18 @@ class ActivityRow(QFrame):
             header.addStretch()
             column.addLayout(header)
             self.message = QLabel(summary)
-            self.message.setTextFormat(Qt.TextFormat.PlainText)
+            if markdown:
+                self.message.setTextFormat(Qt.TextFormat.RichText)
+                self.set_message(summary)
+            else:
+                self.message.setTextFormat(Qt.TextFormat.PlainText)
             self.message.setTextInteractionFlags(
                 Qt.TextInteractionFlag.TextSelectableByMouse
                 | Qt.TextInteractionFlag.TextSelectableByKeyboard
+                | Qt.TextInteractionFlag.LinksAccessibleByMouse
+                | Qt.TextInteractionFlag.LinksAccessibleByKeyboard
             )
+            self.message.linkActivated.connect(self.open_source)
             self.message.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
             self.message.setMargin(2)
             self.message.setWordWrap(True)
@@ -130,6 +140,27 @@ class ActivityRow(QFrame):
             column.addWidget(self.message)
             body.addLayout(column, 1)
             layout.addLayout(body)
+
+    def set_message(self, text):
+        # Same safe Markdown parser as ordinary chat, with raw HTML disabled and
+        # image nodes removed. QLabel must not resolve remote or local resources.
+        from aedrova.desktop.conversation import markdown_html
+
+        self.message.setProperty("aedrovaSourceText", text)
+        self.message.setProperty("aedrovaTranslatingStream", self.pending)
+        self.message.setText(markdown_html(text))
+
+    def open_source(self, value):
+        try:
+            parsed = urlsplit(value)
+            if (
+                parsed.scheme == "https"
+                and parsed.hostname
+                and not (parsed.username or parsed.password)
+            ):
+                webbrowser.open(value)
+        except ValueError:
+            return
 
     def resize_output(self, size):
         height = ceil(size.height() * self.details.fontMetrics().lineSpacing()) + 16
@@ -206,7 +237,10 @@ class AgentStream(QScrollArea):
     def appendPlainText(self, text):  # noqa: N802
         self.add_row(
             ActivityRow(
-                text[:50000], author=self.author_name, character_config=self.character_config
+                text[:50000],
+                author=self.author_name,
+                character_config=self.character_config,
+                markdown=False,
             )
         )
 
@@ -335,6 +369,8 @@ class AgentStream(QScrollArea):
             row.deleteLater()
             self.status_row = None
         self.set_reply(text)
+        if self.reply_row:
+            self.reply_row.message.setProperty("aedrovaTranslatingStream", False)
 
     def set_reply(self, text):
         """Update a single streaming response without adding activity-log rows."""
@@ -343,8 +379,10 @@ class AgentStream(QScrollArea):
                 text, author=self.author_name, character_config=self.character_config
             )
             self.reply_row.is_reply = True
+            self.reply_row.message.setProperty("aedrovaTranslatingStream", True)
             self.add_row(self.reply_row)
         else:
             self.reply_row.summary = text
-            self.reply_row.message.setText(text)
+            self.reply_row.set_message(text)
+            self.reply_row.message.setProperty("aedrovaTranslatingStream", True)
             self.changed.emit()

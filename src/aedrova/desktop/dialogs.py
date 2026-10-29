@@ -51,6 +51,21 @@ def button(text, accessible="", role=""):
     return widget
 
 
+def icon_button(name, title, *, primary=False):
+    """Compact action with a visible glyph, tooltip and full accessible label."""
+    from PySide6.QtCore import QSize
+
+    from aedrova.desktop.icons import assign
+
+    control = button("", accessible=title, role="primary" if primary else "icon")
+    control.setObjectName("WorkspaceAction")
+    control.setFixedSize(44, 44)
+    assign(control, name)
+    control.setIconSize(QSize(20, 20))
+    control.setToolTip(title)
+    return control
+
+
 class CreateDialog(AppDialog):
     def __init__(self, parent, *, workspace, create):
         super().__init__(parent)

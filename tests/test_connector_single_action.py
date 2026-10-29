@@ -21,8 +21,10 @@ def test_disconnected_detail_has_one_connection_action_and_no_inputs(
     detail = dialog.pages.widget(1)
     assert not [w for w in detail.findChildren(QLineEdit) if w.isVisible()]
     assert not [w for w in dialog.findChildren(QSpinBox) if w.isVisible()]
-    actions = [w.text() for w in detail.findChildren(QPushButton) if w.isVisible()]
-    assert actions == ["‹  All connectors", "Connect your account"]
+    actions = [w for w in detail.findChildren(QPushButton) if w.isVisible()]
+    assert [w.accessibleName() for w in actions] == ["All connectors", "Connect your account"]
+    assert actions[0].text() == "" and not actions[0].icon().isNull()
+    assert actions[0].toolTip() == "All connectors"
     assert not dialog.legacy_setup.isVisible()
     assert "24 hours" in dialog.access_note.text()
 

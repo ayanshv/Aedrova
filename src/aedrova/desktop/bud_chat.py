@@ -352,7 +352,7 @@ class BudChat(AppDialog):
             )
             self.rows.addWidget(self.reply_preview)
         else:
-            self.reply_preview.message.setText(text)
+            self.reply_preview.set_message(text)
         self.status.setText("Replying…")
 
     def answered(self, question, result):

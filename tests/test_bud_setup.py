@@ -127,7 +127,7 @@ def test_seven_stages_save_without_oauth_and_never_fake_ready(editor, qtbot):
     dialog.shape.setCurrentIndex(dialog.shape.findData("cloud"))
     dialog.color.addItem("Custom", "#334455")
     dialog.color.setCurrentIndex(dialog.color.findData("#334455"))
-    for stage in [2, 3, 5]:
+    for stage in [2, 3, 4, 5]:
         dialog.next.click()
         assert dialog.pages.currentIndex() == stage
     dialog.resource.setText("team/project")
@@ -550,3 +550,78 @@ def test_custom_personality_roundtrips_and_invalidates_saved_profile(editor):
     assert dialog.personality_sliders["detail"].value() == 45
     dialog.finish_later()
     assert dialog.deferred_setup and not dialog.isVisible()
+
+
+def test_embedded_connectors_show_centered_spinner_for_parent_work(editor, qtbot):
+    dialog, _, _, window = editor
+    window.set_reduced_motion(True)
+    dialog.show_step(5)
+    gallery = dialog.embedded_connectors
+    dialog.pending = True
+    dialog.update_controls()
+    qtbot.waitUntil(lambda: gallery.loading_overlay.isVisible())
+    assert gallery.loading_spinner.timer.isActive()
+    dialog.set_loading(dialog.pages, True)
+    skeleton = getattr(dialog, "_loading_skeleton", None)
+    assert skeleton is None or not skeleton.isVisible()
+    assert gallery.loading_overlay.geometry() == gallery.pages.rect()
+    assert not dialog.status.isVisible()
+    dialog.pending = False
+    dialog.set_loading(dialog.pages, False)
+    dialog.update_controls()
+    assert gallery.loading_overlay.isHidden()
+    assert not gallery.loading_spinner.timer.isActive()
+
+
+def test_plan_capacity_is_visible_and_prevents_new_buds(editor):
+    dialog, rows, saved, window = editor
+    dialog.capacity = {"plan": "pro", "limit": 5, "used": 5, "remaining": 0}
+    dialog.update_controls()
+    assert dialog.capacity_note.text() == "5 / 5 Buds · Pro · shared by your team"
+    assert not dialog.new.isEnabled()
+    dialog.selected_id = None
+    dialog.save_dot()
+    assert not saved
+    assert "Bud limit" in dialog.status.text()
+    dialog.capacity = {"plan": "pro", "limit": 5, "used": 4, "remaining": 1}
+    dialog.update_controls()
+    assert dialog.new.isEnabled()
+
+
+def test_capacity_is_loaded_from_authenticated_service(editor):
+    dialog, rows, saved, window = editor
+    calls = []
+
+    def capacity(workspace):
+        calls.append(workspace)
+        return {"plan": "team", "limit": 15, "used": 2, "remaining": 13}
+
+    window.account_dialog.service.bud_capacity = capacity
+    dialog.refresh()
+    assert calls == [window.workspace_id]
+    assert dialog.capacity_note.text() == "2 / 15 Buds · Team · shared by your team"
+
+
+def test_wizard_visits_personality_and_back_keeps_custom_settings(editor):
+    from aedrova.dots.personality import unpack
+
+    dialog, _, saved, _ = editor
+    for step in (1, 2, 3, 4):
+        dialog.next.click()
+        assert dialog.pages.currentIndex() == step
+    assert dialog.personality_sliders["warmth"].isVisible()
+    dialog.personality_sliders["warmth"].setValue(82)
+    dialog.personality_sliders["reporting"].setValue(47)
+    dialog.personality_voice.setText("Precise, calm, curious.")
+    dialog.next.click()
+    assert dialog.pages.currentIndex() == 5
+    dialog.back.click()
+    assert dialog.pages.currentIndex() == 4
+    assert dialog.personality_sliders["warmth"].value() == 82
+    assert dialog.personality_sliders["reporting"].value() == 47
+    dialog.next.click()
+    dialog.resource.setText("team/project")
+    dialog.save_dot()
+    _, style, voice = unpack(saved[-1]["p_instructions"])
+    assert style["warmth"] == 82 and style["reporting"] == 47
+    assert voice == "Precise, calm, curious."

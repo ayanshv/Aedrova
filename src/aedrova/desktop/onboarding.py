@@ -12,7 +12,7 @@ from PySide6.QtCore import (
     QTimer,
     QVariantAnimation,
 )
-from PySide6.QtGui import QColor, QKeySequence, QRegion, QShortcut
+from PySide6.QtGui import QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QFrame,
     QGraphicsDropShadowEffect,
@@ -351,7 +351,6 @@ class SpotlightTour(QWidget):
         self.window.settings.setValue(self.prefix + "/status", "paused")
         self.next.setFocus()
         self.reposition()
-        fade(self.card, self.window.reduced_motion)
         self.highlight_animation.stop()
         if self.window.reduced_motion:
             self.reveal = 1.0
@@ -379,7 +378,7 @@ class SpotlightTour(QWidget):
             self.show_step(self.index + 1)
 
     def reposition(self):
-        self.setGeometry(self.parentWidget().rect())
+        available = self.parentWidget().rect()
         dark = self.window.theme.name == "dark"
         self.card.setStyleSheet(
             "QFrame#TourCard {background:"
@@ -413,21 +412,24 @@ class SpotlightTour(QWidget):
                     target.setGraphicsEffect(self.component_effect)
                     self.highlighted_target = target
         if target is not None and target.isVisible() and target.isEnabled():
-            origin = self.mapFromGlobal(target.mapToGlobal(QPoint(0, 0)))
-            self.target_rect = QRect(origin, target.size()).intersected(self.rect())
+            origin = self.parentWidget().mapFromGlobal(target.mapToGlobal(QPoint(0, 0)))
+            self.target_rect = QRect(origin, target.size()).intersected(available)
         else:
             self.target_rect = QRect()  # Never spotlight a hidden or unavailable integration.
-        self.card.setFixedWidth(min(420, self.width() - 48))
+        self.card.setFixedWidth(min(420, available.width() - 48))
         self.card.adjustSize()
-        x = max(24, self.width() - self.card.width() - 28)
+        x = max(24, available.width() - self.card.width() - 28)
         y = (
             28
-            if self.target_rect.center().y() > self.height() // 2
-            else self.height() - self.card.height() - 28
+            if self.target_rect.center().y() > available.height() // 2
+            else available.height() - self.card.height() - 28
         )
-        self.card.move(x, max(24, y))
-        # Only the guide intercepts input. The actual control stays interactive.
-        self.setMask(QRegion(self.card.geometry()))
+        # A card-sized child needs no full-window mask. Masking the transparent
+        # overlay can leave an accessible but invisible guide after macOS theme/
+        # layout changes; the component itself already owns its highlight.
+        self.setGeometry(x, max(24, y), self.card.width(), self.card.height())
+        self.card.move(0, 0)
+        self.raise_()
         self.update()
 
     def eventFilter(self, watched, event):  # noqa: N802

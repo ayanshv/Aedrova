@@ -18,8 +18,7 @@ from PySide6.QtWidgets import (
 
 from aedrova.delivery.github import GitHub, repository_name
 from aedrova.desktop.controls import AppDialog, CodingProviderChoice, choose_project
-from aedrova.desktop.design_system import FlowActions
-from aedrova.desktop.dialogs import button, label
+from aedrova.desktop.dialogs import button, icon_button, label
 
 
 def binding_key(user, workspace):
@@ -42,6 +41,17 @@ def save_binding(window, data, workspace=None):
     user = window.current_user()
     if not user:
         raise PermissionError("Sign in before connecting a project.")
+    scope = workspace or window.workspace_id
+    if binding(window, scope).get("folder") != data.get("folder"):
+        # A new project never inherits the prior folder's automatic authority.
+        window.settings.remove(f"agent-permissions/{user.id}/{scope}")
+        dialog = getattr(window, "build_dialog", None)
+        if dialog and dialog.workspace == scope and dialog.pending:
+            dialog.invalidate()
+        if scope == window.workspace_id:
+            from aedrova.desktop.agent_permissions import sync
+
+            sync(window)
     window.settings.setValue(
         binding_key(str(user.id), workspace or window.workspace_id), json.dumps(data)
     )
@@ -128,27 +138,32 @@ class ProjectDialog(AppDialog):
         )
         self.folder = QLineEdit(data.get("folder", ""))
         self.folder.setAccessibleName("Project folder")
-        self.folder.setMinimumHeight(46)
+        self.folder.setFixedHeight(44)
         self.folder.setPlaceholderText("Paste a local folder path or choose a folder")
         row = QHBoxLayout()
+        row.setSpacing(12)
         row.addWidget(self.folder, 1)
-        choose = button("Choose folder", role="outline")
+        choose = icon_button("folder", "Choose project folder")
         choose.clicked.connect(self.choose)
         row.addWidget(choose)
+        row.addSpacing(56)
         layout.addLayout(row)
         layout.addWidget(label("GitHub repository · optional", "title"))
         self.repository = QLineEdit(data.get("repository", ""))
         self.repository.setAccessibleName("GitHub repository")
-        self.repository.setMinimumHeight(46)
+        self.repository.setFixedHeight(44)
         self.repository.setPlaceholderText("owner/repository")
         self.repository.textChanged.connect(lambda: setattr(self, "connected_repo", ""))
-        layout.addWidget(self.repository)
-        self.check = button("Check GitHub connection", role="outline")
+        repo_row = QHBoxLayout()
+        repo_row.setSpacing(12)
+        repo_row.addWidget(self.repository, 1)
+        self.check = icon_button("check", "Check GitHub connection")
         self.check.clicked.connect(self.check_github)
-        layout.addWidget(self.check)
-        setup = button("Set up GitHub · install or sign in", role="outline")
+        repo_row.addWidget(self.check)
+        setup = icon_button("link", "Set up GitHub · install or sign in")
         setup.clicked.connect(self.github_setup)
-        layout.addWidget(setup)
+        repo_row.addWidget(setup)
+        layout.addLayout(repo_row)
         layout.addWidget(
             label(
                 "GitHub uses your existing GitHub CLI login. Aedrova never asks for a "
@@ -162,12 +177,8 @@ class ProjectDialog(AppDialog):
         self.provider.setAccessibleName("Coding provider")
         preferences = window.account_dialog.snapshot.get("agent_preferences", [])
         default = next(
-            (
-                p.get("provider", "codex")
-                for p in preferences
-                if p["workspace_id"] == self.workspace
-            ),
-            "codex",
+            (p.get("provider", "auto") for p in preferences if p["workspace_id"] == self.workspace),
+            "auto",
         )
         self.provider.setCurrentIndex(self.provider.findData(data.get("provider", default)))
         layout.addWidget(self.provider)
@@ -178,7 +189,9 @@ class ProjectDialog(AppDialog):
             label(
                 "Each explicit mention shares your accessible workspace chats with this provider "
                 "and authorizes planning, edits and sandboxed test commands in a separate build "
-                "copy, without further prompts. Provider usage may be billed. Applying to your "
+                "copy, without further prompts. Project questions also share selected text "
+                "files from this folder with your provider, excluding secrets and dependencies. "
+                "Provider usage may be billed. Applying to your "
                 "original folder and publishing still require approval. Turn this off anytime.",
                 "muted",
                 wrap=True,
@@ -188,14 +201,17 @@ class ProjectDialog(AppDialog):
             "Connect once, then start your next build from chat.", "muted", wrap=True
         )
         layout.addWidget(self.status)
-        actions = FlowActions()
-        disconnect = button("Disconnect project", role="outline")
+        actions = QHBoxLayout()
+        actions.setSpacing(12)
+        disconnect = icon_button("logout", "Disconnect project")
         disconnect.clicked.connect(self.disconnect)
         save = button("Save connection", role="primary")
         save.clicked.connect(self.save)
         actions.addWidget(disconnect)
+        actions.addStretch()
         actions.addWidget(save)
         layout.addLayout(actions)
+        layout.addStretch(1)
         for caption in content.findChildren(QLabel):
             if caption.wordWrap():
                 caption.setMinimumHeight(max(0, caption.heightForWidth(580)))

@@ -11,8 +11,14 @@ def test_call_bar_replaces_meeting_tab_and_routes_modes(qtbot, tmp_path, monkeyp
     from aedrova.desktop import meeting_call
 
     window, _ = setup(qtbot, tmp_path)
-    assert [b.text() for b in window.tab_buttons] == ["Conversation", "Project", "Work", "Files"]
-    assert window.pages.count() == 4
+    assert [b.text() for b in window.tab_buttons] == [
+        "Conversation",
+        "Project",
+        "Work",
+        "Files",
+        "People",
+    ]
+    assert window.pages.count() == 5
     calls = []
     monkeypatch.setattr(meeting_call, "open_channel_call", lambda owner, **kw: calls.append(kw))
     window.call_buttons["phone"].click()

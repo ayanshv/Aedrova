@@ -367,7 +367,8 @@ def test_selected_workspace_keeps_visible_background_after_theme_changes(window,
         control = window.workspace_buttons[window.workspace_id]
         image = control.grab().toImage()
         scale = image.devicePixelRatio()
-        assert image.pixelColor(int(5 * scale), int(22 * scale)).name() == window.theme.text.lower()
+        expected = window.theme.accent_bg if theme == "dark" else window.theme.text
+        assert image.pixelColor(int(5 * scale), int(22 * scale)).name() == expected.lower()
 
 
 def test_spring_motion_reacts_without_moving_layout(window, qtbot):

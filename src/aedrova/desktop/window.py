@@ -77,6 +77,9 @@ class AedrovaWindow(QMainWindow):
         self._populate_channels()
         self._load_channel()
         self._render_pages()
+        from aedrova.desktop.localization import Localizer
+
+        self.localizer = Localizer(self)
 
     @property
     def workspace(self):
@@ -174,7 +177,7 @@ class AedrovaWindow(QMainWindow):
         self.create_workspace_button.clicked.connect(self.create_workspace)
         rail_outer.addWidget(self.create_workspace_button)
         self.profile_button = button("○", "Account menu", "icon")
-        self.profile_button.setFixedSize(42, 38)
+        self.profile_button.setFixedSize(42, 42)
         self.profile_button.setToolTip("Account and settings")
         self.profile_button.clicked.connect(self.open_profile_menu)
         rail_outer.addWidget(self.profile_button)
@@ -314,7 +317,7 @@ class AedrovaWindow(QMainWindow):
         self.primary_navigation = tab_area
         self.primary_tabs_layout = tab_area_layout
         tabs_layout = tab_area_layout
-        for index, title in enumerate(("Conversation", "Project", "Work", "Files")):
+        for index, title in enumerate(("Conversation", "Project", "Work", "Files", "People")):
             tab = button(title, f"Open {title.lower()} tab", "tab")
             tab.setCheckable(True)
             tab.toggled.connect(lambda checked, i=index: self.select_tab(i) if checked else None)
@@ -331,7 +334,7 @@ class AedrovaWindow(QMainWindow):
         main_layout.addWidget(self.pages, 1)
         body.addWidget(main, 1)
         self._build_chat()
-        for _ in range(3):
+        for _ in range(4):
             self.pages.addWidget(QWidget())
         self.select_tab(0)
         self.notice = label(
@@ -487,6 +490,9 @@ class AedrovaWindow(QMainWindow):
         jump = view.addAction("Jump to conversation…", self.open_switcher)
         jump.setShortcut(QKeySequence("Ctrl+K"))
         view.addAction("Toggle sidebar", self.toggle_sidebar)
+        from aedrova.desktop.localization import show_language_settings
+
+        view.addAction("Language & translation…", lambda: show_language_settings(self))
         appearance = view.addMenu("Appearance")
         group = QActionGroup(self)
         self.appearance_actions = {}
@@ -690,6 +696,9 @@ class AedrovaWindow(QMainWindow):
                 else []
             )
             self.ai_team_section.sync(team, self.workspace_id)
+        from aedrova.desktop.agent_permissions import sync as sync_permissions
+
+        sync_permissions(self)
         for composer in (self.composer, self.thread_composer):
             composer.dots = (
                 [
@@ -943,20 +952,69 @@ class AedrovaWindow(QMainWindow):
         if workspace != self.workspace_id:
             return
         self.agent_feed.finish_with_result(text)
+        from datetime import UTC, datetime
+
+        self.completed_agent_response = (
+            workspace,
+            getattr(self, "activity_channel", self.channel_id),
+            text,
+            self.agent_feed.author_name,
+            datetime.now(UTC).isoformat(),
+        )
+        if self.messages.source_messages:
+            self.messages.agent_anchor = self.messages.source_messages[-1].id
+            self.messages.refresh_agent()
         self.update_agent_cancel()
         self.build_activity.hide()
         self.messages.set_agent_visible(getattr(self, "activity_channel", None) == self.channel_id)
 
+    def archive_finished_agent(self):
+        finished = getattr(self, "completed_agent_response", None)
+        self.completed_agent_response = None
+        if not finished or not self.connected.active:
+            return
+        workspace, channel, text, author, sent_at = finished
+        self.connected.complete_agent_reply(workspace, channel, text, author, sent_at=sent_at)
+
+    def _record_agent_prompt(self, text, composer):
+        # Slash commands retain the private Build Room workflow; only conversational
+        # mentions are shared in their originating channel or thread.
+        if text.lstrip().split(maxsplit=1)[0].casefold() == "/build":
+            (composer or self.composer).clear_submission(text)
+            self._save_drafts()
+            return
+        parent = self.thread_id if composer is self.thread_composer else None
+        identifier = self.connected.send(text, parent, composer=composer)
+        self.agent_request_origin = (self.workspace_id, self.channel_id, parent, identifier)
+        if identifier and not parent:
+            self.messages.agent_anchor = identifier
+            self.messages.refresh_agent()
+
+    def finish_conversation_response(
+        self, workspace, channel, parent, text, author, prompt_id=None
+    ):
+        self.completed_agent_response = None
+        self.connected.complete_agent_reply(workspace, channel, text, author, parent, prompt_id)
+        self.agent_feed.clear()
+        self.build_activity.hide()
+        self.update_agent_cancel()
+
     def start_agent_request(self, text, *, composer=None):
-        from aedrova.agents.context import build_command
+        from aedrova.agents.context import agent_mention, build_command, without_mention
         from aedrova.desktop.builds import open_build
 
+        if len(text.strip()) > 10000:
+            self.notify("Keep your message under 10,000 characters.")
+            return True
+        if getattr(self, "completed_agent_response", None):
+            self.archive_finished_agent()
+            self.agent_feed.clear()
         preferences = self.account_dialog.snapshot.get("agent_preferences", [])
         nickname = next(
             (p["nickname"] for p in preferences if p["workspace_id"] == self.workspace_id),
             "Aedrova",
         )
-        from aedrova.dots.client import mention
+        from aedrova.dots.client import mention, mention_match
 
         rows = [
             r
@@ -967,22 +1025,17 @@ class AedrovaWindow(QMainWindow):
         task = build_command(text, nickname)
         import re
 
-        addressed_bud = dot and re.match(
-            r"^(?:@" + re.escape(dot["name"]) + r"(?=[,:\s]|$)|<@dot:[^>]+>)",
-            text.strip(),
-            re.IGNORECASE,
-        )
+        from aedrova.localization.intents import localized_build
+
+        bud_match = mention_match(text, dot) if dot else None
+        main_match = agent_mention(text, nickname)
+        addressed_bud = bud_match and (not main_match or bud_match.start() <= main_match.start())
         # A direct Bud mention owns the response, including action-word requests.
         # Explicit Bud tokens also win when its name matches the main agent's nickname.
         if dot and (task is None or addressed_bud):
             from aedrova.desktop.dot_analysis import start_analysis
 
-            request = re.sub(
-                r"^(?:@" + re.escape(dot["name"]) + r"|<@dot:[^>]+>)[,:]?\s*",
-                "",
-                text.strip(),
-                flags=re.IGNORECASE,
-            )
+            request = without_mention(text, bud_match)
             building = bool(
                 re.match(
                     r"^(?:please\s+)?(?:/build|build|implement|fix|create|ship|add)\b",
@@ -990,6 +1043,7 @@ class AedrovaWindow(QMainWindow):
                     re.IGNORECASE,
                 )
             )
+            building = building or localized_build(request)
             if building:
                 from aedrova.desktop.builds import start_background_build
                 from aedrova.desktop.projects import binding
@@ -1000,20 +1054,12 @@ class AedrovaWindow(QMainWindow):
                     else start_background_build(self, request, bud=dot)
                 )
             else:
-                accepted = start_analysis(self, text, bud=dot)
+                accepted = start_analysis(self, request, bud=dot)
             if accepted:
-                for target in (composer,) if composer else (self.composer, self.thread_composer):
-                    target.clear_submission(text)
-                self._save_drafts()
+                self._record_agent_prompt(text, composer)
             return True
-        import re
 
-        candidate = text.strip()
-        names = [nickname, "Aedrova", *(r["name"] for r in rows)]
-        prefix = "|".join(re.escape(name) for name in sorted(names, key=len, reverse=True))
-        candidate = re.sub(
-            r"^(?:@(?:" + prefix + r")|<@dot:[^>]+>)[,:]?\s*", "", candidate, flags=re.IGNORECASE
-        )
+        candidate = without_mention(text, main_match) if main_match else text.strip()
         building = candidate.startswith("/build") or bool(
             re.match(
                 r"^(?:please\s+)?(?:build|implement|fix|create|ship|add)\b",
@@ -1021,13 +1067,12 @@ class AedrovaWindow(QMainWindow):
                 re.IGNORECASE,
             )
         )
+        building = building or localized_build(candidate)
         if (dot or task is not None) and not building:
             from aedrova.desktop.dot_analysis import start_analysis
 
             if start_analysis(self, task or text):
-                for target in (composer,) if composer else (self.composer, self.thread_composer):
-                    target.clear_submission(text)
-                self._save_drafts()
+                self._record_agent_prompt(text, composer)
             return True
         task = build_command(text, nickname) or (text if dot and building else None)
         if task is None:
@@ -1041,9 +1086,7 @@ class AedrovaWindow(QMainWindow):
 
             accepted = start_background_build(self, task)
         if accepted:
-            for target in (composer,) if composer else (self.composer, self.thread_composer):
-                target.clear_submission(text)
-            self._save_drafts()
+            self._record_agent_prompt(text, composer)
         return True
 
     def _local_message(self, identifier):
@@ -1146,6 +1189,13 @@ class AedrovaWindow(QMainWindow):
     def select_tab(self, index):
         if not 0 <= index < len(self.tab_buttons):
             return
+        if index == 4:
+            people = self.pages.widget(4)
+            if hasattr(people, "channel") and people.channel != self.channel_id:
+                people.generation += 1
+                people.channel = self.channel_id
+                people.results.clear()
+                people.notice.clear()
         self.pages.setCurrentIndex(index)
         self.header.show()
         self.primary_navigation.show()
@@ -1157,6 +1207,8 @@ class AedrovaWindow(QMainWindow):
             tab.blockSignals(False)
         if index == 0 and hasattr(self, "thread_panel"):
             self._adapt_thread()
+        if index == 4 and hasattr(self.pages.currentWidget(), "load"):
+            QTimer.singleShot(0, self.pages.currentWidget().load)
 
     def toggle_sidebar(self):
         self.sidebar.setVisible(not self.sidebar.isVisible())
@@ -1280,7 +1332,15 @@ class AedrovaWindow(QMainWindow):
 
     def create_channel(self):
         if self.connected and self.connected.active:
-            self.show_account("channel")
+            from aedrova.desktop.channel_create import CreateChannelDialog
+
+            existing = getattr(self, "channel_create_dialog", None)
+            if existing is not None and existing.isVisible():
+                existing.raise_()
+                return
+            self.channel_create_dialog = CreateChannelDialog(self)
+            self.channel_create_dialog.show()
+            self.channel_create_dialog.name.setFocus()
             return
         self.dialog = CreateDialog(
             self,
@@ -1379,6 +1439,17 @@ class AedrovaWindow(QMainWindow):
                 self.pages.insertWidget(index, page)
             else:
                 self.pages.insertWidget(index, builder())
+        old = self.pages.widget(4)
+        self.pages.removeWidget(old)
+        old.deleteLater()
+        from aedrova.desktop.collaboration import ChatPanel
+
+        people = ChatPanel(self.collaboration, "people", self.channel_id)
+        people.setWindowFlags(Qt.WindowType.Widget)
+        people.setObjectName("ConversationPeople")
+        people.setWindowTitle("People in this conversation")
+        people.search.setPlaceholderText("Find someone in this conversation…")
+        self.pages.insertWidget(4, people)
         self.pages.setCurrentIndex(max(0, selected))
         self._apply_materials()
 
@@ -1400,6 +1471,8 @@ class AedrovaWindow(QMainWindow):
 
     def _card(self, title, description, action_text="", action=None):
         card = GlassFrame()
+        card.theme = self.theme
+        card.reduced_transparency = self.reduced_transparency
         layout = QVBoxLayout(card)
         layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(10)
@@ -1761,8 +1834,10 @@ class AedrovaWindow(QMainWindow):
             def photo_loaded(photo):
                 current = getattr(self.account_dialog, "snapshot", {}).get("user_profile", {})
                 if self.current_user() and current.get("avatar_path") == path:
+                    from aedrova.desktop.profile import rounded_profile_photo
+
                     self.profile_button.setText("")
-                    self.profile_button.setIcon(QIcon(photo))
+                    self.profile_button.setIcon(QIcon(rounded_profile_photo(photo)))
                     self.profile_button.setIconSize(QSize(34, 34))
 
             collaboration.load_avatar(path, photo_loaded)
@@ -1834,18 +1909,30 @@ class AedrovaWindow(QMainWindow):
 
         if not hasattr(self, "account_dialog"):
             self.account_dialog = AccountDialog(self, settings=self.settings)
+            if hasattr(self, "localizer"):
+                self.localizer.bind(self.account_dialog)
             self.account_dialog.dashboard_requested.connect(self.open_dashboard)
         self.account_dialog.pending_intent = intent
         if self.connected and self.connected.active:
             self.account_dialog.pending_workspace = self.workspace_id
         if self.account_dialog.service and self.account_dialog.service.user:
-            if not self.account_dialog.busy:
+            if not self.account_dialog.busy or getattr(
+                self.account_dialog, "background_job", False
+            ):
                 # Reopening must not strand the user on a previous creation
                 # confirmation while a network refresh is pending or fails.
                 if self.account_dialog.snapshot.get("workspaces"):
                     self.account_dialog.pages.setCurrentIndex(4)
                     self.account_dialog.apply_intent()
-                self.account_dialog.refresh()
+                    # The active dashboard already syncs this session's snapshot.
+                    # Keep settings immediately usable instead of covering cached
+                    # content with a full-page loader on every open.
+                    if not self.account_dialog.busy and not (
+                        self.connected and self.connected.active
+                    ):
+                        self.account_dialog.refresh()
+                elif not self.account_dialog.busy:
+                    self.account_dialog.refresh()
         self.account_dialog.show()
         self.account_dialog.raise_()
         self.account_dialog.activateWindow()

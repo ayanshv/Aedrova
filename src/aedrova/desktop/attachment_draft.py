@@ -15,6 +15,7 @@ def stage(composer, path, publish):
     card.setObjectName("AttachmentDraft")
     row = QHBoxLayout(card)
     preview = QLabel()
+    preview.setObjectName("AttachmentImagePreview")
     image = (
         QPixmap(str(path))
         if Path(path).suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}

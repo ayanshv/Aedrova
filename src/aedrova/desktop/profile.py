@@ -78,6 +78,28 @@ def avatar_png(path):
     return bytes(output)
 
 
+def rounded_profile_photo(photo, size=34):
+    """Clip the actual photo; a rounded button does not clip its QIcon."""
+    result = QPixmap(size * 2, size * 2)
+    result.setDevicePixelRatio(2)
+    result.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(result)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+    clip = QPainterPath()
+    clip.addRoundedRect(QRectF(0, 0, size, size), 10, 10)
+    painter.setClipPath(clip)
+    source = photo.toImage()
+    side = min(source.width(), source.height())
+    painter.drawImage(
+        QRectF(0, 0, size, size),
+        source,
+        QRectF((source.width() - side) / 2, (source.height() - side) / 2, side, side),
+    )
+    painter.end()
+    return result
+
+
 class Avatar(QWidget):
     def __init__(self, size=96, parent=None):
         super().__init__(parent)
@@ -201,6 +223,11 @@ class ProfileDialog(AppDialog):
         identity.addWidget(
             label("Your @username is unique. Letters, numbers and underscores.", "muted", wrap=True)
         )
+        from aedrova.desktop.localization import show_language_settings
+
+        language = button("Language & translation…", role="outline")
+        language.clicked.connect(lambda: show_language_settings(self.window))
+        identity.addWidget(language)
         identity.addStretch()
         about = step(
             "More than a name.",
@@ -223,15 +250,14 @@ class ProfileDialog(AppDialog):
         self.bio.setObjectName("ProfileBio")
         self.bio.setPlaceholderText("What do you work on? What should your team know?")
         self.bio.setAccessibleName("Short bio")
-        self.bio.setMaximumHeight(160)
+        self.bio.setMinimumHeight(120)
         about.addWidget(label("About you"))
-        about.addWidget(self.bio)
+        about.addWidget(self.bio, 1)
         self.bio_count = label("", "muted")
         about.addWidget(self.bio_count)
         optional = button("Skip optional details", role="outline")
         optional.clicked.connect(lambda: self.go(2))
         about.addWidget(optional)
-        about.addStretch()
         status = step(
             "Work on your terms.", "Let your team know when you are available, focused, or away."
         )
@@ -444,7 +470,7 @@ class ProfileDialog(AppDialog):
             self.account.snapshot["user_profile"] = result["profile"]
             collaboration = getattr(self.window, "collaboration", None)
             if collaboration:
-                collaboration.last_availability = data["availability"]
+                collaboration.remember_status(data)
                 if self.avatar_data and result["profile"].get("avatar_path"):
                     pixmap = QPixmap()
                     pixmap.loadFromData(self.avatar_data)

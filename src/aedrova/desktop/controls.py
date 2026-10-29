@@ -1,7 +1,7 @@
 """Themed, keyboard-accessible choices, including macOS popup menus."""
 
 from PySide6.QtCore import QRectF, QSize, Qt
-from PySide6.QtGui import QIcon, QPainter, QPainterPath, QPalette, QPen, QRegion
+from PySide6.QtGui import QIcon, QPainter, QPainterPath, QPalette, QPen, QPixmap, QRegion
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -80,6 +80,14 @@ class ChoiceBox(QComboBox):
         self.view().setTextElideMode(Qt.TextElideMode.ElideRight)
         self.setMinimumHeight(44)
 
+    def setCurrentText(self, text):  # noqa: N802
+        # Programmatic enum selections use canonical captions after localization.
+        for index, pair in enumerate(self.property("i18n_items") or []):
+            if pair[0] == text:
+                self.setCurrentIndex(index)
+                return
+        super().setCurrentText(text)
+
     def showPopup(self):  # noqa: N802
         popup = self.view().window()
         popup.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
@@ -117,12 +125,14 @@ class CodingProviderChoice(ChoiceBox):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        from aedrova.desktop.brand import brand_image
         from aedrova.desktop.connector_icons import connector_pixmap
 
         self.setIconSize(QSize(28, 28))
         for key, name in (("codex", "Codex"), ("claude_code", "Claude Code")):
             self.addItem(QIcon(connector_pixmap(key, 28)), name, key)
-        self.addItem("Auto · Aedrova chooses", "auto")
+        self.addItem(QIcon(QPixmap.fromImage(brand_image())), "Auto · Aedrova chooses", "auto")
+        self.setCurrentIndex(self.findData("auto"))
 
 
 def choose_project(parent, initial=""):
@@ -180,4 +190,6 @@ def choose_teammate(parent, names):
     actions.addWidget(start)
     layout.addLayout(actions)
     accepted = dialog.exec() == QDialog.DialogCode.Accepted
-    return choice.currentText(), accepted
+    from aedrova.localization import choice_source
+
+    return choice_source(choice), accepted

@@ -102,7 +102,7 @@ def test_all_steps_fit_and_do_not_send_or_build(window, qtbot, monkeypatch, them
         assert tour.next.isVisible()
         assert tour.heading.text() == STEPS[index].title
         if not tour.target_rect.isEmpty():
-            assert tour.rect().contains(tour.target_rect)
+            assert tour.parentWidget().rect().contains(tour.target_rect)
         assert not tour.grab().isNull()
     tour.advance()
     assert window.tour is None
@@ -161,6 +161,8 @@ def test_tour_highlights_component_without_a_surrounding_overlay(window, qtbot):
     target = tour.highlighted_target
     assert target is not None
     assert target.graphicsEffect() is tour.component_effect
-    assert tour.mask().boundingRect() == tour.card.geometry()
+    assert tour.mask().isEmpty()
+    assert tour.size() == tour.card.size()
+    assert tour.parentWidget().rect().contains(tour.geometry())
     tour.finish("paused")
     assert target.graphicsEffect() is None

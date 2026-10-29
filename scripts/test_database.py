@@ -104,7 +104,11 @@ try {
    'supabase/migrations/202610120002_voice_messages.sql',
    'supabase/tests/voice_messages.sql',
    'supabase/migrations/202610140001_bud_conversations.sql',
-   'supabase/tests/bud_conversations.sql']) {
+   'supabase/tests/bud_conversations.sql',
+   'supabase/migrations/202610230001_auto_agent_preference.sql',
+   'supabase/tests/auto_agent_preference.sql',
+   'supabase/migrations/202610240001_bud_plan_limits.sql',
+   'supabase/tests/bud_plan_limits.sql']) {
   let sql = fs.readFileSync(file,'utf8');
   // Reproduce the already-activated original function, then verify its additive
   // conflict-response upgrade before running the lifecycle tests.

@@ -1,3 +1,195 @@
+## October 24 — signed-in native chat follow-up; step 2 not yet certified
+
+Owner completed Google sign-in. Dashboard dismissal, two native chronological greeting
+exchanges, prompt/answer retention, empty composer/no stale Thinking row, DM picker
+opening, loaded Bud capacity and Finish later returning to chat passed live. Existing
+TikTok Bud still needs authorization; fresh-account tour, full connector OAuth lifecycle
+and other open acceptance gates remain. Public health probe timed out; meeting health
+503. Paid configuration remains deferred, with no new owner payment action now.
+Prelaunch #1 is still OPEN; do not start #2 as though acceptance is complete.
+See [native evidence and remaining boundaries](staging-chat-repairs-2026-10-24.md).
+
+## October 24 — chronological chat, Markdown and connected-project replies
+
+Implemented separate chronological conversational replies, normalized sent timestamps,
+request-before-response causality and originating thread/channel placement. Safe Markdown
+now renders agent/Bud text; connected-project questions receive bounded, secret-filtered,
+read-only local evidence with checked citations. General greetings avoid project/connector
+retrieval. Exact managed model identity is supplied truthfully. Completed build answers
+are retained before the next request clears activity. Logout clears private session caches.
+Central-agent replies remain session-only; durable/cross-device assistant history is not
+claimed. User prompts retain existing shared RPC persistence.
+
+Final desktop suite: 978 passed; backend payment-free selection: 101 passed.
+Ruff/diff/secret-pattern checks pass; latest source staging is open at Google sign-in.
+Full native onboarding and remaining live connector certification are still blocked on
+that sign-in/consent, and funded AI/meeting/activation gates remain deferred. Stage 1 is
+OPEN, not launch-approved. Consolidated owner action and verification:
+[Chat repairs and staging acceptance](staging-chat-repairs-2026-10-24.md).
+
+## October 24 — all owner-paid configuration deferred to final launch gates
+
+Owner requires every action that would charge them to be consolidated at the final
+paid launch gates. Complete payment-free preparation/testing first; never submit
+payments on their behalf. This includes hosting/meeting guard upgrades, provider
+funding, automatic replenishment and any other charge-triggering setup. No payment
+action is required now. Existing approved resources may be used within their limits.
+Actual Claude coding, reliable meetings and other paid-dependent acceptance remain
+OPEN until funded and tested, before launch. This changes sequencing, not closure
+criteria, and does not authorize production promotion. Exact policy and order:
+[Final paid launch gates](final-paid-launch-gates.md).
+
+## October 24 — approved Claude staging activation; API funding gate remains
+
+Owner approved existing Anthropic key transfer to Render staging and combined
+config/models.beta.json. Saved exactly those private settings; both providers now
+appear in authenticated preflight. Model metadata validates the configured Sonnet
+model. Fixed a real gateway TypeError on nested tool-schema type properties and
+deployed ebb36c6 only to existing Free staging. Current managed Claude suppresses
+unreviewed CLI beta capabilities and automatic non-streaming fallback while retaining
+sandbox/tool/cost gates. 627 backend / 970 desktop tests pass; final 34 managed checks pass.
+
+Actual Claude coding is **NOT VERIFIED**: Anthropic's no-generation count endpoint
+rejects with a credit-balance error (HTTP 400); this is an API-account funding gate,
+not a need for a new key. Owner must personally review/add API credits at
+platform.claude.com/settings/billing for the key's organization, and may defer this
+to final paid setup. No payment, upgrade, refill, allowance or production change.
+Exact evidence/handoff: [Claude staging acceptance](claude-staging-acceptance-2026-10-24.md).
+Next: finish the live managed Claude task after funding, then new-workspace free AI
+activation and other existing Stage 1 checks. Overall Stage 1 remains OPEN.
+
+## October 24 — mention routing and sent-prompt retention fixed
+
+Owner explicitly authorized these fixes before the remaining Stage 1 prerequisites.
+Agent mentions now match anywhere with proper name/email boundaries; text before
+and after the mention is retained. Addressed Bud identity remains selected and a
+central-agent request mentioning a Bud keeps the central recipient. Accepted mention
+prompts now use the normal optimistic channel/thread outbox and backend message RPC;
+thinking/result updates do not replace the user message. Receipts, refresh and a
+second prompt preserve history; rejected requests keep drafts. Slash /build commands
+retain their private Build Room behavior. No backend migration or provider change.
+
+Focused regression group: 135 passed, followed by 14 mention-specific checks including
+private slash behavior. Full desktop suite result is recorded in staging acceptance.
+Reloaded source staging with the fixes; Google requested the previous account's
+passkey, so native live sign-in/listening requires the owner. The login screen is
+ready, without a stuck pending authentication. No credentials were changed.
+Remaining Stage 1 provider/meeting/activation/connector gates are unchanged; no launch
+or Stage 2 completion is implied.
+
+## October 24 — Stage 1 live follow-up; gate remains open
+
+Full desktop suite: **954 passed**. Latest backend suite: **621 passed**; the
+focused build/retrieval group also passed 73 checks after planning wording was
+clarified. Actual two-account staging acceptance verified Free Bud capacity,
+simultaneous last-slot enforcement, deletion restoring capacity, Auto save/readback,
+private verified uploads/cancellation, Bud history separation and owner/member
+Online/Away/Do not disturb visibility. Temporary hosted fixtures were cleaned up.
+
+Fixed Stripe external-test install URL validation without relaxing its HTTPS/host/
+path restrictions; restored previously approved staging Stripe settings. Backend
+candidate 1b155eb is deployed only on aedrova-beta-staging from
+codex/stage1-acceptance. Production and checkout remain unchanged. Large CLI harnesses
+now use bounded official provider token counts when the conservative byte estimate
+exceeds context capacity; limits/reservations and failure closure remain enforced.
+50/51 hosted boundary checks pass; meeting health is still 503. Native GitHub
+confirmation and Bud Finish later → highlight tour resume were observed; the full
+hardware/two-device tour is not certified.
+
+Latest actual Auto → Codex planning/implementation/tests/review/apply passed in a
+disposable project; originals stayed unchanged until guarded apply and fixtures
+were cleaned up. Stage 1 is **OPEN** pending both configured providers,
+new-workspace allowance activation, full connector live acceptance, and meeting
+infrastructure/physical checks. Existing Anthropic key validates against provider
+metadata but is not deployed to staging; obtain specific approval for that transfer.
+Search remains unconfigured. Owner must personally approve/pay any hosting charge;
+never submit it for them. Consolidated exact handoff and evidence are in
+[staging acceptance](staging-acceptance-2026-10-24.md).
+
+Owner explicitly queued mention-anywhere parsing and sent-prompt preservation
+**after Stage 1 completes**. Saved those requirements; do not silently reorder them
+or represent either as fixed before implementation and tests.
+
+## October 24 — owner reports Bud quota migration installed
+
+Owner reports `202610240001_bud_plan_limits.sql` ran in staging. Record the manual
+installation as reported complete; authenticated RPC readback, paid-tier boundaries
+and concurrent creation still need hosted acceptance. No repeat SQL action requested.
+Restart the source staging launcher to load the desktop counter. Website capacity
+copy remains a local source change pending publication. Prelaunch gate 1 remains
+PARTIAL / OPEN; no production migration, deployment or launch approval is implied.
+
+## October 24 — approved Bud limits implemented in source
+
+Owner approved Free 1 / Pro 5 / Team 15 / Enterprise explicitly contracted capacity,
+shared per subscription including subspaces. New migration
+`202610240001_bud_plan_limits.sql` reads verified private billing, replaces legacy
+universal 12-cap and serializes creation with a root-scoped transaction lock.
+Saved Buds survive downgrades; edits/deletion remain allowed and new creation is
+blocked at/above capacity. Desktop shows a quiet count/tier in setup; website plan
+cards list capacities. AI allowances, prices and subscriptions are unchanged.
+
+80 focused desktop tests and the embedded PostgreSQL migration/access suites passed;
+35 website public-page tests passed. Hosted concurrent-creator and live plan-change
+acceptance are still pending. Website source updated locally, not publicly deployed.
+Required owner action: Supabase → Aedrova Staging → SQL Editor → New query → run
+`supabase/migrations/202610240001_bud_plan_limits.sql` only in Staging, then restart
+the staging app with its launcher. Until installation hosted enforcement retains
+the old cap. Production installation is a separate release step. No payment,
+credential, production data or deployment change was performed. Step 1 stays open.
+
+## October 24 — conversation People tab and proposed Bud capacity
+
+Added People beside Conversation/Project/Work/Files. It uses the current channel's
+authorized people inventory, refreshes while visible and opens teammate profiles.
+Online/Away/Do not disturb/Offline have green/amber/red/hollow indicators plus
+readable labels; previous-channel responses are invalidated when switching scope,
+and sign-out clears the embedded list. Local changes require restarting staging.
+
+Owner validation pending: Free 1, Pro 5, Team 15 Buds per workspace, Enterprise an
+explicit contracted capacity. See [proposal](bud-plan-limits-proposal.md). This
+does not change entitlements or enforce quotas yet. Bud counts never multiply AI
+usage allowance. No migration, hosted deployment, subscription or payment change.
+
+## October 24 — teammate availability verification
+
+Online, Away, Do not disturb and automatic Offline are shown in Workspace tools →
+People & presence and individual profiles. Fixed stale Do not disturb overriding
+a newly selected Online status; confirmed saves update the local personal cache.
+Idle (five minutes), minimized and hidden windows report Away while preserving
+manual Away/Do not disturb intent. Unchanged presence uses heartbeat without
+rewriting custom status. Server presence expires after 90 seconds without a heartbeat.
+36 focused desktop tests passed. Embedded PostgreSQL migration/access suites passed,
+including owner reading teammate Away/Do not disturb, teammate reading owner Online,
+offline expiry/recovery, inability to edit someone else's status and outsider denial.
+These are local automated checks, not a fresh two-device hosted acceptance run.
+No migration, credential or owner setup is required; restart staging via
+`uv run python scripts/run_staging.py --config work/staging/public-config.json`
+from the project folder to load the source changes. Launch step 1 stays open.
+
+## October 24 — responsive navigation and focused workspace settings
+
+Owner requested rounded profile artwork, immediate DM selection, focused channel
+creation and simplified settings. Local source now uses session-scoped cached
+pickers/results, background transport without full-page navigation locks, deferred
+settings saves with session/logout guards, and five focused settings sections.
+See [UI audit and evidence](ui-responsiveness-2026-10-24.md). Full suite: 933 passed
+before final focused refinements. Native live recheck requires unlocking the Mac
+and restarting staging; no production deployment or new SQL was performed.
+Prelaunch step 1 remains PARTIAL / OPEN with the same provider/meeting blockers.
+
+## October 24 — prelaunch step 1: staging acceptance
+
+Owner approved starting staging acceptance. **PARTIAL / OPEN**, not release approval.
+Fresh app/backend suites: 924 / 598 passing tests. Hosted anonymous boundaries,
+two-account file/Bud privacy and one bounded live Codex reply passed. Meeting health
+is 503; Stripe OAuth and managed Search are unavailable in the inspected catalog.
+See [current evidence and consolidated owner dependencies](staging-acceptance-2026-10-24.md).
+The database runner now includes the Auto preference migration and permission tests.
+No production, hosting purchase, payment setup or new provider grant was performed.
+Do not mark this gate complete or start the next phase without resolving applicable
+acceptance requirements and obtaining owner approval.
+
 ## October 7 — M17G: AI economics and sustainable plan allowances
 
 **Status: planned; implementation requires owner approval.** Run after the builder,
@@ -3116,3 +3308,369 @@ signed out. Backend readiness 200; unauthenticated balance 403. Report at
 work/staging/router-acceptance.json; Render screenshot router-backend-live.png.
 Actual coding inference/both-provider live behavior not tested in this pass; no
 model spend or payment. No further owner action needed for migration/preflight.
+
+Final mention-repair regression: 968 desktop tests passed in 151.48s, followed
+by 14 passing final targeted mention checks (including the private slash-command
+refinement). No backend migration or production deployment for this repair.
+
+### October 25 — Stage 1 native and connector follow-up
+
+Native empty-workspace onboarding/mandatory AI review, dashboard dismissal, required
+Bud setup/Finish later, 22 tour steps per theme, private channel, unsent attachment
+preview/removal, presence display and logout passed. Fixed skipped Bud personality,
+seven-stage navigation, provider-neutral Search copy and native tour visibility;
+corrected guide confirmed live in both themes. 980 desktop tests passed before the
+additional owner visual/scrolling update. Six existing scoped connector grants were
+renewed/read/disconnected; later reads denied: GitHub, Notion, Supabase Staging,
+Figma, Instagram and Vercel. Stripe cancellation passed; actual installation not
+submitted. TikTok needs fresh @aedrova sign-in. Search still unavailable. Synthetic
+workspace archived recoverably. No production or paid change. Owner requested soft
+glass illustrations matching their folder/device references and gentler chat wheel
+input; implemented using existing light/dark tokens, leaving buttons unchanged.
+Final visual/scrolling/onboarding regression group: 125 passed. Latest source
+staging restarted and signed in; illustration sheets visually inspected in both
+themes. Exact checks, limitations and consolidated owner steps:
+docs/prelaunch-checks-2026-10-25.md.
+Stage 1 remains OPEN; do not claim #2 approved or final paid/device gates satisfied.
+
+October 25 follow-up: TikTok sandbox profile/videos and Stripe test Accounts/Balance
+OAuth/read/disconnect/denial accepted. New-workspace Free activation and repeat
+activation without replenishment accepted; synthetic workspace archived, no model
+spend. 130 focused backend checks passed. Search free agreement accepted under
+specific approval, but card-required activation stopped without submission or key.
+Owner proposes existing OpenAI knowledge-based Research Bud instead of separate
+Search funding; live web verification is a distinct optional capability, not an
+implicit replacement. Claude credit-balance failure and meeting health 503 persist;
+public approvals/global revocation/live refresh and paid/device gates remain open.
+Full evidence and superseded owner actions: docs/prelaunch-checks-2026-10-25.md.
+
+October 25 OpenAI live research: backend 8df2cc3 deployed Live to staging, full
+backend suite 638 passed. Desktop regression group 97 passed and final native
+source-link checks 3 passed. Existing OpenAI key used for one real bounded search:
+two HTTPS sources, $0.019123 metered, enable-without-spend and disconnect/denial
+passed. No Brave account/card needed; its previous setup gate is superseded.
+Meta Privacy/Terms/deletion links saved and verified; required settings complete,
+app still unpublished. TikTok Production remains Draft, needing review/demo and
+production configuration. Prepared public review pack saved. Claude/meeting
+funding remains at final owner-paid gates, followed by actual coding/device tests.
+Stage 1 still OPEN. See docs/openai-research-acceptance-2026-10-25.md and
+docs/provider-public-review-preparation.md.
+
+### October 25 — live quota/media acceptance checkpoint
+
+Live staging synthetic capacity checks passed Free 1, Pro 5, Team 15, including
+concurrent contention for the final slot (exactly one winner), overflow rejection,
+Team-to-Pro/Free downgrade preservation of all 15 existing Buds, editing while above
+cap, and creation after removing enough Buds. Synthetic billing rows were restored
+and capacity workspaces archived. These transitions do not certify Stripe lifecycle.
+Server-verified text/PNG/voice WAV round trips and pending-upload cancellation passed;
+real final-candidate microphone/listening remains open. Controlled connector/research/
+upload/voice backend group: 101 passed. Desktop group after direct research routing
+and workspace-settings accessibility fixes: 48 passed.
+
+Native complete Research conversation revealed invalid model-selected tool names.
+Direct routing for a single explicitly selected connected Research Bud was implemented
+and regression-tested. Native retry then reached hosted research, which rejected an
+incomplete/unsourced provider result. It correctly did not fabricate a response or
+automatically retry. Full Research conversation acceptance remains FAILED/OPEN, not
+superseded by the earlier successful direct search. Report checkpoint:
+work/stage1-final-oct25/research-conversation.json. A disposable Research workspace
+still needs recoverable archival and its test connection removed on resumption;
+interactive in-memory acceptance sessions ended when execution was interrupted.
+Notion lifecycle OAuth was started, not completed; no fresh expiry/refresh result.
+Public Instagram/TikTok reviews and external approval remain open. Claude/meeting
+funding and real-device acceptance remain explicitly deferred final gates.
+
+### October 25 — final staging acceptance results
+
+Supersedes the earlier failed Research checkpoint for the single-turn end-to-end path:
+actual Research answer returned, citations validated, owner-only user/assistant history
+saved in order, sources preserved, Thinking not persisted, reopened in both themes.
+Fixed connection-specific Bud citation validation and transient Error-state routing.
+Native unsent image preview→verified send passed; real microphone→8-second preview→
+playback completion→discard passed without uploading ambient audio. Human listening
+still required. Live Notion refresh/read/external token revocation/read denial and
+app-grant expiry denial passed. Live Supabase refresh/read/disconnect/denial passed.
+Other providers' edge lifecycles remain controlled-test evidence, not individual live
+external-revocation certification. Desktop full 990 passed plus final focused 29;
+backend full 638 passed plus final Research 11. Staging backend 6623ac5 Live.
+Temporary Pro was explicitly approved for at most two attempts, then restored Free,
+usage intact and reserved zero. Test workspace archived; managed Research grant removed.
+Synthetic image unsend was not verified; retained only in archived test workspace.
+No payments, production changes or new keys. Meta business/access verification and
+App Review, TikTok genuine demo/production review, and auditory clarity remain OPEN.
+Stage 1 is NOT closed and #2 is not automatically started. Claude and reliable
+meetings remain deferred final gates. Complete evidence and exact owner actions:
+docs/staging-acceptance-final-2026-10-25.md.
+
+### October 25 — approved Meta continuation
+
+Owner specifically approved Tech Provider continuation; applied. App Review draft
+3090636337944737 now accessible. Website platform and Utility & productivity category
+saved. Submission disabled pending actual business/access verification, icon upload
+certification and review material. No private documents, new agreement, business
+account or public submission completed. Stage 1 remains OPEN; TikTok genuine demo
+and human audio clarity also pending. See final staging acceptance report.
+
+### October 26 — persistent reminder and new-project onboarding
+
+Stage 1 remains OPEN. Owner requests a brief current-stage reminder after unrelated
+project responses; saved in .cursor/rules/manual-actions.mdc. Open: Meta actual
+operator/business and access verification plus public review; TikTok genuine demo
+and public review; human audio clarity. Funded Claude and reliable two-device
+meetings remain deferred final launch gates. Stage 2 has not started.
+
+Onboarding project selection now offers Start a new project: name and choose a
+location, explicitly create an empty local folder, then use the existing project/AI
+configuration. Cancel creates nothing; collisions/invalid names reject safely.
+Existing folders are never overwritten. No build/provider call starts on creation.
+37 focused new-project/onboarding tests passed; Ruff and diff checks passed.
+Saved in source; packaged installers and production are unchanged.
+
+### October 26 — dark-theme refinement
+
+Desktop staging source now uses deliberate dark shell/workspace/composer/elevated
+surfaces, legible body/metadata/placeholders, restrained message selection without
+full-width hover stripes, and neutral image-preview backing without recoloring.
+Shared menus/dialogs and embedded People surface corrected; light palette and
+appearance preferences retained. Actual Qt fixtures visually checked in both themes.
+Full desktop suite: 1008 passed; final action-state token refinement: 7 focused
+checks passed. No installer rebuild or production deployment. Details and limitations:
+docs/dark-theme-redesign-2026-10-26.md. Stage 1 acceptance remains OPEN with its
+existing provider-review and human audio-clarity requirements.
+
+### October 26 — website screenshot and team refresh
+
+Recaptured 24 product image variants from current source with synthetic local data;
+all eleven homepage stories now have matching light/dark images and refreshed cache
+keys. Added owner-confirmed team names/roles on Home and About, with monograms.
+Bios/headshots deliberately pending owner input; ask for bios at completion.
+Website-only PR https://github.com/ayanshv/Aedrova-website/pull/26 excludes fourteen
+staging backend commits. Local public checks: 48 on staging, 46 on isolated main
+base. Desktop visual/theme checks: 14 passed, including late-created dark card fix.
+Stage 1 remains OPEN; this does not activate billing, release downloads, public
+provider permissions or meeting services.
+
+### October 27 — composer execution permissions and website release
+
+Added account/workspace-scoped Ask for approval (default), Approve for me, and Full
+access beside upload in both composers. Coding runs use actual per-action approval
+transport; Claude shares the gate. Automatic review is conservative; Full access
+covers the isolated project copy and preserves secret/network/workspace/cost boundaries
+and separate apply/publish review. Mode changes cancel active work. Source update;
+installers are not rebuilt. Full desktop 1,031 passed, final permission suite 28 passed;
+actual installed Codex initialize/thread handshake passed without a model call.
+No funded live provider run claimed. See docs/agent-permissions-2026-10-27.md.
+
+Website-only PR27 merged as 9e26da8 and Render reports Live. /team contains the supplied
+metadata-free portrait and founders-first hierarchy; Home/About/footer link to it.
+Stable PNG/ICO endpoints and original public icon now HTTP200 without noindex.
+Search Console confirms homepage and /team indexed; fresh homepage indexing request
+accepted. Independent Cloudflare sitemap remains at17 URLs until login agreement
+approval permits publishing the prepared18-URL bundle. No guarantee of favicon or
+AI Overview display. Team bios remain owner input. Stage1 remains OPEN with prior
+Meta/TikTok public review and human audio-clarity blockers; paid gates stay deferred.
+
+### October 27 — co-founder portraits and crawler publication
+
+Owner supplied Abhinav and Minh-Khoa photos and changed Ayansh's title to
+Co-Founder & CEO / CTO. Website PR28 merged as ab2bca4; both branch checks and main
+CI passed; Render production reports Live (automatic deploy, 1m02s). All three
+portrait image hashes verified live against metadata-free web copies; /team shows
+the new title and correct identity/role alt text. 37 focused public checks passed;
+light/dark and narrow-screen layouts checked. Bios remain owner input after response.
+
+Owner explicitly approved Cloudflare sign-in/agreement and sitemap publication.
+Existing aedrovaerrorfallback Worker version cc6a1990 now serves the tested bundle,
+with routes/bindings/free plan unchanged. Apex and www robots/sitemap GET/HEAD and
+exact payloads verified; sitemap contains 18 pages including /team. Search Console
+accepted the refreshed sitemap submission; this does not guarantee recrawl timing,
+favicon display or AI Overview inclusion. Cloudflare agreement blocker is resolved.
+Stage 1 remains OPEN for public provider reviews and human audio clarity; funded
+Claude and reliable two-device meetings remain deferred final launch gates.
+
+### October 27 — owner-requested role-based team bios
+
+Owner requested generic bios based on the four confirmed roles. Published concise
+responsibility-focused descriptions without personal-history, credentials, employment
+or achievement claims. Website PR29 merged as ac157a3; Render reports Live, automatic
+deploy 1m05s. 37 focused public/page checks and Ruff passed; release CI passed;
+light/dark/narrow layouts checked and all four exact bios verified in live HTML.
+No further bio input is required for this task. Existing Cloudflare approval and
+18-URL sitemap deployment were already complete, so neither was repeated. Stage 1
+remains OPEN for provider public reviews and human audio clarity; Claude funding
+and reliable meetings remain deferred final launch gates.
+
+### October 27 — favicon remains absent in Google result
+
+Rechecked after owner screenshot: visible Google globe remains, so do not claim
+Search display fixed. Homepage icon links, root ICO/512x512 PNG, image MIME, HTTP200,
+noindex absence and robots eligibility verified. Search Console now records successful
+homepage crawl Oct27 at3:32:30PM, crawl/index allowed, superseding old Oct21 snapshot.
+This does not verify Google's image-fetch/selection status. Existing homepage indexing
+request already accepted today; no redundant submission or unstable URL change.
+No newly verified website defect or owner-required action. Evidence in
+work/favicon-recheck-oct27/findings.md. Stage1 remains OPEN with existing gates.
+
+### October 27 — team/company entity discovery
+
+Website PR30 merged as 8d0cb42. Both branch checks and main CI run160 passed. Live
+/team, /about and Home now have verified public organization/founder metadata and
+matching visible summaries. Team/About identify all four people, actual roles and
+stable profile anchors; the three co-founders are distinct from communications.
+Added factual product/audience context, author/update dates and internal links.
+Organization logo uses existing crawlable /favicon.png; no invented legal entity,
+credentials, external affiliations or personal facts. 47 focused checks and Ruff
+passed; dark/mobile visuals checked. Google Search Console confirms both pages
+indexed and accepted fresh Team and About indexing requests. These are queue
+acceptances, not guarantees of Gemini/AI Overview selection. Existing homepage
+request/sitemap remain unchanged. No owner action needed for this task. Evidence:
+website work/team-entity-discovery-oct27/live-verification.json and indexing screenshots.
+Stage1 remains OPEN for provider public review and audio clarity; Claude funding
+and reliable meetings remain deferred final launch gates.
+
+### October 27 — faceless default portrait
+
+Owner requested a default faceless person image for Joash Thomas. Replaced his
+monogram with an inline neutral head/shoulders silhouette in the existing portrait
+card; theme colors adapt in light/dark. Decorative SVG is hidden from assistive
+technology and is not added as a real Person photograph in structured data.
+12 focused product/discovery checks and Ruff passed; light/dark screenshots checked.
+PR31 merged as 4c4c65e, branch/main CI passed, live public /team placeholder verified.
+Name, role, biography and founder hierarchy retained. No owner action is required.
+Stage 1 remains OPEN with existing provider-review/audio acceptance gates; funded
+Claude and reliable meetings remain deferred final launch gates.
+
+### October 27 — borderless login and pebble dark surfaces
+
+Removed the account login's inset panel appearance: matching dialog/page backgrounds,
+transparent login card and explicit frameless scroll area. Dark-mode surfaces,
+secondary colors and setup illustration glass now use neutral pebble grays; blue
+primary action colors and light-mode palette remain. Actual Qt login captures in
+work/pebble-login-oct27 checked in both themes. 35 focused theme/contrast, visual,
+onboarding and workspace AI setup checks passed; Ruff check/format passed. Full
+1036-test desktop suite passed immediately before this appearance-only change.
+Staging source launcher refreshed to show latest code. No owner action is needed
+for these appearance changes. Stage 1 remains OPEN for Meta business verification/
+public review, TikTok genuine demo/public review and final human audio clarity.
+Funded Claude and reliable two-device meetings remain deferred final launch gates.
+
+### October 27 — minimal account workspace picker
+
+Replaced the tall welcome-home action stack with a centered workspace selector,
+a single primary enter arrow, and icon-only create/invite/settings/archive/restore
+and close controls. Every action has a descriptive tooltip and accessible name;
+archive still requires the existing confirmation and restore remains recoverable.
+Empty accounts disable workspace-specific actions. Retained workspace names and
+an Archived section for discoverability, removed redundant explanatory paragraphs.
+Uses existing outline icon family and theme tokens, including pebble dark mode.
+48 account, archive/restore, onboarding, AI setup and theme checks passed; Ruff
+passed. Light/dark actual Qt captures saved in work/workspace-picker-oct27.
+No personal action is required for this UI change. Stage 1 remains OPEN for Meta
+verification/public review, TikTok demo/public review and human audio clarity;
+funded Claude and reliable two-device meetings remain deferred final gates.
+
+### October 27 — compact action layout audit
+
+Audited the desktop account/workspace, project setup, connector navigation, profile,
+Bud setup and build action layouts for repeated full-width utility-button stacks.
+Simplified account settings into one utility toolbar and inline invitation-code
+entry; reduced settings navigation to accessible icon buttons and removed duplicate
+branding/oversized section art. Project folder and GitHub check/setup actions now sit
+beside their fields; disconnect is compact. Connector refresh/back navigation uses
+consistent icons. Added a shared 44px icon-action helper with tooltip/accessibility
+labels. Kept explicit connection/save/build consent actions and authorization text,
+profile form labels, archive confirmation and provider permissions intact. Existing
+well-grouped profile/build controls did not need a broad redesign.
+126 account/onboarding/navigation/build/connector checks passed; 29 further project,
+spinner/visual checks passed. Five connector assertions were updated to test the
+new accessible back action instead of its removed visible text, then all 22 tests
+in connector single-action/navigation suites passed. Ruff check/format passed.
+Theme screenshots: work/compact-layout-audit-oct27. Latest source staging launcher
+opened; a restart may require Google sign-in again because sessions are in memory.
+No payment or production migration. Stage 1 remains OPEN for Meta verification and
+public review, TikTok demo/public review, and human audio clarity; paid Claude and
+reliable two-device meetings remain deferred final gates.
+
+### October 27 — simplified layout alignment correction
+
+Aligned settings heading, workspace selector, section title and form fields on one
+content grid; the 44px navigation rail occupies its own column. Removed redundant
+section artwork, standardized 16/20px spacing, and moved account utility actions
+below the join form. Project folder/repository fields now share the same width and
+44px control height; attached icons align on common columns and the primary save
+sits at the trailing edge. Active/archived workspace selector heights now match.
+Actual Qt light/dark account, agent and project screenshots inspected in
+work/alignment-oct27. 58 affected account/archive/navigation/onboarding/project
+checks passed; Ruff check/format passed. Staging refreshed from current source.
+No owner setup is needed for styling; Continue with Google in staging to enter it.
+Stage 1 remains OPEN for public provider approvals and final audio clarity; paid
+Claude and reliable two-device meetings remain deferred final launch gates.
+
+### October 27 — full-height responsive layouts
+
+Settings actions now anchor to the bottom; short agent/account forms sit in the
+middle of available content space beneath their headings. Channel/member/pending
+invitation lists expand with window height instead of yielding space to trailing
+spacers. Workspace picker fills available width/height with an adaptive center and
+archived controls below. Profile bio and Bud guidance editors expand; project save
+footer stays at the bottom. Existing chat, conversation pickers and connector
+content already expand and were retained. Small windows continue to scroll.
+100 affected account/archive/onboarding/project/Bud checks and six profile checks
+passed. Five additional geometry checks verify bottom action placement and list
+growth when resized; passed. Light/dark large-window captures checked in
+work/full-height-oct27. Current source staging launched. No owner setup needed for
+layout changes; Continue with Google in Staging to see authenticated screens.
+Stage 1 remains OPEN for provider public approvals and final human audio clarity;
+funded Claude and reliable two-device meetings remain deferred final gates.
+
+### October 27 — balanced spacing correction
+
+Supersedes the previous short-form full-height spacing rule: flexible gaps had split
+related controls and produced awkward empty bands. Workspace heading, selector,
+utility icons and archived picker now form one centered group (720px maximum width),
+with consistent 20/24px internal spacing and remaining room outside the group.
+Agent/account/project fields and their actions stay close together; only trailing
+space absorbs excess height. Channel/member/invitation lists and profile/Bud text
+editors retain useful expansion. Existing full-height chat/connector areas retained.
+55 affected account/archive/project/navigation and responsive checks passed; six
+resize tests passed again after centering adjustment. The tests now guard bounded
+form/action gaps and active/archive separation at large heights, retaining list-growth
+checks. Light/dark normal/large screenshots inspected in work/balanced-spacing-oct27.
+No payment, backend or authorization change. Stage 1 remains OPEN for provider public
+approvals and final human audio clarity; funded Claude and reliable meetings deferred.
+
+### October 27 — main repository integration validation
+
+Owner requested all pending work in both GitHub main branches, with no manual merge
+handoff. Website combined source passed 644 service tests, 10 edge checks, lint and
+credential scans; pushed to main as 873d9b9. Desktop local full suite passed 1042
+checks and embedded PostgreSQL migration/RLS tests passed. Protected-main PR4 found
+one test-only CI dependency: the mocked plan/build journey still probed installed
+CLIs through its new Auto default. Its routing fixture now supplies a synthetic
+available provider alongside the synthetic runner; 61 build-flow checks passed.
+Required hosted CI must pass before merging PR4. No branch protection was disabled.
+Stage 1 external approvals/audio and deferred paid gates remain unchanged.
+
+Windows hosted CI additionally found that the approval-transport test fixture tried
+to execute a POSIX shebang script as a native Windows program (WinError193). The
+fixture now launches its synthetic server through the current Python interpreter
+on every platform, retaining actual stdio, approval denial/acceptance, cancellation
+and managed-auth isolation assertions. 73 permission/build tests passed locally.
+Linux/macOS and RLS hosted checks passed on the preceding fixture fix; the final
+cross-platform rerun remains the merge gate. Runtime permissions were not relaxed.
+
+### October 29 — reader-specific multilingual support
+
+Implemented personal language preferences, 20 language choices, asynchronous display
+translation of shared messages/prompts and completed agent replies, original-text
+controls, RTL and interface label translation. Stored history, authorization, submitted
+fields and enum values remain canonical. Matching authenticated website/backend uses
+existing metered OpenAI Responses allowance, protected technical tokens, bounded
+requests and reader/workspace-scoped memory caches. No new migration, key or purchase.
+See docs/multilingual-support.md for coverage, privacy, limitations and live acceptance.
+Unsigned public website currently offers core Hindi navigation; full-page/other language
+translation needs authenticated workspace AI. Do not claim full offline public-site
+localization or live translation acceptance. Existing Stage 1 and deferred paid gates
+are unchanged. Also fixed a deleted Qt ChatPanel timer/callback lifetime error found
+in the pending protected-main CI; no test or branch protection was disabled.

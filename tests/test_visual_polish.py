@@ -29,7 +29,7 @@ def test_dark_scroll_panels_and_live_theme_change(qtbot, tmp_path):
         actual, expected = image.pixelColor(2, 2), QColor(DARK.bg)
         # Native color conversion can round a channel by one on macOS.
         assert max(abs(a - b) for a, b in zip(actual.getRgb(), expected.getRgb(), strict=True)) <= 1
-        assert dialog.palette().color(QPalette.ColorRole.Window).name().upper() == DARK.bg
+        assert dialog.palette().color(QPalette.ColorRole.Window).name().upper() == DARK.elevated
     window.set_theme("light", persist=False)
     for dialog in dialogs:
         assert dialog.palette().color(QPalette.ColorRole.Window).name() == "#ffffff"
@@ -82,7 +82,7 @@ def test_confirmation_dialog_uses_current_app_palette(qtbot, tmp_path):
     box.setText("Review the changes before applying them.")
     box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
     box.show()
-    assert box.palette().color(QPalette.ColorRole.Window).name().upper() == DARK.bg
+    assert box.palette().color(QPalette.ColorRole.Window).name().upper() == DARK.elevated
     assert box.palette().color(QPalette.ColorRole.WindowText).name().upper() == DARK.text
     box.close()
 
@@ -124,9 +124,8 @@ def test_profile_popup_mouse_activation_and_theme(qtbot, tmp_path):
         window.set_theme(mode, persist=False)
         qtbot.mouseClick(window.profile_button, Qt.MouseButton.LeftButton)
         qtbot.waitUntil(lambda: window.profile_menu.isVisible())
-        assert window.profile_menu.palette().color(
-            QPalette.ColorRole.Window
-        ) == window.palette().color(QPalette.ColorRole.Window)
+        expected = window.theme.elevated if mode == "dark" else window.theme.bg
+        assert window.profile_menu.palette().color(QPalette.ColorRole.Window) == QColor(expected)
         assert any(action.text() == "Settings…" for action in window.profile_menu.actions())
         window.profile_menu.close()
 

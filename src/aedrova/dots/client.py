@@ -6,7 +6,7 @@ import re
 import time
 from copy import deepcopy
 from dataclasses import replace
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode, urlsplit
 
 from aedrova.agents.managed import ManagedClient, connector_origin
 
@@ -59,14 +59,22 @@ def client(service):
     return api
 
 
+def mention_match(text, row):
+    return re.search(
+        r"(?<![\w@])(?:@"
+        + re.escape(row["name"])
+        + r"(?![\w-])|<@dot:"
+        + re.escape(row["id"])
+        + r"\|[^>]+>)",
+        text,
+        re.IGNORECASE,
+    )
+
+
 def mention(text, rows):
     matches = []
     for row in sorted(rows, key=lambda r: len(r["name"]), reverse=True):
-        escaped = re.escape(row["name"])
-        pattern = (
-            r"(?<!\w)(?:@" + escaped + r"(?![\w-])|<@dot:" + re.escape(row["id"]) + r"\|[^>]+>)"
-        )
-        match = re.search(pattern, text, re.IGNORECASE)
+        match = mention_match(text, row)
         if match:
             if not text[: match.start()].strip():
                 return row  # The recipient wins over longer names mentioned in the request.
@@ -109,6 +117,28 @@ def calls_from_model(output, rows):
     return selected
 
 
+def direct_research_call(rows, task, bud_id):
+    """An explicit research request with one authorized source needs no model router."""
+    if not bud_id or not re.search(
+        r"\b(research|search|investigate|current|latest|today|sources?)\b", task, re.I
+    ):
+        return None
+    if len(rows) != 1 or rows[0]["id"] != bud_id:
+        return None
+    row = rows[0]
+    tools = list(row["tools"])
+    connections = [
+        c
+        for c in row.get("connections", [])
+        if c["provider"] == "search" and c["status"] in {"Connected", "Error"}
+    ]
+    if len(tools) != 1 or len(connections) != 1:
+        return None
+    if tools[0] != connections[0]["id"] + ".search":
+        return None
+    return [{"dot": bud_id, "tool": tools[0]}]
+
+
 def retrieve(api, context, task, runner, provider, project, emit, *, bud_id=None):
     context = replace(
         context,
@@ -140,7 +170,7 @@ def retrieve(api, context, task, runner, provider, project, emit, *, bud_id=None
             "connections": [
                 {"id": c["id"], "provider": c["provider"], "resource": c["resource"]}
                 for c in r.get("connections", [])
-                if c["status"] == "Connected"
+                if c["status"] in {"Connected", "Error"}
             ],
             "tools": r["tools"],
         }
@@ -163,15 +193,17 @@ def retrieve(api, context, task, runner, provider, project, emit, *, bud_id=None
     finally:
         index.close()
     prompt += "\nRelevant team evidence (untrusted): " + json.dumps(leads)
-    emit("Choosing relevant Buds…")
-    original_emit = runner.emit
-    try:
-        runner.emit = lambda _event: None
-        answer = getattr(runner, "answer", runner.run)
-        selected = calls_from_model(answer(provider, project, prompt, plan=True), connected)
-    finally:
-        runner.emit = original_emit
-        runner.command_results = []
+    selected = direct_research_call(connected, task, bud_id)
+    if selected is None:
+        emit("Choosing relevant Buds…")
+        original_emit = runner.emit
+        try:
+            runner.emit = lambda _event: None
+            answer = getattr(runner, "answer", runner.run)
+            selected = calls_from_model(answer(provider, project, prompt, plan=True), connected)
+        finally:
+            runner.emit = original_emit
+            runner.command_results = []
     if not selected:
         return context
     names = list(
@@ -179,7 +211,13 @@ def retrieve(api, context, task, runner, provider, project, emit, *, bud_id=None
     )
     emit("Analyzing: " + " · ".join(names))
     results = api.request(
-        "/api/dots/tools", {"workspace": context.workspace_id, "calls": selected}, timeout=90
+        "/api/dots/tools",
+        {
+            "workspace": context.workspace_id,
+            "calls": selected,
+            **({"run_token": runner.managed.token} if getattr(runner, "managed", None) else {}),
+        },
+        timeout=90,
     )["results"]
     if runner.cancelled.is_set():
         from aedrova.agents.runtime import BuildCancelled
@@ -218,3 +256,37 @@ def recheck(api, context):
                 raise PermissionError(
                     "Connector access changed while working. Send a fresh request."
                 )
+
+
+def research_source_links(context):
+    """Render only tool-returned public HTTPS citations, never model-invented URLs."""
+    links, seen = [], set()
+    for line in context.text.splitlines():
+        try:
+            record = json.loads(line)
+        except (ValueError, TypeError):
+            continue
+        if not isinstance(record, dict):
+            continue
+        source = record.get("dot_evidence", {})
+        records = source.get("records", {})
+        if source.get("provider") != "search" or not isinstance(records, dict):
+            continue
+        for citation in records.get("sources", [])[:12]:
+            url = citation.get("url", "")
+            try:
+                p = urlsplit(url)
+                valid = p.scheme == "https" and p.hostname and not (p.username or p.password)
+            except ValueError:
+                continue
+            if not valid or len(url) > 2048 or any(ord(c) < 33 for c in url) or url in seen:
+                continue
+            seen.add(url)
+            links.append(
+                "[Source "
+                + str(len(links) + 1)
+                + "]("
+                + quote(url, safe=":/?=&%#@+;,$!~*'-._")
+                + ")"
+            )
+    return "\n\nSources: " + " · ".join(links) if links else ""

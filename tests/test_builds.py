@@ -413,6 +413,14 @@ def test_build_plan_then_approval_and_worker_cleanup(qtbot, tmp_path, monkeypatc
             else "Implemented; tests passed."
         )
 
+    # Auto routing must use the same synthetic provider as the mocked runner.
+    # CI deliberately has no installed/authenticated coding CLI.
+    from aedrova.agents.routing import Candidate
+
+    monkeypatch.setattr(
+        "aedrova.agents.routing.runtime_candidates",
+        lambda **_: [Candidate("codex", available=True)],
+    )
     monkeypatch.setattr(LocalRunner, "run", run)
     from aedrova.agents.checkout import prepare as real_prepare
 
@@ -457,7 +465,7 @@ def test_slash_build_opens_private_studio_without_sending_chat(qtbot, tmp_path, 
         ("@Aedrova build a widget", "a widget"),
         ("/build", ""),
         ("/build a widget", "a widget"),
-        ("We could ask @Nova later", None),
+        ("We could ask @Nova later", "We could ask later"),
         ("@Nova what do you think?", "what do you think?"),
         ("@Nova builder", "builder"),
         ("/building", None),
@@ -568,3 +576,15 @@ sys.exit(2)
     )
     with pytest.raises(RuntimeError, match="incompatible"):
         LocalRunner(lambda _: None).run("codex", tmp_path, "task", plan=True)
+
+
+def test_planning_requires_current_read_only_inspection_and_real_citations():
+    from aedrova.agents.runtime import instructions
+
+    prompt = instructions("Implement and test a greeting", Path("/context"), plan=True)
+    assert "inspection of the repository and evidence NOW" in prompt
+    assert "Reading files with safe shell commands is permitted" in prompt
+    assert "do not edit files" in prompt
+    assert "execute project scripts or tests during planning" in prompt
+    assert "not a conflict with planning" in prompt
+    assert "actual exact source identifiers" in prompt

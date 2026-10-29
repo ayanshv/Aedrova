@@ -217,6 +217,18 @@ class IdentityService:
         self._authenticated()
         return self.client.rpc("save_workspace_dot", parameters).execute().data
 
+    def bud_capacity(self, workspace):
+        self._authenticated()
+        try:
+            return (
+                self.client.rpc("workspace_bud_capacity", {"p_workspace": workspace}).execute().data
+            )
+        except Exception as error:
+            if getattr(error, "code", None) == "PGRST202":
+                # Older hosts must not show an invented plan or allowance.
+                return None
+            raise
+
     def save_bud(self, parameters):
         self._authenticated()
         appearance = parameters.get("p_appearance", "auto")
@@ -417,6 +429,26 @@ class IdentityService:
             return {"setup_required": True}
         self.profiles_available = True
         return result or {}
+
+    def save_language_preference(self, language, translate=True):
+        from aedrova.localization import LANGUAGES
+
+        self._authenticated()
+        if language not in LANGUAGES or type(translate) is not bool:
+            raise ValueError("Choose a supported language.")
+        user_id = str(self.user.id)
+        result = self.client.auth.update_user(
+            {
+                "data": {
+                    "aedrova_language": language,
+                    "aedrova_translate": translate,
+                }
+            }
+        )
+        if not self.user or str(self.user.id) != user_id or str(result.user.id) != user_id:
+            raise PermissionError("Session changed while saving language preferences.")
+        self.user = result.user
+        return language
 
     def save_full_profile(self, data, avatar=None):
         from uuid import uuid4

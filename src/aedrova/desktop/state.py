@@ -26,6 +26,7 @@ class Message:
     saved: bool = False
     pinned: bool = False
     sender_id: str = ""
+    agent: bool = False
 
 
 @dataclass

@@ -287,18 +287,30 @@ def gather(
     )
 
 
+def agent_mention(text, nickname="Aedrova"):
+    names = sorted({"Aedrova", nickname}, key=len, reverse=True)
+    return re.search(
+        r"(?<![\w@])@(?:" + "|".join(re.escape(name) for name in names) + r")(?![\w-])",
+        text,
+        re.IGNORECASE,
+    )
+
+
+def without_mention(text, match):
+    """Remove the addressed name only; retain the user's surrounding request."""
+    before = text[: match.start()].rstrip()
+    after = text[match.end() :].lstrip(",: \t")
+    return (before + (" " if before and after else "") + after).strip()
+
+
 def build_command(text, nickname="Aedrova"):
-    """Explicit leading mentions open the agent; mentions in ordinary prose stay silent."""
+    """An explicit agent mention anywhere addresses the agent; plain chat stays silent."""
     value = text.strip()
     slash = re.match(r"^/build(?:\s+(.*))?$", value, re.IGNORECASE | re.DOTALL)
     if slash:
         return (slash.group(1) or "").strip()
-    mention = re.match(
-        r"^@(?:Aedrova|" + re.escape(nickname) + r")[,:]?(?:\s+(.*))?$",
-        value,
-        re.IGNORECASE | re.DOTALL,
-    )
+    mention = agent_mention(value, nickname)
     if not mention:
         return None
-    request = (mention.group(1) or "").strip()
+    request = without_mention(value, mention)
     return re.sub(r"^build(?:\s+|$)", "", request, count=1, flags=re.IGNORECASE).strip()

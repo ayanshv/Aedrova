@@ -105,6 +105,7 @@ def test_dm_picker_includes_buds_without_human_coworkers(qtbot, tmp_path, monkey
     bud = dot("Orbit")
     data = {**window.account_dialog.snapshot, "directory": [], "dots": [bud]}
     service.snapshot = lambda: data
+    window.account_dialog.snapshot = data
     selected = []
     opened = []
 

@@ -23,6 +23,12 @@ class Theme:
     accent_text: str
     primary_text: str
     avatars: tuple[str, ...]
+    header: str
+    elevated: str
+    composer: str
+    preview: str
+    accent_hover: str
+    accent_pressed: str
 
 
 LIGHT = Theme(
@@ -42,24 +48,36 @@ LIGHT = Theme(
     "#1954D1",
     "#FFFFFF",
     ("#E4E7EC", "#EDEDEF", "#E4E4E7", "#E9E9EC"),
+    "#FFFFFF",
+    "#FFFFFF",
+    "#FFFFFF",
+    "#F5F6F8",
+    "#1954D1",
+    "#004C99",
 )
 DARK = Theme(
     "dark",
-    "#0C0C0D",
-    "#141415",
-    "#0C0C0D",
-    "#141415",
-    "#1C1C1E",
-    "#262628",
-    "#333336",
+    "#1B1B1B",
+    "#222222",
+    "#181818",
+    "#1F1F1F",
+    "#292929",
+    "#353535",
+    "#444444",
+    "#F2F2F2",
+    "#BDBDBD",
+    "#B0B0B0",
+    "#79A7FF",
+    "#353535",
+    "#D6D6D6",
+    "#181818",
+    ("#383838", "#303030", "#3E3E3E", "#353535"),
+    "#1E1E1E",
+    "#303030",
+    "#292929",
     "#F5F6F8",
-    "#CACACF",
-    "#A0A0A8",
-    "#6C9EFF",
-    "#202D45",
-    "#A8C6FF",
-    "#0C0C0D",
-    ("#353537", "#262628", "#38383B", "#323235"),
+    "#89B2FF",
+    "#6796F3",
 )
 
 
@@ -76,10 +94,20 @@ def palette(theme: Theme):
         (QPalette.ColorRole.Highlight, theme.accent_bg),
         (QPalette.ColorRole.HighlightedText, theme.accent_text),
         (QPalette.ColorRole.PlaceholderText, theme.muted),
-        (QPalette.ColorRole.ToolTipBase, theme.surface),
+        (QPalette.ColorRole.ToolTipBase, theme.elevated),
         (QPalette.ColorRole.ToolTipText, theme.text),
     ):
         result.setColor(role, QColor(color))
+    if theme.name == "dark":
+        # Qt's built-in neutral roles are also used by loading and native controls.
+        # Keep those roles inside the same surface progression as the QSS widgets.
+        for role, color in (
+            (QPalette.ColorRole.Midlight, theme.hover),
+            (QPalette.ColorRole.Mid, theme.border),
+            (QPalette.ColorRole.Dark, theme.rail),
+            (QPalette.ColorRole.Light, theme.elevated),
+        ):
+            result.setColor(role, QColor(color))
     for role in (
         QPalette.ColorRole.Text,
         QPalette.ColorRole.WindowText,
@@ -98,6 +126,10 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
         capsule = t.surface
     selected = t.accent_bg
     bud_surface = "#FEFDFC" if t.name == "light" else t.surface
+    overlay = t.bg if white else t.elevated
+    control = t.bg if white else t.surface
+    composer = capsule if white else t.composer
+    placeholder = "" if white else f"placeholder-text-color: {t.muted};"
     return f"""
     QFrame#DictationStrip, QFrame#UploadProgress {{ background: {t.canvas};
         border: none; border-radius: 10px; }}
@@ -140,19 +172,29 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QWidget#SettingsSection {{ border-bottom: 1px solid {t.border}; }}
     QLabel#AgentIdentity {{ color: {t.accent_text}; background: {t.accent_bg};
         font-size: 10px; padding: 2px 6px; border-radius: 4px; }}
-    QMainWindow, QDialog, QStackedWidget#AccountPages, QWidget#AccountPage {{ background: {t.bg}; }}
-    QWidget#AccountLoginCard {{ background: {t.bg}; border: none;
-        border-radius: 10px; }}
-    QComboBox {{ background: {t.bg}; border: 1px solid transparent;
+    QMainWindow, QStackedWidget#AccountPages, QWidget#AccountPage {{ background: {t.bg}; }}
+    QDialog {{ background: {overlay}; }}
+    QDialog#ConversationPeople {{ background: {t.bg}; }}
+    QDialog#AccountDialog {{ background: {t.bg}; border: none; }}
+    QWidget#AccountLoginCard {{ background: transparent; border: none;
+        border-radius: 0; }}
+    QPushButton#WorkspaceAction {{ padding: 0; border: none; border-radius: 12px;
+        background: transparent; }}
+    QPushButton#WorkspaceAction:hover {{ background: {t.hover}; }}
+    QPushButton#WorkspaceAction:focus {{ border: 1px solid {t.accent}; }}
+    QPushButton#WorkspaceAction[role="primary"] {{ background: {t.accent}; }}
+    QPushButton#WorkspaceAction[role="primary"]:hover {{ background: {t.accent_hover}; }}
+    QPushButton#WorkspaceAction:disabled {{ background: transparent; }}
+    QComboBox {{ background: {control}; border: 1px solid transparent;
         border-radius: 7px; padding: 10px; min-width: 75px; }}
     QComboBox::drop-down {{ border: none; width: 30px; background: transparent; }}
     QComboBox:focus {{ border-color: {t.accent}; }}
     QComboBox::down-arrow {{ image: none; border: none; width: 0px; height: 0px; }}
-    QComboBox QAbstractItemView {{ background: {t.bg}; color: {t.text};
+    QComboBox QAbstractItemView {{ background: {overlay}; color: {t.text};
         border: none; border-radius: 7px; padding: 6px;
         selection-background-color: {t.accent_bg}; selection-color: {t.accent_text};
         outline: none; }}
-    QFrame#ChoicePopup {{ background: {t.bg}; border: none;
+    QFrame#ChoicePopup {{ background: {overlay}; border: none;
         border-radius: 16px; padding: 0; }}
     QListView#ChoiceList, QListView#ChoiceList:focus {{ border: none; outline: none; }}
     QComboBox QAbstractItemView::item {{ min-height: 30px; padding: 5px 12px;
@@ -172,8 +214,10 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QListWidget[accountList="true"]::item {{ padding: 7px; border-radius: 6px; }}
     QListWidget[accountList="true"]::item:selected {{
         background: {t.accent_bg}; color: {t.accent_text}; }}
-    QWidget#Chat, QWidget#Thread, QFrame#Rail {{ background: transparent; border: none; }}
-    QFrame#Topbar, QFrame#ChannelHeader {{ background: {t.bg}; }}
+    QWidget#Chat, QWidget#Thread {{ background: transparent; border: none; }}
+    QFrame#Rail {{ background: {"transparent" if white else t.rail}; border: none; }}
+    QFrame#Topbar {{ background: {t.header}; }}
+    QFrame#ChannelHeader {{ background: {t.bg}; }}
     QLabel {{ background: transparent; border: none; }}
     QLabel[role='muted'] {{ color: {t.muted}; font-size: 12px; }}
     QLabel#MessageTimestamp {{ color: {t.secondary}; font-size: 11px; }}
@@ -185,8 +229,13 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QLabel[role='badge'] {{ color: {t.secondary}; background: {capsule};
         border-radius: 11px; padding: 5px 10px; font-size: 11px; font-weight: 500; }}
     QLabel[role='error'] {{ color: {"#B4232F" if white else "#FF8A92"}; font-size: 12px; }}
-    QFrame#Composer {{ background: {capsule}; border: 1px solid {t.border}; border-radius: 14px; }}
+    QFrame#Composer {{ background: {composer}; border: 1px solid {t.border}; border-radius: 14px; }}
     QFrame#Composer[focused='true'] {{ border: 1px solid {t.accent}; }}
+    QLabel#AttachmentImagePreview {{ background: {t.preview}; border-radius: 5px;
+        padding: {0 if white else 3}px; }}
+    QFrame#AttachmentDraft {{ background: {"transparent" if white else t.surface};
+        border: {"none" if white else "1px solid " + t.border};
+        border-radius: 9px; }}
     QLabel#ComposerCue {{ color: {t.muted}; font-size: 10px; font-weight: 500; padding-left: 8px; }}
     QPushButton#WorkspaceToolsToggle {{ color: {t.secondary}; font-size: 12px; padding: 7px 8px; }}
     QWidget#WorkspaceTools QPushButton {{ padding: 5px 9px; font-size: 11px; min-height: 22px; }}
@@ -220,15 +269,16 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QPushButton:disabled {{ color: {t.muted}; }}
     QPushButton[role='primary'] {{ background: {t.accent}; color: {t.primary_text};
         padding: 9px 18px; border-radius: 8px; font-weight: 600; text-align: center; }}
-    QPushButton[role='primary']:hover {{ background: {"#1954D1" if white else "#89B2FF"}; }}
-    QPushButton[role='primary']:pressed {{ background: {"#004C99" if white else "#0071E3"}; }}
+    QPushButton[role='primary']:hover {{ background: {t.accent_hover}; }}
+    QPushButton[role='primary']:pressed {{ background: {t.accent_pressed}; }}
     QPushButton[role='primary']:disabled {{ background: {t.hover}; color: {t.muted}; }}
     QPushButton[role='outline'] {{ border: 1px solid {t.border}; background: {t.bg}; }}
     QPushButton[role='outline']:hover {{ background: {t.surface}; border-color: {t.muted}; }}
     QPushButton[role='icon'] {{ padding: 0px; text-align: center; }}
     QPushButton[role='workspace'] {{ border-radius: 7px; font-size: 17px;
         font-weight: 600; text-align: center; padding: 0px; }}
-    QPushButton[role='workspace']:checked {{ background: {t.text}; color: {t.bg}; }}
+    QPushButton[role='workspace']:checked {{ background: {t.text if white else t.accent_bg};
+        color: {t.bg if white else t.accent_text}; }}
     QPushButton[role='tab'] {{ padding: 9px 12px; border-radius: 0px; font-size: 12px;
         color: {t.secondary}; }}
     QPushButton[role='tab']:checked {{ background: transparent; color: {t.accent_text};
@@ -246,7 +296,8 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QListWidget#ConversationRecipients::item:hover {{ background: {t.hover}; }}
     QListWidget#ConversationRecipients::item:disabled {{ color: {t.muted};
         font-size: 11px; background: transparent; }}
-    QListWidget#MentionPicker {{ background: {t.surface}; border: 1px solid {t.border};
+    QListWidget#MentionPicker {{ background: {t.surface if white else overlay};
+        border: 1px solid {t.border};
         border-radius: 10px; outline: none; padding: 4px; }}
     QListWidget#MentionPicker::item {{ padding: 4px 8px; border-radius: 6px; }}
     QListWidget#MentionPicker::item:selected {{ background: {t.accent_bg}; color: {t.text}; }}
@@ -262,7 +313,7 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QListWidget#Switcher::item {{ padding: 14px; border-radius: 7px; }}
     QListWidget#Switcher::item:selected {{ background: {t.accent_bg}; color: {t.accent_text}; }}
     QPlainTextEdit {{ background: {t.surface}; border: 1px solid {t.border}; border-radius: 7px;
-        padding: 8px; selection-background-color: {t.accent_bg}; }}
+        padding: 8px; selection-background-color: {t.accent_bg}; {placeholder} }}
     QPlainTextEdit#ComposerEditor, QPlainTextEdit#ComposerEditor:focus {{
         background: transparent; border: 1px solid transparent; }}
     QPlainTextEdit#BuildRequest {{ border: 1px solid {t.border};
@@ -272,7 +323,7 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
         border-radius: 8px; padding: 12px; color: {t.text}; }}
     QPlainTextEdit#ProfileBio:focus {{ border-color: {t.accent}; }}
     QLineEdit {{ background: {t.surface}; border: 1px solid {t.border}; border-radius: 8px;
-        padding: 10px; selection-background-color: {t.accent_bg}; }}
+        padding: 10px; selection-background-color: {t.accent_bg}; {placeholder} }}
     QScrollArea {{ border: none; background: transparent; }}
     QScrollBar:vertical {{ background: transparent; width: 7px; margin: 6px 1px; }}
     QScrollBar::handle:vertical {{ background: {t.border}; min-height: 32px; border-radius: 3px; }}
@@ -299,7 +350,7 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
         background: transparent; padding: 0; margin: 0;
         text-align: center; font-size: 16px; }}
     QFrame#ReactionBar QPushButton:hover {{ background: {t.hover}; }}
-    QMenu {{ background: {t.bg}; border: none; padding: 8px; border-radius: 16px; }}
+    QMenu {{ background: {overlay}; border: none; padding: 8px; border-radius: 16px; }}
     QMenu::item {{ padding: 10px 24px 10px 12px; border-radius: 8px; }}
     QMenu::separator {{ height: 1px; background: {t.border}; margin: 6px 8px; }}
     QMenu::item:disabled {{ color: {t.muted}; }}
@@ -336,7 +387,8 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QPushButton#AgentDisclosure:focus {{ border: 1px solid {t.accent}; border-radius: 6px; }}
     QPlainTextEdit#AgentCommandOutput {{ background: transparent; border: none;
         padding: 4px; font-size: 12px; }}
-    QToolTip {{ background: {t.surface}; color: {t.text}; border: 1px solid {t.border};
+    QToolTip {{ background: {t.surface if white else overlay}; color: {t.text};
+        border: 1px solid {t.border};
         padding: 6px; }}
     QListWidget#DotList {{ border: none; border-radius: 12px;
         background: {t.surface}; padding: 5px; }}

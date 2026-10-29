@@ -173,7 +173,7 @@ def test_reconfigured_project_cannot_auto_continue(qtbot, tmp_path, monkeypatch)
     [
         ("Write", {"file_path": "hello.py"}, True),
         ("Write", {"file_path": "../outside.py"}, False),
-        ("Bash", {"command": "python -m unittest"}, True),
+        ("Bash", {"command": "python -m pytest -q"}, True),
         ("Bash", {"dangerouslyDisableSandbox": True}, False),
         ("WebFetch", {"url": "https://example.com"}, False),
     ],
@@ -190,7 +190,11 @@ def test_background_routine_approval_respects_scope(
     dialog.pending = True
     dialog.background_run = True
     dialog.background_settings = (str(root), "codex", True)
-    dialog.job = SimpleNamespace(runner=LocalRunner(lambda _: None))
+    window.settings.setValue("agent-permissions/u/w", "auto")
+    dialog.job = SimpleNamespace(runner=LocalRunner(lambda _: None), permission_mode="auto")
+    from PySide6.QtWidgets import QMessageBox
+
+    monkeypatch.setattr(QMessageBox, "exec", lambda self: QMessageBox.StandardButton.No)
     request = {"tool": tool, "data": data, "event": threading.Event(), "allow": False}
     dialog.permission(request)
     assert request["event"].is_set() and request["allow"] is allow

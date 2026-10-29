@@ -58,7 +58,9 @@ def category(task):
     ):
         if re.search(pattern, task, re.I):
             return name
-    return "conversation"
+    from aedrova.localization.intents import localized_build
+
+    return "implementation" if localized_build(task) else "conversation"
 
 
 def choose(
