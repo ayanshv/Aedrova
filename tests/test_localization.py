@@ -212,3 +212,38 @@ def test_ui_translation_is_plain_text_not_model_supplied_html(qtbot, tmp_path):
     widget.setToolTip("Continue")
     window.localizer.apply_value(widget, "toolTip", "setToolTip")
     assert "<img" not in widget.toolTip() and "&lt;img" in widget.toolTip()
+
+
+@pytest.mark.parametrize("cancel", [False, True])
+def test_language_save_waits_for_background_sync_without_losing_click(qtbot, tmp_path, cancel):
+    from PySide6.QtWidgets import QAbstractButton
+
+    from aedrova.desktop.controls import ChoiceBox
+    from aedrova.desktop.localization import show_language_settings
+
+    window, source = setup(qtbot, tmp_path)
+    qtbot.wait(50)
+    qtbot.waitUntil(lambda: not window.account_dialog.busy)
+    calls = []
+
+    def persist(language, enabled):
+        calls.append((language, enabled))
+        source.user.user_metadata = {"aedrova_language": language, "aedrova_translate": enabled}
+
+    source.save_language_preference = persist
+    window.account_dialog.busy = True
+    dialog = show_language_settings(window)
+    dialog.findChild(ChoiceBox).setCurrentIndex(1)
+    save = next(b for b in dialog.findChildren(QAbstractButton) if b.text() == "Save")
+    save.click()
+    assert not save.isEnabled() and calls == []
+    if cancel:
+        dialog.reject()
+    window.account_dialog.busy = False
+    if cancel:
+        qtbot.wait(250)
+        assert calls == []
+    else:
+        qtbot.waitUntil(lambda: window.localizer.language == "hi", timeout=5000)
+        assert calls == [("hi", True)] and not dialog.isVisible()
+        assert source.user.user_metadata["aedrova_language"] == "hi"

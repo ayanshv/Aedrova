@@ -2,6 +2,7 @@
 
 from collections import OrderedDict
 from html import escape
+from time import monotonic
 
 from PySide6.QtCore import QEvent, QObject, Qt, QThreadPool, QTimer, Signal
 from PySide6.QtGui import QAction
@@ -486,10 +487,15 @@ def show_language_settings(window):
         def saved(result):
             if (
                 not isValid(window)
+                or account.service is not service
                 or not account.service
                 or not account.service.user
                 or str(account.service.user.id) != user_id
             ):
+                return
+            if not isValid(dialog):
+                if not result.get("error"):
+                    window.localizer.configure(language, enabled)
                 return
             if result.get("error"):
                 status.setText("Could not save your language preference. Please retry.")
@@ -507,7 +513,35 @@ def show_language_settings(window):
             except Exception:
                 return {"error": True}
 
-        account.run(operation, saved)
+        deadline = monotonic() + 30
+
+        def start_when_ready():
+            # Account.run deliberately declines overlapping work. A background sync
+            # must not silently discard this explicit save and strand its button.
+            if not isValid(window) or not isValid(dialog) or not dialog.isVisible():
+                return
+            if (
+                account.service is not service
+                or not service.user
+                or str(service.user.id) != user_id
+            ):
+                status.setText("Your session changed. Reopen language settings.")
+                save.setEnabled(True)
+                return
+            if account.busy:
+                if monotonic() >= deadline:
+                    status.setText(
+                        "Workspace sync is taking longer than expected. Please retry Save."
+                    )
+                    save.setEnabled(True)
+                    return
+                status.setText("Waiting for workspace sync…")
+                QTimer.singleShot(150, start_when_ready)
+                return
+            status.setText("Saving language…")
+            account.run(operation, saved)
+
+        start_when_ready()
 
     save.clicked.connect(apply)
     dialog.open()
