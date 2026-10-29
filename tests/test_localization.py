@@ -188,3 +188,10 @@ def test_snapshot_refresh_preserves_translation_generation(qtbot, tmp_path):
     window.localizer.restore_preference()
     assert window.localizer.generation == generation
     assert window.localizer.language == "hi"
+
+
+def test_quoted_native_examples_do_not_authorize_builds():
+    assert not localized_build('What does "एक ऐप बनाओ" mean?')
+    assert not localized_build("Translate: एक ऐप बनाओ")
+    assert not localized_build("The phrase is “创建一个应用”.")
+    assert localized_build("एक ऐप बनाओ")

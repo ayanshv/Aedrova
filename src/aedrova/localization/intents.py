@@ -19,6 +19,14 @@ NATIVE = re.compile(
 
 
 def localized_build(text):
+    # Quoted examples and translation questions are content, not coding instructions.
+    if re.match(
+        r"^\s*(?:translate\b|what does\b|what is the meaning\b|explain the (?:word|phrase)\b)",
+        text,
+        re.I,
+    ):
+        return False
+    text = re.sub(r'```[\s\S]*?```|`[^`]*`|"[^"\n]*"|“[^”\n]*”', "", text)
     if re.search(r"\b(?:don't|do not)\b|मत\s|न\s+बना|不要|하지\s*마", text, re.I):
         return False
     return bool(LATIN.search(text.strip()) or NATIVE.search(text))
