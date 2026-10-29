@@ -22,6 +22,7 @@ from aedrova.desktop.controls import ChoiceBox, CodingProviderChoice, choose_pro
 from aedrova.desktop.dialogs import button, label
 from aedrova.desktop.projects import binding, save_binding
 from aedrova.desktop.zen_visuals import ProjectPicker, SetupVisual, ThemePhoto
+from aedrova.localization import choice_source
 
 SETUP_STEPS = (
     ("Choose your style", "Make the workspace feel like yours.", "Continue"),
@@ -99,7 +100,7 @@ class SetupPages(QScrollArea):
                 theme=self.appearance.currentData(),
                 motion=self.motion.isChecked(),
                 transparency=self.transparency.isChecked(),
-                editor=self.editor.currentText(),
+                editor=choice_source(self.editor),
             )
         elif self.page == 6:
             self.draft.update(
@@ -195,7 +196,7 @@ class SetupPages(QScrollArea):
                 self.profile_form.back.hide()
                 self.profile_form.state_changed.connect(self.sync_profile_controls)
                 for control in self.profile_form.findChildren(QPushButton):
-                    if control.text() == "Finish later":
+                    if (control.property("i18n_text") or [control.text()])[0] == "Finish later":
                         control.hide()
                 self.column.addWidget(self.profile_form)
                 self.note(
@@ -451,7 +452,9 @@ class SetupPages(QScrollArea):
             self.workspace = (
                 self.window.workspace_id
                 if self.window.workspace_id in allowed
-                else account.workspace_id() if account.workspace_id() in allowed else None
+                else account.workspace_id()
+                if account.workspace_id() in allowed
+                else None
             )
             self.original = binding(self.window, self.workspace) if self.workspace else {}
             self.draft = dict(self.original)

@@ -12,6 +12,7 @@ from aedrova.desktop.projects import Job
 from aedrova.desktop.teammate_habitat import TeamSection
 from aedrova.dots.client import client
 from aedrova.dots.roles import NAMES, ROLES, purpose_from, role_for, stored_role
+from aedrova.localization import choice_source
 
 
 def shelf_rows(rows):
@@ -667,7 +668,7 @@ class DotDialog(AppDialog):
                 self.ready_copy.setText(
                     self.name.text()
                     + " · "
-                    + (", ".join(sources) if sources else self.provider.currentText())
+                    + (", ".join(sources) if sources else choice_source(self.provider))
                 )
                 self.show_step(6)
             elif self.current() and not self.has_changes():

@@ -80,6 +80,14 @@ class ChoiceBox(QComboBox):
         self.view().setTextElideMode(Qt.TextElideMode.ElideRight)
         self.setMinimumHeight(44)
 
+    def setCurrentText(self, text):  # noqa: N802
+        # Programmatic enum selections use canonical captions after localization.
+        for index, pair in enumerate(self.property("i18n_items") or []):
+            if pair[0] == text:
+                self.setCurrentIndex(index)
+                return
+        super().setCurrentText(text)
+
     def showPopup(self):  # noqa: N802
         popup = self.view().window()
         popup.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
@@ -182,4 +190,6 @@ def choose_teammate(parent, names):
     actions.addWidget(start)
     layout.addLayout(actions)
     accepted = dialog.exec() == QDialog.DialogCode.Accepted
-    return choice.currentText(), accepted
+    from aedrova.localization import choice_source
+
+    return choice_source(choice), accepted

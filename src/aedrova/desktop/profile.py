@@ -223,6 +223,11 @@ class ProfileDialog(AppDialog):
         identity.addWidget(
             label("Your @username is unique. Letters, numbers and underscores.", "muted", wrap=True)
         )
+        from aedrova.desktop.localization import show_language_settings
+
+        language = button("Language & translation…", role="outline")
+        language.clicked.connect(lambda: show_language_settings(self.window))
+        identity.addWidget(language)
         identity.addStretch()
         about = step(
             "More than a name.",

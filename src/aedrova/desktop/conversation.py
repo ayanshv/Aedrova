@@ -83,8 +83,10 @@ class ConversationModel(QAbstractListModel):
             return message
         if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.AccessibleTextRole):
             decision = "Confirmed decision. " if message.decision else ""
+            view = self.parent()
+            body = view.display_body(message) if hasattr(view, "display_body") else message.body
             return (
-                f"{message.author}, {message.time}. {decision}{message.body}. "
+                f"{message.author}, {message.time}. {decision}{body}. "
                 f"{message.attachment} {len(message.replies)} replies."
             )
         if role == Qt.ItemDataRole.AccessibleDescriptionRole:
@@ -159,7 +161,9 @@ class MessageDelegate(QStyledItemDelegate):
 
     def document(self, message, width):
         width = max(80, min(880, width))
-        key = (message.id, message.body, width, self.theme.name)
+        display = self.view.display_body(message)
+        hint = self.view.translation_hint(message)
+        key = (message.id, display, hint, width, self.theme.name)
         if key not in self.documents:
             document = SafeDocument()
             document.setDefaultFont(font(14))
@@ -170,10 +174,12 @@ class MessageDelegate(QStyledItemDelegate):
             text = re.sub(
                 r"<@(?:dot:|ai:)?([a-f0-9-]{36})\|([^>\n]{1,80})>",
                 lambda m: "@" + m[2],
-                message.body,
+                display,
             )
             if message.attachment.lower().endswith(".wav") and text.startswith("Shared a file:"):
                 text = "Voice message"
+            if hint:
+                text += "\n\n_" + hint + "_"
             document.setMarkdown(text, QTextDocument.MarkdownFeature.MarkdownNoHTML)
             previews = ""
             for url in message_urls(message.body):
@@ -853,7 +859,7 @@ class MessageView(QListView):
             QApplication.clipboard().setText(cursor.selectedText().replace("\u2029", "\n"))
             return
         if self.currentIndex().isValid():
-            QApplication.clipboard().setText(self.currentIndex().data(MESSAGE_ROLE).body)
+            QApplication.clipboard().setText(self.display_body(self.currentIndex().data(MESSAGE_ROLE)))
 
     def _context_menu(self, position):
         index = self.indexAt(position)
@@ -907,7 +913,19 @@ class MessageView(QListView):
         cursor = self.selection_cursor()
         if cursor and cursor.hasSelection():
             menu.addAction("Copy selection", self.copy_current)
-        menu.addAction("Copy message", lambda: QApplication.clipboard().setText(message.body))
+        localizer = self.reader_localizer()
+        if localizer and localizer.enabled:
+            title = "Show translation" if message.id in localizer.originals else "Show original"
+            menu.addAction(
+                localizer.text(title, interface=True), lambda: self.toggle_original(message.id)
+            )
+            menu.addAction(
+                localizer.text("Copy original", interface=True),
+                lambda: QApplication.clipboard().setText(message.body),
+            )
+        menu.addAction(
+            "Copy message", lambda: QApplication.clipboard().setText(self.display_body(message))
+        )
         menu.exec(self.viewport().mapToGlobal(position))
 
     def _choose_for(self, identifier):
@@ -1024,6 +1042,50 @@ class MessageView(QListView):
             self.agent_message_id = "agent-" + str(uuid4())
             self.agent_anchor = self.source_messages[-1].id if self.source_messages else None
         self.show_messages(self.source_messages, force=True)
+
+    def reader_localizer(self):
+        node = self
+        while node is not None:
+            value = getattr(node, "localizer", None)
+            if value is not None:
+                return value
+            node = node.parentWidget()
+        return None
+
+    def display_body(self, message):
+        localizer = self.reader_localizer()
+        if not localizer or message.id in localizer.originals or message.unsent:
+            return message.body
+        return localizer.text(message.body)
+
+    def translation_hint(self, message):
+        localizer = self.reader_localizer()
+        if not localizer or not localizer.enabled or message.unsent:
+            return ""
+        from aedrova.localization import LANGUAGES
+
+        translated = self.display_body(message)
+        if translated != message.body:
+            return (
+                localizer.text("Translated", interface=True) + " · " + LANGUAGES[localizer.language]
+            )
+        if message.id in localizer.originals:
+            return localizer.text("Original text", interface=True)
+        state = localizer.translation_state(message.body)
+        if state == "original":
+            return localizer.text("Original text", interface=True)
+        if state == "pending" and localizer.language != "en":
+            return localizer.text("Translating…", interface=True)
+        return ""
+
+    def toggle_original(self, identifier):
+        localizer = self.reader_localizer()
+        if localizer:
+            if identifier in localizer.originals:
+                localizer.originals.remove(identifier)
+            else:
+                localizer.originals.add(identifier)
+            self.show_messages(self.source_messages, force=True)
 
     def show_messages(self, messages, *, force=False):
         from aedrova.desktop.state import Message

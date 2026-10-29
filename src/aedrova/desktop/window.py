@@ -77,6 +77,9 @@ class AedrovaWindow(QMainWindow):
         self._populate_channels()
         self._load_channel()
         self._render_pages()
+        from aedrova.desktop.localization import Localizer
+
+        self.localizer = Localizer(self)
 
     @property
     def workspace(self):
@@ -487,6 +490,9 @@ class AedrovaWindow(QMainWindow):
         jump = view.addAction("Jump to conversation…", self.open_switcher)
         jump.setShortcut(QKeySequence("Ctrl+K"))
         view.addAction("Toggle sidebar", self.toggle_sidebar)
+        from aedrova.desktop.localization import show_language_settings
+
+        view.addAction("Language & translation…", lambda: show_language_settings(self))
         appearance = view.addMenu("Appearance")
         group = QActionGroup(self)
         self.appearance_actions = {}
@@ -1019,6 +1025,8 @@ class AedrovaWindow(QMainWindow):
         task = build_command(text, nickname)
         import re
 
+        from aedrova.localization.intents import localized_build
+
         bud_match = mention_match(text, dot) if dot else None
         main_match = agent_mention(text, nickname)
         addressed_bud = bud_match and (not main_match or bud_match.start() <= main_match.start())
@@ -1035,6 +1043,7 @@ class AedrovaWindow(QMainWindow):
                     re.IGNORECASE,
                 )
             )
+            building = building or localized_build(request)
             if building:
                 from aedrova.desktop.builds import start_background_build
                 from aedrova.desktop.projects import binding
@@ -1058,6 +1067,7 @@ class AedrovaWindow(QMainWindow):
                 re.IGNORECASE,
             )
         )
+        building = building or localized_build(candidate)
         if (dot or task is not None) and not building:
             from aedrova.desktop.dot_analysis import start_analysis
 
@@ -1899,6 +1909,8 @@ class AedrovaWindow(QMainWindow):
 
         if not hasattr(self, "account_dialog"):
             self.account_dialog = AccountDialog(self, settings=self.settings)
+            if hasattr(self, "localizer"):
+                self.localizer.bind(self.account_dialog)
             self.account_dialog.dashboard_requested.connect(self.open_dashboard)
         self.account_dialog.pending_intent = intent
         if self.connected and self.connected.active:

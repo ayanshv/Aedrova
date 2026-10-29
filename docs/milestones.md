@@ -3659,3 +3659,18 @@ on every platform, retaining actual stdio, approval denial/acceptance, cancellat
 and managed-auth isolation assertions. 73 permission/build tests passed locally.
 Linux/macOS and RLS hosted checks passed on the preceding fixture fix; the final
 cross-platform rerun remains the merge gate. Runtime permissions were not relaxed.
+
+### October 29 — reader-specific multilingual support
+
+Implemented personal language preferences, 20 language choices, asynchronous display
+translation of shared messages/prompts and completed agent replies, original-text
+controls, RTL and interface label translation. Stored history, authorization, submitted
+fields and enum values remain canonical. Matching authenticated website/backend uses
+existing metered OpenAI Responses allowance, protected technical tokens, bounded
+requests and reader/workspace-scoped memory caches. No new migration, key or purchase.
+See docs/multilingual-support.md for coverage, privacy, limitations and live acceptance.
+Unsigned public website currently offers core Hindi navigation; full-page/other language
+translation needs authenticated workspace AI. Do not claim full offline public-site
+localization or live translation acceptance. Existing Stage 1 and deferred paid gates
+are unchanged. Also fixed a deleted Qt ChatPanel timer/callback lifetime error found
+in the pending protected-main CI; no test or branch protection was disabled.

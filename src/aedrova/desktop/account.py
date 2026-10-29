@@ -39,6 +39,7 @@ from aedrova.desktop.dialogs import button, icon_button, label
 from aedrova.desktop.welcome_surface import WelcomeSurface
 from aedrova.identity.oauth import google_sign_in
 from aedrova.identity.service import Connection, IdentityService
+from aedrova.localization import choice_source
 
 
 class ResultSignals(QObject):
@@ -792,7 +793,7 @@ class AccountDialog(AppDialog):
         from aedrova.agents.managed import ai_access_mode
 
         self.onboarding_ack.setChecked(False)
-        provider = self.onboarding_provider.currentText()
+        provider = choice_source(self.onboarding_provider)
         self.onboarding_model.setText(
             provider + " · Aedrova’s approved model and your plan’s usage limits."
             if ai_access_mode() == "included"
@@ -1309,7 +1310,7 @@ class AccountDialog(AppDialog):
         else:
             parameters = {"p_workspace": self.workspace_id(), "p_user": user}
             if action == "role":
-                parameters["p_role"] = self.role.currentText()
+                parameters["p_role"] = choice_source(self.role)
             self.mutate("set_member_role" if action == "role" else "remove_member", parameters)
 
     def revoke_invitation(self):

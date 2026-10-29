@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QVBoxLayout,
 )
+from shiboken6 import isValid
 
 from aedrova.desktop.controls import AppDialog, AppMenu, ChoiceBox
 from aedrova.desktop.conversation import SafeDocument
@@ -138,6 +139,8 @@ class ChatPanel(AppDialog):
         QTimer.singleShot(0, self.load)
 
     def load_failed(self):
+        if not isValid(self):
+            return
         self.generation += 1
         self.set_loading(self.results, False)
         self.results.clear()
@@ -149,7 +152,7 @@ class ChatPanel(AppDialog):
             super().reject()
 
     def load(self):
-        if not self.isVisible():
+        if not isValid(self) or not self.isVisible():
             return
         self.generation += 1
         generation = self.generation
@@ -168,7 +171,9 @@ class ChatPanel(AppDialog):
             self.section,
             self.channel,
             lambda data: (
-                self.loaded(data) if generation == self.generation and self.isVisible() else None
+                self.loaded(data)
+                if isValid(self) and generation == self.generation and self.isVisible()
+                else None
             ),
         )
 

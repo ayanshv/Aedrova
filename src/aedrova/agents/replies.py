@@ -16,6 +16,24 @@ def needs_sources(question):
     """
     import re
 
+    # Non-English requests can refer to the same English workspace evidence.
+    # Greetings stay fast; unknown non-Latin questions retain read-only context.
+    greetings = {
+        "नमस्ते",
+        "हैलो",
+        "हेलो",
+        "नमस्ते Aedrova",
+        "नमस्कार",
+        "हाय",
+        "سلام",
+        "مرحبا",
+        "你好",
+        "こんにちは",
+        "안녕하세요",
+        "สวัสดี",
+    }
+    if any(ord(c) > 0x024F for c in question):
+        return question.strip().strip("!।。?？ ") not in greetings
     return bool(
         re.search(
             r"\b(workspace|chatspace|channels?|messages?|chats?|files?|meetings?|transcripts?|"
@@ -46,11 +64,16 @@ async def _reply(access, prompt, cancelled, emit, timeout):
     if len(prompt.encode()) > 240000:
         raise ValueError("This question has too much context. Try a narrower request.")
     limit = min(4096, access.limits.get("output_tokens", 4096))
+    language_instruction = (
+        "Respond in the language of the current user question, including mixed-language "
+        "questions. Preserve code, citations and proper names."
+    )
     if access.provider == "codex":
         path = "/responses"
         body = {
             "model": access.model,
             "input": prompt,
+            "instructions": language_instruction,
             "max_output_tokens": limit,
             "stream": True,
             "store": False,
@@ -63,6 +86,7 @@ async def _reply(access, prompt, cancelled, emit, timeout):
         body = {
             "model": access.model,
             "messages": [{"role": "user", "content": prompt}],
+            "system": language_instruction,
             "max_tokens": limit,
             "stream": True,
             "tools": [],

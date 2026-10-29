@@ -146,6 +146,8 @@ class ActivityRow(QFrame):
         # image nodes removed. QLabel must not resolve remote or local resources.
         from aedrova.desktop.conversation import markdown_html
 
+        self.message.setProperty("aedrovaSourceText", text)
+        self.message.setProperty("aedrovaTranslatingStream", self.pending)
         self.message.setText(markdown_html(text))
 
     def open_source(self, value):
@@ -367,6 +369,8 @@ class AgentStream(QScrollArea):
             row.deleteLater()
             self.status_row = None
         self.set_reply(text)
+        if self.reply_row:
+            self.reply_row.message.setProperty("aedrovaTranslatingStream", False)
 
     def set_reply(self, text):
         """Update a single streaming response without adding activity-log rows."""
@@ -375,8 +379,10 @@ class AgentStream(QScrollArea):
                 text, author=self.author_name, character_config=self.character_config
             )
             self.reply_row.is_reply = True
+            self.reply_row.message.setProperty("aedrovaTranslatingStream", True)
             self.add_row(self.reply_row)
         else:
             self.reply_row.summary = text
             self.reply_row.set_message(text)
+            self.reply_row.message.setProperty("aedrovaTranslatingStream", True)
             self.changed.emit()
