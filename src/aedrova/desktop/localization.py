@@ -332,7 +332,7 @@ class Localizer(QObject):
         if not origin:
             return
         batch, size = [], 0
-        for key, value in self.queue.items():
+        for key, value in sorted(self.queue.items(), key=lambda item: item[0][3] != "message"):
             if key[2] != self.language or key[1] != workspace:
                 continue
             if batch and (size + len(value.encode()) > 24000 or len(batch) >= 12):
