@@ -2,7 +2,6 @@
 
 from collections import OrderedDict
 from html import escape
-from time import monotonic
 
 from PySide6.QtCore import QEvent, QObject, Qt, QThreadPool, QTimer, Signal
 from PySide6.QtGui import QAction
@@ -481,10 +480,18 @@ def show_language_settings(window):
             window.localizer.configure(language, enabled)
             dialog.accept()
             return
+        if getattr(window, "language_save_pending", False):
+            status.setText("A language preference is already being saved. Please wait.")
+            return
+        window.language_save_pending = True
         save.setEnabled(False)
+        status.setText("Saving language…")
         user_id = str(account.service.user.id)
 
         def saved(result):
+            if not isValid(window):
+                return
+            window.language_save_pending = False
             if (
                 not isValid(window)
                 or account.service is not service
@@ -492,56 +499,44 @@ def show_language_settings(window):
                 or not account.service.user
                 or str(account.service.user.id) != user_id
             ):
-                return
-            if not isValid(dialog):
-                if not result.get("error"):
-                    window.localizer.configure(language, enabled)
+                if isValid(dialog):
+                    dialog.reject()
                 return
             if result.get("error"):
-                status.setText("Could not save your language preference. Please retry.")
-                save.setEnabled(True)
+                if isValid(dialog):
+                    status.setText("Could not save your language preference. Please retry.")
+                    save.setEnabled(True)
                 return
+            service.user = result["user"]
             window.localizer.configure(language, enabled)
-            dialog.accept()
+            if isValid(dialog):
+                dialog.accept()
 
         service = account.service
 
         def operation():
+            clone = None
             try:
-                service.save_language_preference(language, enabled)
-                return {"ok": True}
+                # A separate transport avoids sharing the account refresh queue or
+                # an HTTP connection with a long-running workspace inventory.
+                clone = service.fork_for_context()
+                if not clone.user or str(clone.user.id) != user_id:
+                    return {"error": True}
+                clone.save_language_preference(language, enabled)
+                return {"ok": True, "user": clone.user}
             except Exception:
                 return {"error": True}
+            finally:
+                if clone:
+                    clone.close_context()
 
-        deadline = monotonic() + 30
+        from aedrova.desktop.account import AccountJob
 
-        def start_when_ready():
-            # Account.run deliberately declines overlapping work. A background sync
-            # must not silently discard this explicit save and strand its button.
-            if not isValid(window) or not isValid(dialog) or not dialog.isVisible():
-                return
-            if (
-                account.service is not service
-                or not service.user
-                or str(service.user.id) != user_id
-            ):
-                status.setText("Your session changed. Reopen language settings.")
-                save.setEnabled(True)
-                return
-            if account.busy:
-                if monotonic() >= deadline:
-                    status.setText(
-                        "Workspace sync is taking longer than expected. Please retry Save."
-                    )
-                    save.setEnabled(True)
-                    return
-                status.setText("Waiting for workspace sync…")
-                QTimer.singleShot(150, start_when_ready)
-                return
-            status.setText("Saving language…")
-            account.run(operation, saved)
-
-        start_when_ready()
+        window.language_save_job = AccountJob(operation)
+        window.language_save_job.signals.finished.connect(
+            lambda result, ok: saved(result if ok else {"error": True})
+        )
+        QThreadPool.globalInstance().start(window.language_save_job)
 
     save.clicked.connect(apply)
     dialog.open()

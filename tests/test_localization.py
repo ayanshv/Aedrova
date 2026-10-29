@@ -214,8 +214,10 @@ def test_ui_translation_is_plain_text_not_model_supplied_html(qtbot, tmp_path):
     assert "<img" not in widget.toolTip() and "&lt;img" in widget.toolTip()
 
 
-@pytest.mark.parametrize("cancel", [False, True])
-def test_language_save_waits_for_background_sync_without_losing_click(qtbot, tmp_path, cancel):
+@pytest.mark.parametrize("outcome", ["success", "error", "switched"])
+def test_language_save_uses_isolated_transport_while_account_is_busy(qtbot, tmp_path, outcome):
+    import threading
+
     from PySide6.QtWidgets import QAbstractButton
 
     from aedrova.desktop.controls import ChoiceBox
@@ -224,26 +226,41 @@ def test_language_save_waits_for_background_sync_without_losing_click(qtbot, tmp
     window, source = setup(qtbot, tmp_path)
     qtbot.wait(50)
     qtbot.waitUntil(lambda: not window.account_dialog.busy)
-    calls = []
+    entered, release = threading.Event(), threading.Event()
+    calls, closed = [], []
+    updated = SimpleNamespace(
+        id="u", user_metadata={"aedrova_language": "hi", "aedrova_translate": True}
+    )
 
     def persist(language, enabled):
+        entered.set()
+        release.wait(3)
         calls.append((language, enabled))
-        source.user.user_metadata = {"aedrova_language": language, "aedrova_translate": enabled}
+        if outcome == "error":
+            raise RuntimeError("redacted fixture")
 
-    source.save_language_preference = persist
+    source.fork_for_context = lambda: SimpleNamespace(
+        user=updated, save_language_preference=persist, close_context=lambda: closed.append(True)
+    )
+    # This stays busy throughout: saving must never join or overwrite its job.
     window.account_dialog.busy = True
     dialog = show_language_settings(window)
     dialog.findChild(ChoiceBox).setCurrentIndex(1)
     save = next(b for b in dialog.findChildren(QAbstractButton) if b.text() == "Save")
     save.click()
-    assert not save.isEnabled() and calls == []
-    if cancel:
-        dialog.reject()
-    window.account_dialog.busy = False
-    if cancel:
-        qtbot.wait(250)
-        assert calls == []
-    else:
-        qtbot.waitUntil(lambda: window.localizer.language == "hi", timeout=5000)
-        assert calls == [("hi", True)] and not dialog.isVisible()
+    qtbot.waitUntil(entered.is_set)
+    assert not save.isEnabled() and window.account_dialog.busy
+    if outcome == "switched":
+        window.account_dialog.service = SimpleNamespace(user=SimpleNamespace(id="other"))
+    release.set()
+    qtbot.waitUntil(lambda: not window.language_save_pending, timeout=5000)
+    assert calls == [("hi", True)] and closed == [True]
+    assert window.account_dialog.busy
+    if outcome == "success":
+        assert window.localizer.language == "hi" and not dialog.isVisible()
         assert source.user.user_metadata["aedrova_language"] == "hi"
+    else:
+        assert window.localizer.language == "en"
+        if outcome == "error":
+            assert save.isEnabled()
+    window.account_dialog.busy = False
