@@ -4,11 +4,11 @@ Planning baseline: October 30, 2026, Asia/Bangkok. Apple Developer membership is
 
 Target: 13–18 focused working days of execution, excluding external provider review, owner setup and funding delays. This is an estimate, not a promised launch date. Preparation may overlap; milestone completion remains gated. No implementation or tests are authorized by this timeline alone; the owner’s request to stop tests remains in effect until explicitly resumed.
 
-Stage 1 remains OPEN. Previously passed: fresh onboarding, bounded OpenAI build/review/apply, Stripe test access, TikTok staging access and new-workspace Free activation. Multilingual implementation is merged, but final live reply translation hit the existing Free request cap; simultaneous readers remain unverified and public-site localization is partial. No temporary allowance was applied.
+Stage 1 remains OPEN. Previously passed: fresh onboarding, bounded OpenAI build/review/apply, Stripe test access, TikTok staging access and new-workspace Free activation. Offline English/Hindi desktop translation and simultaneous-reader prompt-display acceptance have now passed with two real staging accounts. Public-site localization remains partial and separate. The earlier bounded API test allowance was restored; offline acceptance needed no entitlement change.
 
 ## 1. Finish staging acceptance — Days 1–3
 
-Close non-funded acceptance: Bud caps, Research conversations, connector lifecycle, uploads, voice and final multilingual checks. Track public Meta/Instagram and TikTok review separately.
+Passed: live Bud-cap/downgrade checks, uploads/voice transport, human audio clarity, Research single-turn, and simultaneous English/Hindi reader/prompt display with offline models. Remaining: Research multi-turn follow-up, remaining provider lifecycle cases, and public Meta/Instagram/TikTok review.
 
 Exit: evidence for each advertised flow; unresolved features held back from launch.
 
