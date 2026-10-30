@@ -1,3 +1,17 @@
+# Current desktop translation — October 30, 2026
+
+Desktop display translation now runs locally through CTranslate2 and SentencePiece with pinned English/Hindi Argos model data. It makes no translation inference API request and has no paid cloud fallback. Ordinary sign-in, message synchronization and language-preference saving still use the existing authenticated backend. Generating an agent response is separate and retains normal AI usage policies.
+
+English/Hindi packs are installed on the tested Mac. On a clean installation use View → Language & translation → Download English/Hindi languages (209 MB once), then choose the display language. Downloads contain no conversation text and are size/SHA-256 checked before bounded data-only extraction. CPU inference is serialized off the UI thread, with bounded input/output and per-reader memory caches. Code, mentions, URLs and source text stay canonical; Show original remains available. Missing/unsupported packs retain originals and never trigger a paid translation fallback.
+
+Only English↔Hindi is currently provided offline. Other language choices retain original text. Public website translation has not been converted by this desktop task and keeps its previously documented behavior. Model outputs may be imperfect; review original text for important details. Model data provenance is retained beside installed weights; release packaging must include runtime notices and verify clean-machine behavior.
+
+## Acceptance
+
+Two distinct staging identities read the same synthetic hosted conversation concurrently, with English/Hindi display preferences, actual local model inference, and original toggles. Multilingual prompt text and mentions remained unchanged in hosted history. Synthetic workspaces were archived for both test identities; no preference overwrites or paid entitlements were needed. Local inference was separately exercised with socket connections blocked: zero network connections were attempted. This check covers prompt delivery/display and existing multilingual intent routing; no new billable agent generation or build was run.
+
+## Historical API implementation (superseded for desktop)
+
 # Per-reader languages — October 29, 2026
 
 ## Behavior

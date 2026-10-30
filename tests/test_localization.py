@@ -53,22 +53,13 @@ def test_two_readers_see_different_languages_without_rewriting_history(
     window, source = setup(qtbot, tmp_path)
     qtbot.wait(50)
     qtbot.waitUntil(lambda: not window.account_dialog.busy)
-    source.fork_for_context = lambda: SimpleNamespace(
-        client=SimpleNamespace(
-            auth=SimpleNamespace(get_session=lambda: SimpleNamespace(access_token="test-token"))
-        ),
-        close_context=lambda: None,
-    )
-    monkeypatch.setattr(
-        "aedrova.agents.managed.application_origin", lambda: "https://staging.example"
-    )
     calls = []
 
-    def request(self, path, body, **kwargs):
-        calls.append(body)
-        return {"texts": ["नमस्ते" if v == "Hello" else HINDI.get(v, v) for v in body["texts"]]}
+    def request(items, language):
+        calls.append(language)
+        return {"texts": ["नमस्ते" if v == "Hello" else HINDI.get(v, v) for v, _ in items]}
 
-    monkeypatch.setattr("aedrova.agents.managed.ManagedClient.request", request)
+    monkeypatch.setattr("aedrova.localization.offline.batch", request)
     original = Message("m", "Alex", "A", "12:00", "Hello")
     window.messages.show_messages([original])
     window.localizer.configure("hi", True)
@@ -82,7 +73,7 @@ def test_two_readers_see_different_languages_without_rewriting_history(
     assert window.messages.display_body(original) == "नमस्ते"
     window.localizer.configure("en", False)
     assert window.messages.display_body(original) == "Hello"
-    assert calls and all(c["workspace"] == "w" for c in calls)
+    assert calls and all(c == "hi" for c in calls)
     window.localizer.timer.stop()
     window.localizer.scan_timer.stop()
     qtbot.waitUntil(lambda: not window.localizer.pending, timeout=5000)
@@ -150,23 +141,14 @@ def test_pending_translation_cannot_cross_language_switch(qtbot, tmp_path, monke
     window, source = setup(qtbot, tmp_path)
     qtbot.wait(50)
     qtbot.waitUntil(lambda: not window.account_dialog.busy)
-    source.fork_for_context = lambda: SimpleNamespace(
-        client=SimpleNamespace(
-            auth=SimpleNamespace(get_session=lambda: SimpleNamespace(access_token="test"))
-        ),
-        close_context=lambda: None,
-    )
-    monkeypatch.setattr(
-        "aedrova.agents.managed.application_origin", lambda: "https://staging.example"
-    )
     entered, release = threading.Event(), threading.Event()
 
-    def response(self, path, body, **kwargs):
+    def response(items, language):
         entered.set()
         release.wait(3)
-        return {"texts": ["हिन्दी" for _ in body["texts"]]}
+        return {"texts": ["हिन्दी" for _ in items]}
 
-    monkeypatch.setattr("aedrova.agents.managed.ManagedClient.request", response)
+    monkeypatch.setattr("aedrova.localization.offline.batch", response)
     message = Message("private", "Alex", "A", "12:00", "Hello")
     window.localizer.configure("hi", True)
     window.messages.show_messages([message])

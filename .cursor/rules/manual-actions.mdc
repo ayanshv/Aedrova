@@ -23,7 +23,8 @@ The owner requested a brief reminder at the end of every response to unrelated
 project work: Stage 1 (staging acceptance) remains OPEN. Read docs/milestones.md
 for current blockers; do not imply closure or start Stage 2 without approval.
 Keep the reminder current when the milestone changes. As of October 30, 2026, public Meta/Instagram verification and review, TikTok
-demo/public review, simultaneous-reader multilingual acceptance, Research follow-up
-and remaining provider lifecycle cases remain open. Human voice-message audio clarity
+demo/public review, Research follow-up and remaining provider lifecycle cases remain
+open. Simultaneous English/Hindi readers and prompt-display acceptance passed with
+offline models on October 30. Human voice-message audio clarity
 was confirmed by the owner and is CLOSED for the tested setup. Claude funding and
 reliable two-device meetings remain deferred final launch gates.

@@ -8,7 +8,7 @@ Status: Stage 1 OPEN. Owner explicitly resumed acceptance after the prior reques
 - 14 backend translation checks passed.
 - Native actual agent reply translated to Hindi: “नमस्ते! मैं कैसे मदद कर सकता हूँ?” Prompt remained before the reply. English restoration displayed original “@Aedrova hello” and “Hello! How can I help?” again.
 - Previously approved temporary staging allowance was applied only to Beta isolation 1 eb8958, bounded to 50,000 microUSD extra reservation allowance and 120 seconds/two translation batches. Runner verified restoration of Free and original allowance; usage retained. No purchase or production change.
-- Account display language restored to English. Simultaneous independent live readers and the per-message original toggle are not certified by this pass.
+- Account display language restored to English. Simultaneous live readers and original toggles were subsequently verified with actual offline models; see the offline acceptance update below.
 
 ## Retained live evidence, not rerun claims
 
@@ -18,7 +18,7 @@ Research single-turn conversation, citations, saved history, themes and cleanup 
 
 ## Remaining acceptance
 
-1. Two simultaneous readers with different language preferences, including a multilingual agent prompt; live Research multi-turn follow-up and remaining provider-specific lifecycle cases.
+1. Live Research multi-turn follow-up and remaining provider-specific lifecycle cases.
 2. Meta developer dashboard → Aedrova Buds → App Review/business and access verification: complete operator documents privately when requested, then genuine review materials. TikTok developer dashboard → Aedrova Buds → Production: genuine demo and public review. These are external launch blockers for publicly advertised connectors; no approval inferred.
 
 Funded Claude and reliable two-device meetings remain final paid gates. Public anonymous website localization remains Hindi navigation only. Apple activation is acknowledged but signing/Apple login belong to later preparation. No payments made.
@@ -26,3 +26,7 @@ Funded Claude and reliable two-device meetings remain final paid gates. Public a
 ## Owner audio confirmation — October 30
 
 Owner reported: “the audio message sounds pretty clear and good”. Human voice-message clarity gate CLOSED for the tested microphone/device. This does not certify other devices or two-device meetings. No further owner audio action required for this gate.
+
+## Offline English/Hindi reader acceptance
+
+Passed with two real staging accounts and a synthetic shared hosted conversation. Actual CTranslate2 model inference displayed English/Hindi independently, preserved canonical source/mentions and restored originals in both readers. One early harness comparison needed server rows sorted by sequence; that was corrected without changing application chronology. Visual review found poor isolated-fragment wording around mentions; sentence-preserving markers now retain context and fall back safely if markers change. Native model inference with socket connections blocked passed with zero network attempts. Language-pack data installed on this Mac; no paid plan, provider key, migration or AI quota change. Current scope is desktop English/Hindi; other languages retain originals and public website behavior is unchanged. No new billable agent generation was needed for prompt-delivery/display and intent-routing checks.

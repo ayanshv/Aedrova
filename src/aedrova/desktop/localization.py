@@ -102,9 +102,10 @@ HINDI = {
     "Team channel": "टीम का चैनल",
     "Shared conversation": "साझा बातचीत",
     "Language preferences saved.": "भाषा की प्राथमिकताएँ सहेजी गईं।",
-    "Original text remains unchanged. AI translations use your workspace allowance.": (
-        "मूल पाठ नहीं बदलता। AI अनुवाद में कार्यस्थान का AI कोटा लगता है।"
+    "Translation runs on this device. No translation API usage.": (
+        "अनुवाद इसी डिवाइस पर होता है। कोई अनुवाद API उपयोग नहीं।"
     ),
+    "Download English/Hindi languages · 209 MB": "अंग्रेज़ी/हिन्दी भाषाएँ डाउनलोड करें · 209 MB",
 }
 
 
@@ -320,21 +321,8 @@ class Localizer(QObject):
             getattr(widget, setter)(translated)
 
     def flush(self):
-        account = getattr(self.window, "account_dialog", None)
         workspace = getattr(self.window, "workspace_id", "")
-        if (
-            self.pending
-            or not self.queue
-            or not workspace
-            or not account
-            or not account.service
-            or not account.service.user
-        ):
-            return
-        from aedrova.agents.managed import ManagedClient, application_origin
-
-        origin = application_origin()
-        if not origin:
+        if self.pending or not self.queue:
             return
         batch, size = [], 0
         for key, value in sorted(self.queue.items(), key=lambda item: item[0][3] != "message"):
@@ -349,33 +337,12 @@ class Localizer(QObject):
         for key, _ in batch:
             self.queue.pop(key, None)
         generation, account_id, language = self.generation, self.account_id, self.language
-        service = account.service
         self.pending = True
 
         def operation():
-            clone = None
-            try:
-                clone = service.fork_for_context()
-                if generation != self.generation:
-                    return {"error": True}
-                session = clone.client.auth.get_session()
-                client = ManagedClient(origin, session.access_token)
-                return client.request(
-                    "/api/translations",
-                    {"workspace": workspace, "language": language, "texts": [v for _, v in batch]},
-                    timeout=50,
-                )
-            except Exception as error:
-                return {
-                    "error": True,
-                    "busy": any(
-                        phrase in str(error)
-                        for phrase in ("concurrent build limit", "two active builds")
-                    ),
-                }
-            finally:
-                if clone:
-                    clone.close_context()
+            from aedrova.localization.offline import batch as translate_batch
+
+            return translate_batch([(value, key[3] == "ui") for key, value in batch], language)
 
         def finished(result):
             if not isValid(self) or not isValid(self.window):
@@ -392,16 +359,20 @@ class Localizer(QObject):
                     and len(values) == len(batch)
                     and all(isinstance(v, str) for v in values)
                 ):
-                    for (key, _), value in zip(batch, values, strict=True):
-                        self.cache[key] = value
+                    unavailable = set(result.get("unavailable", []))
+                    for i, ((key, _), value) in enumerate(zip(batch, values, strict=True)):
+                        if i in unavailable:
+                            self.failed.add(key)
+                        else:
+                            self.cache[key] = value
+                    if unavailable:
+                        for view in (self.window.messages, self.window.thread_messages):
+                            view.setToolTip(
+                                "Offline translation unavailable. Download English/Hindi languages "
+                                "in View → Language & translation. Originals remain available."
+                            )
                     while len(self.cache) > 1000:
                         self.cache.popitem(last=False)
-                elif result.get("busy") and all(self.retries.get(key, 0) < 6 for key, _ in batch):
-                    for key, value in batch:
-                        self.retries[key] = self.retries.get(key, 0) + 1
-                        self.queue[key] = value
-                    self.timer.start(3000)
-                    return
                 else:
                     self.failed.update(key for key, _ in batch)
                     self.failed.update(self.queue)
@@ -451,7 +422,7 @@ def show_language_settings(window):
     layout.addWidget(automatic)
     layout.addWidget(
         label(
-            "Original text remains unchanged. AI translations use your workspace allowance.",
+            "Translation runs on this device. No translation API usage.",
             "muted",
             wrap=True,
         )
@@ -464,6 +435,58 @@ def show_language_settings(window):
         lambda: window.localizer.configure(window.localizer.language, window.localizer.enabled)
     )
     layout.addWidget(retry)
+    from aedrova.localization.offline import download, ready
+
+    pack_status = label(
+        "English/Hindi available offline. Other languages show original text."
+        if ready()
+        else "English/Hindi needs a one-time download. Other languages show original text.",
+        "muted",
+        wrap=True,
+    )
+    layout.addWidget(pack_status)
+    install = button("Download English/Hindi languages · 209 MB")
+    install.setVisible(not ready())
+    layout.addWidget(install)
+
+    def install_languages():
+        if getattr(window, "language_install_pending", False):
+            return
+        window.language_install_pending = True
+        install.setEnabled(False)
+        pack_status.setText("Downloading offline languages… Messages remain available.")
+
+        def operation():
+            try:
+                download()
+                return True
+            except Exception:
+                return False
+
+        def completed(ok):
+            if not isValid(window):
+                return
+            window.language_install_pending = False
+            if isValid(dialog):
+                install.setEnabled(True)
+                install.setVisible(not ok)
+                pack_status.setText(
+                    "Offline languages ready. No translation API usage."
+                    if ok
+                    else "Could not download offline languages. Retry when connected."
+                )
+            if ok:
+                window.localizer.configure(window.localizer.language, window.localizer.enabled)
+
+        from aedrova.desktop.account import AccountJob
+
+        window.language_install_job = AccountJob(operation)
+        window.language_install_job.signals.finished.connect(
+            lambda result, ok: completed(bool(result) if ok else False)
+        )
+        QThreadPool.globalInstance().start(window.language_install_job)
+
+    install.clicked.connect(install_languages)
     actions = QHBoxLayout()
     actions.addStretch()
     cancel = button("Cancel")
