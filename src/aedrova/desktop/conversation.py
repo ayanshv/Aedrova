@@ -245,7 +245,7 @@ class MessageDelegate(QStyledItemDelegate):
             or message.unsent
             or previous.unsent
             or message.decision
-            or message.delivery
+            or (message.delivery and message.delivery not in {"Sending…", "Retrying…"})
             or message.edited
             or message.saved
             or message.pinned
