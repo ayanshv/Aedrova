@@ -3741,3 +3741,10 @@ Expanded-catalog verification: all 98 packages pinned, 1,082 desktop checks pass
 ### October 30 — UI fixes inserted after staging acceptance
 
 Owner requested a dedicated pre-launch UI fixes step immediately after Stage 1. The timeline now has eight steps: staging acceptance; UI fixes/visual acceptance; security/recovery; production operations; minor and contained sizeable features; parallel Apple/installer preparation; final paid/commercial gates; packaging and launch. UI work is estimated at 1–2 working days; total estimate becomes 15–20 focused working days excluding external delays. This change records the plan only, does not close Stage 1, and does not authorize starting Stage 2. All payments remain owner-controlled final gates.
+
+
+### October 30 — Research multi-turn follow-up accepted
+
+Research follow-up gate CLOSED. Actual signed-in staging BudChat passed three hosted turns, reopening saved history before the ambiguous follow-up and retaining the named project, official sources and user correction. Six chronological messages persisted, with no Thinking-only residue. The owner approved an exact disposable-workspace Pro-policy exception for at most three turns/10 minutes/$0.50, without resetting counters or changing company caps. Actual usage was $0.070677. Free, allowance $0.50 and reserved zero verified afterward; grant disconnected and fixture archived. No new key, funding, payment, subscription or production change. See docs/research-followup-acceptance-2026-10-30.md. Stage 1 now remains OPEN for remaining connector lifecycle cases and public Meta/Instagram/TikTok approvals. Paid Claude and reliable two-device meetings remain deferred final gates. Stage 2 UI remains planned, not begun.
+
+The pending desktop merge also exposed a Windows late-layout transcript scrolling regression. Bottom-follow now survives later inline-row range changes and cancels on manual mouse/keyboard/scrollbar navigation. The existing visibility assertion remains intact; a new late-growth/manual-scroll regression passed. 17 chat/scroll checks and 9 Bud conversation checks passed locally; required cross-platform CI still gates merge.

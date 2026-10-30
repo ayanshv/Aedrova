@@ -549,6 +549,8 @@ class MessageView(QListView):
         self._scroll_timer.setSingleShot(True)
         self._scroll_timer.timeout.connect(self._finish_scroll)
         self.verticalScrollBar().rangeChanged.connect(lambda *_: self._scroll_timer.start(0))
+        self.verticalScrollBar().sliderPressed.connect(self._cancel_scroll)
+        self.verticalScrollBar().actionTriggered.connect(lambda *_: self._cancel_scroll())
         self.agent_feed = None
         self.agent_message_id = None
         self.agent_visible = False
@@ -632,6 +634,7 @@ class MessageView(QListView):
         return index, document, max(0, min(position, document.characterCount() - 1))
 
     def mousePressEvent(self, event):  # noqa: N802
+        self._cancel_scroll()
         if event.button() == Qt.MouseButton.LeftButton:
             hit = self.text_hit(event.position().toPoint())
             self.selecting_text = hit is not None
@@ -827,6 +830,7 @@ class MessageView(QListView):
             self.thread_requested.emit(index.data(MESSAGE_ROLE).id)
 
     def keyPressEvent(self, event):  # noqa: N802
+        self._cancel_scroll()
         moves = {
             Qt.Key.Key_Left: QTextCursor.MoveOperation.PreviousCharacter,
             Qt.Key.Key_Right: QTextCursor.MoveOperation.NextCharacter,
@@ -994,8 +998,17 @@ class MessageView(QListView):
             and self.visualRect(index).height() > self.viewport().height()
         ):
             self.verticalScrollBar().setValue(self.verticalScrollBar().maximum())
-        if self.viewport().rect().intersects(self.visualRect(index)):
+        # An inline transcript can grow again after Qt lays out its child labels.
+        # Keep the bottom target through those later range changes; explicit user
+        # navigation cancels it, so reading older messages still stays in place.
+        if (
+            self._scroll_hint != QListView.ScrollHint.PositionAtBottom
+            and self.viewport().rect().intersects(self.visualRect(index))
+        ):
             self._scroll_target = None
+
+    def _cancel_scroll(self):
+        self._scroll_target = None
 
     def wheelEvent(self, event):  # noqa: N802
         self._scroll_target = None
