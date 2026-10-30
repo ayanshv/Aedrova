@@ -3690,3 +3690,28 @@ main at 5120d55 and Live on existing staging. No migration, new credential, fund
 or purchase is needed. Native language-quality acceptance remains open until the
 corrected app is verified. Existing Stage 1 public-provider and audio gates remain
 OPEN; paid Claude/meeting gates stay deferred.
+
+
+### October 30 — Apple active and revised launch timeline
+
+Owner reports Apple Developer membership activated. Enrollment is no longer a blocker; team access, Developer ID/notarization and Sign in with Apple still require setup and verification. See docs/pre-launch-timeline.md for the estimated 13–18 working-day gated plan, including a 3–4 working-day slot for minor and sizeable contained features and final paid gates. This entry is planning only: no tests resumed, purchase made, or Stage 2 authorized. Stage 1 remains OPEN.
+
+
+### October 30 — sizeable feature allowance in launch plan
+
+Owner requested a slot for sizeable features without significant product expansion. Step 4 now allows one contained sizeable feature or two smaller additions, including integration and acceptance, over 3–4 working days. Overall estimate becomes 13–18 focused working days excluding external delays. Feature selection remains pending; this authorizes planning only and does not resume tests. Payment gates remain last; Stage 1 stays OPEN.
+
+
+### October 30 — staging acceptance explicitly resumed
+
+Owner resumed Stage 1. 72 targeted desktop checks passed. Native actual agent reply translated to Hindi, then restoring English displayed the original prompt and reply. Approved bounded test allowance applied and verified restored Free/original allowance, usage retained. See docs/staging-acceptance-2026-10-30.md for current evidence and remaining live cases. Public approvals, final human audio clarity and simultaneous-reader validation remain OPEN. Paid Claude and reliable meetings deferred; Stage 2 not started.
+
+
+### October 30 — human voice clarity accepted
+
+Owner listened to the staging voice message and confirmed it sounds clear and good. Final human voice-message clarity gate is CLOSED for the tested setup. Stage 1 remains OPEN for simultaneous-reader/multilingual and Research follow-up acceptance, remaining provider lifecycle cases and public Meta/Instagram/TikTok approvals. Paid Claude and reliable two-device meetings remain deferred final gates. No additional audio action is required now.
+
+
+### October 30 — optimistic media messages
+
+Files and voice now create sender-only conversation echoes immediately on explicit Send, with visible Sending status while the existing private upload/verification runs in the background. Text already used an optimistic outbox; pending delivery status is now visible. Attachment echoes reconcile by verified attachment/message identifiers, preserve acknowledgement if metadata refresh fails, expose cancellation and failed-local removal, and clear on sign-out. Uncertain uploads are not blindly resubmitted. Voice preview controls hide during sending and return on failure; redundant Voice message body/card wording removed, playback controls retained. Server verification and teammate access remain unchanged. 100 affected desktop checks passed, including blocked transfer, receipt deduplication, failures, and voice-label removal. Staging source needs restart to load these edits; no provider key, migration or payment. Stage 1 remains OPEN for the recorded acceptance/public provider gates.

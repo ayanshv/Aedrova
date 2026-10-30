@@ -187,3 +187,88 @@ def test_picker_accepts_multiple_files_in_one_selection(qtbot, tmp_path, monkeyp
     window.composer._submit()
     qtbot.waitUntil(lambda: len(uploaded) == 2 and not window.connected.pending)
     assert uploaded == list(map(str, files))
+
+
+@pytest.mark.parametrize("voice", [False, True])
+def test_media_echo_precedes_transfer_and_receipt_reconciles(qtbot, tmp_path, voice):
+    from test_connected import row
+
+    window, service = setup(qtbot, tmp_path)
+    qtbot.waitUntil(lambda: not window.account_dialog.busy)
+    entered, release = Event(), Event()
+    captured = []
+
+    def transfer(identifier, *args, **kwargs):
+        captured.append(identifier)
+        entered.set()
+        assert release.wait(5)
+        return "verified-message"
+
+    service.fork_for_context = lambda: SimpleNamespace(
+        upload_attachment=transfer, close_context=lambda: None
+    )
+    source = tmp_path / ("voice-message-1s.wav" if voice else "brief.txt")
+    source.write_bytes(b"local preview")
+    try:
+        assert window.connected.upload(str(source), voice_data=b"audio" if voice else None)
+        local = window.channel.messages[-1]
+        assert local.id.startswith("upload-")
+        assert local.attachment == source.name
+        assert not local.attachment_id  # Unverified bytes cannot be downloaded/shared.
+        assert local.delivery == "Sending…"
+        qtbot.waitUntil(entered.is_set)
+        assert not release.is_set()
+    finally:
+        release.set()
+        qtbot.waitUntil(lambda: not window.connected.upload_jobs)
+    assert not any(m.id.startswith("upload-") for m in window.channel.messages)
+    assert sum(m.id == "verified-message" for m in window.channel.messages) == 1
+    assert window.channel.messages[-1].delivery == ""
+    # A later realtime receipt replaces the acknowledgement rather than duplicating it.
+    message = row("verified-message")
+    window.connected.cache.setdefault("c", {})[message["id"]] = message
+    window.connected.apply(service.snapshot(), [message], "w", "c")
+    assert sum(m.id == "verified-message" for m in window.channel.messages) == 1
+    assert not window.connected.outbox
+
+
+@pytest.mark.parametrize("failure", [ValueError("Invalid file"), RuntimeError("offline")])
+def test_failed_media_echo_is_explicit_and_removable(qtbot, tmp_path, failure):
+    window, service = setup(qtbot, tmp_path)
+    qtbot.waitUntil(lambda: not window.account_dialog.busy)
+
+    def transfer(*args, **kwargs):
+        raise failure
+
+    service.fork_for_context = lambda: SimpleNamespace(
+        upload_attachment=transfer, close_context=lambda: None
+    )
+    source = tmp_path / "brief.txt"
+    source.write_text("Original remains available")
+    assert window.connected.upload(str(source))
+    qtbot.waitUntil(lambda: not window.connected.pending)
+    local = next(m for m in window.channel.messages if m.id.startswith("upload-"))
+    assert local.delivery.startswith(
+        "Not sent" if isinstance(failure, ValueError) else "Delivery unconfirmed"
+    )
+    window.connected.dismiss_local_message(local.id)
+    assert not any(m.id == local.id for m in window.channel.messages)
+    assert source.exists()
+
+
+def test_voice_card_has_no_redundant_body_label(qtbot, tmp_path):
+    from aedrova.desktop.state import Message
+
+    window, _ = setup(qtbot, tmp_path)
+    voice = Message(
+        "voice",
+        "You",
+        "Y",
+        "12:00",
+        "Shared a file: voice-message-1s.wav",
+        attachment="voice-message-1s.wav",
+        attachment_id="verified",
+        mine=True,
+    )
+    text = window.messages.delegate.document(voice, 400).toPlainText()
+    assert not text.strip()

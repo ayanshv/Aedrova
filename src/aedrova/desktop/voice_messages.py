@@ -239,6 +239,7 @@ class VoiceMessage(Dictation):
             lambda: not self.valid(epoch),
         ):
             self.show_state("uploading", "Sharing your voice message…")
+            self.strip.hide()  # The conversation now shows the pending voice card.
 
     def cancel(self):
         super().cancel()

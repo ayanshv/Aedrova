@@ -99,7 +99,7 @@ def message_tree(rows, user_id, *, directory=None, attachments=None):
             else row.get("agent_name")
             or directory.get(row["sender_id"], "Teammate " + row["sender_id"][:6])
         )
-        file = attachments.get(row["id"], {})
+        file = attachments.get(row["id"], row.get("_attachment", {}))
         by_id[row["id"]] = Message(
             row["id"],
             author,
@@ -562,6 +562,12 @@ class ConnectedDashboard(QObject):
             if r["channel_id"] in {c["id"] for c in snapshot["channels"]}
         }
         server_ids = {r["id"] for r in rows}
+        verified_files = {f["id"] for f in self.files.values()}
+        self.outbox = {
+            i: r
+            for i, r in self.outbox.items()
+            if not r.get("_upload_id") or r["_upload_id"] not in verified_files
+        }
         for identifier in server_ids:
             self.outbox.pop(identifier, None)
         rows = rows + [dict(r) for r in self.outbox.values() if r["channel_id"] == channel_id]
@@ -992,6 +998,28 @@ class ConnectedDashboard(QObject):
             return False
         identifier = self.pending.setdefault(key, str(uuid4()))
         progress = UploadProgress(composer, Path(path).name)
+        progress.hide()  # The conversation echo owns visible delivery feedback.
+        # A sender-only echo is not a server publication. File validation and
+        # membership checks still complete before teammates can see the message.
+        local_id = "upload-" + identifier
+        self.outbox[local_id] = {
+            "id": local_id,
+            "channel_id": channel,
+            "sender_id": user_id,
+            "body": "Shared a file: " + Path(path).name,
+            "parent_id": parent,
+            "created_at": datetime.now(UTC).isoformat(),
+            "sequence": 0,
+            "local": True,
+            "delivery": "Sending…",
+            "_upload_id": identifier,
+            "_attachment": {"filename": Path(path).name},
+            "_cancel": progress.cancel,
+        }
+        self.render_local_messages()
+        view = self.window.thread_messages if parent else self.window.messages
+        view.scrollToBottom()
+        view.animate_sent(local_id)
 
         def stopped():
             from shiboken6 import isValid
@@ -1026,7 +1054,7 @@ class ConnectedDashboard(QObject):
                     cancelled=stopped,
                     progress=progress.updated.emit,
                 )
-                publication = {"shared": bool(result)}
+                publication = {"shared": bool(result), "message_id": result}
                 # Fetch only the verified message instead of waiting for a workspace snapshot.
                 if result and hasattr(transport, "client") and not stopped():
                     try:
@@ -1046,7 +1074,7 @@ class ConnectedDashboard(QObject):
                         pass  # Already shared; normal realtime reconciliation can recover metadata.
                 return publication
             except ValueError as error:
-                return {"error": str(error)}
+                return {"error": str(error), "rejected": True}
             except Exception:
                 return {"error": "Could not confirm upload. Check the chat before trying again."}
             finally:
@@ -1072,11 +1100,34 @@ class ConnectedDashboard(QObject):
             ):
                 return
             allowed = {c["id"] for c in self.account.snapshot.get("channels", [])}
+            local = self.outbox.get(local_id)
+            if local:
+                local.pop("_cancel", None)
+            if channel not in allowed:
+                self.outbox.pop(local_id, None)
+            elif result.get("shared"):
+                # Keep an acknowledged echo if metadata fetching failed, so
+                # eventual realtime delivery cannot make the message disappear.
+                self.outbox.pop(local_id, None)
+                if local:
+                    local["id"] = result["message_id"]
+                    local["delivery"] = ""
+                    self.outbox[local["id"]] = local
+            elif result.get("error") and local:
+                local["delivery"] = (
+                    "Not sent · attach again"
+                    if result.get("rejected")
+                    else "Delivery unconfirmed · check connection"
+                )
+            else:
+                self.outbox.pop(local_id, None)
             if result.get("rows") and channel in allowed:
                 self.cache.setdefault(channel, {}).update({r["id"]: r for r in result["rows"]})
                 self.files.update({f["message_id"]: f for f in result.get("files", [])})
-                if self.window.channel_id == channel:
-                    self.render_local_messages()
+                for row in result["rows"]:
+                    self.outbox.pop(row["id"], None)
+            if self.window.channel_id == channel:
+                self.render_local_messages()
             if isValid(progress):
                 progress.complete(
                     result.get("error")
@@ -1085,6 +1136,8 @@ class ConnectedDashboard(QObject):
                     ),
                     success=bool(result.get("shared")),
                 )
+                if not result.get("shared"):
+                    progress.deleteLater()
             if completed:
                 completed(result)
             QTimer.singleShot(0, self.refresh)
@@ -1122,8 +1175,21 @@ class ConnectedDashboard(QObject):
         queued = self.enqueue(key, prepare, prepared, priority=True)
         if not queued:
             self.pending.pop(key, None)
+            self.outbox.pop(local_id, None)
+            self.render_local_messages()
             progress.complete("Already queued or unavailable. Your file was not added twice.")
         return bool(queued)
+
+    def dismiss_local_message(self, identifier):
+        row = self.outbox.get(identifier)
+        if row and row.get("delivery") and row["delivery"] not in {"Sending…", "Retrying…"}:
+            self.outbox.pop(identifier, None)
+            self.render_local_messages()
+
+    def cancel_local_upload(self, identifier):
+        row = self.outbox.get(identifier)
+        if row and row.get("delivery") == "Sending…" and row.get("_cancel"):
+            row["_cancel"]()
 
     def download(self):
         if not self.active:
