@@ -126,3 +126,21 @@ def test_full_five_minutes_fit_existing_upload_limit():
     data = encode_voice(b"\0\0" * 16000 * 300)
     assert len(data) < MAX_BYTES
     assert inspect_file("voice.wav", data) == "audio/wav"
+
+
+def test_waveform_samples_verified_audio_and_bounds_malformed_input():
+    import math
+    import struct
+
+    from aedrova.desktop.voice_waveform import levels
+
+    pcm = b"\0\0" * 16000 + b"".join(
+        struct.pack("<h", int(12000 * math.sin(i * 0.1))) for i in range(16000)
+    )
+    sampled = levels(encode_voice(pcm))
+    assert len(sampled) == 30
+    assert all(0.08 <= value <= 1 for value in sampled)
+    assert max(sampled[:15]) == 0.08
+    assert max(sampled[15:]) == 1
+    assert levels(b"not a recording") == ()
+    assert levels(encode_voice(b"\0\0" * 16000)) == (0.08,) * 30
