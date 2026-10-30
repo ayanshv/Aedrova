@@ -438,6 +438,22 @@ class MessageDelegate(QStyledItemDelegate):
             )
             painter.setFont(font(11))
             painter.setPen(QColor(t.secondary))
+            if voice:
+                from aedrova.desktop.voice_waveform import paint
+
+                duration = playback.get("duration", 0) if active else 0
+                named_duration = re.search(r"voice-message-(\d+)s\.wav$", message.attachment)
+                seconds = duration // 1000 or (int(named_duration[1]) if named_duration else 0)
+                elapsed = playback.get("position", 0) // 1000 if active else seconds
+                clock = f"{elapsed // 60:02d}:{elapsed % 60:02d}"
+                paint(
+                    painter,
+                    QRectF(x + 46, bottom + 23, max(1, card_width - 120), 20),
+                    t,
+                    playback.get("waveform", ()) if active else (),
+                    min(1, playback.get("position", 0) / duration) if duration else 0,
+                )
+                painter.drawText(QRectF(x + card_width - 62, bottom + 23, 52, 18), clock)
             elided = painter.fontMetrics().elidedText(
                 (
                     (
@@ -452,7 +468,8 @@ class MessageDelegate(QStyledItemDelegate):
                 Qt.TextElideMode.ElideRight,
                 int(card_width - 60),
             )
-            painter.drawText(QRectF(x + 48, bottom + 23, card_width - 55, 18), elided)
+            if not voice:
+                painter.drawText(QRectF(x + 48, bottom + 23, card_width - 55, 18), elided)
             if height > 58:
                 preview = getattr(self.view, "attachment_previews", {}).get(message.attachment_id)
                 area = QRectF(x + 12, bottom + 48, card_width - 24, height - 58)

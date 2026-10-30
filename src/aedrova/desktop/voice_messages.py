@@ -262,6 +262,7 @@ class VoicePlayback(QObject):
         self.window, self.connected, self.scope = window, connected, scope
         self.player = None
         self.identifier = None
+        self.waveform = ()
         self.generation = 0
         window.installEventFilter(self)
         from PySide6.QtCore import QTimer
@@ -286,6 +287,7 @@ class VoicePlayback(QObject):
         if self.player:
             self.player.dispose()
         self.player = self.identifier = self.origin = None
+        self.waveform = ()
         self.paint()
 
     def paint(self):
@@ -299,6 +301,7 @@ class VoicePlayback(QObject):
                 ),
                 "position": self.player.player.position() if self.player else 0,
                 "duration": self.player.player.duration() if self.player else 0,
+                "waveform": self.waveform,
             }
             view.viewport().update()
 
@@ -323,6 +326,9 @@ class VoicePlayback(QObject):
                 if not isinstance(data, bytes):
                     raise ValueError("Unavailable audio")
                 self.player = VoicePlayer(data, self.window)
+                from aedrova.desktop.voice_waveform import levels
+
+                self.waveform = levels(data)
                 self.player.hide()
                 self.player.changed.connect(self.paint)
                 self.player.toggle()
