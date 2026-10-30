@@ -3748,3 +3748,25 @@ Owner requested a dedicated pre-launch UI fixes step immediately after Stage 1. 
 Research follow-up gate CLOSED. Actual signed-in staging BudChat passed three hosted turns, reopening saved history before the ambiguous follow-up and retaining the named project, official sources and user correction. Six chronological messages persisted, with no Thinking-only residue. The owner approved an exact disposable-workspace Pro-policy exception for at most three turns/10 minutes/$0.50, without resetting counters or changing company caps. Actual usage was $0.070677. Free, allowance $0.50 and reserved zero verified afterward; grant disconnected and fixture archived. No new key, funding, payment, subscription or production change. See docs/research-followup-acceptance-2026-10-30.md. Stage 1 now remains OPEN for remaining connector lifecycle cases and public Meta/Instagram/TikTok approvals. Paid Claude and reliable two-device meetings remain deferred final gates. Stage 2 UI remains planned, not begun.
 
 The pending desktop merge also exposed a Windows late-layout transcript scrolling regression. Bottom-follow now survives later inline-row range changes and cancels on manual mouse/keyboard/scrollbar navigation. The existing visibility assertion remains intact; a new late-growth/manual-scroll regression passed. 17 chat/scroll checks and 9 Bud conversation checks passed locally; required cross-platform CI still gates merge.
+
+
+## October 30 — connector lifecycle acceptance
+
+Live refresh/read passed for GitHub, Figma, Stripe, TikTok, Instagram and Supabase;
+Notion's earlier live refresh/revocation/expiry evidence is retained. Vercel's legacy
+installation token correctly required reconnect on induced expiry, and a fresh existing-
+installation OAuth flow restored reads. Actual provider-side revocation denied subsequent
+reads for the newly tested providers; Vercel's termination acknowledgment was explicitly
+approved by the owner. Local disconnect denial and catalog-wide controlled expiry,
+concurrency and no-resurrection checks passed. Managed Search has no customer OAuth grant.
+
+Fixed the Figma refresh endpoint, HTTP-200 OAuth errors and Supabase revoked-refresh 404
+classification. 115 targeted backend checks passed. Updated a Windows CI geometry test
+to await the actual asynchronous layout condition instead of assuming it finishes in
+100 ms; the same visibility requirement remains, and five local chat checks passed.
+No owner payment, model call, secret generation or public-provider approval occurred.
+See [full evidence and cleanup](connector-lifecycle-acceptance-2026-10-30.md).
+
+Stage 1 remains OPEN only for public Meta/Instagram verification/App Review and TikTok
+demo/Production review, plus required release CI before source promotion. No Stage 2 UI
+work started. Funded Claude and reliable two-device meetings remain final paid gates.

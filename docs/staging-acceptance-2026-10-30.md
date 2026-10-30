@@ -18,8 +18,7 @@ Research single-turn conversation, citations, saved history, themes and cleanup 
 
 ## Remaining acceptance
 
-1. Remaining provider-specific expiry/refresh/revocation lifecycle cases.
-2. Meta developer dashboard → Aedrova Buds → App Review/business and access verification: complete operator documents privately when requested, then genuine review materials. TikTok developer dashboard → Aedrova Buds → Production: genuine demo and public review. These are external launch blockers for publicly advertised connectors; no approval inferred.
+1. Meta developer dashboard → Aedrova Buds → App Review/business and access verification: complete operator documents privately when requested, then genuine review materials. TikTok developer dashboard → Aedrova Buds → Production: genuine demo and public review. These are external launch blockers for publicly advertised connectors; no approval inferred.
 
 Funded Claude and reliable two-device meetings remain final paid gates. Public website navigation now has 52 choices; desktop offline packs support 50 language/regional choices. See multilingual-support.md for scope and quality limits. Apple activation is acknowledged but signing/Apple login belong to later preparation. No payments made.
 
@@ -38,4 +37,16 @@ A real signed-in staging Qt BudChat used the hosted Research/search and reply pi
 
 The initial Free test correctly stopped at the shared account budget/request limit. Owner explicitly approved a bounded existing-Pro test policy on the exact disposable staging workspace, retaining the $0.50 allowance, counters and company limits. Three turns cost 70,677 microUSD ($0.070677), with response times 61.77, 48.38 and 53.91 seconds. No funding, purchase, subscription, new key or production change. Free restoration, unchanged allowance, zero reservations, disconnected search grant and archived fixture were independently recorded. No owner action remains for this Research gate.
 
-See research-followup-acceptance-2026-10-30.md. Stage 1 remains OPEN for provider lifecycle cases and public Meta/Instagram/TikTok approval; Stage 2 UI work is not started. Funded Claude and reliable two-device meetings remain deferred final paid gates.
+See research-followup-acceptance-2026-10-30.md. Stage 1 remains OPEN for public Meta/Instagram/TikTok approval; Stage 2 UI work is not started. Funded Claude and reliable two-device meetings remain deferred final paid gates.
+
+
+## Connector lifecycle — October 30 live completion
+
+Provider-specific refresh, expiry/reconnect and external revocation acceptance is now
+recorded in [connector lifecycle acceptance](connector-lifecycle-acceptance-2026-10-30.md).
+Notion's October 25 live evidence is retained; the other OAuth providers were exercised
+live, with actual refresh where supported and provider-side revocation. Managed Search
+has no customer OAuth credential to revoke. Catalog-wide local boundaries and concurrency
+passed controlled tests. Three actual provider-response bugs were fixed; 115 targeted
+checks passed. Public review is separate. No further owner action is needed for the
+completed lifecycle checks; tested provider authorizations may need reconnecting for use.

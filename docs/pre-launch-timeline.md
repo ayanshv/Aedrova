@@ -8,7 +8,7 @@ Stage 1 remains OPEN. Previously passed: fresh onboarding, bounded OpenAI build/
 
 ## 1. Finish staging acceptance — Days 1–3
 
-Passed: live Bud-cap/downgrade checks, uploads/voice transport, human audio clarity, Research three-turn conversation/follow-up/correction, and simultaneous English/Hindi reader/prompt display with offline models. Remaining: provider-specific lifecycle cases and public Meta/Instagram/TikTok review.
+Passed: live Bud-cap/downgrade checks, uploads/voice transport, human audio clarity, Research three-turn conversation/follow-up/correction, and simultaneous English/Hindi reader/prompt display with offline models. Connector lifecycle acceptance also passed; see connector-lifecycle-acceptance-2026-10-30.md. Remaining: public Meta/Instagram/TikTok review.
 
 Exit: evidence for each advertised flow; unresolved features held back from launch.
 
