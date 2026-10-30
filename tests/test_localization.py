@@ -155,6 +155,7 @@ def test_pending_translation_cannot_cross_language_switch(qtbot, tmp_path, monke
     window.messages.display_body(message)
     window.localizer.flush()
     qtbot.waitUntil(entered.is_set)
+    window.localizer.cache[("reader", window.workspace_id, "hi", "message", "Earlier")] = "पहले"
     window.localizer.configure("en", False)
     release.set()
     qtbot.waitUntil(lambda: not window.localizer.pending)

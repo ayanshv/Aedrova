@@ -166,6 +166,7 @@ class Localizer(QObject):
     def configure(self, language, enabled=True):
         self.language, self.enabled = normalize(language), enabled is True
         self.generation += 1
+        self.cache.clear()
         self.queue.clear()
         self.failed.clear()
         self.retries.clear()
