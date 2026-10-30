@@ -9,15 +9,18 @@ import sys
 import tempfile
 import threading
 import zipfile
+from collections import OrderedDict
 from pathlib import Path
 
+from aedrova.localization import LANGUAGES, normalize
+
 MANIFEST = json.loads(Path(__file__).with_name("models.json").read_text())
-SUPPORTED = {"en", "hi"}
+SUPPORTED = set(LANGUAGES)
 PROTECTED = re.compile(
-    r"```[\s\S]*?```|`[^`\n]*`|<@[^>\n]+>|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|@[\w.-]+|https?://[^\s<>\)]+|\[(?:message|file|source):[^\]\n]+\]|\bAedrova\b|\*\*"
+    r"```[\s\S]*?```|`[^`\n]*`|<@[^>\n]+>|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|@[\w.-]+|https?://[^\s<>\)]+|\[(?:message|file|source):[^\]\n]+\]|\b(?:Aedrova|Buds)\b|\*\*"
 )
 _LOCK = threading.RLock()
-_ENGINES = {}
+_ENGINES = OrderedDict()
 
 
 class Unavailable(ValueError):
@@ -37,8 +40,30 @@ def model_root():
     return Path(os.getenv("XDG_DATA_HOME", Path.home() / ".local/share")) / "aedrova/translation"
 
 
-def ready():
-    return all((model_root() / row["pair"] / "ready.json").is_file() for row in MANIFEST)
+def required(language):
+    if language == "en":
+        return []
+    pairs = {"en_" + language, language + "_en"}
+    rows = [row for row in MANIFEST if row["pair"] in pairs]
+    if len(rows) != 2:
+        raise Unavailable("This offline language pack is not available yet.")
+    return rows
+
+
+def ready(language="hi"):
+    try:
+        return all(
+            (model_root() / row["pair"] / "ready.json").is_file() for row in required(language)
+        )
+    except Unavailable:
+        return False
+
+
+def download_size(language):
+    try:
+        return sum(row["bytes"] for row in required(language))
+    except Unavailable:
+        return 0
 
 
 def install_archive(archive, row):
@@ -63,15 +88,18 @@ def install_archive(archive, row):
             entries = [
                 item
                 for item in bundle.infolist()
-                if item.filename.startswith(row["pair"] + "/model/")
+                if item.filename.startswith(row.get("root", row["pair"]) + "/model/")
                 or item.filename
                 in {
-                    row["pair"] + "/sentencepiece.model",
-                    row["pair"] + "/README.md",
-                    row["pair"] + "/metadata.json",
+                    row.get("root", row["pair"]) + "/sentencepiece.model",
+                    row.get("root", row["pair"]) + "/bpe.model",
+                    row.get("root", row["pair"]) + "/README.md",
+                    row.get("root", row["pair"]) + "/metadata.json",
                 }
             ]
-            if sum(item.file_size for item in entries) > 180_000_000:
+            if sum(item.file_size for item in entries) > min(
+                900_000_000, row.get("uncompressed_bytes", 180_000_000)
+            ):
                 raise ValueError("Offline language files exceeded the size limit.")
             for item in entries:
                 parts = Path(item.filename).parts
@@ -83,20 +111,19 @@ def install_archive(archive, row):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 with bundle.open(item) as source, target.open("wb") as output:
                     shutil.copyfileobj(source, output)
-        if (
-            not (stage / "model/model.bin").is_file()
-            or not (stage / "sentencepiece.model").is_file()
+        if not (stage / "model/model.bin").is_file() or not any(
+            (stage / name).is_file() for name in ("sentencepiece.model", "bpe.model")
         ):
             raise ValueError("Offline language files are missing model data.")
         (stage / "ready.json").write_text(json.dumps(row))
         stage.rename(destination)
 
 
-def download():
+def download(language="hi"):
     """Explicit one-time download; sends no message, identity or workspace data."""
     import httpx
 
-    for row in MANIFEST:
+    for row in required(language):
         if (model_root() / row["pair"] / "ready.json").is_file():
             continue
         with tempfile.TemporaryDirectory(prefix="aedrova-language-") as temporary:
@@ -119,35 +146,97 @@ def source_language(text, *, interface=False):
     prose = PROTECTED.sub("", text)
     if re.search(r"[\u0900-\u097f]", prose):
         return "hi"
-    if sum(c.isalpha() for c in prose) < 20 and all(ord(c) < 128 for c in prose):
+    lowered = prose.strip().lower().strip(".!? ")
+    greetings = {
+        "bonjour": "fr",
+        "hola": "es",
+        "gracias": "es",
+        "merci": "fr",
+        "hallo": "de",
+        "danke": "de",
+        "ciao": "it",
+        "olá": "pt",
+    }
+    if lowered in greetings:
+        return greetings[lowered]
+    if lowered in {"hello", "hi", "hey", "thanks", "thank you", "yes", "no", "ok", "okay", "test"}:
         return "en"
     try:
-        from langdetect import DetectorFactory, detect
+        import py3langid
 
-        DetectorFactory.seed = 0
-        return detect(prose)
+        code = py3langid.classify(prose)[0]
+        if code == "zh" and any(
+            c in "體國學愛會這與臺灣說頁書間後萬對為來們當過還麼樣場長" for c in prose
+        ):
+            return "zt"
+        return normalize(code) if code in LANGUAGES or code in {"no"} else code
     except Exception:
         return "en"
 
 
+class BPETokenizer:
+    def __init__(self, path, source, target):
+        from sacremoses import MosesDetokenizer, MosesPunctNormalizer, MosesTokenizer
+        from subword_nmt.apply_bpe import BPE
+
+        aliases = {"pb": "pt", "zt": "zh"}
+        self.normalizer = MosesPunctNormalizer(aliases.get(source, source))
+        self.tokenizer = MosesTokenizer(aliases.get(source, source))
+        self.detokenizer = MosesDetokenizer(aliases.get(target, target))
+        with path.open(encoding="utf-8") as file:
+            self.bpe = BPE(file)
+
+    def encode(self, text, out_type=str):
+        text = " ".join(self.tokenizer.tokenize(self.normalizer.normalize(text)))
+        return self.bpe.process_line(text).split()
+
+    def decode(self, tokens):
+        return self.detokenizer.detokenize(" ".join(tokens).replace("@@ ", "").split())
+
+
+class Model:
+    def __init__(self, root):
+        import ctranslate2
+
+        self.prefix = json.loads((root / "metadata.json").read_text(encoding="utf-8")).get(
+            "target_prefix", ""
+        )
+        self.translator = ctranslate2.Translator(
+            str(root / "model"), device="cpu", compute_type="int8", intra_threads=2
+        )
+
+    def translate_batch(self, tokens, **kwargs):
+        return self.translator.translate_batch(
+            tokens,
+            target_prefix=[[self.prefix]] * len(tokens) if self.prefix else None,
+            replace_unknowns=True,
+            **kwargs,
+        )
+
+
 def _engine(source, target):
-    pair = source + "_" + target
-    root = model_root() / pair
+    root = model_root() / (source + "_" + target)
+    aliases = {"pt": "pb", "pb": "pt", "zh": "zt", "zt": "zh"}
+    if not (root / "ready.json").is_file() and target == "en" and source in aliases:
+        root = model_root() / (aliases[source] + "_en")
     key = str(root)
     if key not in _ENGINES:
         if not (root / "ready.json").is_file():
             raise Unavailable(
-                "Download English/Hindi offline languages in View → Language & translation."
+                "Add the required offline language pack in View → Language & translation."
             )
-        import ctranslate2
         import sentencepiece
 
-        _ENGINES[key] = (
-            ctranslate2.Translator(
-                str(root / "model"), device="cpu", compute_type="int8", intra_threads=2
-            ),
-            sentencepiece.SentencePieceProcessor(model_file=str(root / "sentencepiece.model")),
+        tokenizer = (
+            sentencepiece.SentencePieceProcessor(model_file=str(root / "sentencepiece.model"))
+            if (root / "sentencepiece.model").is_file()
+            else BPETokenizer(root / "bpe.model", source, target)
         )
+        _ENGINES[key] = (Model(root), tokenizer)
+        while len(_ENGINES) > 2:
+            _, (old, _) = _ENGINES.popitem(last=False)
+            old.translator.unload_model()
+    _ENGINES.move_to_end(key)
     return _ENGINES[key]
 
 
@@ -160,6 +249,8 @@ def translate(text, target, *, interface=False):
             return text
         if source not in SUPPORTED or target not in SUPPORTED:
             raise Unavailable("This offline language pair is not installed. Showing original text.")
+        if source != "en" and target != "en":
+            return translate(translate(text, "en"), target, interface=True)
         translator, tokenizer = _engine(source, target)
 
         def prose(value):
@@ -173,9 +264,18 @@ def translate(text, target, *, interface=False):
                 result = translator.translate_batch(
                     [tokens[offset : offset + 256]],
                     beam_size=2,
-                    max_decoding_length=384,
+                    max_decoding_length=min(
+                        384, max(32, len(tokens[offset : offset + 256]) * 3 + 16)
+                    ),
+                    no_repeat_ngram_size=3,
                 )[0]
-                results.append(tokenizer.decode(result.hypotheses[0]))
+                decoded = tokenizer.decode(result.hypotheses[0]).replace("▁", " ").strip()
+                prefix = getattr(translator, "prefix", "")
+                if prefix and decoded.startswith(prefix):
+                    decoded = decoded[len(prefix) :].lstrip()
+                if not decoded.strip() or len(decoded) > max(120, len(body) * 12):
+                    raise Unavailable("Translation was not reliable. Showing original text.")
+                results.append(decoded)
             return start + " ".join(results) + end
 
         matches = list(PROTECTED.finditer(text))

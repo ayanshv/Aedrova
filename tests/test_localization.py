@@ -14,7 +14,7 @@ from aedrova.localization.intents import localized_build
 def test_languages_normalize_and_long_prose_preserves_code():
     assert normalize("hi-IN") == "hi" and normalize("ar_SA") == "ar"
     assert normalize([]) == "en" and normalize("unknown") == "en"
-    assert len(LANGUAGES) == 20
+    assert len(LANGUAGES) == 50
     source = ("हिन्दी paragraph. " * 900) + '```\nprint("Hello")\n```'
     parts = chunks(source)
     assert "".join(p for p, _ in parts) == source

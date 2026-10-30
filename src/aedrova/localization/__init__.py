@@ -3,36 +3,65 @@
 LANGUAGES = {
     "en": "English",
     "hi": "हिन्दी",
-    "es": "Español",
-    "fr": "Français",
+    "ar": "العربية",
+    "az": "Azərbaycanca",
+    "bg": "Български",
+    "bn": "বাংলা",
+    "ca": "Català",
+    "cs": "Čeština",
+    "da": "Dansk",
     "de": "Deutsch",
-    "pt": "Português",
+    "el": "Ελληνικά",
+    "eo": "Esperanto",
+    "es": "Español",
+    "et": "Eesti",
+    "eu": "Euskara",
+    "fa": "فارسی",
+    "fi": "Suomi",
+    "fr": "Français",
+    "ga": "Gaeilge",
+    "gl": "Galego",
+    "he": "עברית",
+    "hu": "Magyar",
+    "id": "Bahasa Indonesia",
     "it": "Italiano",
     "ja": "日本語",
     "ko": "한국어",
-    "zh": "中文",
-    "ar": "العربية",
-    "ur": "اردو",
-    "bn": "বাংলা",
-    "ta": "தமிழ்",
-    "te": "తెలుగు",
-    "id": "Bahasa Indonesia",
-    "vi": "Tiếng Việt",
-    "th": "ไทย",
-    "tr": "Türkçe",
+    "ky": "Кыргызча",
+    "lt": "Lietuvių",
+    "lv": "Latviešu",
+    "ms": "Bahasa Melayu",
+    "nb": "Norsk bokmål",
+    "nl": "Nederlands",
+    "pb": "Português (Brasil)",
+    "pl": "Polski",
+    "pt": "Português",
+    "ro": "Română",
     "ru": "Русский",
+    "sk": "Slovenčina",
+    "sl": "Slovenščina",
+    "sq": "Shqip",
+    "sv": "Svenska",
+    "sw": "Kiswahili",
+    "th": "ไทย",
+    "tl": "Filipino",
+    "tr": "Türkçe",
+    "uk": "Українська",
+    "ur": "اردو",
+    "vi": "Tiếng Việt",
+    "zh": "简体中文",
+    "zt": "繁體中文",
 }
-RTL = {"ar", "ur"}
+RTL = {"ar", "ur", "fa", "he"}
 
 
 def normalize(value):
     if not isinstance(value, str):
         return "en"
-    return (
-        value.split("-")[0].split("_")[0].lower()
-        if value.split("-")[0].split("_")[0].lower() in LANGUAGES
-        else "en"
-    )
+    code = value.strip().replace("_", "-").lower()
+    aliases = {"pt-br": "pb", "zh-tw": "zt", "zh-hant": "zt", "no": "nb"}
+    code = aliases.get(code, code.split("-")[0])
+    return code if code in LANGUAGES else "en"
 
 
 def preference(user):

@@ -105,7 +105,7 @@ HINDI = {
     "Translation runs on this device. No translation API usage.": (
         "अनुवाद इसी डिवाइस पर होता है। कोई अनुवाद API उपयोग नहीं।"
     ),
-    "Download English/Hindi languages · 209 MB": "अंग्रेज़ी/हिन्दी भाषाएँ डाउनलोड करें · 209 MB",
+    "Offline language pack": "ऑफ़लाइन भाषा पैक",
 }
 
 
@@ -368,7 +368,7 @@ class Localizer(QObject):
                     if unavailable:
                         for view in (self.window.messages, self.window.thread_messages):
                             view.setToolTip(
-                                "Offline translation unavailable. Download English/Hindi languages "
+                                "Offline translation unavailable. Add language packs "
                                 "in View → Language & translation. Originals remain available."
                             )
                     while len(self.cache) > 1000:
@@ -435,30 +435,57 @@ def show_language_settings(window):
         lambda: window.localizer.configure(window.localizer.language, window.localizer.enabled)
     )
     layout.addWidget(retry)
-    from aedrova.localization.offline import download, ready
+    from aedrova.localization.offline import download, download_size, ready
 
-    pack_status = label(
-        "English/Hindi available offline. Other languages show original text."
-        if ready()
-        else "English/Hindi needs a one-time download. Other languages show original text.",
-        "muted",
-        wrap=True,
+    layout.addWidget(label("Offline language pack", "muted"))
+    pack = ChoiceBox()
+    pack.setAccessibleName("Offline language pack")
+    for code, name in LANGUAGES.items():
+        if code != "en":
+            pack.addItem(name, code)
+    pack.setCurrentIndex(
+        pack.findData(window.localizer.language if window.localizer.language != "en" else "hi")
     )
+    layout.addWidget(pack)
+    pack_status = label("", "muted", wrap=True)
     layout.addWidget(pack_status)
-    install = button("Download English/Hindi languages · 209 MB")
-    install.setVisible(not ready())
+    install = button("Download language pack")
     layout.addWidget(install)
+
+    def describe_pack():
+        code = pack.currentData()
+        available = ready(code)
+        size = download_size(code)
+        pack_status.setText(
+            "Ready offline. Add other packs to read teammates’ languages."
+            if available
+            else "Download once for this device. Missing packs leave original text visible."
+        )
+        install.setText(f"Download {LANGUAGES[code]} · {size / 1_000_000:.0f} MB")
+        install.setVisible(not available)
+        install.setEnabled(bool(size) and not getattr(window, "language_install_pending", False))
+
+    def select_pack():
+        code = choice.currentData()
+        if code != "en":
+            pack.setCurrentIndex(pack.findData(code))
+
+    choice.currentIndexChanged.connect(select_pack)
+    pack.currentIndexChanged.connect(describe_pack)
+    describe_pack()
 
     def install_languages():
         if getattr(window, "language_install_pending", False):
             return
+        code = pack.currentData()
         window.language_install_pending = True
         install.setEnabled(False)
+        pack.setEnabled(False)
         pack_status.setText("Downloading offline languages… Messages remain available.")
 
         def operation():
             try:
-                download()
+                download(code)
                 return True
             except Exception:
                 return False
@@ -468,13 +495,12 @@ def show_language_settings(window):
                 return
             window.language_install_pending = False
             if isValid(dialog):
-                install.setEnabled(True)
-                install.setVisible(not ok)
-                pack_status.setText(
-                    "Offline languages ready. No translation API usage."
-                    if ok
-                    else "Could not download offline languages. Retry when connected."
-                )
+                pack.setEnabled(True)
+                describe_pack()
+                if not ok:
+                    pack_status.setText(
+                        "Could not download offline languages. Retry when connected."
+                    )
             if ok:
                 window.localizer.configure(window.localizer.language, window.localizer.enabled)
 

@@ -19,8 +19,9 @@ actions, then obtain owner approval before the next milestone.
 
 ## Persistent stage reminder
 
-The owner requested a brief reminder at the end of every response to unrelated
-project work: Stage 1 (staging acceptance) remains OPEN. Read docs/milestones.md
+The owner requests a brief reminder at the end of every project response while the
+current stage is incomplete, including its remaining launch-timeline steps, not only
+a generic status. Current status: Stage 1 (staging acceptance) remains OPEN. Read docs/milestones.md
 for current blockers; do not imply closure or start Stage 2 without approval.
 Keep the reminder current when the milestone changes. As of October 30, 2026, public Meta/Instagram verification and review, TikTok
 demo/public review, Research follow-up and remaining provider lifecycle cases remain

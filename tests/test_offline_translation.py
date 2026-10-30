@@ -117,3 +117,130 @@ def test_context_markers_preserve_mentions_without_exposing_technical_spans(monk
 
     monkeypatch.setattr(offline, "_engine", lambda *args: (Engine(), Tokenizer()))
     assert offline.translate("कृपया @Aedrova सारांश दें।", "en") == "Please summarize for @Aedrova."
+
+
+def test_every_advertised_language_has_two_pinned_models():
+    from aedrova.localization import LANGUAGES
+
+    assert len(LANGUAGES) == 50
+    for language in LANGUAGES:
+        rows = offline.required(language)
+        assert len(rows) == (0 if language == "en" else 2)
+        for row in rows:
+            assert row["url"].startswith("https://argos-net.com/v1/")
+            assert len(row["sha256"]) == 64
+            assert 0 < row["bytes"] < 700_000_000
+            assert row.get("uncompressed_bytes", 180_000_000) <= 900_000_000
+
+
+def test_reader_pivots_foreign_languages_through_english(monkeypatch):
+    from types import SimpleNamespace
+
+    calls = []
+    monkeypatch.setattr(
+        offline,
+        "source_language",
+        lambda text, interface=False: "en" if interface or text == "English bridge" else "fr",
+    )
+
+    class Tokenizer:
+        def encode(self, text, out_type):
+            return [text]
+
+        def decode(self, tokens):
+            return tokens[0]
+
+    class Engine:
+        def __init__(self, pair):
+            self.pair = pair
+
+        def translate_batch(self, tokens, **kwargs):
+            calls.append(self.pair)
+            return [
+                SimpleNamespace(
+                    hypotheses=[["English bridge" if self.pair == ("fr", "en") else "हिन्दी"]]
+                )
+            ]
+
+    monkeypatch.setattr(offline, "_engine", lambda *pair: (Engine(pair), Tokenizer()))
+    assert offline.translate("Bonjour", "hi") == "हिन्दी"
+    assert calls == [("fr", "en"), ("en", "hi")]
+
+
+def test_selected_pack_does_not_download_unrelated_languages(monkeypatch, tmp_path):
+    import hashlib
+
+    import httpx
+
+    payload = b"verified archive fixture"
+    rows = [
+        dict(
+            pair=pair,
+            bytes=len(payload),
+            sha256=hashlib.sha256(payload).hexdigest(),
+            url="https://argos-net.com/v1/" + pair,
+        )
+        for pair in ("en_es", "es_en", "en_fr", "fr_en")
+    ]
+    monkeypatch.setattr(offline, "MANIFEST", rows)
+    monkeypatch.setenv("AEDROVA_TRANSLATION_MODELS", str(tmp_path))
+    installed = []
+
+    from contextlib import contextmanager
+
+    @contextmanager
+    def stream(method, url, **kwargs):
+        assert url.endswith(("en_es", "es_en"))
+        yield httpx.Response(200, content=payload, request=httpx.Request(method, url))
+
+    monkeypatch.setattr(httpx, "stream", stream)
+    monkeypatch.setattr(offline, "install_archive", lambda path, row: installed.append(row["pair"]))
+    offline.download("es")
+    assert installed == ["en_es", "es_en"]
+
+
+def test_bpe_model_install_and_path_traversal_rejection(monkeypatch, tmp_path):
+    import hashlib
+    import zipfile
+
+    monkeypatch.setenv("AEDROVA_TRANSLATION_MODELS", str(tmp_path / "models"))
+    archive = tmp_path / "bpe.argosmodel"
+
+    def build(extra=False):
+        with zipfile.ZipFile(archive, "w") as bundle:
+            bundle.writestr("bundle/model/model.bin", b"model fixture")
+            bundle.writestr("bundle/bpe.model", b"bpe fixture")
+            if extra:
+                bundle.writestr("bundle/model/../../escape", b"blocked")
+        return dict(
+            pair="en_da",
+            root="bundle",
+            bytes=archive.stat().st_size,
+            sha256=hashlib.sha256(archive.read_bytes()).hexdigest(),
+        )
+
+    row = build(True)
+    with pytest.raises(ValueError, match="Invalid offline"):
+        offline.install_archive(archive, row)
+    assert not (tmp_path / "models/en_da").exists()
+    row = build()
+    offline.install_archive(archive, row)
+    assert (tmp_path / "models/en_da/bpe.model").exists()
+
+
+def test_unreliable_model_expansion_keeps_original(monkeypatch):
+    from types import SimpleNamespace
+
+    class Tokenizer:
+        def encode(self, text, out_type):
+            return [text]
+
+        def decode(self, tokens):
+            return tokens[0]
+
+    class Engine:
+        def translate_batch(self, tokens, **kwargs):
+            return [SimpleNamespace(hypotheses=[["repeated " * 100]])]
+
+    monkeypatch.setattr(offline, "_engine", lambda *pair: (Engine(), Tokenizer()))
+    assert offline.batch([("Support", True)], "ky") == {"texts": ["Support"], "unavailable": [0]}

@@ -87,7 +87,11 @@ def main():
                 print(f"Verified {key}: {value['bytes']} bytes", flush=True)
             except Exception as error:
                 errors[key] = type(error).__name__ + ": " + str(error)[:120]
-    complete = [l for l in languages if {"en_" + l, l + "_en"} <= {r["pair"] for r in verified}]
+    complete = [
+        language
+        for language in languages
+        if {"en_" + language, language + "_en"} <= {r["pair"] for r in verified}
+    ]
     result = {
         "index": INDEX,
         "languages": ["en", *complete],
