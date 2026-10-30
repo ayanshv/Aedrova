@@ -176,8 +176,12 @@ class MessageDelegate(QStyledItemDelegate):
                 lambda m: "@" + m[2],
                 display,
             )
-            if message.attachment.lower().endswith(".wav") and text.startswith("Shared a file:"):
-                text = "Voice message"
+            voice_only = message.attachment.lower().endswith(".wav") and message.body.startswith(
+                "Shared a file:"
+            )
+            if voice_only:
+                text = ""
+                hint = ""
             if hint:
                 text += "\n\n_" + hint + "_"
             document.setMarkdown(text, QTextDocument.MarkdownFeature.MarkdownNoHTML)
@@ -353,7 +357,7 @@ class MessageDelegate(QStyledItemDelegate):
             header_height = QFontMetrics(font(14, True)).height() + 6
             available = max(0, rect.width() - 94)
             badge_width = 76 if message.decision else 0
-            delivery = message.delivery if message.delivery not in {"Sending…", "Retrying…"} else ""
+            delivery = message.delivery
             timestamp = delivery or (
                 message.time
                 + (" · edited" if message.edited else "")
@@ -437,13 +441,10 @@ class MessageDelegate(QStyledItemDelegate):
             elided = painter.fontMetrics().elidedText(
                 (
                     (
-                        "Voice message · "
-                        + (
-                            f"{playback.get('position', 0) // 1000}s / "
-                            f"{playback.get('duration', 0) // 1000}s"
-                            if active
-                            else "Play"
-                        )
+                        f"{playback.get('position', 0) // 1000}s / "
+                        f"{playback.get('duration', 0) // 1000}s"
+                        if active
+                        else "Play"
                     )
                     if voice
                     else message.attachment
@@ -859,7 +860,9 @@ class MessageView(QListView):
             QApplication.clipboard().setText(cursor.selectedText().replace("\u2029", "\n"))
             return
         if self.currentIndex().isValid():
-            QApplication.clipboard().setText(self.display_body(self.currentIndex().data(MESSAGE_ROLE)))
+            QApplication.clipboard().setText(
+                self.display_body(self.currentIndex().data(MESSAGE_ROLE))
+            )
 
     def _context_menu(self, position):
         index = self.indexAt(position)
@@ -869,9 +872,23 @@ class MessageView(QListView):
         if self.text_selection and self.text_selection[0] != index.data(MESSAGE_ROLE).id:
             self.text_selection = None
         menu = AppMenu(self)
-        if self.allow_threads and index.data(MESSAGE_ROLE).id != self.agent_message_id:
+        if (
+            self.allow_threads
+            and not index.data(MESSAGE_ROLE).delivery
+            and index.data(MESSAGE_ROLE).id != self.agent_message_id
+        ):
             menu.addAction("Reply in thread", lambda: self._request_thread(index))
         message = index.data(MESSAGE_ROLE)
+        if message.mine and message.delivery == "Sending…" and message.id.startswith("upload-"):
+            menu.addAction(
+                "Cancel upload",
+                lambda: self.action_requested.emit("cancel-local", message.id),
+            )
+        if message.mine and message.delivery and message.delivery not in {"Sending…", "Retrying…"}:
+            menu.addAction(
+                "Remove local message",
+                lambda: self.action_requested.emit("dismiss-local", message.id),
+            )
         if not message.unsent and not message.delivery and message.id != self.agent_message_id:
             reactions = AppMenu(menu)
             reactions.setTitle("React")

@@ -694,6 +694,16 @@ class Collaboration(QObject):
         menu.exec(self.more_button.mapToGlobal(self.more_button.rect().bottomLeft()))
 
     def action(self, action, identifier):
+        if action == "cancel-local":
+            connected = self.connected()
+            if connected:
+                connected.cancel_local_upload(identifier)
+            return
+        if action == "dismiss-local":
+            connected = self.connected()
+            if connected:
+                connected.dismiss_local_message(identifier)
+            return
         message = self.window._local_message(identifier)
         if not message:
             return
