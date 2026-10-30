@@ -3674,3 +3674,19 @@ translation needs authenticated workspace AI. Do not claim full offline public-s
 localization or live translation acceptance. Existing Stage 1 and deferred paid gates
 are unchanged. Also fixed a deleted Qt ChatPanel timer/callback lifetime error found
 in the pending protected-main CI; no test or branch protection was disabled.
+
+### October 30 — independent language-preference saving
+
+Live startup testing exposed continuous workspace synchronization occupying the
+shared account queue. A bounded queue wait avoided the original stuck button but
+could still time out, so it is superseded by a separate authenticated transport clone
+and worker for preferences. It does not overwrite or join the workspace inventory
+job. Only one language save runs per window, errors re-enable retry, and results
+cannot update another account or a destroyed dialog. The clone validates the same
+user and closes its transport after each save. No auth permissions are expanded.
+30 localization/profile checks cover busy refresh, provider error and session change.
+The final full and hosted suites gate merge. Website/backend cache correction is on
+main at 5120d55 and Live on existing staging. No migration, new credential, funding
+or purchase is needed. Native language-quality acceptance remains open until the
+corrected app is verified. Existing Stage 1 public-provider and audio gates remain
+OPEN; paid Claude/meeting gates stay deferred.

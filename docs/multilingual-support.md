@@ -75,3 +75,15 @@ hardening; 44 targeted localization/collaboration checks passed afterward. Full 
 suite 657 passed. Both source trees pass Ruff, whitespace and tracked credential checks.
 The browser preview verifies Hindi navigation and an explicit unavailable/original-text
 fallback for unsigned visitors; source IDs/URLs and form values are unchanged.
+
+## October 30 live follow-up
+
+Website/backend main includes the final cache correction at 5120d55 and is Live in
+staging. Translation scripts and every shipped locale catalog participate in the
+asset version, and locale fetches use that version. Website tests: 658 passed.
+Desktop initial final suite: 1063 passed. Live startup testing then found busy
+workspace synchronization could discard or starve a language save. Saving now uses
+an independent authenticated clone/worker, with one pending save per window and
+account/lifetime checks before applying results. 30 targeted localization/profile
+checks passed, including busy refresh, errors, and an account switch. The full/hosted
+candidate suites and the native language-quality check gate final acceptance.

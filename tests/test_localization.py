@@ -212,3 +212,55 @@ def test_ui_translation_is_plain_text_not_model_supplied_html(qtbot, tmp_path):
     widget.setToolTip("Continue")
     window.localizer.apply_value(widget, "toolTip", "setToolTip")
     assert "<img" not in widget.toolTip() and "&lt;img" in widget.toolTip()
+
+
+@pytest.mark.parametrize("outcome", ["success", "error", "switched"])
+def test_language_save_uses_isolated_transport_while_account_is_busy(qtbot, tmp_path, outcome):
+    import threading
+
+    from PySide6.QtWidgets import QAbstractButton
+
+    from aedrova.desktop.controls import ChoiceBox
+    from aedrova.desktop.localization import show_language_settings
+
+    window, source = setup(qtbot, tmp_path)
+    qtbot.wait(50)
+    qtbot.waitUntil(lambda: not window.account_dialog.busy)
+    entered, release = threading.Event(), threading.Event()
+    calls, closed = [], []
+    updated = SimpleNamespace(
+        id="u", user_metadata={"aedrova_language": "hi", "aedrova_translate": True}
+    )
+
+    def persist(language, enabled):
+        entered.set()
+        release.wait(3)
+        calls.append((language, enabled))
+        if outcome == "error":
+            raise RuntimeError("redacted fixture")
+
+    source.fork_for_context = lambda: SimpleNamespace(
+        user=updated, save_language_preference=persist, close_context=lambda: closed.append(True)
+    )
+    # This stays busy throughout: saving must never join or overwrite its job.
+    window.account_dialog.busy = True
+    dialog = show_language_settings(window)
+    dialog.findChild(ChoiceBox).setCurrentIndex(1)
+    save = next(b for b in dialog.findChildren(QAbstractButton) if b.text() == "Save")
+    save.click()
+    qtbot.waitUntil(entered.is_set)
+    assert not save.isEnabled() and window.account_dialog.busy
+    if outcome == "switched":
+        window.account_dialog.service = SimpleNamespace(user=SimpleNamespace(id="other"))
+    release.set()
+    qtbot.waitUntil(lambda: not window.language_save_pending, timeout=5000)
+    assert calls == [("hi", True)] and closed == [True]
+    assert window.account_dialog.busy
+    if outcome == "success":
+        assert window.localizer.language == "hi" and not dialog.isVisible()
+        assert source.user.user_metadata["aedrova_language"] == "hi"
+    else:
+        assert window.localizer.language == "en"
+        if outcome == "error":
+            assert save.isEnabled()
+    window.account_dialog.busy = False
