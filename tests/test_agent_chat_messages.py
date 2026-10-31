@@ -67,9 +67,44 @@ def test_long_agent_transcript_scrolls_to_last_response(qtbot, tmp_path):
     for number in range(12):
         window.agent_event(window.workspace_id, f"Update {number}: " + "Readable progress. " * 12)
     window.messages.scrollToBottom()
-    qtbot.wait(100)
     last = window.agent_feed.rows[-1].message
-    bottom = last.mapToGlobal(last.rect().bottomLeft()).y()
     viewport = window.messages.viewport()
-    assert bottom <= viewport.mapToGlobal(viewport.rect().bottomLeft()).y()
+    # Offscreen Windows delivers wrapped-label layout after the first 100 ms.
+    # Wait for the actual bottom geometry, retaining the same visibility check.
+    qtbot.waitUntil(
+        lambda: window.messages.verticalScrollBar().maximum() > 0
+        and last.mapToGlobal(last.rect().bottomLeft()).y()
+        <= viewport.mapToGlobal(viewport.rect().bottomLeft()).y()
+    )
     assert window.messages.verticalScrollBar().maximum() > 0
+
+
+def test_bottom_follow_survives_late_row_layout_but_respects_manual_scroll(qtbot, tmp_path):
+    from PySide6.QtWidgets import QAbstractSlider
+
+    window = AedrovaWindow(settings=QSettings(str(tmp_path / "ui.ini"), QSettings.Format.IniFormat))
+    qtbot.addWidget(window)
+    window.resize(900, 650)
+    window.show()
+    for number in range(8):
+        window.agent_event(window.workspace_id, f"Update {number}: " + "Readable progress. " * 12)
+    view = window.messages
+    bar = view.verticalScrollBar()
+    view.scrollToBottom()
+    qtbot.waitUntil(lambda: bar.maximum() > 0 and bar.value() == bar.maximum())
+    window.agent_feed.rows[-1].message.setText("Expanded response. " * 200)
+    view.doItemsLayout()
+    qtbot.waitUntil(lambda: bar.value() == bar.maximum())
+    last = window.agent_feed.rows[-1].message
+    qtbot.waitUntil(
+        lambda: (
+            last.mapToGlobal(last.rect().bottomLeft()).y()
+            <= view.viewport().mapToGlobal(view.viewport().rect().bottomLeft()).y()
+        )
+    )
+    bar.triggerAction(QAbstractSlider.SliderAction.SliderToMinimum)
+    assert bar.value() == 0
+    window.agent_feed.rows[-1].message.setText("Further response detail. " * 240)
+    view.doItemsLayout()
+    qtbot.wait(50)
+    assert bar.value() == 0

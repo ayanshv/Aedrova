@@ -3722,3 +3722,51 @@ Hosted CI additionally caught a delivery-grouping regression. Pending and acknow
 ### October 30 — minimal voice-message waveform
 
 Voice cards now show compact rounded waveform bars and mm:ss duration in both themes, retaining the existing play/pause control and no redundant Voice message heading. Playback progress uses the theme accent. Verified audio is sampled on explicit playback; unloaded messages use a neutral audio indicator, without downloading recordings just for decoration. Sample state clears with player/account scope. 25 focused voice/upload/send checks passed; light/dark actual Qt captures inspected in work/voice-waveforms. No backend changes, migrations, keys, payments or new owner setup. Stage 1 remaining: simultaneous-reader multilingual acceptance, Research follow-up, remaining provider lifecycle cases, and public Meta/Instagram/TikTok approval. Human audio clarity already passed; funded Claude and reliable two-device meetings remain deferred final gates.
+
+
+### October 30 — offline English/Hindi reader acceptance
+
+Owner requested only simultaneous English/Hindi readers, multilingual prompts and offline translation, then stop. Desktop translation now uses pinned CTranslate2/SentencePiece with verified English/Hindi model data, CPU workers and scoped caches; no translation inference API or cloud fallback. Clean installs have an explicit 209 MB language download. Packs were installed and real model inference verified locally. Two distinct staging identities read the same synthetic hosted messages concurrently, with independent languages and original toggles; multilingual prompts/mentions remained canonical. Fixtures archived for both identities. Socket-blocked native inference attempted zero connections. Prompt delivery/display and intent routing were checked; no new paid agent generation/build. English/Hindi only; unsupported desktop languages show originals and website translation is unchanged. Stage 1 remains OPEN for Research multi-turn follow-up, remaining connector lifecycle cases and public Meta/Instagram/TikTok approvals. Human audio clarity passed; paid Claude and reliable two-device meetings remain deferred final gates. See docs/multilingual-support.md and docs/staging-acceptance-2026-10-30.md. Do not begin another gate automatically.
+
+Verification: full desktop suite 1077 passed; 43 focused localization/agent/Bud checks passed after the context-preservation correction. The built Python wheel includes the pinned model manifest; packaging collection includes the local inference runtimes. Actual Windows installer/device acceptance remains in the later release phase.
+
+
+### October 30 — expanded offline languages and footer layout
+
+Expanded desktop localization to the complete 50-choice official bidirectional English model catalog, with per-language on-demand downloads, native names, RTL for Arabic/Urdu/Persian/Hebrew, BPE compatibility, English pivoting and a two-model memory bound. Packages are verified locally before pinning; no translation API fallback or provider funding is introduced. Website navigation catalogs expand separately, and the footer navigation spans the available width with readable columns. Full-page website AI translation remains metered and distinct. See docs/multilingual-support.md for precise coverage and limitations. No new owner credential, migration or purchase is required. Stage 1 remains OPEN for Research multi-turn follow-up, remaining connector expiry/refresh/revocation cases and public Meta/Instagram/TikTok approvals. Human voice clarity and simultaneous English/Hindi readers passed. Funded Claude builds and reliable two-device meetings remain deferred final paid gates; Stage 2 is not started.
+
+Expanded-catalog verification: all 98 packages pinned, 1,082 desktop checks passed plus catalog coverage; five representative real language models passed socket-blocked inference. Website: 52 static navigation choices, 658 existing checks plus catalog coverage passed. No inference API charges for desktop translation/static navigation.
+
+
+### October 30 — UI fixes inserted after staging acceptance
+
+Owner requested a dedicated pre-launch UI fixes step immediately after Stage 1. The timeline now has eight steps: staging acceptance; UI fixes/visual acceptance; security/recovery; production operations; minor and contained sizeable features; parallel Apple/installer preparation; final paid/commercial gates; packaging and launch. UI work is estimated at 1–2 working days; total estimate becomes 15–20 focused working days excluding external delays. This change records the plan only, does not close Stage 1, and does not authorize starting Stage 2. All payments remain owner-controlled final gates.
+
+
+### October 30 — Research multi-turn follow-up accepted
+
+Research follow-up gate CLOSED. Actual signed-in staging BudChat passed three hosted turns, reopening saved history before the ambiguous follow-up and retaining the named project, official sources and user correction. Six chronological messages persisted, with no Thinking-only residue. The owner approved an exact disposable-workspace Pro-policy exception for at most three turns/10 minutes/$0.50, without resetting counters or changing company caps. Actual usage was $0.070677. Free, allowance $0.50 and reserved zero verified afterward; grant disconnected and fixture archived. No new key, funding, payment, subscription or production change. See docs/research-followup-acceptance-2026-10-30.md. Stage 1 now remains OPEN for remaining connector lifecycle cases and public Meta/Instagram/TikTok approvals. Paid Claude and reliable two-device meetings remain deferred final gates. Stage 2 UI remains planned, not begun.
+
+The pending desktop merge also exposed a Windows late-layout transcript scrolling regression. Bottom-follow now survives later inline-row range changes and cancels on manual mouse/keyboard/scrollbar navigation. The existing visibility assertion remains intact; a new late-growth/manual-scroll regression passed. 17 chat/scroll checks and 9 Bud conversation checks passed locally; required cross-platform CI still gates merge.
+
+
+## October 30 — connector lifecycle acceptance
+
+Live refresh/read passed for GitHub, Figma, Stripe, TikTok, Instagram and Supabase;
+Notion's earlier live refresh/revocation/expiry evidence is retained. Vercel's legacy
+installation token correctly required reconnect on induced expiry, and a fresh existing-
+installation OAuth flow restored reads. Actual provider-side revocation denied subsequent
+reads for the newly tested providers; Vercel's termination acknowledgment was explicitly
+approved by the owner. Local disconnect denial and catalog-wide controlled expiry,
+concurrency and no-resurrection checks passed. Managed Search has no customer OAuth grant.
+
+Fixed the Figma refresh endpoint, HTTP-200 OAuth errors and Supabase revoked-refresh 404
+classification. 115 targeted backend checks passed. Updated a Windows CI geometry test
+to await the actual asynchronous layout condition instead of assuming it finishes in
+100 ms; the same visibility requirement remains, and five local chat checks passed.
+No owner payment, model call, secret generation or public-provider approval occurred.
+See [full evidence and cleanup](connector-lifecycle-acceptance-2026-10-30.md).
+
+Stage 1 remains OPEN only for public Meta/Instagram verification/App Review and TikTok
+demo/Production review, plus required release CI before source promotion. No Stage 2 UI
+work started. Funded Claude and reliable two-device meetings remain final paid gates.

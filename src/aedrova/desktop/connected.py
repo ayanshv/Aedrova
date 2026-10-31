@@ -9,6 +9,7 @@ from uuid import uuid4
 from PySide6.QtCore import QEvent, QObject, Qt, QThreadPool, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QApplication, QFileDialog
+from shiboken6 import isValid
 
 from aedrova.desktop.conversation import MESSAGE_ROLE
 from aedrova.desktop.conversation_picker import choose_conversation
@@ -382,6 +383,12 @@ class ConnectedDashboard(QObject):
         return True
 
     def refresh(self):
+        # A queued refresh can outlive the account dialog during window teardown.
+        if not isValid(self) or not isValid(self.window) or not isValid(self.account):
+            if isValid(self):
+                self.active = False
+                self.timer.stop()
+            return
         if (
             not self.active
             or self.account.busy

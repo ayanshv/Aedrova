@@ -179,3 +179,20 @@ def test_server_snapshot_loads_private_attachment_preview(qtbot, tmp_path):
         timeout=5000,
     )
     assert window.messages.attachment_previews["attachment"] == "Private staging preview"
+
+
+def test_queued_refresh_after_account_destruction_stops_without_network(qtbot, tmp_path):
+    from unittest.mock import Mock
+
+    from PySide6.QtCore import QCoreApplication, QEvent, QTimer
+
+    window, _ = setup(qtbot, tmp_path)
+    controller, account = window.connected, window.account_dialog
+    account.run = Mock()
+    controller.timer.start()
+    QTimer.singleShot(0, controller.refresh)
+    account.deleteLater()
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    qtbot.waitUntil(lambda: not controller.active)
+    assert not controller.timer.isActive()
+    account.run.assert_not_called()

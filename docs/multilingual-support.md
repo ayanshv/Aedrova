@@ -1,3 +1,25 @@
+# Current desktop translation — October 30, 2026
+
+The desktop catalog offers 50 language and regional choices. Each non-English choice has a pinned English↔language pair; non-English conversations pivot through English. English and Hindi remain the default first choices. The catalog includes European, South Asian, East Asian, Middle Eastern and African languages, with Brazilian Portuguese and Traditional Chinese variants. Arabic, Urdu, Persian and Hebrew use right-to-left layouts.
+
+Translation runs on the device through CTranslate2 with SentencePiece or Moses/BPE tokenizers. It makes no translation inference API request and has no paid cloud fallback. Normal account sync and saving preferences still use the authenticated backend. Agent generation retains normal AI usage policies.
+
+Open View → Language & translation, choose a display language, and download its language pack. Download size is shown before installation. English readers can separately choose source-language packs to read teammates’ foreign messages. Only selected pairs download; packs are not bundled into every installer. Existing English/Hindi packs stay usable. Each device needs its own packs and disk space; installation needs internet once. Missing packs keep original text visible.
+
+Official Argos package data is pinned by compressed length and SHA-256 and extracted as bounded data only. Model metadata and tokenizer variants are respected. CPU inference runs off the UI thread, with at most two loaded model engines and reader-scoped caches. Code, mentions, URLs, Aedrova/Buds brand names and canonical source text are protected. Show original remains available. Language detection and translation quality are probabilistic; native-speaker review of all languages has not been performed. Short or ambiguous text can be misidentified. Unreliable output falls back to originals.
+
+Public website navigation has static locale catalogs and no inference charge. This is navigation coverage, not human-verified translation of every public/legal page. Signed-in full-page website translation remains the separate metered backend feature. No claim of free unlimited AI inference or legally authoritative translated text is made.
+
+## Verification of the expanded catalog
+
+Every advertised non-English desktop choice must have both verified data packages in models.json. All 98 official model archives were verified locally and pinned. The expanded desktop suite passed 1,082 checks; the separate full-catalog coverage check passed afterward. Five real models (Spanish, French, Danish/BPE, Japanese and Korean) translated a synthetic sentence with socket connections blocked and zero network attempts. Local checks cover selected-pair-only downloads, checksum failure, bounded extraction/path traversal, BPE installation, pivoting through English, original preservation and simultaneous reader isolation. The publisher rejected GitHub runner downloads with HTTP 403, so package verification ran locally; the standalone verification script is retained. Existing required desktop/RLS CI is unchanged. Clean-machine Windows/macOS installer and native-speaker review remain release work.
+
+## Acceptance
+
+Two distinct staging identities read the same synthetic hosted conversation concurrently, with English/Hindi display preferences, actual local model inference, and original toggles. Multilingual prompt text and mentions remained unchanged in hosted history. Synthetic workspaces were archived for both test identities; no preference overwrites or paid entitlements were needed. Local inference was separately exercised with socket connections blocked: zero network connections were attempted. This check covers prompt delivery/display and existing multilingual intent routing; no new billable agent generation or build was run.
+
+## Historical API implementation (superseded for desktop)
+
 # Per-reader languages — October 29, 2026
 
 ## Behavior
