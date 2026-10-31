@@ -3909,3 +3909,61 @@ Funded Claude and reliable two-device meetings stay deferred final launch gates.
 Production Buffer callback/client enablement, further platform acceptance,
 security/recovery, operations/deletion, Apple sign-in/installers and final
 commercial activation retain their own gates. No Stage 2 or payment was started.
+
+## October 31 — Stage 2 started: owner-directed UI fixes
+
+Owner approved Stage 2 and will supply specific fixes one at a time. After each
+completed fix, ask for the next fix; do not expand into an unsolicited redesign.
+The preceding final candidate checks passed and merged (app aaa5aa1, backend
+1d7334e); checked Buffer backend d6873cb is live on staging. Deferred funded Claude
+and reliable two-device meetings retain their final launch gates.
+
+Fix 1: added custom 16px outline icons to composer permissions: review/question
+bubble for Ask for approval, shield/check for Approve for me, open lock for Full
+access. Icons appear in the selected control and menu, including thread composers,
+and recolor on theme changes. Scoped compact-control padding fixes the icon/text
+clipping revealed by visual review. Permission values, confirmation and execution
+gates are unchanged. Existing permission suite: 28 passed; Python lint passed;
+actual controls rendered and reviewed in light and dark themes. Preview:
+work/stage2-permission-icons/permissions-light-dark.png.
+This is a local Stage 2 UI iteration; no hosted deployment or payment was made.
+Remaining Stage 2 work: the owner's next supplied UI fixes and final visual review
+of the combined candidate. No personal setup action is needed for this fix.
+
+Stage 2 fix 2: removed the initials painted beneath the transparent agent brand
+mark, so no A shows through its center. Human avatars retain their initials.
+Changed the conversation header suffix and streaming-message badge from AI to
+Agent, including the badge's accessible label. Existing agent conversation tests:
+5 passed; Python lint and diff checks passed. Local UI iteration, no deployment
+or personal setup required. Await the owner's next specific UI fix; combined
+light/dark visual acceptance remains part of Stage 2.
+
+Stage 2 fix 3: replaced the sidebar Invite teammates text button with an aligned
+44px icon-only row: Invite teammates, Workspace settings and Connectors. Reused
+the existing native outline icon family, theme recoloring, hover/focus styles,
+accessible names and tooltips. Existing account/manage/connector handlers remain
+in use. Removed those three duplicate entries from the profile menu; personal
+Settings, Edit profile and Log out remain there. Preserved the invite button's
+onboarding target. The existing workspace-action routing test passed with all
+three shortcuts; actual light/dark rendering and signed-in profile-menu contents
+were also verified. Local iteration; no hosted deployment or personal setup.
+Remaining Stage 2 work: the owner's next fix and combined visual acceptance.
+
+November 1 — Stage 2 fix 4: repaired @-menu keyboard navigation for native macOS
+arrow events carrying Qt's KeypadModifier. Up/Down move between selectable entries,
+skip headings, wrap and scroll the chosen entry into view; Enter/Tab inserts the
+mention without sending. Active-picker keys are reserved before window shortcuts,
+so Escape dismisses the menu first. Editor focus and ordinary shortcuts remain
+available when the picker is closed. Added accessible keyboard guidance. Mention
+picker/routing/chat regression suites: 30 passed, including native-modifier and
+Escape-shortcut regressions. Python lint/diff checks passed. Local Stage 2
+iteration; no deployment, payment or personal setup required. Remaining: owner's
+next specific UI fix and combined visual acceptance.
+
+November 1 — Stage 2 fix 5: updated the brand motto to “Your team, plus Agents”
+across Bud setup, website footer/product/plans metadata, Hindi navigation copy and
+self-contained outage-page source. Updated editable investor/demo collateral
+sources; existing exported videos/images are historical captures, not regenerated.
+Website publishing and relevant checks are being completed for this copy update.
+Remaining Stage 2 work: owner's next UI fix and combined visual acceptance.
+No personal setup or payment is needed for the source changes.
