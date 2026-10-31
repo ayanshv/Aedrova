@@ -3967,3 +3967,10 @@ sources; existing exported videos/images are historical captures, not regenerate
 Website publishing and relevant checks are being completed for this copy update.
 Remaining Stage 2 work: owner's next UI fix and combined visual acceptance.
 No personal setup or payment is needed for the source changes.
+
+Motto release verification: website PR #43 passed both CI checks, merged into main
+(9f4b426), and deployed successfully on the existing Render production service.
+Home/plans/product/Hindi copy and branded HTML errors show the new motto live.
+Desktop CI exposed an older account-menu test still expecting shortcuts moved to
+the sidebar by fix 3; updated it to assert the new placement and real routing.
+No owner action is required.

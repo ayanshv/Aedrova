@@ -23,8 +23,11 @@ def test_account_menu_routes_real_actions(qtbot, tmp_path):
     assert window.profile_button.text() == "TP"
     actions = {a.text(): a for a in window.profile_menu.actions()}
     assert not actions["person@example.test"].isEnabled()
-    actions["Workspace settings…"].trigger()
-    actions["Invite teammates…"].trigger()
+    assert "Workspace settings…" not in actions
+    assert "Invite teammates…" not in actions
+    window.profile_menu.close()
+    window.workspace_settings_button.click()
+    window.invite_button.click()
     assert calls == ["manage", "invite"]
     assert "Log out" in actions
     window.profile_menu.close()
