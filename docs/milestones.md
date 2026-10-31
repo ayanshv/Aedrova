@@ -3882,3 +3882,12 @@ The new Buffer path supersedes direct Meta/TikTok public review as the primary
 publishing dependency; legacy public approvals themselves remain unverified.
 Stage 1 remains open until those final candidate checks are recorded. Paid Claude
 and reliable two-device meetings remain final deferred gates; Stage 2 not started.
+
+
+October 31 cleanup: live local disconnect, denied reuse of the disconnected grant,
+Bud removal/private social-draft cleanup and disposable workspace archival passed.
+The real scheduled post was already deleted in Buffer; its queue was verified zero.
+Provider-side test-authorization revocation is being verified separately. Source
+for the main integration merged as app 0ca4146 and backend 2c03fc2; Instagram
+metadata correction merged as 4cb73b8. Final status compatibility/display commits
+are in required CI; no payments, production enablement or public test delivery.

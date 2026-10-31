@@ -24,6 +24,9 @@ production publishing enablement, customer personal token or public delivery.
   repeated the approved operation successfully.
 - A repeated dispatch returned the same provider post ID. Buffer showed exactly
   one queue entry; its read API reported `scheduled` with the exact UTC due time.
+- Local disconnect removed the channel from Aedrova. A fresh draft using that
+  disconnected grant was rejected. Removing the disposable Bud also purged its
+  private social records, and the test workspace was archived.
 - Owner-approved removal deleted only that scheduled test. Buffer queue returned
   to zero. It was never publicly delivered. No other social posts were changed.
 
