@@ -125,3 +125,12 @@ def test_current_provider_scheduled_state_is_clear(social):
     dialog.checked(row)
     assert "scheduled in Buffer" in dialog.status.text()
     assert "unavailable" not in dialog.status.text()
+
+
+def test_no_channels_has_actionable_buffer_setup(social):
+    dialog, _ = social
+    dialog.loaded(({"channels": []}, {"posts": []}, {"available": True}))
+    dialog.update_controls()
+    assert dialog.channel_setup.isVisible()
+    assert not dialog.selection_button.isEnabled()
+    assert "refresh here" in dialog.status.text()

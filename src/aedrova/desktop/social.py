@@ -59,7 +59,17 @@ class SocialDialog(AppDialog):
         self.channel_list = QListWidget()
         self.channel_list.setAccessibleName("Social publishing channel permissions")
         channel_layout.addWidget(self.channel_list, 1)
+        self.channel_setup = label(
+            '<a href="https://publish.buffer.com/settings/channels">'
+            "Connect social profiles in Buffer ↗</a>",
+            "muted",
+            wrap=True,
+        )
+        self.channel_setup.setTextFormat(Qt.TextFormat.RichText)
+        self.channel_setup.setOpenExternalLinks(True)
+        channel_layout.addWidget(self.channel_setup)
         select = button("Save channel selection", role="primary")
+        self.selection_button = select
         select.clicked.connect(self.select_channels)
         channel_layout.addWidget(select)
         self.pages.addTab(channels_page, "Accounts")
@@ -149,6 +159,8 @@ class SocialDialog(AppDialog):
         self.pages.setEnabled(self.available and not self.pending and self.job is None)
         self.reload_button.setEnabled(not self.pending and self.job is None)
         self.due.setVisible(self.mode.currentData() == "schedule")
+        self.selection_button.setEnabled(bool(self.channels))
+        self.channel_setup.setVisible(self.available and not self.channels)
 
     def scope(self):
         return {"workspace": self.workspace, "dot": self.bud["id"]}
@@ -209,7 +221,8 @@ class SocialDialog(AppDialog):
         self.post_list.setCurrentIndex(index)
         self.load_post()
         self.status.setText(
-            "Choose channels in Accounts to get started."
+            "Connect Buffer above, then add social profiles using the link in Accounts "
+            "and refresh here."
             if not self.destination.count()
             else "Choose a draft or create something new."
         )
