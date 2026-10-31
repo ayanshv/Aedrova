@@ -285,7 +285,7 @@ def test_every_specialty_has_curated_tools_without_fake_access(editor):
     expected = {
         "builder": ("GitHub — owner setup required", "Supabase — coming next"),
         "designer": ("Figma — coming next", "Notion — coming next"),
-        "marketing": ("Instagram — coming next", "TikTok — coming next"),
+        "marketing": ("Buffer — coming next",),
         "finance": ("Stripe — coming next", "QuickBooks"),
         "research": ("AI model — uses workspace AI access", "Web search — coming next"),
         "product": ("Notion — coming next", "PostHog"),

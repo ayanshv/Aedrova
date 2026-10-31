@@ -97,3 +97,130 @@ documents, new business account, new agreement or public submission completed.
 The review page is preserved. TikTok actual 1024px mark uploaded; the remaining Save validation error
 is the missing genuine demo video. No false demo, production callback, public
 permission grant or final agreement was submitted. Draft fields are not claimed saved.
+
+
+## October 31 — portfolio created; public approval still blocked
+
+Owner explicitly approved the prepared Meta portfolio creation. Meta confirmed
+“Aedrova was created”; portfolio 4669825286497673 is linked to app
+3077883259220045. This creates a Meta administrative portfolio, not a corporation.
+The app remains Unpublished, the portfolio Unverified, and access verification
+is disabled until business verification completes.
+
+Verification was opened without selecting a legal business type. The owner must
+privately confirm the actual country, business structure, legal operator and
+any required supporting information/documents in Meta Business Suite → Settings
+→ Security Center → Verification for Aedrova. Do not infer a corporation,
+partnership or sole proprietorship from the brand or team roles. The previously
+deferred registration and operator placeholder remain unchanged.
+
+TikTok Production draft now contains the prepared Productivity description,
+policy URLs, Desktop selection, Login Kit, user.info.basic and video.list.
+The actual 1024×1024 mark was uploaded. Save still reports validation errors:
+a genuine end-to-end demo video and a Desktop redirect URI are missing. These
+in-browser fields are UNSAVED; they are not a submitted review. Do not use
+sandbox credentials as production credentials or register an unreviewed final
+callback just to satisfy validation. Both provider tabs are preserved.
+
+An isolated real staging desktop workspace was opened for the demonstration,
+without mocked connector data or model calls. Native automation currently selects
+the older installed staging window instead of this Python window. Owner action:
+bring “Aedrova — Provider review demo” to the front. Recording the actual connect,
+consent, profile/video read and disconnect flow remains blocked until that window
+can be controlled. No fabricated review video was uploaded.
+
+Release CI exposed a queued refresh callback accessing a destroyed account dialog.
+Commit 4336ca0 stops the controller/timer before touching deleted Qt objects; a
+regression queues the callback after actual deferred deletion. 33 focused checks
+passed. Required hosted desktop and PostgreSQL checks still gate source merge;
+record the final CI/merge result before claiming release CI complete.
+
+No payment, new production credential, legal registration, private business document
+submission, public provider approval or Stage 2 work occurred.
+
+
+October 31 continuation: all eight hosted checks at 4336ca0 passed, including both
+Ubuntu/macOS/Windows runs and PostgreSQL RLS. PR #8 merged normally as
+904f3dc6c52cbfc6cca2931e0ab1cf036b2f57a9. Release CI/source merge is CLOSED for this
+candidate; main-push checks and installer/device gates remain separate.
+
+The owner asked about avoiding personal verification data. No verification details
+were submitted. The current Meta screen has no skip path for this public-access
+route. Options are to retain approved-account testing or explicitly defer public
+Instagram availability; neither constitutes public approval. Business verification
+remains an external gate if public Instagram is included at launch.
+
+The dedicated local source-only Aedrova Review Demo bundle is now accessible to
+native automation. Existing Google session completed sign-in; welcome/setup was
+skipped through real UI controls, and isolated workspace “Aedrova Review Demo 12e1”
+is open at Bud setup. No model call, new grant, payment or public submission occurred
+in opening the demo. Genuine TikTok recording is still pending.
+
+
+The real UI configured Social Review (Marketing) in the isolated demo workspace,
+then used TikTok → Connect your account. The hosted identity handoff accepted the
+existing staging Google account and reached Safari’s TikTok login page. No active
+TikTok session is available there. Owner must sign in as @aedrova, leave consent
+open, and stop on any attempt limit. No TikTok consent, read-result demo, video
+upload or public submission is claimed for this attempt. The demo app remains open.
+
+
+October 31 signed-in continuation: Safari’s own Profile link identifies @aedrova5.
+The matching sandbox’s public client key was compared to the real authorization
+request and matched; its Target Users table contains only @aedrova. The fresh
+authorization returned access_denied/non_sandbox_target, not an attempt-limit error.
+No blind retry or successful demo was claimed. Add account → Connect TikTok account
+is prepared; owner was asked for action-time approval to link @aedrova5, or to
+switch Safari to the already registered @aedrova account. No tester was added yet.
+Evidence: work/provider-reviews-oct31/tiktok-add-tester-confirmation.png.
+
+
+October 31 approved tester link: owner explicitly approved linking @aedrova5.
+Continue was clicked on the prepared Add account dialog. The in-app browser did
+not expose its popup, so the same authenticated developer sandbox was opened in
+Safari. Safari's Add account → Continue opened TikTok's deliberate logout/fresh-
+login flow. Its Last login indicator was Google; Continue with Google reached an
+existing-account chooser. No Google identity was guessed because the required
+TikTok handle is @aedrova5 and the chooser does not establish email-to-handle
+ownership. Owner was asked to select that account and leave confirmation open.
+The tester link is NOT yet verified complete; no new consent/payment/public
+submission is claimed. Prior specific approval remains valid for this exact link.
+
+
+October 31 — tester account access unavailable: owner reported no longer having
+access to the account needed by the fresh @aedrova5 tester-link login. Stop this
+linking attempt; do not guess another Google identity, bypass account checks or
+claim the tester was added. No completed link was verified. TikTok demo/public
+review is blocked until the owner identifies an accessible TikTok account for an
+explicit tester grant, recovers the intended account through the provider, or
+explicitly defers public TikTok availability. No recovery request, account change,
+payment or public submission was made. Meta verification remains separately open;
+release CI at 4336ca0 passed and PR #8 merged as 904f3dc6.
+
+
+## October 31 — Marketing Bud publishing architecture transition
+
+Owner requested Buffer as the primary publishing provider, replacing the need
+for each customer to configure Meta/TikTok developer apps. Historical direct
+read-connector evidence above remains accurate; no public approval was fabricated.
+The new primary workflow uses encrypted server OAuth, explicit channel selection,
+editable drafts, exact-content approval and durable at-most-once dispatch.
+See docs/marketing-social-buffer.md for API findings, limitations and deployment.
+
+Buffer confidential staging app creation and staging credential storage/deployment
+were explicitly approved. The app was created and generated credentials were
+saved in ignored private configuration and Render staging (save-only; deployment
+waits for tests/CI). No payment or public test post occurred. The operator's
+Buffer account currently has zero social channels. Owner must connect an actual
+profile in Buffer, then approve exact content/channel/time for real publication
+acceptance. No customer personal API keys are requested. OAuth analytics are
+unsupported and clearly unavailable. Production publishing defaults disabled.
+
+Stage 1 remains OPEN pending real Buffer login/channel/publishing/status/lifecycle
+acceptance and release CI for this new candidate. Direct Meta/TikTok public review
+is deferred for legacy direct connectors, no longer a dependency of the new
+Buffer publishing path. Research multi-turn, offline English/Hindi readers,
+prior connector lifecycle, Bud caps, fresh onboarding, bounded OpenAI build and
+owner-confirmed audio clarity retain their recorded passes. Funded Claude builds
+and reliable two-device meetings remain deferred final paid/setup gates. Stage 2
+UI polish must follow Stage 1 and requires owner approval.

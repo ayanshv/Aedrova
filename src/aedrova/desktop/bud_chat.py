@@ -41,6 +41,12 @@ class BudChat(AppDialog):
         settings = button("Configure", "Configure " + bud["name"], "outline")
         settings.clicked.connect(self.configure)
         header.addWidget(settings)
+        from aedrova.dots.roles import role_for
+
+        if role_for(bud.get("role", "")) == "marketing":
+            social = button("Social", "Social accounts, drafts and publishing", "outline")
+            social.clicked.connect(self.open_social)
+            header.addWidget(social)
         close = button("Close", role="outline")
         close.clicked.connect(self.reject)
         header.addWidget(close)
@@ -123,6 +129,12 @@ class BudChat(AppDialog):
 
         self.reject()
         open_dots(self.host, self.bud["id"])
+
+    def open_social(self):
+        from aedrova.desktop.social import SocialDialog
+
+        self.social_dialog = SocialDialog(self)
+        self.social_dialog.show()
 
     def waiting(self, active):
         self.busy = active
