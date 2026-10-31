@@ -3891,3 +3891,21 @@ Provider-side test-authorization revocation is being verified separately. Source
 for the main integration merged as app 0ca4146 and backend 2c03fc2; Instagram
 metadata correction merged as 4cb73b8. Final status compatibility/display commits
 are in required CI; no payments, production enablement or public test delivery.
+
+
+October 31 final Buffer lifecycle receipt: the provider-side Aedrova Staging test
+authorization was revoked in Buffer Connected Apps and its entry disappeared.
+The underlying Instagram channel remains connected. Primary Buffer live acceptance
+is CLOSED for Instagram scheduling: authorization, organization/channel retrieval,
+selected-channel draft review, exact approval, approval invalidation, single-use
+refresh rotation, real scheduling, retry deduplication, local/provider revocation
+and fixture cleanup passed. The test was scheduled, then deleted before delivery;
+no actual public-delivery or every-network format pass is implied. OAuth analytics
+are unavailable by provider policy, explicitly disclosed rather than simulated.
+Required final status fixes are tracked by app PR #10 and website PR #42; merge
+and staging deployment must use passing checks. Once those candidate checks pass,
+the non-funded Stage 1 scope is ready for the owner to approve Stage 2 UI work.
+Funded Claude and reliable two-device meetings stay deferred final launch gates.
+Production Buffer callback/client enablement, further platform acceptance,
+security/recovery, operations/deletion, Apple sign-in/installers and final
+commercial activation retain their own gates. No Stage 2 or payment was started.

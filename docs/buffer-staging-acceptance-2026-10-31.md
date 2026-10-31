@@ -27,6 +27,8 @@ production publishing enablement, customer personal token or public delivery.
 - Local disconnect removed the channel from Aedrova. A fresh draft using that
   disconnected grant was rejected. Removing the disposable Bud also purged its
   private social records, and the test workspace was archived.
+- Revoked the disposable Aedrova Staging grant in Buffer Connected Apps. Its
+  connected-app entry disappeared; the Instagram channel itself remains connected.
 - Owner-approved removal deleted only that scheduled test. Buffer queue returned
   to zero. It was never publicly delivered. No other social posts were changed.
 
