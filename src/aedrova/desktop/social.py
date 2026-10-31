@@ -348,7 +348,10 @@ class SocialDialog(AppDialog):
     def checked(self, row):
         state = row.get("provider_status") or row["state"]
         title = {
-            "buffer": "Queued in Buffer",
+            "buffer": "Last confirmed: queued in Buffer",
+            "scheduled": "Last confirmed: scheduled in Buffer",
+            "published": "Last confirmed: published",
+            "failed": "Buffer reported a publishing failure",
             "sent": "Published",
             "draft": "Draft",
             "approved": "Approved · ready for your final action",

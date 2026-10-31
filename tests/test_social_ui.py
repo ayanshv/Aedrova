@@ -117,3 +117,11 @@ def test_provider_rejection_is_visible_when_opening_draft(social):
     assert "Not submitted" in dialog.status.text()
     assert "Check Instagram media format" in dialog.status.text()
     assert not calls
+
+
+def test_current_provider_scheduled_state_is_clear(social):
+    dialog, _ = social
+    row = {**approved(), "state": "submitted", "provider_status": "scheduled"}
+    dialog.checked(row)
+    assert "scheduled in Buffer" in dialog.status.text()
+    assert "unavailable" not in dialog.status.text()
