@@ -8,7 +8,13 @@ Stage 1 remains OPEN. Previously passed: fresh onboarding, bounded OpenAI build/
 
 ## 1. Finish staging acceptance — Days 1–3
 
-Passed: live Bud-cap/downgrade checks, uploads/voice transport, human audio clarity, Research three-turn conversation/follow-up/correction, and simultaneous English/Hindi reader/prompt display with offline models. Connector lifecycle acceptance also passed; see connector-lifecycle-acceptance-2026-10-30.md. Remaining: public Meta/Instagram/TikTok review.
+Passed: live Bud-cap/downgrade checks, uploads/voice transport, human audio clarity, Research three-turn conversation/follow-up/correction, and simultaneous English/Hindi reader/prompt display with offline models. Connector lifecycle acceptance also passed; see connector-lifecycle-acceptance-2026-10-30.md. The owner subsequently selected Buffer as the primary social publishing path.
+Real Instagram scheduling, approval, duplicate prevention, refresh and revocation
+acceptance passed on October 31; see buffer-staging-acceptance-2026-10-31.md.
+Direct Meta/TikTok public approvals remain unverified for legacy read connectors
+and no longer block this new path. Remaining candidate status-fix CI/deployment
+must pass before the non-funded Stage 1 scope exits. Funded Claude and reliable
+two-device meetings remain deferred final launch gates.
 
 Exit: evidence for each advertised flow; unresolved features held back from launch.
 

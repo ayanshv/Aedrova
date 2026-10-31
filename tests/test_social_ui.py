@@ -107,3 +107,30 @@ def test_social_review_is_readable_in_both_themes(social, theme, qtbot):
     assert dialog.primary.isVisible() and dialog.primary.width() >= 44
     assert dialog.destination.isVisible()
     assert not dialog.grab().isNull()
+
+
+def test_provider_rejection_is_visible_when_opening_draft(social):
+    dialog, calls = social
+    row = {**approved(), "state": "rejected", "error": "Check Instagram media format."}
+    dialog.post_list.addItem("Rejected draft", row)
+    dialog.post_list.setCurrentIndex(1)
+    assert "Not submitted" in dialog.status.text()
+    assert "Check Instagram media format" in dialog.status.text()
+    assert not calls
+
+
+def test_current_provider_scheduled_state_is_clear(social):
+    dialog, _ = social
+    row = {**approved(), "state": "submitted", "provider_status": "scheduled"}
+    dialog.checked(row)
+    assert "scheduled in Buffer" in dialog.status.text()
+    assert "unavailable" not in dialog.status.text()
+
+
+def test_no_channels_has_actionable_buffer_setup(social):
+    dialog, _ = social
+    dialog.loaded(({"channels": []}, {"posts": []}, {"available": True}))
+    dialog.update_controls()
+    assert dialog.channel_setup.isVisible()
+    assert not dialog.selection_button.isEnabled()
+    assert "refresh here" in dialog.status.text()
