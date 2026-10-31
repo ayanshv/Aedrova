@@ -161,7 +161,7 @@ def build_setup(d, window):
 
     welcome = page(
         "Set up your Buds",
-        "Your team, plus AI.\nA few thoughtful choices. A teammate that feels yours.",
+        "Your team, plus Agents.\nA few thoughtful choices. A teammate that feels yours.",
         centered=True,
     )
     welcome.addStretch(1)

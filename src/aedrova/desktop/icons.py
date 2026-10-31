@@ -2,7 +2,7 @@
 
 from PySide6.QtCore import QRectF, QSize, Qt
 from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap
-from PySide6.QtWidgets import QAbstractButton
+from PySide6.QtWidgets import QAbstractButton, QComboBox
 
 SYMBOLS = {
     "+": "plus",
@@ -118,6 +118,45 @@ def icon(name, color):
         path.quadTo(2, 3, 2, 4)
         path.closeSubpath()
         p.drawPath(path)
+    elif name == "permission_ask":
+        # A small review bubble: a question, rather than an alarming warning.
+        path = QPainterPath()
+        path.moveTo(6, 15)
+        path.lineTo(3, 17)
+        path.lineTo(3, 6)
+        path.quadTo(3, 3, 6, 3)
+        path.lineTo(14, 3)
+        path.quadTo(17, 3, 17, 6)
+        path.lineTo(17, 12)
+        path.quadTo(17, 15, 14, 15)
+        path.closeSubpath()
+        p.drawPath(path)
+        question = QPainterPath()
+        question.moveTo(8, 7)
+        question.cubicTo(8, 4, 13, 5, 12, 8)
+        question.quadTo(10, 9, 10, 10)
+        p.drawPath(question)
+        p.drawPoint(10, 12)
+    elif name == "permission_auto":
+        path = QPainterPath()
+        path.moveTo(10, 2)
+        path.lineTo(17, 5)
+        path.lineTo(16, 11)
+        path.quadTo(15, 15, 10, 18)
+        path.quadTo(5, 15, 4, 11)
+        path.lineTo(3, 5)
+        path.closeSubpath()
+        p.drawPath(path)
+        p.drawLine(7, 10, 9, 12)
+        p.drawLine(9, 12, 13, 8)
+    elif name == "permission_full":
+        p.drawRoundedRect(QRectF(4, 9, 12, 9), 2, 2)
+        shackle = QPainterPath()
+        shackle.moveTo(8, 9)
+        shackle.lineTo(8, 6)
+        shackle.cubicTo(8, 1, 16, 1, 16, 6)
+        p.drawPath(shackle)
+        p.drawLine(10, 12, 10, 15)
     elif name == "check":
         p.drawLine(4, 10, 8, 14)
         p.drawLine(8, 14, 16, 5)
@@ -195,3 +234,8 @@ def refresh(root, theme):
         if name:
             color = theme.primary_text if button.property("role") == "primary" else theme.secondary
             button.setIcon(icon(name, color))
+
+    for control in root.findChildren(QComboBox):
+        for index, name in enumerate(control.property("itemIconNames") or []):
+            if index < control.count():
+                control.setItemIcon(index, icon(name, theme.secondary))

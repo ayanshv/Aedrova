@@ -338,7 +338,10 @@ class MessageDelegate(QStyledItemDelegate):
             painter.drawRoundedRect(QRectF(x, y, 34, 34), 12, 12)
             painter.setPen(QColor(t.text))
             painter.setFont(font(11, True))
-            painter.drawText(QRectF(x, y, 34, 34), Qt.AlignmentFlag.AlignCenter, message.initials)
+            if not message.agent:
+                painter.drawText(
+                    QRectF(x, y, 34, 34), Qt.AlignmentFlag.AlignCenter, message.initials
+                )
             if message.agent:
                 from aedrova.desktop.brand import brand_image
 
@@ -373,7 +376,7 @@ class MessageDelegate(QStyledItemDelegate):
                 0,
                 min(
                     QFontMetrics(font(14, True)).horizontalAdvance(
-                        message.author + (" · AI" if message.agent else "")
+                        message.author + (" · Agent" if message.agent else "")
                     )
                     + 4,
                     available - time_width - badge_width - 12,
@@ -385,7 +388,7 @@ class MessageDelegate(QStyledItemDelegate):
                 QRectF(x, y, name_width, header_height - 6),
                 line_flags,
                 painter.fontMetrics().elidedText(
-                    message.author + (" · AI" if message.agent else ""),
+                    message.author + (" · Agent" if message.agent else ""),
                     Qt.TextElideMode.ElideRight,
                     int(name_width),
                 ),
@@ -1232,6 +1235,7 @@ class MessageEditor(QPlainTextEdit):
     submitted = Signal()
     focus_changed = Signal(bool)
     completion = None
+    completion_active = None
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1246,6 +1250,26 @@ class MessageEditor(QPlainTextEdit):
         self.focus_changed.emit(False)
 
     def event(self, event):
+        # Reserve active-picker keys before window shortcuts (notably Escape).
+        # Cocoa also marks physical arrow keys as keypad keys.
+        if (
+            event.type() == QEvent.Type.ShortcutOverride
+            and self.completion
+            and self.completion_active
+            and self.completion_active()
+            and not (event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier)
+            and event.key()
+            in (
+                Qt.Key.Key_Up,
+                Qt.Key.Key_Down,
+                Qt.Key.Key_Escape,
+                Qt.Key.Key_Tab,
+                Qt.Key.Key_Return,
+                Qt.Key.Key_Enter,
+            )
+        ):
+            event.accept()
+            return True
         # QWidget handles Tab traversal before keyPressEvent. Complete an active
         # mention here, while keeping ordinary Tab/Shift Tab focus navigation.
         if (
@@ -1307,11 +1331,15 @@ class Composer(QFrame):
         self.suggestion.hide()
         self.suggestion.clicked.connect(self.complete_mention)
         self.editor.completion = self.completion_key
+        self.editor.completion_active = lambda: not self.suggestion.isHidden()
         self.editor.cursorPositionChanged.connect(self.update_suggestion)
         self.mention_list = QListWidget(self)
         self.mention_list.setObjectName("MentionPicker")
         self.mention_list.setAccessibleName(
             "Mention suggestions. Agents, Buds, people and channel."
+        )
+        self.mention_list.setAccessibleDescription(
+            "Up and Down browse suggestions. Enter or Tab selects. Escape dismisses."
         )
         self.mention_list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.mention_list.setIconSize(QSize(30, 30))
@@ -1340,8 +1368,14 @@ class Composer(QFrame):
         self.permissions.setMaximumWidth(175)
         self.permissions.setMinimumHeight(30)
         self.permissions.setFixedHeight(30)
-        for value, (title, description) in MODES.items():
-            self.permissions.addItem(title, value)
+        from aedrova.desktop.icons import icon
+
+        names = ["permission_ask", "permission_auto", "permission_full"]
+        self.permissions.setProperty("itemIconNames", names)
+        self.permissions.setIconSize(QSize(16, 16))
+        color = self.permissions.palette().windowText().color().name()
+        for name, (value, (title, description)) in zip(names, MODES.items(), strict=True):
+            self.permissions.addItem(icon(name, color), title, value)
             self.permissions.setItemData(
                 self.permissions.count() - 1, description, Qt.ItemDataRole.ToolTipRole
             )
@@ -1574,24 +1608,26 @@ class Composer(QFrame):
             self._select_mention(chosen or first)
 
     def completion_key(self, event):
+        modifiers = event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier
         if self.suggestion.isHidden():
             return False
-        if event.key() == Qt.Key.Key_Escape:
+        if event.key() == Qt.Key.Key_Escape and not modifiers:
             self.suggestion.hide()
             self.mention_list.hide()
-        elif event.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down) and not event.modifiers():
+        elif event.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down) and not modifiers:
             rows = [
                 i
                 for i in range(self.mention_list.count())
                 if self.mention_list.item(i).data(Qt.ItemDataRole.UserRole)
             ]
-            current = rows.index(self.mention_list.currentRow())
+            if not rows:
+                return False
             step = 1 if event.key() == Qt.Key.Key_Down else -1
+            current_row = self.mention_list.currentRow()
+            current = rows.index(current_row) if current_row in rows else (-1 if step > 0 else 0)
             self.mention_list.setCurrentRow(rows[(current + step) % len(rows)])
-        elif (
-            event.key() in (Qt.Key.Key_Tab, Qt.Key.Key_Return, Qt.Key.Key_Enter)
-            and not event.modifiers()
-        ):
+            self.mention_list.scrollToItem(self.mention_list.currentItem())
+        elif event.key() in (Qt.Key.Key_Tab, Qt.Key.Key_Return, Qt.Key.Key_Enter) and not modifiers:
             self.complete_mention()
         else:
             return False
