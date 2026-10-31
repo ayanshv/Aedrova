@@ -213,6 +213,8 @@ class SocialDialog(AppDialog):
             if not self.destination.count()
             else "Choose a draft or create something new."
         )
+        if self.available and self.row:
+            self.checked(self.row)
         if not self.available:
             self.status.setText(
                 result[2].get("setup_hint") or "Social publishing is being prepared."
@@ -293,6 +295,8 @@ class SocialDialog(AppDialog):
             else "Save draft"
         )
         self.update_controls()
+        if self.row:
+            self.checked(self.row)
 
     def changed(self, *_):
         if not self.rendering:
@@ -342,10 +346,20 @@ class SocialDialog(AppDialog):
         self.refresh()
 
     def checked(self, row):
-        state = row["provider_status"] or row["state"]
-        self.status.setText(
-            "Buffer status: " + state + (" · " + row["error"] if row["error"] else "")
-        )
+        state = row.get("provider_status") or row["state"]
+        title = {
+            "buffer": "Queued in Buffer",
+            "sent": "Published",
+            "draft": "Draft",
+            "approved": "Approved · ready for your final action",
+            "rejected": "Not submitted",
+            "unknown": "Submission unconfirmed",
+            "sending": "Submission unconfirmed",
+            "submitted": "Submitted to Buffer",
+            "error": "Buffer reported a publishing error",
+            "notSent": "Not published",
+        }.get(state, "Publishing status unavailable")
+        self.status.setText(title + (" · " + row.get("error", "") if row.get("error") else ""))
 
     def reject_draft(self):
         if self.row:
