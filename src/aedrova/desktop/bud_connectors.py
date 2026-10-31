@@ -28,6 +28,7 @@ from aedrova.dots.client import client
 from aedrova.dots.roles import ROLES, recommendation_set, role_for
 
 HELP = {
+    "buffer": "Sign in to Buffer. Personal API keys are not accepted.",
     "github": (
         "Use a fine-grained GitHub token for this repository only. Read: Metadata, "
         "Contents, Issues, Pull requests and Deployments."
@@ -68,6 +69,7 @@ HELP = {
     ),
 }
 RESOURCE_HELP = {
+    "buffer": "Choose your Buffer organization after signing in, then select channels in Social.",
     "github": (
         "Open your repository on GitHub. From github.com/owner/repository, copy owner/repository."
     ),
@@ -98,6 +100,7 @@ RESOURCE_HELP = {
 }
 
 GLYPHS = {
+    "buffer": "▱",
     "github": "GH",
     "supabase": "↯",
     "figma": "F",
@@ -156,9 +159,12 @@ def normalize_resource(provider, value):
 class ConnectorsDialog(AppDialog):
     run = DotDialog.run
 
-    def __init__(self, window, selected=None, *, on_change=None, embedded_owner=None):
+    def __init__(
+        self, window, selected=None, *, on_change=None, embedded_owner=None, initial_provider=None
+    ):
         super().__init__(embedded_owner or window)
         self.embedded_owner = embedded_owner
+        self.initial_provider = initial_provider
         if embedded_owner is not None:
             self.setWindowFlags(Qt.WindowType.Widget)
         self.window, self.workspace = window, window.workspace_id
@@ -193,9 +199,7 @@ class ConnectorsDialog(AppDialog):
         navigation.addWidget(label("Connectors", "subheading"))
         navigation.addWidget(label("Your tools.\nYour Buds.", "muted", wrap=True))
         navigation.addStretch()
-        navigation.addWidget(
-            label("Your account’s access\nRead-only connections", "muted", wrap=True)
-        )
+        navigation.addWidget(label("Your account’s access\nScoped connections", "muted", wrap=True))
         root.addWidget(rail)
         rail.setVisible(embedded_owner is None)
         main = QVBoxLayout()
@@ -351,9 +355,8 @@ class ConnectorsDialog(AppDialog):
             item.setTextFormat(Qt.TextFormat.PlainText)
             success_layout.addWidget(item)
         success_layout.addSpacing(16)
-        success_layout.addWidget(
-            label("Verified access · Read-only", "muted"), alignment=Qt.AlignmentFlag.AlignHCenter
-        )
+        self.success_permissions = label("Verified access · Read-only", "muted")
+        success_layout.addWidget(self.success_permissions, alignment=Qt.AlignmentFlag.AlignHCenter)
         back_connected = button(
             "Connect another tool", role="outline" if embedded_owner else "primary"
         )
@@ -525,6 +528,13 @@ class ConnectorsDialog(AppDialog):
             self.apply_role_filter()
             self.rebuild_gallery()
             self.refresh_existing()
+            if self.initial_provider:
+                provider = next(
+                    (p for p in self.providers if p["id"] == self.initial_provider), None
+                )
+                self.initial_provider = None
+                if provider:
+                    self.open_provider(provider)
             if self.selected_provider:
                 self.auth_details(self.selected_provider)
             self.status.setText(
@@ -599,6 +609,11 @@ class ConnectorsDialog(AppDialog):
             return
         self.success_bud.set_config(row)
         self.success_heading.setText(provider["name"] + " is connected.")
+        self.success_permissions.setText(
+            "Post access · Each publication needs approval"
+            if provider["id"] == "buffer"
+            else "Verified access · Read-only"
+        )
         self.success_copy.setText(
             row["name"]
             + " can now access: "
@@ -607,6 +622,11 @@ class ConnectorsDialog(AppDialog):
             + row["name"]
             + " in your conversation."
         )
+        if provider["id"] == "buffer":
+            self.success_copy.setText(
+                "Your Buffer organization is connected. Open Social in your "
+                "Marketing Bud to choose channels and review drafts."
+            )
         self.pages.setCurrentIndex(2)
         self.status.setText("Connected. Your Bud’s access has been verified.")
 
@@ -795,6 +815,8 @@ class ConnectorsDialog(AppDialog):
         self.oauth_hint.setText(
             "Finish signing in through your browser. Your Bud will update here."
             if self.oauth_state
+            else "Sign in to Buffer, then choose channels in Social. Each post needs approval."
+            if provider["id"] == "buffer" and provider.get("oauth_available")
             else "Choose a research topic for your Bud. No codes or keys to copy."
             if managed
             else "Sign in and approve read-only access. Finish here without copying codes or IDs."
@@ -1118,9 +1140,11 @@ class ConnectorsDialog(AppDialog):
         super().done(result)
 
 
-def open_connectors(window, selected=None, on_change=None):
+def open_connectors(window, selected=None, on_change=None, *, initial_provider=None):
     if not window.current_user():
         window.show_account()
         return
-    window.connectors_dialog = ConnectorsDialog(window, selected, on_change=on_change)
+    window.connectors_dialog = ConnectorsDialog(
+        window, selected, on_change=on_change, initial_provider=initial_provider
+    )
     window.connectors_dialog.show()

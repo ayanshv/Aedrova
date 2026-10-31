@@ -217,6 +217,24 @@ class QueryJob(QRunnable):
                     from aedrova.dots.personality import guidance
 
                     identity += guidance(live)
+                    from aedrova.dots.roles import role_for
+
+                    if role_for(live.get("role", "")) == "marketing":
+                        identity += (
+                            "\nYou are the marketing strategist, not a delivery provider. "
+                            "Help with "
+                            "audience, campaigns, research, platform-specific captions, "
+                            "variations, "
+                            "hashtags, calls to action and calendars. "
+                            "Label assumptions and ask for "
+                            "missing objectives. Social draft text is never publication consent. "
+                            "Users review/edit drafts in Social, select a destination "
+                            "and time, then "
+                            "approve before dispatch. Never claim a post is scheduled or published "
+                            "without a verified provider result. "
+                            "Buffer OAuth analytics are unavailable; "
+                            "do not invent engagement metrics or claim to have retrieved them.\n"
+                        )
                 prompt = (
                     identity + "Answer naturally and concisely. General knowledge, conversation "
                     "and drafting do not need workspace evidence. For claims about this team's "

@@ -5,7 +5,7 @@ ROLES = {
     "designer": ("Designer", ("figma", "notion"), ("google_drive",)),
     "marketing": (
         "Marketing",
-        ("instagram", "tiktok"),
+        ("buffer",),
         ("meta_ads", "google_analytics", "posthog", "notion"),
     ),
     "finance": ("Finance", ("stripe",), ("quickbooks", "google_sheets", "notion")),
@@ -27,6 +27,7 @@ ROLES = {
     ),
 }
 NAMES = {
+    "buffer": "Buffer",
     "github": "GitHub",
     "supabase": "Supabase",
     "vercel": "Vercel",
