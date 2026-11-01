@@ -160,6 +160,13 @@ class SettingsDialog(AppDialog):
                 row.addWidget(manage)
                 row.addWidget(refresh)
                 layout.addLayout(row)
+                self.activate_ai = button("Activate included AI", role="primary")
+                self.activate_ai.setToolTip(
+                    "Activate available free access. No card or subscription."
+                )
+                self.activate_ai.clicked.connect(self.activate_included_ai)
+                self.activate_ai.hide()
+                layout.addWidget(self.activate_ai)
                 self.load_balance()
         layout = root_layout
         self.status = label("Preferences are saved on this Mac.", "muted", wrap=True)
@@ -207,6 +214,16 @@ class SettingsDialog(AppDialog):
                 or self.window.workspace_id != workspace
             ):
                 return
+            self.activate_ai.hide()
+            if result.get("status") == "no_plan":
+                authorized = any(
+                    row.get("workspace_id") == workspace
+                    and row.get("user_id") == expected
+                    and row.get("role") in {"owner", "admin"}
+                    for row in self.account.snapshot.get("members", [])
+                )
+                self.activate_ai.setVisible(authorized)
+                self.activate_ai.setEnabled(authorized)
             if result.get("error"):
                 self.billing_status.setText(result["error"])
             elif result.get("status") == "active":
@@ -226,14 +243,55 @@ class SettingsDialog(AppDialog):
                 )
             else:
                 self.billing_status.setText(
-                    "Your workspace has no active plan. Its owner or admin can manage "
-                    "team billing on the website."
+                    "Included AI is not active for this Space. Its owner or admin can activate "
+                    "available free access here, without a card or subscription. Plan limits apply."
                 )
 
         if not self.window.connected.enqueue(
             ("managed-balance", expected, workspace), operation, completed
         ):
             self.billing_status.setText("Connection busy. Refresh usage shortly.")
+
+    def activate_included_ai(self):
+        if not self.user or not self.window.connected or getattr(self, "activation_pending", False):
+            return
+        workspace, expected = self.window.workspace_id, str(self.user.id)
+        self.activation_pending = True
+        self.activate_ai.setEnabled(False)
+        self.billing_status.setText("Activating your Space’s included AI…")
+
+        def operation():
+            try:
+                _, _, access, user = self.account.service.realtime_credentials()
+                if user != expected:
+                    return {"error": "Your account changed. Sign in again."}
+                return ManagedClient(self.billing_origin, access).activate_free(workspace)
+            except RuntimeError as error:
+                return {"error": str(error)}
+            except Exception:
+                return {"error": "Could not confirm activation. Refresh usage before retrying."}
+
+        def completed(result):
+            self.activation_pending = False
+            if (
+                not self.user
+                or str(self.user.id) != expected
+                or self.window.workspace_id != workspace
+            ):
+                return
+            if result.get("error"):
+                self.billing_status.setText(result["error"])
+                self.activate_ai.setEnabled(True)
+            else:
+                self.activate_ai.hide()
+                self.load_balance()
+
+        if not self.window.connected.enqueue(
+            ("activate-included", expected, workspace), operation, completed
+        ):
+            self.activation_pending = False
+            self.activate_ai.setEnabled(True)
+            self.billing_status.setText("Connection busy. Retry activation shortly.")
 
     def workspace_settings(self):
         self.close()

@@ -3983,3 +3983,25 @@ rules and AGENTS.md. Exact attributions, historical records, missing-value marke
 and existing idempotent Stripe setup payloads are retained. No payment or owner
 setup is required. Stage 2 remaining: next owner-directed fix and combined visual
 review. This entry describes the source change; hosted rollout is separate.
+
+November 1: Stage 2 native-language message-label polish. Hide the “Original text”
+footer when no translation changed the message, for every configured language.
+Only show it when a reader explicitly switches from an available translation
+back to its original. Actual translated messages keep their language badge.
+Existing translation-unavailable tooltips and original-copy actions remain.
+Verified with simultaneous English/Hindi readers, native messages, original
+selection and translated-to-English messages. No personal setup or payment is
+needed. Remaining Stage 2 work: next owner-directed fix and light/dark review.
+
+November 1: owner changed the onboarding scope after reviewing the six-screen
+rebuild. Preserve the original login, Space creation/join, AI review, invitation,
+profile, project, GitHub, device and optional tour screens and actions. Apply the
+new neutral material treatment, finite context/brand opening and coordinated
+crossfades to those existing screens instead. The alternate six-stage flow and
+its migration were removed; no onboarding SQL or new progress schema is required.
+Agent message logos now draw directly on the conversation background, without a
+colored avatar tile or user-photo override. Added explicit owner/admin included-AI
+activation in Settings, reusing the existing authenticated /api/free endpoint and
+all service eligibility/budget controls, with no automatic purchase/subscription.
+Stage 2 remains open for the owner's next UI fix and combined visual/live review.
+Paid Claude and reliable two-device meetings remain deferred launch gates.

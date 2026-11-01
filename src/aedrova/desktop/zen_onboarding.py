@@ -203,6 +203,8 @@ class ZenOnboarding(AppDialog):
         self.theme = resolve_theme(self.theme_mode)
         self.apply_appearance(self.theme_mode)
         self.canvas = ZenCanvas(self)
+        from aedrova.desktop.onboarding_scene import OpeningScene
+        self.opening_scene = OpeningScene(self)
         self.primary = QPushButton("Get started", self)
         self.primary.setObjectName("OnboardingContinue")
         self.primary.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -249,6 +251,7 @@ class ZenOnboarding(AppDialog):
     def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
         self.canvas.setGeometry(self.rect())
+        self.opening_scene.setGeometry(40, 254, self.width() - 80, min(270, self.height() - 374))
         self.primary.setGeometry(self.width() // 2 - 200, self.height() - 102, 400, 40)
         self.skip.setGeometry(self.width() - 164, 24, 148, 40)
         self.back.setGeometry(20, 24, 128, 40)
@@ -256,6 +259,7 @@ class ZenOnboarding(AppDialog):
 
     def show_stage(self, stage):
         self.stage = stage
+        self.opening_scene.setVisible(stage == 0)
         self.entered = self.now()
         self.action_started = None
         actions = (
@@ -543,6 +547,7 @@ class ZenOnboarding(AppDialog):
             self.system_appearance_changed
         )
         self.timer.stop()
+        self.opening_scene.timer.stop()
         self.setup.stop_workspace_wait()
         QApplication.instance().removeEventFilter(self)
 

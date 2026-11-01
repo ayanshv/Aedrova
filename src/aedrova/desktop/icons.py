@@ -40,6 +40,12 @@ def icon(name, color):
         for x in (4, 11):
             for y in (4, 11):
                 p.drawRoundedRect(QRectF(x, y, 5, 5), 1, 1)
+    elif name == "camera":
+        p.drawRoundedRect(QRectF(2, 6, 16, 12), 2, 2)
+        p.drawEllipse(QRectF(7, 9, 6, 6))
+        p.drawLine(6, 6, 8, 3)
+        p.drawLine(8, 3, 13, 3)
+        p.drawLine(13, 3, 15, 6)
     elif name == "plus":
         p.drawLine(10, 4, 10, 16)
         p.drawLine(4, 10, 16, 10)

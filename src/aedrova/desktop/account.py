@@ -27,7 +27,6 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
-    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -36,6 +35,7 @@ from shiboken6 import isValid
 from aedrova.desktop.brand import BrandMark
 from aedrova.desktop.controls import AppDialog, ChoiceBox, CodingProviderChoice
 from aedrova.desktop.dialogs import button, icon_button, label
+from aedrova.desktop.onboarding_motion import OnboardingStack
 from aedrova.desktop.welcome_surface import WelcomeSurface
 from aedrova.identity.oauth import google_sign_in
 from aedrova.identity.service import Connection, IdentityService
@@ -116,7 +116,7 @@ class AccountDialog(AppDialog):
             wrap=True,
         )
         layout.addWidget(self.status)
-        self.pages = QStackedWidget()
+        self.pages = OnboardingStack(self)
         self.pages.setObjectName("AccountPages")
         layout.addWidget(self.pages)
         self._login_page()
@@ -430,7 +430,7 @@ class AccountDialog(AppDialog):
         page = WelcomeSurface()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(24, 24, 24, 24)
-        self.onboarding_steps = QStackedWidget()
+        self.onboarding_steps = OnboardingStack(self)
         self.onboarding_steps.setMaximumWidth(440)
         layout.addWidget(self.onboarding_steps, alignment=Qt.AlignmentFlag.AlignHCenter)
 
