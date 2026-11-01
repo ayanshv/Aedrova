@@ -491,7 +491,10 @@ def test_desktop_workspace_actions_use_connected_account(window):
     window.show_account = lambda intent=None: intents.append(intent)
     window.create_workspace_button.click()
     window.invite_teammates_button.click()
-    assert intents == ["create", "invite"]
+    window.workspace_settings_button.click()
+    window.open_connectors = lambda: intents.append("connectors")
+    window.workspace_connectors_button.click()
+    assert intents == ["create", "invite", "manage", "connectors"]
 
 
 def test_invitation_exit_opens_hidden_chat_dashboard(window, qtbot):

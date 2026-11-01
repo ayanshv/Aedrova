@@ -25,7 +25,7 @@ from aedrova.desktop.brand import BrandMark, app_icon
 from aedrova.desktop.controls import AppDialog, AppMenu
 from aedrova.desktop.conversation import Composer, MessageView
 from aedrova.desktop.design_system import FlowActions
-from aedrova.desktop.dialogs import CreateDialog, SwitcherDialog, button, label
+from aedrova.desktop.dialogs import CreateDialog, SwitcherDialog, button, icon_button, label
 from aedrova.desktop.materials import (
     AdaptiveBento,
     Backdrop,
@@ -195,9 +195,26 @@ class AedrovaWindow(QMainWindow):
         subtitle = label("Team workspace", "muted")
         subtitle.setContentsMargins(7, 0, 0, 0)
         side.addWidget(subtitle)
-        self.invite_teammates_button = button("Invite teammates…", "Invite teammates")
+        self.workspace_quick_actions = QWidget()
+        self.workspace_quick_actions.setObjectName("WorkspaceQuickActions")
+        self.workspace_quick_actions.setAccessibleName("Workspace actions")
+        quick_actions = QHBoxLayout(self.workspace_quick_actions)
+        quick_actions.setContentsMargins(0, 0, 0, 0)
+        quick_actions.setSpacing(6)
+        self.invite_teammates_button = icon_button("invite", "Invite teammates")
         self.invite_teammates_button.clicked.connect(lambda: self.show_account("invite"))
-        side.addWidget(self.invite_teammates_button)
+        self.workspace_settings_button = icon_button("settings", "Workspace settings")
+        self.workspace_settings_button.clicked.connect(lambda: self.show_account("manage"))
+        self.workspace_connectors_button = icon_button("link", "Connectors")
+        self.workspace_connectors_button.clicked.connect(lambda: self.open_connectors())
+        for control in (
+            self.invite_teammates_button,
+            self.workspace_settings_button,
+            self.workspace_connectors_button,
+        ):
+            quick_actions.addWidget(control)
+        quick_actions.addStretch()
+        side.addWidget(self.workspace_quick_actions)
         from aedrova.desktop.dots import DotSection
 
         self.ai_team_section = DotSection(self)
@@ -1857,9 +1874,6 @@ class AedrovaWindow(QMainWindow):
             menu.addAction("Edit profile…", lambda: open_profile_editor(self))
         menu.addAction("Settings…", self.show_settings)
         if user:
-            menu.addAction("Workspace settings…", lambda: self.show_account("manage"))
-            menu.addAction("Connectors…", self.open_connectors)
-            menu.addAction("Invite teammates…", lambda: self.show_account("invite"))
             menu.addSeparator()
             menu.addAction("Log out", self.log_out)
         else:

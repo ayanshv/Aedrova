@@ -187,6 +187,7 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QPushButton#WorkspaceAction:disabled {{ background: transparent; }}
     QComboBox {{ background: {control}; border: 1px solid transparent;
         border-radius: 7px; padding: 10px; min-width: 75px; }}
+    QComboBox#AgentPermissions {{ padding: 4px 8px; }}
     QComboBox::drop-down {{ border: none; width: 30px; background: transparent; }}
     QComboBox:focus {{ border-color: {t.accent}; }}
     QComboBox::down-arrow {{ image: none; border: none; width: 0px; height: 0px; }}

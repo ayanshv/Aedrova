@@ -75,3 +75,40 @@ def test_search_backwards_wrap_escape_and_unicode(qtbot):
     assert c.mention_list.isHidden()
     c.editor.setPlainText("email@orbit")
     assert c.mention_list.isHidden()
+
+
+def test_macos_keypad_flag_browses_without_sending(qtbot):
+    c = composer_with_people(qtbot)
+    c.activateWindow()
+    qtbot.waitUntil(c.isActiveWindow)
+    c.editor.setFocus()
+    qtbot.waitUntil(c.editor.hasFocus)
+    sent = []
+    c.submitted.connect(sent.append)
+    qtbot.keyClicks(c.editor, "@")
+    qtbot.keyClick(c.editor, Qt.Key.Key_Down, Qt.KeyboardModifier.KeypadModifier)
+    assert c.mention_choice[0] == "Reviewer"
+    qtbot.keyClick(c.editor, Qt.Key.Key_Down, Qt.KeyboardModifier.KeypadModifier)
+    assert c.mention_choice[0] == "Orbit"
+    qtbot.keyClick(c.editor, Qt.Key.Key_Return, Qt.KeyboardModifier.KeypadModifier)
+    assert c.editor.toPlainText() == "@Orbit "
+    assert c.editor.hasFocus() and not sent
+
+
+def test_escape_dismisses_picker_before_window_shortcut(qtbot):
+    from PySide6.QtGui import QKeySequence, QShortcut
+
+    c = composer_with_people(qtbot)
+    c.activateWindow()
+    qtbot.waitUntil(c.isActiveWindow)
+    c.editor.setFocus()
+    qtbot.waitUntil(c.editor.hasFocus)
+    escaped = []
+    shortcut = QShortcut(QKeySequence("Escape"), c)
+    shortcut.activated.connect(lambda: escaped.append(True))
+    qtbot.keyClicks(c.editor, "@")
+    qtbot.keyClick(c.editor, Qt.Key.Key_Escape)
+    assert c.mention_list.isHidden() and c.suggestion.isHidden()
+    assert not escaped
+    qtbot.keyClick(c.editor, Qt.Key.Key_Escape)
+    assert escaped == [True]
