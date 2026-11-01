@@ -88,8 +88,18 @@ def test_simultaneous_readers_do_not_share_display_or_prompt_state(qtbot, tmp_pa
     qtbot.waitUntil(lambda: second.messages.display_body(english) == "नमस्ते")
     assert first.messages.display_body(english) == "Hello"
     assert second.messages.display_body(hindi) == "नमस्ते"
+    qtbot.waitUntil(lambda: first.localizer.translation_state(english.body) == "ready")
+    qtbot.waitUntil(lambda: second.localizer.translation_state(hindi.body) == "ready")
+    assert first.messages.translation_hint(english) == ""
+    assert second.messages.translation_hint(hindi) == ""
+    first.messages.toggle_original("en")
+    second.messages.toggle_original("hi")
+    assert first.messages.translation_hint(english) == ""
+    assert second.messages.translation_hint(hindi) == ""
     second.messages.toggle_original("en")
     assert second.messages.display_body(english) == "Hello"
+    assert second.messages.translation_hint(english) == "मूल पाठ"
+    assert first.messages.translation_hint(hindi) == "Translated · English"
     assert first.messages.display_body(hindi) == "Hello"
     prompt = "कृपया @Aedrova यह ऐप बनाओ"
     second.composer.editor.setPlainText(prompt)

@@ -1120,10 +1120,10 @@ class MessageView(QListView):
                 localizer.text("Translated", interface=True) + " · " + LANGUAGES[localizer.language]
             )
         if message.id in localizer.originals:
-            return localizer.text("Original text", interface=True)
+            if localizer.text(message.body) != message.body:
+                return localizer.text("Original text", interface=True)
+            return ""
         state = localizer.translation_state(message.body)
-        if state == "original":
-            return localizer.text("Original text", interface=True)
         if state == "pending" and localizer.language != "en":
             return localizer.text("Translating…", interface=True)
         return ""
