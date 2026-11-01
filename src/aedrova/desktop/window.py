@@ -560,11 +560,6 @@ class AedrovaWindow(QMainWindow):
         self.workspace_buttons.clear()
         for workspace in self.store.workspaces:
             item = button(workspace.initials, f"Open {workspace.name} workspace", "workspace")
-            if workspace.icon:
-                from aedrova.desktop.icons import assign
-
-                assign(item, workspace.icon)
-                item.setText("")
             item.setFixedSize(44, 44)
             item.setCheckable(True)
             item.setChecked(workspace.id == self.workspace_id)
@@ -1922,22 +1917,6 @@ class AedrovaWindow(QMainWindow):
             self.setup_dialog.close()
         account.sign_out()
         self.update_profile_button()
-
-    def show_first_use(self):
-        from aedrova.desktop.account import AccountDialog
-        from aedrova.desktop.first_use import FirstUseJourney
-
-        if not hasattr(self, "account_dialog"):
-            self.account_dialog = AccountDialog(self, settings=self.settings)
-            self.localizer.bind(self.account_dialog)
-            self.account_dialog.dashboard_requested.connect(self.open_dashboard)
-        existing = getattr(self, "first_use_journey", None)
-        if existing and existing.isVisible():
-            existing.raise_()
-            return
-        self.first_use_journey = FirstUseJourney(self)
-        self.first_use_journey.show()
-        self.first_use_journey.raise_()
 
     def show_account(self, intent=None):
         from aedrova.desktop.account import AccountDialog

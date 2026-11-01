@@ -72,7 +72,7 @@ def workspaces_from_snapshot(snapshot, user_id=None):
         if not channels:
             channels = [Channel("", "No channels yet", "Ask an admin for channel access.")]
         initials = "".join(word[0] for word in row["name"].split())[:2].upper()
-        result.append(Workspace(row["id"], row["name"], initials, channels, row.get("icon", "")))
+        result.append(Workspace(row["id"], row["name"], initials, channels))
     return result
 
 

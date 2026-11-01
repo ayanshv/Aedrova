@@ -108,9 +108,7 @@ try {
    'supabase/migrations/202610230001_auto_agent_preference.sql',
    'supabase/tests/auto_agent_preference.sql',
    'supabase/migrations/202610240001_bud_plan_limits.sql',
-   'supabase/tests/bud_plan_limits.sql',
-   'supabase/migrations/202611010001_first_use_journey.sql',
-   'supabase/tests/first_use_journey.sql']) {
+   'supabase/tests/bud_plan_limits.sql']) {
   let sql = fs.readFileSync(file,'utf8');
   // Reproduce the already-activated original function, then verify its additive
   // conflict-response upgrade before running the lifecycle tests.

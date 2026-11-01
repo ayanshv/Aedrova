@@ -227,10 +227,6 @@ class DotDialog(AppDialog):
             recover("Reconnect the workspace before managing Buds.")
 
     def sync_connection_rows(self, rows):
-        onboarding = getattr(self.window, "sync_bud_connections", None)
-        if onboarding:
-            onboarding(rows)
-            return
         cache = getattr(self.window, "dot_connection_states", {})
         for row in rows:
             cache[(self.user, row["id"], row["version"])] = {

@@ -334,8 +334,9 @@ class MessageDelegate(QStyledItemDelegate):
         if not grouped:
             x, y = rect.x() + 28, rect.y() + 14
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor(t.avatars[message.tone % len(t.avatars)]))
-            painter.drawRoundedRect(QRectF(x, y, 34, 34), 12, 12)
+            if not message.agent:
+                painter.setBrush(QColor(t.avatars[message.tone % len(t.avatars)]))
+                painter.drawRoundedRect(QRectF(x, y, 34, 34), 12, 12)
             painter.setPen(QColor(t.text))
             painter.setFont(font(11, True))
             if not message.agent:
@@ -349,7 +350,7 @@ class MessageDelegate(QStyledItemDelegate):
             photo = getattr(self.view, "avatar_images", {}).get(
                 getattr(self.view, "avatar_paths", {}).get(message.sender_id)
             )
-            if photo is not None and not photo.isNull():
+            if not message.agent and photo is not None and not photo.isNull():
                 painter.save()
                 clip = QPainterPath()
                 clip.addRoundedRect(QRectF(x, y, 34, 34), 12, 12)

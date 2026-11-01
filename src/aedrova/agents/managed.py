@@ -109,6 +109,12 @@ class ManagedClient:
         if response.status_code != 200:
             message = data.get("error") if isinstance(data, dict) else None
             if isinstance(message, str) and self._access_token not in message:
+                if message == "Choose a plan on the website before using included AI.":
+                    raise RuntimeError(
+                        "This Space’s included AI is not active yet. Its owner or admin can open "
+                        "Settings → Your team’s plan & AI access → Activate included AI, "
+                        "then retry."
+                    )
                 if message == "Included AI access is not configured yet.":
                     raise RuntimeError(
                         "Your team’s AI service hasn’t been enabled yet. "
@@ -122,6 +128,12 @@ class ManagedClient:
         from urllib.parse import quote
 
         return self.request("/api/balance/" + quote(workspace, safe=""))
+
+    def activate_free(self, workspace):
+        """Explicit owner action; the service enforces eligibility and all budgets."""
+        from urllib.parse import quote
+
+        return self.request("/api/free/" + quote(workspace, safe=""), {})
 
     def begin(self, workspace, provider, request_id):
         result = self.request(

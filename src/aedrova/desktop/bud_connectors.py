@@ -13,7 +13,6 @@ from PySide6.QtWidgets import (
     QLayout,
     QLineEdit,
     QScrollArea,
-    QSizePolicy,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -161,21 +160,12 @@ class ConnectorsDialog(AppDialog):
     run = DotDialog.run
 
     def __init__(
-        self,
-        window,
-        selected=None,
-        *,
-        on_change=None,
-        embedded_owner=None,
-        initial_provider=None,
-        host=None,
-        available_only=False,
+        self, window, selected=None, *, on_change=None, embedded_owner=None, initial_provider=None
     ):
-        super().__init__(embedded_owner or host or window)
+        super().__init__(embedded_owner or window)
         self.embedded_owner = embedded_owner
-        self.onboarding_host, self.available_only = host, available_only
         self.initial_provider = initial_provider
-        if embedded_owner is not None or host is not None:
+        if embedded_owner is not None:
             self.setWindowFlags(Qt.WindowType.Widget)
         self.window, self.workspace = window, window.workspace_id
         self.user = str(window.current_user().id)
@@ -191,10 +181,8 @@ class ConnectorsDialog(AppDialog):
         self.oauth_timer.timeout.connect(self.poll_oauth)
         self.setObjectName("EmbeddedConnectors" if embedded_owner else "Connectors")
         self.setWindowTitle("Aedrova · Connectors")
-        self.setMinimumSize(
-            0 if embedded_owner or host else 760, 0 if embedded_owner or host else 620
-        )
-        if embedded_owner is None and host is None:
+        self.setMinimumSize(0 if embedded_owner else 760, 0 if embedded_owner else 620)
+        if embedded_owner is None:
             self.resize(1120, 820)
         root = QHBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -213,17 +201,15 @@ class ConnectorsDialog(AppDialog):
         navigation.addStretch()
         navigation.addWidget(label("Your account’s access\nScoped connections", "muted", wrap=True))
         root.addWidget(rail)
-        rail.setVisible(embedded_owner is None and host is None)
+        rail.setVisible(embedded_owner is None)
         main = QVBoxLayout()
-        main.setContentsMargins(0, 0, 0, 0) if embedded_owner or host else main.setContentsMargins(
+        main.setContentsMargins(0, 0, 0, 0) if embedded_owner else main.setContentsMargins(
             30, 28, 30, 24
         )
         main.setSpacing(12 if embedded_owner else 18)
         root.addLayout(main, 1)
         header = QHBoxLayout()
-        heading_title = label("Connectors", "heading")
-        heading_title.setVisible(host is None)
-        header.addWidget(heading_title)
+        header.addWidget(label("Connectors", "heading"))
         header.addStretch()
         refresh = icon_button("refresh", "Refresh connectors")
         refresh.clicked.connect(self.refresh)
@@ -254,19 +240,12 @@ class ConnectorsDialog(AppDialog):
         self.loading_spinner = self.loading_overlay.spinner
         self.pages.currentChanged.connect(
             lambda index: (
-                self.filter.setVisible(index == 0 and host is None),
+                self.filter.setVisible(index == 0),
                 self.search.setVisible(index == 0),
-                self.bud.setVisible(index == 0 and embedded_owner is None and host is None),
+                self.bud.setVisible(index == 0 and embedded_owner is None),
                 refresh.setVisible(index == 0),
             )
         )
-        if host is not None:
-            self.pages.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Ignored)
-            self.pages.currentChanged.connect(
-                lambda index: self.pages.setMinimumHeight(
-                    self.pages.currentWidget().minimumSizeHint().height() if index == 1 else 240
-                )
-            )
         main.addWidget(self.pages, 1)
         self.gallery = QScrollArea(self)
         self.gallery.setWidgetResizable(True)
@@ -456,10 +435,8 @@ class ConnectorsDialog(AppDialog):
         self.loading_overlay.set_active(busy)
         self.status.setVisible(not busy)
         self.bud.setEnabled(not busy)
-        can_connect = (
-            self.onboarding_host is not None
-            or bool(self.bud.currentData())
-            or bool(self.embedded_owner and self.embedded_owner.admin())
+        can_connect = bool(self.bud.currentData()) or bool(
+            self.embedded_owner and self.embedded_owner.admin()
         )
         self.oauth.setEnabled(
             can_connect
@@ -519,10 +496,6 @@ class ConnectorsDialog(AppDialog):
         def fetch(service):
             api = client(service)
             providers = api.request("/api/buds/connectors")["providers"]
-            if self.available_only:
-                providers = [
-                    p for p in providers if p.get("oauth_available") or p.get("managed_available")
-                ]
             rows = api.request("/api/dots?workspace=" + self.workspace)["items"]
             return providers, rows
 
@@ -553,8 +526,6 @@ class ConnectorsDialog(AppDialog):
                 self.bud.setCurrentIndex(max(0, self.bud.findData(selected)))
             self.bud.blockSignals(False)
             self.apply_role_filter()
-            if self.onboarding_host:
-                self.filter.setCurrentIndex(self.filter.findData("all"))
             self.rebuild_gallery()
             self.refresh_existing()
             if self.initial_provider:
@@ -568,7 +539,7 @@ class ConnectorsDialog(AppDialog):
                 self.auth_details(self.selected_provider)
             self.status.setText(
                 "Choose a tool to connect."
-                if self.rows or self.onboarding_host is not None
+                if self.rows
                 else "Choose a tool. Your Bud will be saved when you connect."
                 if self.embedded_owner
                 else "Create a Bud first, then connect its tools here."
@@ -679,7 +650,6 @@ class ConnectorsDialog(AppDialog):
                 wrap=True,
             )
         )
-        banner.setVisible(self.onboarding_host is None)
         layout.addWidget(banner)
         self.cards, self.grid_layouts = [], []
         role = self.filter.currentData()
@@ -919,15 +889,6 @@ class ConnectorsDialog(AppDialog):
 
             owner.save_dot(on_saved=saved)
             return
-        if self.onboarding_host is not None:
-            from aedrova.desktop.first_use_visuals import PURPOSE_ROLES
-
-            flow = self.window.flow
-            role = PURPOSE_ROLES[flow.purpose.currentData()]
-            identity = flow.state.get("buds", {}).get(role)
-            if not identity or self.bud.currentData() != identity:
-                flow.ensure_context_bud(role)
-                return
         if not self.bud.currentData():
             self.status.setText("Choose a Bud first.")
             return

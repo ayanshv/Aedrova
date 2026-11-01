@@ -3993,17 +3993,15 @@ Verified with simultaneous English/Hindi readers, native messages, original
 selection and translated-to-English messages. No personal setup or payment is
 needed. Remaining Stage 2 work: next owner-directed fix and light/dark review.
 
-November 1: Stage 2 complete first-use rebuild implemented in native PySide6.
-Six cohesive screens use actual Aedrova/Bud art, finite/reduced-motion animation,
-Space identity, unified Auto AI review, real connector OAuth, capped Bud activation,
-optional code-based teammate invitations and a real first conversation/project
-handoff. Interrupted progress is account-private and versioned, with atomic retry
-protection; existing/completed users are not forced into fresh creation. Staging
-source launcher uses the new default flow. Full regression baseline: 1,104 passed;
-PostgreSQL migration/RLS suite passed. Final focused checks and all six stages in
-light/dark desktop/narrow layouts are recorded in work/onboarding-rebuild.
-Required owner rollout: run 202611010001_first_use_journey.sql in Aedrova Staging
-(scvmvqlzcqhwrrsiahpj) SQL Editor, then sign in for hosted new-user acceptance.
-Do not apply to production yet. Full details: docs/onboarding-rebuild/implementation.md.
-Stage 2 remains open for hosted acceptance, the next owner-directed UI fix and
-combined visual review. Deferred paid launch gates remain unchanged.
+November 1: owner changed the onboarding scope after reviewing the six-screen
+rebuild. Preserve the original login, Space creation/join, AI review, invitation,
+profile, project, GitHub, device and optional tour screens and actions. Apply the
+new neutral material treatment, finite context/brand opening and coordinated
+crossfades to those existing screens instead. The alternate six-stage flow and
+its migration were removed; no onboarding SQL or new progress schema is required.
+Agent message logos now draw directly on the conversation background, without a
+colored avatar tile or user-photo override. Added explicit owner/admin included-AI
+activation in Settings, reusing the existing authenticated /api/free endpoint and
+all service eligibility/budget controls, with no automatic purchase/subscription.
+Stage 2 remains open for the owner's next UI fix and combined visual/live review.
+Paid Claude and reliable two-device meetings remain deferred launch gates.
