@@ -406,7 +406,7 @@ class DotDialog(AppDialog):
 
         def description(key):
             if key == "llm":
-                return "AI model — uses workspace AI access; provider setup required"
+                return "AI model: uses workspace AI access; provider setup required"
             provider = providers.get(key, {})
             state = (
                 "available to connect"
@@ -415,7 +415,7 @@ class DotDialog(AppDialog):
                 if key == "github"
                 else "coming next"
             )
-            return NAMES[key] + " — " + state
+            return NAMES[key] + ": " + state
 
         self.recommendations.setText(
             title

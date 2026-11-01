@@ -279,7 +279,7 @@ class ReviewDialog(AppDialog):
 
     def prepared(self, publication):
         self.publication = publication
-        visibility = "PRIVATE" if publication.private else "PUBLIC — anyone can see uploaded code"
+        visibility = "PRIVATE" if publication.private else "PUBLIC: anyone can see uploaded code"
         self.scope.setText(
             f"{visibility}\nPR title: {publication.title}\n"
             f"Repository: {publication.repository}\nNew branch: "

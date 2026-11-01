@@ -3974,3 +3974,12 @@ Home/plans/product/Hindi copy and branded HTML errors show the new motto live.
 Desktop CI exposed an older account-menu test still expecting shortcuts moved to
 the sidebar by fix 3; updated it to assert the new placement and real routing.
 No owner action is required.
+
+November 1: Stage 2 writing polish. Reduced em dashes in window titles, connector
+recommendations, publication visibility warnings, onboarding and search titles.
+Added prose guidance to coding/chat/Bud/Research prompts, without rewriting user
+messages, code or citations. Saved the owner preference in both projects' writing
+rules and AGENTS.md. Exact attributions, historical records, missing-value markers
+and existing idempotent Stripe setup payloads are retained. No payment or owner
+setup is required. Stage 2 remaining: next owner-directed fix and combined visual
+review. This entry describes the source change; hosted rollout is separate.
