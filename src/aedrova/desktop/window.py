@@ -59,7 +59,7 @@ class AedrovaWindow(QMainWindow):
         icon = app_icon()
         if not icon.isNull():
             self.setWindowIcon(icon)
-        self.setWindowTitle("Aedrova — Northstar Labs · Local preview")
+        self.setWindowTitle("Aedrova · Northstar Labs · Local preview")
         self.resize(1440, 940)
         self.setMinimumSize(900, 650)
         self.dialog = None
@@ -744,7 +744,7 @@ class AedrovaWindow(QMainWindow):
                 getattr(self, "activity_workspace", None) == self.workspace_id
             )
         channel = self.channel
-        self.setWindowTitle(f"Aedrova — {self.workspace.name} · Local preview")
+        self.setWindowTitle(f"Aedrova · {self.workspace.name} · Local preview")
         self.channel_title.setText(channel.name if channel.direct else channel.name.capitalize())
         self.channel_topic.setText(channel.topic)
         self.conversation_date.setText(
@@ -773,7 +773,7 @@ class AedrovaWindow(QMainWindow):
             self.store.drafts.get((self.workspace_id, self.channel_id, ""), "")
         )
         if self.connected and self.connected.active:
-            self.setWindowTitle(f"Aedrova — {self.workspace.name}")
+            self.setWindowTitle(f"Aedrova · {self.workspace.name}")
             self.connection_badge.setText("Connected")
             self.conversation_date.setText("Shared conversation")
             self.members_label.setText("Your team")

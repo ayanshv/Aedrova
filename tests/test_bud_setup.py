@@ -269,8 +269,8 @@ def test_role_presets_persist_independently_of_appearance(editor):
     dialog.job_role.setCurrentIndex(dialog.job_role.findData("designer"))
     dialog.role.setText("Review our designs")
     dialog.resource.setText("team/project")
-    assert "Figma — coming next" in dialog.recommendations.text()
-    assert "Notion — coming next" in dialog.recommendations.text()
+    assert "Figma: coming next" in dialog.recommendations.text()
+    assert "Notion: coming next" in dialog.recommendations.text()
     assert "Each account authorizes its own access" in dialog.recommendations.text()
     dialog.save_dot()
     assert saved[-1]["p_role"] == "Designer · Review our designs"
@@ -283,12 +283,12 @@ def test_role_presets_persist_independently_of_appearance(editor):
 def test_every_specialty_has_curated_tools_without_fake_access(editor):
     dialog, _, _, _ = editor
     expected = {
-        "builder": ("GitHub — owner setup required", "Supabase — coming next"),
-        "designer": ("Figma — coming next", "Notion — coming next"),
-        "marketing": ("Buffer — coming next",),
-        "finance": ("Stripe — coming next", "QuickBooks"),
-        "research": ("AI model — uses workspace AI access", "Web search — coming next"),
-        "product": ("Notion — coming next", "PostHog"),
+        "builder": ("GitHub: owner setup required", "Supabase: coming next"),
+        "designer": ("Figma: coming next", "Notion: coming next"),
+        "marketing": ("Buffer: coming next",),
+        "finance": ("Stripe: coming next", "QuickBooks"),
+        "research": ("AI model: uses workspace AI access", "Web search: coming next"),
+        "product": ("Notion: coming next", "PostHog"),
     }
     for specialty, phrases in expected.items():
         dialog.job_role.setCurrentIndex(dialog.job_role.findData(specialty))

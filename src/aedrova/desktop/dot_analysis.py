@@ -184,6 +184,7 @@ class QueryJob(QRunnable):
                 evidence.write_text(retrieval_record(context, self.task) + "\n" + context.text)
                 identity = (
                     "You are Aedrova, the workspace assistant. Introduce yourself as Aedrova. "
+                    "Prefer short sentences and commas to em dashes in your own prose. "
                     "If asked about your underlying model or provider, answer truthfully "
                     "using known configuration; do not invent a model or conceal its provider. "
                 )

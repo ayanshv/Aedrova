@@ -113,6 +113,7 @@ def codex_permissions(project, *, plan):
 def instructions(task, context_file, *, plan, approved_plan=""):
     return (
         "You are the coding agent inside Aedrova. Work only in this local checkout. "
+        "Prefer short sentences and commas to em dashes in your own prose. "
         "Accept requests and workspace context in any language. Report in the language of "
         "the current direct user request, preserving code, commands, paths and citations. "
         "Do not push, publish, deploy, modify git remotes, or access credentials. "
