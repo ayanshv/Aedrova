@@ -3983,3 +3983,27 @@ rules and AGENTS.md. Exact attributions, historical records, missing-value marke
 and existing idempotent Stripe setup payloads are retained. No payment or owner
 setup is required. Stage 2 remaining: next owner-directed fix and combined visual
 review. This entry describes the source change; hosted rollout is separate.
+
+November 1: Stage 2 native-language message-label polish. Hide the “Original text”
+footer when no translation changed the message, for every configured language.
+Only show it when a reader explicitly switches from an available translation
+back to its original. Actual translated messages keep their language badge.
+Existing translation-unavailable tooltips and original-copy actions remain.
+Verified with simultaneous English/Hindi readers, native messages, original
+selection and translated-to-English messages. No personal setup or payment is
+needed. Remaining Stage 2 work: next owner-directed fix and light/dark review.
+
+November 1: Stage 2 complete first-use rebuild implemented in native PySide6.
+Six cohesive screens use actual Aedrova/Bud art, finite/reduced-motion animation,
+Space identity, unified Auto AI review, real connector OAuth, capped Bud activation,
+optional code-based teammate invitations and a real first conversation/project
+handoff. Interrupted progress is account-private and versioned, with atomic retry
+protection; existing/completed users are not forced into fresh creation. Staging
+source launcher uses the new default flow. Full regression baseline: 1,104 passed;
+PostgreSQL migration/RLS suite passed. Final focused checks and all six stages in
+light/dark desktop/narrow layouts are recorded in work/onboarding-rebuild.
+Required owner rollout: run 202611010001_first_use_journey.sql in Aedrova Staging
+(scvmvqlzcqhwrrsiahpj) SQL Editor, then sign in for hosted new-user acceptance.
+Do not apply to production yet. Full details: docs/onboarding-rebuild/implementation.md.
+Stage 2 remains open for hosted acceptance, the next owner-directed UI fix and
+combined visual review. Deferred paid launch gates remain unchanged.

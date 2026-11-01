@@ -85,7 +85,6 @@ def main():
             interpreter,
             "-m",
             "aedrova.desktop.app",
-            "--account",
             "--settings-file",
             str(args.settings_file.resolve()),
         ],

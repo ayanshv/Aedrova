@@ -1,0 +1,353 @@
+Aedrova — Complete Onboarding Experience Rebuild
+You are acting as a world-class product designer, creative director, motion designer, and senior frontend engineer.
+Your task is to completely redesign and rebuild Aedrova's existing onboarding experience from the ground up.
+This is a production implementation task, not a design proposal.
+The objective is to create an extraordinarily polished, cinematic, interactive first-time user experience inspired by the craftsmanship, animation quality, visual storytelling, and interaction design of Shotbase's onboarding.
+Reference:
+https://shotbase.com/
+The goal is NOT to copy Shotbase's interface or branding. Instead, understand the level of design sophistication and execution that makes its onboarding memorable, and translate those qualities into Aedrova's own visual identity and product experience.
+The result should feel like an exceptionally well-crafted Apple-quality software experience.
+
+PART 1 — UNDERSTAND AEDROVA BEFORE DESIGNING
+Before writing code, thoroughly inspect the existing repository.
+Understand:
+The current onboarding implementation and its routing.
+Existing authentication and account creation.
+The Space and Subspace architecture.
+The Aedrova main AI agent.
+The Buds architecture and their individual roles.
+Available integrations and their actual authorization flows.
+Existing connector management.
+Existing component library and design tokens.
+Typography, colors, backgrounds, shadows, borders, and spacing.
+Existing animations and animation libraries.
+Database schema and onboarding persistence.
+How users transition from onboarding into their first Space.
+Inspect the actual production application design wherever accessible.
+Important product context:
+Aedrova is a collaborative AI workspace that turns team conversations into working software.
+It brings together shared context from:
+Team chats.
+Meetings.
+Project documents.
+Decisions.
+Development tools.
+Design tools.
+Connected applications.
+Aedrova's primary agent works alongside the team, while Buds are specialized AI teammates that users can activate for different responsibilities.
+The main Aedrova agent and Buds must be visually and conceptually distinct.
+Aedrova also intelligently routes tasks to appropriate AI capabilities. Do not ask users to select between underlying coding model providers. Present one unified Aedrova experience.
+Do not invent capabilities or integrations that are not actually implemented.
+PART 2 — DESIGN PHILOSOPHY
+The entire onboarding must feel intentional, premium, cinematic, and remarkably smooth.
+The most important visual characteristics:
+Editorial minimalism.
+Beautiful typography and spacing.
+Carefully composed visual scenes.
+Dimensional UI elements with subtle depth.
+Smooth, sophisticated animations.
+Tactile interaction feedback.
+Beautiful transitions between stages.
+Consistent visual identity.
+Extremely clear hierarchy.
+No unnecessary clutter.
+Visual identity
+Use Aedrova's existing brand identity.
+Inspect the actual logo, Bud assets, colors, fonts, and existing production UI.
+Do not invent an entirely new brand identity.
+The design should retain Aedrova's established minimal, premium aesthetic.
+Prioritize:
+Warm, clean light backgrounds.
+Deep ink or charcoal typography.
+Restrained blue accents.
+Subtle gradients.
+Soft, realistic shadows.
+Controlled glass and translucent surfaces.
+Beautifully balanced whitespace.
+Light mode must feel particularly refined. Dark mode must retain the same hierarchy and sophistication rather than looking like an inverted version of light mode.
+Avoid:
+Generic purple AI gradients.
+Excessive neon.
+Unnecessary glowing elements.
+Overly rounded everything.
+Massive collections of cards.
+Excessive text.
+Generic SaaS onboarding templates.
+Cartoonish illustrations.
+Unnecessary decorative icons.
+Every visual element must have a reason to exist.
+PART 3 — THE ONBOARDING JOURNEY
+Build the following experience as a cohesive sequence.
+SCREEN 01 — THE FIRST OPENING
+This is the most important screen.
+It needs an exceptionally polished introduction.
+Do not immediately present a conventional form.
+Create a cinematic opening sequence featuring the actual Aedrova branding.
+Visual concept:
+Start with a clean, atmospheric background.
+Reveal the Aedrova logo through a sophisticated entrance animation.
+Introduce floating UI elements representing conversations, projects, meetings, and specialized agents.
+Have these separate elements gradually converge into a unified Aedrova Space.
+Introduce the Aedrova agent as the central coordinating element.
+Introduce the Buds as specialized members of the team.
+The animation should communicate the product's value without needing a lengthy explanation.
+Headline:
+"Your team, plus Agents."
+Supporting copy:
+"One shared workspace where conversations become decisions, and decisions become working software."
+Primary CTA:
+"Get started"
+Secondary option:
+"Explore Aedrova"
+Make the first impression unforgettable.
+Use carefully timed reveals, opacity transitions, subtle scaling, depth, and movement.
+Do not make this look like a conventional landing page.
+SCREEN 02 — CREATE YOUR SPACE
+Introduce the Space concept.
+Headline:
+"Everything starts with a Space."
+Supporting copy:
+"Bring your people, projects, conversations, and AI teammates together."
+Allow the user to:
+Name their Space.
+Choose an appropriate Space icon or identity.
+Describe what their team is building.
+Select a general purpose for their Space.
+Use a visually engaging interface instead of a boring settings form.
+Make the act of creating a Space feel satisfying.
+The form should be minimal and only request information that is genuinely useful.
+Do not ask unnecessary questions.
+SCREEN 03 — BRING YOUR CONTEXT
+This is a major Aedrova differentiator.
+Headline:
+"Give Aedrova the bigger picture."
+Supporting copy:
+"Your team already has the context. Connect the tools where your work happens."
+Create a beautifully designed integration experience.
+Inspect the existing integration registry and display only integrations that are actually supported.
+Organize available integrations into intuitive groups, for example:
+Conversations.
+Development.
+Design.
+Planning.
+Other tools.
+Use actual integration logos and existing connector components wherever available.
+Each integration must have:
+Its actual logo.
+Its name.
+A concise explanation of what it provides.
+A clear connect action.
+An accurate connection status.
+After connecting, animate the integration into a connected state.
+Make the transition feel responsive and satisfying.
+IMPORTANT:
+Do not fabricate successful connections.
+Use the existing OAuth and connector flows.
+Handle loading, authorization failures, cancellation, and reconnecting correctly.
+Allow users to skip this stage and connect their tools later.
+Do not claim that Aedrova has access to meetings, chats, or documents that have not actually been connected.
+The design should make the value of shared context immediately understandable.
+SCREEN 04 — ASSEMBLE YOUR AI TEAM
+This screen should be one of the visual highlights of onboarding.
+Headline:
+"Meet your new teammates."
+Supporting copy:
+"Your team doesn't have to build alone. Assemble a group of specialized AI teammates."
+Introduce the main Aedrova agent separately from the Buds.
+Aedrova:
+The central AI agent that understands the team's context, coordinates work, and helps turn conversations into execution.
+Buds:
+Specialized AI teammates with distinct roles and capabilities.
+Use the actual existing Bud identities, illustrations, logos, personalities, and configurations.
+Potential roles include:
+Builder.
+Designer.
+Product.
+Research.
+Marketing.
+Finance.
+Only display roles and capabilities supported by the current implementation.
+The visual composition should make the Buds feel like a cohesive miniature team rather than generic software feature cards.
+Interaction:
+Hovering over a Bud reveals a refined preview.
+Selecting a Bud creates a satisfying activation animation.
+Activated Buds receive a clear visual active state.
+Explain their responsibilities in a single concise sentence.
+Allow multiple selections.
+Recommend relevant Buds based on the user's stated Space purpose.
+Users should be able to continue without activating every Bud.
+Do not confuse the Builder Bud with the central Aedrova agent.
+Do not imply that a Bud has integrations or permissions that it does not have.
+SCREEN 05 — BRING YOUR TEAM TOGETHER
+Headline:
+"Better things happen together."
+Allow users to optionally invite teammates.
+Keep this exceptionally simple.
+Email invitation field.
+Add multiple teammates.
+Clear invitation state.
+Option to skip and do this later.
+Do not make inviting teammates mandatory.
+Do not make this screen feel like an administrative settings page.
+SCREEN 06 — THE FIRST BUILDING MOMENT
+Headline:
+"Let's make something happen."
+Ask the user what their team is currently working on.
+Provide a beautiful conversational input interface.
+Suggested placeholder:
+"What are you and your team building?"
+The user should be able to describe an actual project or objective.
+Use this information to initialize their first conversation or project using existing Aedrova functionality.
+Where connected context exists, allow Aedrova to use it through the actual supported context pipeline.
+Where no external context exists, use the user's description as the starting point.
+Do not fabricate project summaries or pretend to have analyzed integrations.
+Primary CTA:
+"Start building"
+After the user activates this, provide a beautiful transition into the actual Aedrova application.
+The final transition should feel like entering a newly assembled workspace.
+Do not leave the user on a generic onboarding completion screen.
+PART 4 — ANIMATION AND MOTION DESIGN
+This is a critical requirement.
+Do not treat animations as optional finishing touches.
+They are a core part of this redesign.
+Study the quality of Shotbase's first-launch experience and apply comparable attention to detail.
+Implement:
+1. Screen transitions
+Smooth transitions between onboarding stages.
+Coordinated entrance and exit animations.
+Subtle directional motion.
+Natural easing.
+No abrupt content replacement.
+Avoid excessive animation duration.
+2. Element transitions
+Staggered appearance of individual elements.
+Subtle scaling.
+Layered movement.
+Smooth opacity transitions.
+Natural hover states.
+Refined active and selected states.
+3. Interactive feedback
+Buttons should feel responsive.
+Cards should respond naturally to interaction.
+Selections should have visually satisfying feedback.
+Progress indicators should animate smoothly.
+Loading states should feel intentional.
+4. Opening animation
+Give the first screen special attention.
+It should have a recognizable visual signature that feels uniquely Aedrova.
+Do not simply animate the logo with a fade-in.
+Create a carefully composed visual sequence that introduces the relationship between people, shared context, Aedrova, and Buds.
+5. Performance
+Animations must remain smooth.
+Avoid expensive continuous effects and unnecessary rendering.
+Use the existing animation library where possible.
+If using Framer Motion or another library, first verify whether it is already installed.
+Respect reduced-motion preferences.
+Do not autoplay audio. Sound should only be included as an optional experience if technically appropriate.
+PART 5 — INTERACTION AND NAVIGATION
+The onboarding should feel like one continuous experience.
+Implement:
+Clear progress indication.
+Consistent navigation.
+Back functionality.
+Continue functionality.
+Appropriate skip options.
+Inline validation.
+Persistent user selections.
+Loading and error states.
+Smooth transitions after asynchronous operations.
+Do not make every stage feel like an isolated modal.
+Keep the interface consistent across the entire experience.
+The user should always understand:
+Where they are.
+What they are doing.
+What happens next.
+Keep the experience efficient. The user should be able to complete the essential setup in a few minutes.
+PART 6 — FUNCTIONAL IMPLEMENTATION
+This must be a genuine production implementation.
+Not a visual prototype.
+All existing backend functionality must continue working.
+Requirements:
+Preserve existing authentication.
+Correctly associate onboarding data with the authenticated user.
+Persist Space creation.
+Persist Bud selections.
+Persist invitation states.
+Persist completed onboarding state.
+Preserve integration OAuth flows.
+Correctly handle OAuth callbacks returning to onboarding.
+Allow interrupted onboarding to resume.
+Ensure completed users are not unnecessarily shown onboarding again.
+Ensure existing users are not accidentally forced through a new-user flow.
+Respect existing database relationships, permissions, and RLS policies.
+Keep onboarding state consistent across sessions and devices where the architecture supports it.
+Use the existing backend and database architecture.
+Do not create a parallel onboarding system if the current architecture already supports these operations.
+Do not introduce fake data into production.
+Do not create buttons that look functional but do nothing.
+Do not silently perform actions on the user's behalf.
+PART 7 — RESPONSIVENESS AND ACCESSIBILITY
+The experience must work beautifully on:
+Desktop.
+Laptop.
+Tablet.
+Mobile.
+Desktop is the primary design target.
+Pay particular attention to the 1440 × 900 viewport.
+Also test at approximately 390 × 844.
+Ensure:
+No overflow.
+No clipped animations.
+Correct responsive composition.
+Keyboard navigation.
+Visible focus states.
+Accessible labels.
+Appropriate contrast.
+Reduced-motion support.
+PART 8 — QUALITY CONTROL
+After implementation, thoroughly test the experience.
+Do not stop when the screens render.
+Verify:
+A brand-new user can complete onboarding.
+Existing authenticated users retain access.
+Space creation works.
+Integration connection flows work.
+OAuth returns to the correct onboarding stage.
+Bud selections persist.
+Teammate invitations work.
+Skipping optional stages works.
+Refreshing the application does not lose progress.
+Completed onboarding correctly transitions into the actual application.
+Dark and light modes both work.
+Mobile layouts remain usable.
+Run the existing tests, type checks, and linting commands.
+Fix any issues introduced by this implementation.
+Take screenshots of each onboarding stage at desktop and mobile sizes. Inspect them critically.
+Look for:
+Misaligned elements.
+Inconsistent spacing.
+Poor typography.
+Unbalanced compositions.
+Inconsistent shadows.
+Awkward transitions.
+Unnecessary visual noise.
+Generic-looking components.
+Refine until the entire experience feels cohesive and production-ready.
+FINAL CREATIVE DIRECTION
+The final result should feel like:
+Shotbase-level onboarding craftsmanship.
+Apple-level visual refinement.
+Aedrova's own unmistakable identity.
+Do not settle for a conventional SaaS onboarding flow.
+Do not simply modernize the existing forms.
+Reimagine the entire first-use experience.
+Every screen should feel intentionally designed. Every transition should have a purpose. Every interaction should feel satisfying.
+Most importantly, communicate the actual magic of Aedrova:
+A team bringing its context together, working alongside specialized AI teammates, and turning ideas into working software.
+Implement the complete experience in the existing repository. Do not stop at a plan or a collection of mockups.
+At completion, provide:
+Summary of the new onboarding experience.
+Files and components changed.
+Any database changes.
+Tests performed and results.
+Remaining limitations, if any.

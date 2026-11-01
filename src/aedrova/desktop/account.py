@@ -978,9 +978,11 @@ class AccountDialog(AppDialog):
             self.status.setText("Sign-in did not finish. Please try again.")
             return
         self.awaiting_sign_in_snapshot = True
-        self.show()
-        self.raise_()
-        self.activateWindow()
+        journey = getattr(self.parent(), "first_use_journey", None)
+        if not journey or not journey.isVisible():
+            self.show()
+            self.raise_()
+            self.activateWindow()
         self.account_label.setText(user.email or "Signed in")
         self.pages.setCurrentIndex(1)
         self.refresh()

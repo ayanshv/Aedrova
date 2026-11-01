@@ -47,6 +47,7 @@ class Workspace:
     name: str
     initials: str
     channels: list[Channel]
+    icon: str = ""
 
 
 class DemoStore:

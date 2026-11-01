@@ -320,6 +320,17 @@ class IdentityService:
                     workspace["billing_unavailable"] = True
                 else:
                     raise
+        try:
+            identities = self.client.table("workspace_identity").select("*").execute().data
+        except Exception as error:
+            if getattr(error, "code", None) != "PGRST205":
+                raise
+            identities = []
+        for workspace in workspaces:
+            identity = next((r for r in identities if r["workspace_id"] == workspace["id"]), {})
+            workspace.update(
+                {k: identity[k] for k in ("icon", "purpose", "description") if k in identity}
+            )
         archived = self.client.rpc("list_my_workspaces", {"p_archived": True}).execute().data
         memberships = self.client.rpc("list_members", {}).execute().data
         channels = (
@@ -382,6 +393,12 @@ class IdentityService:
             "create_subspace",
             "move_subspace",
             "onboard_workspace",
+            "get_first_use_progress",
+            "save_first_use_progress",
+            "create_first_use_space",
+            "activate_first_use_buds",
+            "invite_first_use_teammate",
+            "complete_first_use",
             "set_agent_preferences",
             "create_channel",
             "create_invitation",

@@ -63,7 +63,7 @@ def main():
     if args.thread:
         window.open_pinned()
     if account_first:
-        window.show_account()
+        window.show_account() if args.account else window.show_first_use()
     if args.smoke_report:
 
         def capture():
