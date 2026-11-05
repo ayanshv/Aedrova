@@ -58,7 +58,7 @@ class OpeningScene(QWidget):
         p.scale(scale, scale)
         elapsed = time.monotonic() - self.started
         progress = 1 if self.flow.reduced else ease(elapsed / 2.6)
-        # Real neutral material and soft offsets replace continuous blur effects.
+
         area = QRectF(-208, -126, 416, 252)
         for offset, alpha in ((18, 3), (10, 6), (4, 10)):
             p.setPen(Qt.PenStyle.NoPen)

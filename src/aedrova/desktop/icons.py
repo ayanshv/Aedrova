@@ -125,7 +125,7 @@ def icon(name, color):
         path.closeSubpath()
         p.drawPath(path)
     elif name == "permission_ask":
-        # A small review bubble: a question, rather than an alarming warning.
+
         path = QPainterPath()
         path.moveTo(6, 15)
         path.lineTo(3, 17)

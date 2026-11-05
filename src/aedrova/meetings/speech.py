@@ -42,7 +42,7 @@ class MicrophoneBuffer:
         if len(self.pcm) < 320000:
             return None
         pcm = bytes(self.pcm[:320000])
-        # No backlog and no raw audio file. Drop remainder, at most one frame.
+
         self.pcm.clear()
         result = io.BytesIO()
         with wave.open(result, 'wb') as wav:

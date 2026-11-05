@@ -1,5 +1,5 @@
 begin;
--- Local M12 foundation. Deploy at M14; no audio recording/provider is enabled by SQL.
+
 create table public.meeting_transcript_segments (
  id uuid primary key,
  meeting_id uuid not null references public.meetings(id) on delete cascade,
@@ -58,8 +58,8 @@ begin
  return p_id;
 end $$;
 
--- Explicitly withdrawing consent invalidates stored material, including after a call ends.
--- Any speaker/consenting participant can withdraw their meeting's shared text.
+
+
 create function public.withdraw_meeting_text(p_meeting uuid,p_delete boolean) returns void
 language plpgsql security definer set search_path='' as $$
 declare u uuid:=aedrova_private.require_user(); m public.meetings;
@@ -107,7 +107,7 @@ begin
  limit greatest(1,least(coalesce(p_limit,50),50));
 end $$;
 
--- Privileged maintenance only; run as a scheduled DB task during M14 setup.
+
 create function aedrova_private.expire_meeting_text() returns bigint
 language plpgsql security definer set search_path='' as $$
 declare n bigint;
@@ -122,7 +122,7 @@ revoke all on function public.append_meeting_text(uuid,uuid,bigint,uuid[],text,i
 grant execute on function public.append_meeting_text(uuid,uuid,bigint,uuid[],text,integer),
  public.withdraw_meeting_text(uuid,boolean),public.meeting_text_context(uuid,integer)
  to authenticated;
--- Support installing optional meeting context after Product Memory.
+
 do $$ begin
  if to_regprocedure('aedrova_private.purge_source_memory()') is not null then
  execute 'create trigger memory_meeting_withdrawal after delete or update of ai_allowed

@@ -59,12 +59,12 @@ class AccountJob(QRunnable):
         except Exception as error:
             from aedrova.identity.errors import retryable
 
-            # Pass a classification only; never provider text or tokens.
+
             result, success = {"retryable": retryable(error)}, False
         finally:
             self.operation = None
-        # The window/application may close while this background request runs.
-        # A destroyed Qt receiver must not turn shutdown into a second failure.
+
+
         if isValid(self.signals):
             try:
                 self.signals.finished.emit(result, success)
@@ -228,7 +228,7 @@ class AccountDialog(AppDialog):
         self.workspaces.currentIndexChanged.connect(self.render_workspace)
         page.workspace_slot.addWidget(self.workspaces)
         self.account_label = label("", "muted", wrap=True)
-        # Account identity belongs in its own section, rather than above every form.
+
         agent = page.add_section(
             "agent", "Your agent", "Choose how Aedrova builds with your team.", "work"
         )
@@ -552,16 +552,16 @@ class AccountDialog(AppDialog):
         invitations.addWidget(label("You can invite more people anytime.", "muted"))
         invitations.addStretch()
 
-        # Keep existing ready/invitation indices stable; creation visits this
-        # required review before either independent Space or subspace is written.
+
+
         self.ai_review_step = self.onboarding_steps.count()
         review = step(
             "STEP 3 OF 3",
             "How should your agent work?",
             "Choose how builds run on this computer. You can change it later.",
         )
-        # Let the surrounding scroll area scroll on short screens instead of
-        # squeezing wrapped disclosures and actions into overlapping rows.
+
+
         review.parentWidget().setMinimumHeight(560)
         review.addWidget(label("Model", "section"))
         self.onboarding_model = label("", "muted", wrap=True)
@@ -1038,8 +1038,8 @@ class AccountDialog(AppDialog):
         if self.awaiting_sign_in_snapshot and self.service and self.service.user:
             self.awaiting_sign_in_snapshot = False
             self.sign_in_ready.emit()
-        # Profile customization remains in Account → Edit profile; the intro is a
-        # permission-free product playground, with no competing setup dialogs.
+
+
 
     def apply_intent(self):
         intent, self.pending_intent = self.pending_intent, None
@@ -1195,13 +1195,13 @@ class AccountDialog(AppDialog):
                         },
                     )
                 except Exception:
-                    # Creation already succeeded. Retain its ID and retry setup,
-                    # never issue another create after a preference failure.
+
+
                     configuration["ai_setup_pending"] = True
             try:
                 snapshot = self.service.snapshot()
             except Exception:
-                # The write succeeded. Never present a failed refresh as a failed creation.
+
                 snapshot = None
             return value, snapshot
 
@@ -1370,8 +1370,8 @@ class AccountDialog(AppDialog):
             try:
                 service.sign_out()
             except Exception:
-                # Local credentials are discarded even if Auth is unreachable.
-                # Remote sessions retain their normal expiry; do not claim revocation.
+
+
                 return
 
         self.run(revoke, completed)

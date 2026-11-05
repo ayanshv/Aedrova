@@ -7,7 +7,7 @@ alter table public.chat_profiles add column status_emoji text not null default '
 alter table public.chat_profiles add column avatar_path text;
 alter table public.chat_profiles add column profile_completed boolean not null default false;
 create unique index chat_username_unique on public.chat_profiles(username) where username is not null;
--- Avatars are private, immutable PNGs. No public or signed URL is persisted.
+
 insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
  values('aedrova-avatars','aedrova-avatars',false,2097152,array['image/png']);
 create function aedrova_private.can_read_avatar(path text) returns boolean language sql stable security definer set search_path='' as $$
@@ -31,7 +31,7 @@ declare u uuid:=aedrova_private.require_user(); old public.chat_profiles; merged
 begin
  perform aedrova_private.check_user_budget('profile-save',30,60);
  if length(p_data::text)>8000 then raise exception 'Profile too large' using errcode='22023'; end if;
- -- Serialize the user's avatar/profile updates without acquiring workspace locks.
+
  perform 1 from auth.users where id=u for update;
  select * into old from public.chat_profiles where user_id=u;
  merged:=coalesce(to_jsonb(old),'{}')||p_data;
@@ -57,7 +57,7 @@ language sql stable security definer set search_path='' as $$
  from public.workspace_members m join auth.users a on a.id=m.user_id left join public.chat_profiles p on p.user_id=m.user_id
  where aedrova_private.member_role(m.workspace_id) in ('owner','admin','member') and m.role in ('owner','admin','member')
 $$;
--- Keep the existing inventory contract and extend the people objects only.
+
 alter function public.chat_inventory(uuid,text,text,uuid) rename to chat_inventory_base;
 revoke all on function public.chat_inventory_base(uuid,text,text,uuid) from public,anon,authenticated;
 create function public.chat_inventory(p_workspace uuid,p_query text default '',p_section text default 'search',p_channel uuid default null)
@@ -65,7 +65,7 @@ returns jsonb language plpgsql stable security definer set search_path='' as $$
 declare result jsonb; people jsonb; u uuid:=aedrova_private.require_user();
 begin
  result:=public.chat_inventory_base(p_workspace,p_query,p_section,p_channel);
- -- Name/username matches must use custom profile data, including people omitted by the old Google-name search.
+
  select coalesce(jsonb_agg(jsonb_build_object('user_id',m.user_id,'display_name',coalesce(p.display_name,nullif(left(a.raw_user_meta_data->>'full_name',80),''),'Teammate'),
  'role',m.role,'username',p.username,'bio',coalesce(p.bio,''),'title',coalesce(p.title,''),'status',coalesce(p.status,''),'status_emoji',coalesce(p.status_emoji,''),'avatar_path',p.avatar_path,
  'availability',case when p.last_seen>now()-interval '90 seconds' then p.availability else 'offline' end)),'[]') into people

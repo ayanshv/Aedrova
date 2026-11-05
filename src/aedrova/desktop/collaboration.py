@@ -147,7 +147,7 @@ class ChatPanel(AppDialog):
         self.notice.setText("Could not refresh this view. Check your access and try again.")
 
     def reject(self):
-        # An embedded tab must not disappear when Escape bubbles from its search.
+
         if self.isWindow():
             super().reject()
 
@@ -157,8 +157,8 @@ class ChatPanel(AppDialog):
         self.generation += 1
         generation = self.generation
         self.notice.clear()
-        # Show authorized local results now; network inventory reconciles afterward.
-        # Never substitute local guesses for server authorization on opening content.
+
+
         cached = self.owner.local_inventory(self.search.text(), self.section, self.channel)
         if any(cached.get(key) for key in ("messages", "channels", "people")):
             self.loaded(cached)
@@ -269,7 +269,7 @@ class Collaboration(QObject):
         self.pending_link = None
         self.scope_workspace = None
         self.allowed_channels = set()
-        # One navigation row; the Files tab already opens the workspace file browser.
+
         for title, section in [("Activity", "activity"), ("Saved", "saved")]:
             control = button(title, role="outline")
             control.clicked.connect(lambda checked=False, s=section: self.panel(s))
@@ -653,7 +653,7 @@ class Collaboration(QObject):
                 else ("away" if away else self.last_availability)
             )
             if own.get("availability") == availability:
-                # A heartbeat must not overwrite a recently edited custom status.
+
                 self.request("heartbeat", {})
             else:
                 self.request(
@@ -904,7 +904,7 @@ class Collaboration(QObject):
             self.window.notify("This conversation is unavailable to your account.")
             return
         self.window.switch_workspace(workspace)
-        # Read message through the user-JWT before deciding whether it is a reply.
+
         connected = self.connected()
         service = connected.account.service
 
@@ -1186,7 +1186,7 @@ class Collaboration(QObject):
 
     def manage_members(self, dialog):
         dialog.accept()
-        # Existing account page owns invitations, workspace roles and private-channel access.
+
         self.window.show_account()
 
     def profile(self, person):

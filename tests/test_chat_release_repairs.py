@@ -67,8 +67,8 @@ def test_each_reply_stays_between_its_prompt_and_the_next_prompt(qtbot, tmp_path
     window.finish_conversation_response("w", "c", parent, "Second answer", "Aedrova")
     window.connected.render_local_messages()
     messages = window.channel.messages[0].replies if thread else window.channel.messages
-    # The artificial second prompt is in the future; real sent timestamps below
-    # deliberately establish causality without relying on dictionary insertion.
+
+
     for r in window.connected.agent_replies[("w", "c")]:
         if r["body"] == "Second answer":
             r["created_at"] = (now + timedelta(seconds=2)).isoformat()
@@ -201,7 +201,7 @@ def test_actual_chat_job_finishes_without_reordering_or_replacing_prompts(
         qtbot.waitUntil(lambda: not window.dot_query, timeout=10000)
         qtbot.waitUntil(lambda: not window.connected.current_action and not window.connected.queue)
     window.connected.render_local_messages()
-    # Initial history loading is independent of these four new messages.
+
     bodies = [m.body for m in window.messages.conversation_model.messages if m.body != "Hello"]
     assert bodies[:3] == [
         "@Aedrova hello",

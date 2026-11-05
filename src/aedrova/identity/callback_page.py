@@ -21,7 +21,7 @@ def render_callback(success=True):
         else "Sign-in was not completed. Return to Aedrova to try again."
     )
     status = "CONTINUE IN THE APP" if success else "SIGN-IN PAUSED"
-    # All interpolated content is fixed application text or a local base64 PNG.
+
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

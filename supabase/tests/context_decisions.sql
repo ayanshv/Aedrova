@@ -40,7 +40,7 @@ set local request.jwt.claim.sub='60000000-0000-0000-0000-000000000002';
 select pg_temp.check_true((select count(*)=0 from public.context_decisions),'revocation removes decision access');
 select pg_temp.denied($q$select public.set_context_decision('61000000-0000-0000-0000-000000000001','Export CSV',false)$q$);
 reset role;
--- Service-side deletion must remove the decision, including its copied source text.
+
 delete from public.messages where id='61000000-0000-0000-0000-000000000002';
 select pg_temp.check_true((select count(*)=0 from public.context_decisions where message_id='61000000-0000-0000-0000-000000000002'),'deleted source cascades');
 set local role anon;

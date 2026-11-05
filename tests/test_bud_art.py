@@ -30,7 +30,7 @@ def test_all_six_assets_are_distinct_transparent_and_drawable(qapp):
 def test_identity_survives_shelf_and_custom_color_cache(qapp):
     row = dict(name="Orbit", role="Finance", appearance="research", color="#8844AA", shape="round")
     config = shelf_rows([row])[0]["config"]
-    assert appearance(config) == "research"  # Job does not override a chosen look.
+    assert appearance(config) == "research"
     assert appearance({"role": "Revenue analyst"}) == "finance"
     assert appearance({"shape": "squircle"}) == "designer"
     assert sprite("research", "#8844AA").cacheKey() == sprite("research", "#8844AA").cacheKey()

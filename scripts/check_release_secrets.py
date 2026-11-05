@@ -33,7 +33,7 @@ def main():
     paths = list((ROOT / "src").rglob("*.py"))
     paths += list((ROOT / "src/aedrova/desktop/assets").rglob("*"))
     if args.app:
-        # Third-party binaries are covered by dependency review, not this source pattern check.
+
         paths += list((args.app / "Contents/Resources/aedrova").rglob("*"))
         paths += [p for p in args.app.rglob("*") if p.name.startswith(".env")]
     findings = inspect_paths(paths)

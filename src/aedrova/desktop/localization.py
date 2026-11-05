@@ -23,7 +23,6 @@ from aedrova.desktop.controls import AppDialog, ChoiceBox
 from aedrova.desktop.dialogs import button, label
 from aedrova.localization import LANGUAGES, RTL, normalize
 
-# Offline essentials remain usable before sign-in or when the service is unavailable.
 HINDI = {
     "Workspace": "कार्यस्थान",
     "View": "दृश्य",
@@ -266,7 +265,7 @@ class Localizer(QObject):
                     continue
                 if widget.objectName() in ("MessageTimestamp", "AgentCommandOutput"):
                     continue
-                # Never translate text entered by the user, workspace names or model values.
+
                 if isinstance(widget, (QLineEdit, QPlainTextEdit)):
                     self.apply_value(widget, "placeholderText", "setPlaceholderText")
                 elif isinstance(widget, (QLabel, QAbstractButton, QAction)):
@@ -567,8 +566,8 @@ def show_language_settings(window):
         def operation():
             clone = None
             try:
-                # A separate transport avoids sharing the account refresh queue or
-                # an HTTP connection with a long-running workspace inventory.
+
+
                 clone = service.fork_for_context()
                 if not clone.user or str(clone.user.id) != user_id:
                     return {"error": True}

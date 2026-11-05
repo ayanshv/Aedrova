@@ -1,4 +1,4 @@
--- Buds presentation reuses existing Dot identities, grants and mention tokens.
+
 begin;
 alter table public.workspace_dots add column if not exists role text not null default '';
 alter table public.workspace_dots add column if not exists instructions text not null default '';
@@ -16,8 +16,8 @@ begin
  if p_role is null or p_instructions is null or length(p_role)>240 or length(p_instructions)>2000 then
   raise exception 'Keep the Bud purpose under 240 characters and instructions under 2000';
  end if;
- -- Existing RPC enforces fresh owner/admin, rate limit, immutable resource,
- -- optimistic version, maximum Bud count and validated identity values.
+
+
  select * into r from public.save_workspace_dot(p_id,p_workspace,p_version,p_provider,p_resource,p_name,p_color,p_shape);
  update public.workspace_dots set role=p_role,instructions=p_instructions where id=r.id returning * into r;
  return r;

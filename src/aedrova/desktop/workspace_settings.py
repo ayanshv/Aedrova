@@ -59,8 +59,8 @@ class WorkspaceSettingsView(QWidget):
         )
         control.setIconSize(QSize(20, 20))
         self.symbols.append((control, symbol))
-        # Native accessibility can toggle a checkable button without emitting
-        # clicked. Keep the selected navigation and visible page in sync.
+
+
         control.toggled.connect(lambda checked: self.show_section(key) if checked else None)
         self.group.addButton(control)
         self.buttons[key] = control

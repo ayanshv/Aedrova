@@ -125,8 +125,8 @@ class MeetingAction(QFrame):
             layout.addWidget(ParticipantAvatar(person, theme))
         self.count = label(f"{len(participants)} in meeting", "muted")
         self.count.setAccessibleName(f"{len(participants)} meeting participants")
-        # Attach before showing: an unparented visible label becomes a native
-        # window and can switch macOS away from a fullscreen call.
+
+
         layout.addWidget(self.count)
         self.count.setVisible(bool(meeting))
         layout.addStretch()

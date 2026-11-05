@@ -1,4 +1,4 @@
--- Auto routing must retain the same authority and privacy as explicit providers.
+
 begin;
 insert into auth.users(id,email,email_confirmed_at) values
  ('24000000-0000-0000-0000-000000000001','auto-owner@team.test',now()),

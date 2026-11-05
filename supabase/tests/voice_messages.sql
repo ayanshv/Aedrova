@@ -1,4 +1,4 @@
--- Disposable PostgreSQL proof of voice finalization and private-file boundaries.
+
 begin;
 insert into auth.users(id,email,email_confirmed_at) values
  ('b3000000-0000-0000-0000-000000000001','voice@test.local',now()),

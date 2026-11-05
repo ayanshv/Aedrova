@@ -198,9 +198,9 @@ class Dictation(QObject):
             self.pcm.clear()
             self.source = QAudioSource(device, fmt, self)
             self.source.setBufferSize(32000)
-            # Qt's native QAudio::State signal cannot reliably cross PySide's
-            # generic callable conversion on macOS. A no-argument Qt slot drops
-            # that unused enum and reads the source's authoritative error state.
+
+
+
             self.source.stateChanged.connect(self.audio_state)
             stream = self.source.start()
             if stream is None:
@@ -293,7 +293,7 @@ class Dictation(QObject):
             if not text.strip():
                 self.show_state("error", "No speech detected. Try again when ready.")
                 return
-            # Append safely to the CURRENT draft; never replace typing or send automatically.
+
             draft = self.composer.editor.toPlainText()
             if len(draft) + len(text) + 1 > 10000:
                 self.show_state(

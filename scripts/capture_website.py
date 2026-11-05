@@ -26,7 +26,7 @@ def capture(name, theme, tab=0):
     if app.focusWidget():
         app.focusWidget().clearFocus()
     QTest.qWait(250)
-    # centralWidget is the actual app content, excluding the native menu/title bars.
+
     if not window.centralWidget().grab().save(str(OUTPUT / name)):
         raise RuntimeError(f"Could not capture {name}")
 

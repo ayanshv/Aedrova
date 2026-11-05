@@ -1,5 +1,5 @@
 begin;
--- Incremental hardening; preserve existing RPCs, RLS and committed-message cursors.
+
 create index if not exists message_text_search on public.messages
  using gin(to_tsvector('simple'::regconfig,body));
 create index if not exists message_thread_sequence on public.messages(channel_id,parent_id,sequence);
@@ -49,7 +49,7 @@ revoke all on function aedrova_private.check_user_budget(text,integer,integer) f
 create function aedrova_private.limit_user_insert() returns trigger
 language plpgsql security definer set search_path='' as $$
 begin
- -- Replays do not add a message; existing send_message verifies its immutable contents.
+
  if tg_table_name='messages' and exists(select 1 from public.messages where id=new.id)
  then return new; end if;
  perform aedrova_private.check_user_budget(tg_argv[0],tg_argv[1]::integer,tg_argv[2]::integer);

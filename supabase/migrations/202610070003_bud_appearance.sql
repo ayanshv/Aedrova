@@ -1,4 +1,4 @@
--- Run after 202610070002_bud_profiles.sql. No change to access or provider authority.
+
 begin;
 alter table public.workspace_dots add column if not exists appearance text not null default 'auto';
 alter table public.workspace_dots drop constraint if exists bud_appearance_valid;

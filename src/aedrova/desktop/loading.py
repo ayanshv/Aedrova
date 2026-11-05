@@ -46,8 +46,8 @@ class Skeleton(QWidget):
     def paintEvent(self, event):  # noqa: N802
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        # Stylesheet-polished intermediate containers can inherit the platform's
-        # default Base color. Resolve the window palette, which owns the theme.
+
+
         colors = self.window().palette()
         parent = self.parentWidget()
         while parent is not None:

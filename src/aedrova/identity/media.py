@@ -14,8 +14,8 @@ class MediaClient:
         self.origin, self.token = validate_origin(origin), token
 
     def request(self, path, body=None):
-        # Free staging hosts can take over 35 seconds to wake. Never retry a POST
-        # whose publication outcome is ambiguous; allow one bounded verification wait.
+
+
         timeout = httpx.Timeout(90 if path == "/api/files/verify" else 35, connect=10)
         with httpx.Client(timeout=timeout, follow_redirects=False, trust_env=False) as client:
             with client.stream(
@@ -56,8 +56,8 @@ def warm_upload_verifier(origin):
         try:
             with httpx.Client(timeout=55, follow_redirects=False, trust_env=False) as client:
                 with client.stream("GET", origin + "/health"):
-                    pass  # No auth, file data, retained response or automatic retries.
+                    pass
         except httpx.HTTPError:
-            pass  # The real authenticated verifier remains authoritative.
+            pass
 
     Thread(target=wake, name="aedrova-upload-wake", daemon=True).start()

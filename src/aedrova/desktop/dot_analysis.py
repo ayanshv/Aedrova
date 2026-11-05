@@ -91,7 +91,7 @@ class QueryJob(QRunnable):
             private = self.private_history is not None
             encoded, retrieval_task = "", self.task
             if private:
-                # Validate before either tool selection or model inference sees private data.
+
                 history = [
                     {"role": row["role"], "body": row["body"]} for row in self.private_history[-40:]
                 ]
@@ -128,8 +128,8 @@ class QueryJob(QRunnable):
                     query=self.task,
                     preferred_channel=self.channel,
                 )
-            # A literal greeting needs no provider startup, tokens or tool process.
-            # Membership has already been checked above; never shortcut Bud settings.
+
+
             if not self.bud and self.task.strip().casefold().rstrip("!. ") in {
                 "hi",
                 "hello",
@@ -175,7 +175,7 @@ class QueryJob(QRunnable):
                         ),
                     )
                 if private:
-                    # Bounded, user-owned conversation data; never posted/indexed as team context.
+
                     context = replace(context, text=context.text + "\n" + encoded)
                 evidence = project / "context.jsonl"
                 evidence.touch(mode=0o600)
@@ -261,8 +261,8 @@ class QueryJob(QRunnable):
                     project,
                     prompt,
                     context=context.text,
-                    # Source-backed answers are withheld until citations, grants
-                    # and channel access are rechecked. General replies can stream.
+
+
                     emit=self.signals.reply.emit if not self.sources else None,
                 )
                 if private and (not result.strip() or len(result) > 20000):

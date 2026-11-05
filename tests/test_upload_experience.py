@@ -62,7 +62,7 @@ def test_cancelled_queued_upload_never_opens_an_isolated_session(qtbot, tmp_path
     service.fork_for_context = factory
     source = tmp_path / "brief.txt"
     source.write_text("Team brief")
-    # Hold the account queue long enough to cancel before preparation starts.
+
     window.account_dialog.busy = True
     window.connected.upload(str(source))
     window.composer.findChildren(UploadProgress)[0].cancel()
@@ -214,7 +214,7 @@ def test_media_echo_precedes_transfer_and_receipt_reconciles(qtbot, tmp_path, vo
         local = window.channel.messages[-1]
         assert local.id.startswith("upload-")
         assert local.attachment == source.name
-        assert not local.attachment_id  # Unverified bytes cannot be downloaded/shared.
+        assert not local.attachment_id
         assert local.delivery == "Sending…"
         qtbot.waitUntil(entered.is_set)
         assert not release.is_set()
@@ -224,7 +224,7 @@ def test_media_echo_precedes_transfer_and_receipt_reconciles(qtbot, tmp_path, vo
     assert not any(m.id.startswith("upload-") for m in window.channel.messages)
     assert sum(m.id == "verified-message" for m in window.channel.messages) == 1
     assert window.channel.messages[-1].delivery == ""
-    # A later realtime receipt replaces the acknowledgement rather than duplicating it.
+
     message = row("verified-message")
     window.connected.cache.setdefault("c", {})[message["id"]] = message
     window.connected.apply(service.snapshot(), [message], "w", "c")

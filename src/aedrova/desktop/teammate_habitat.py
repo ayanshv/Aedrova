@@ -28,7 +28,7 @@ def paint_orb(p, rect, config, *, phase=0.0, blink=False, look=0.0, rotation=0.0
     p.rotate(rotation)
     scale = 1 + math.sin(phase * 1.7) * 0.018
     p.scale(scale, scale)
-    # Planets stay legible at sidebar scale: one sphere, two eyes, one smile.
+
     r = min(rect.width(), rect.height()) * 0.37
     base = QColor(config.get("color", "#4388F5"))
     if not base.isValid():

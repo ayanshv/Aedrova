@@ -180,7 +180,7 @@ class RunLedger:
             ]
 
     def record_route(self, run_id, phase, decision, state):
-        # Store allowlisted metadata only, never prompts, exceptions or provider payloads.
+
         if decision.get("provider") not in {"codex", "claude_code"}:
             raise ValueError("Invalid routing provider")
         if decision.get("category") not in {"repair", "testing", "refactor", "implementation"}:

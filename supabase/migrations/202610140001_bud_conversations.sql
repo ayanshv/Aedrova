@@ -1,4 +1,4 @@
--- Private Bud history is deliberately excluded from shared chat/search/notifications.
+
 begin;
 create table public.bud_messages (
  id uuid primary key,

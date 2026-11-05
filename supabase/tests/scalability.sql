@@ -28,7 +28,7 @@ select public.accept_invitation(current_setting('test.invite'));
 select pg_temp.check_true((select count(*)=1 from public.search_workspace_context(current_setting('test.w')::uuid,'invoice')),'private channel excluded for ordinary member');
 set local request.jwt.claim.sub='90000000-0000-0000-0000-000000000001';
 reset role;
--- Force the fixture's current window to its cap, without sending 120 broadcasts.
+
 insert into aedrova_private.write_budgets values(
  '90000000-0000-0000-0000-000000000001','message',
  floor(extract(epoch from clock_timestamp())/60)::bigint*60,120)

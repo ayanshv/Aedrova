@@ -61,7 +61,7 @@ select pg_temp.denied('select public.finish_meeting_speech(''81000000-0000-0000-
 set local role authenticated;
 select public.review_meeting_segment('82000000-0000-0000-0000-000000000001',1,'Reviewed again',true);
 select pg_temp.check_true((select count(*)=0 from public.meeting_text_context(current_setting('test.c')::uuid)),'review cannot resurrect withdrawn AI access');
--- Expired in-flight work cannot be saved. Charged reservation attempts are not refunded.
+
 reset role;
 update aedrova_private.meeting_speech_jobs set deadline=now()-interval '1 second'
  where id='82000000-0000-0000-0000-000000000002';
@@ -70,7 +70,7 @@ select pg_temp.denied('select public.finish_meeting_speech(''81000000-0000-0000-
 set local role authenticated;
 select set_config('test.rev',(select revision::text from public.meetings where id=current_setting('test.m')::uuid),true);
 reset role;
--- Fill the shared budget with historical reservations; no provider call or audio involved.
+
 insert into aedrova_private.meeting_speech_jobs
  (id,meeting_id,user_id,revision,roster,digest,offset_ms,duration_ms,state)
  select gen_random_uuid(),current_setting('test.m')::uuid,

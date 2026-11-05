@@ -43,7 +43,7 @@ def save_binding(window, data, workspace=None):
         raise PermissionError("Sign in before connecting a project.")
     scope = workspace or window.workspace_id
     if binding(window, scope).get("folder") != data.get("folder"):
-        # A new project never inherits the prior folder's automatic authority.
+
         window.settings.remove(f"agent-permissions/{user.id}/{scope}")
         dialog = getattr(window, "build_dialog", None)
         if dialog and dialog.workspace == scope and dialog.pending:

@@ -20,7 +20,7 @@ reset role;
 update aedrova_private.storage_usage set limit_bytes=10485763 where workspace_id=current_setting('test.w')::uuid;
 set local role authenticated;
 select set_config('test.pending',public.reserve_attachment('a4000000-0000-0000-0000-000000000002',current_setting('test.c')::uuid,'pending.txt',3,repeat('a',64)),true);
--- A retry does not charge twice.
+
 select public.reserve_attachment('a4000000-0000-0000-0000-000000000002',current_setting('test.c')::uuid,'pending.txt',3,repeat('a',64));
 do $$ begin
  begin perform public.reserve_attachment('a4000000-0000-0000-0000-000000000003',current_setting('test.c')::uuid,'over.txt',1,repeat('a',64));
@@ -48,7 +48,7 @@ set local role authenticated;
 set local request.jwt.claim.sub='a3000000-0000-0000-0000-000000000001';
 select pg_temp.denied($q$select public.reserve_attachment('a4000000-0000-0000-0000-000000000002',current_setting('test.c')::uuid,'pending.txt',3,repeat('a',64))$q$);
 reset role;
--- Cascade deletion preserves a cleanup tombstone, and existing Storage metadata prevents ack.
+
 delete from public.attachments where object_path=current_setting('test.path');
 update aedrova_private.storage_cleanup set ready_at=now()-interval '1 hour';
 select set_config('test.lease',(select lease::text from public.claim_storage_cleanup()),true);
@@ -56,7 +56,7 @@ do $$ begin
  begin perform public.finish_storage_cleanup(current_setting('test.path'),current_setting('test.lease')::uuid);
  exception when raise_exception then return; end;
  raise exception 'FAIL existing object released'; end $$;
--- Fixture simulates Storage API deletion; production worker never deletes metadata in SQL.
+
 delete from storage.objects where name=current_setting('test.path');
 select pg_temp.check_true(public.finish_storage_cleanup(current_setting('test.path'),current_setting('test.lease')::uuid),'API deletion ack releases bytes');
 select pg_temp.check_true((select used_bytes=0 from aedrova_private.storage_usage where workspace_id=current_setting('test.w')::uuid),'all retired bytes released');

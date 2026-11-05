@@ -44,7 +44,7 @@ def change(window, value):
         if answer != QMessageBox.StandardButton.Yes:
             sync(window)
             return
-    # Changing authority never silently escalates an already-running task.
+
     dialog = getattr(window, "build_dialog", None)
     if dialog and dialog.workspace == window.workspace_id and dialog.pending:
         dialog.invalidate()

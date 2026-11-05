@@ -13,7 +13,7 @@ from PySide6.QtMultimedia import QAudioFormat, QMediaCaptureSession, QVideoFrame
 
 
 async def main():
-    # Initialize the actual bundled agent runtime without submitting a model prompt.
+
     with TemporaryDirectory(prefix="aedrova-sdk-") as checkout:
         options = ClaudeAgentOptions(
             cwd=checkout,
@@ -50,7 +50,7 @@ async def main():
             "live meeting connection",
             "camera/microphone capture",
             "screen sharing",
-            "network loss/echo cancellation", 
+            "network loss/echo cancellation",
         ],
     }
     Path("work").mkdir(exist_ok=True)

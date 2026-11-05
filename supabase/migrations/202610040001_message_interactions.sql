@@ -5254,7 +5254,7 @@ begin
  else
  delete from public.message_reactions where message_id=p_message and user_id=u and emoji=p_emoji;
  end if;
- -- Content-free notifications only, same private recipients as ordinary messages.
+
  for u in select wm.user_id from public.workspace_members wm
  where wm.workspace_id=w and ((not (select private from public.channels where id=m.channel_id)
  and wm.role<>'guest') or exists(select 1 from public.channel_members cm
@@ -5278,7 +5278,7 @@ begin
  delete from public.context_decisions where message_id=p_message;
  delete from public.attachments where message_id=p_message;
  delete from public.message_reactions where message_id=p_message;
- -- Preserve thread references, erase body, and invalidate any collected build context.
+
  update public.messages set body='Message unsent.',unsent_at=clock_timestamp() where id=p_message;
 end $$;
 create trigger message_unsend_notification after update of unsent_at on public.messages

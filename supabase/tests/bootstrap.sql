@@ -1,4 +1,4 @@
--- Test-only Supabase schema facsimile for embedded PostgreSQL. NEVER apply to Supabase.
+
 create role anon nologin;
 create role service_role nologin;
 create role authenticated nologin;
@@ -25,7 +25,7 @@ $$;
 grant usage on schema realtime to authenticated;
 grant select,insert on realtime.messages to authenticated;
 
--- Facsimile records payloads so tests can assert there is no private content in events.
+
 create table realtime.test_events(payload jsonb,event text,topic text,private boolean);
 create function realtime.send(payload jsonb,event text,topic text,private boolean default true)
 returns void language sql as $$ insert into realtime.test_events values(payload,event,topic,private) $$;

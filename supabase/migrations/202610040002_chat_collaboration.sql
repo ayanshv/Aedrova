@@ -30,7 +30,7 @@ create table public.chat_notifications(id bigint generated always as identity pr
 create index chat_notifications_user on public.chat_notifications(user_id,id desc);
 create index chat_marks_user on public.chat_marks(user_id,kind);
 create index chat_typing_expiry on public.chat_typing(expires_at);
--- All mutations use user-JWT RPCs; read policies continue to enforce channel access.
+
 alter table public.chat_profiles enable row level security;
 alter table public.chat_marks enable row level security;
 alter table public.chat_typing enable row level security;
@@ -47,7 +47,7 @@ create policy typing_visible on public.chat_typing for select to authenticated u
 create policy preferences_visible on public.chat_preferences for select to authenticated using(user_id=auth.uid() and aedrova_private.can_read_channel(channel_id));
 create policy notifications_visible on public.chat_notifications for select to authenticated using(user_id=auth.uid() and exists(
  select 1 from public.messages m where m.id=message_id and aedrova_private.can_read_channel(m.channel_id) and m.unsent_at is null));
--- Enforce channel posting policy for EVERY existing entry point, including uploads/replies.
+
 create function aedrova_private.check_posting() returns trigger language plpgsql security definer set search_path='' as $$
 begin
  if (select posting from public.channels where id=new.channel_id)='admins'
@@ -185,7 +185,7 @@ begin
  'preferences',coalesce((select jsonb_agg(to_jsonb(p)) from public.chat_preferences p join public.channels c on c.id=p.channel_id where c.workspace_id=p_workspace and p.user_id=u and aedrova_private.can_read_channel(c.id)),'[]'),
  'unseen',(select count(*) from public.chat_notifications n join public.messages m on m.id=n.message_id join public.channels c on c.id=m.channel_id where n.user_id=u and c.workspace_id=p_workspace and aedrova_private.can_read_channel(c.id) and m.unsent_at is null and n.seen_at is null));
 end $$;
--- Update metadata reconciliation so edits/pins/saves refresh even outside the newest sequence.
+
 create or replace function public.message_interactions(p_ids uuid[]) returns jsonb
 language plpgsql stable security definer set search_path='' as $$
 declare u uuid:=aedrova_private.require_user(); result jsonb;

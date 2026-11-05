@@ -15,12 +15,12 @@ REDIRECT_ALLOWLIST = f"http://127.0.0.1:{PORT}/auth/**"
 
 
 class LoopbackServer(HTTPServer):
-    # Reuse a closed listener after TCP TIME_WAIT, never an active listener.
-    # Each attempt still requires its own random callback path and PKCE verifier.
+
+
     allow_reuse_address = True
 
     def handle_error(self, request, client_address):
-        # Ignore incomplete/broken loopback requests without logging callback data.
+
         pass
 
     def get_request(self):
@@ -92,7 +92,7 @@ def google_sign_in(service, cancel=None, *, opener=webbrowser.open, timeout=180,
         finished = Event()
 
         def interrupt_stalled_request():
-            # Cancellation and the overall deadline also interrupt partial HTTP headers.
+
             while not finished.wait(0.05):
                 if cancel.is_set() or time.monotonic() >= deadline:
                     connection = getattr(server, "active_connection", None)

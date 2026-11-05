@@ -1,4 +1,4 @@
--- Allow only server-inspected bounded PCM voice messages through existing private uploads.
+
 begin;
 create or replace function public.finish_verified_attachment(p_user uuid,p_id uuid,p_sha256 text,p_type text,
  p_parent uuid default null) returns uuid language plpgsql security definer set search_path='' as $$
@@ -11,7 +11,7 @@ begin
  then raise exception 'Upload verification failed' using errcode='42501'; end if;
  perform set_config('request.jwt.claims',json_build_object('sub',p_user,'role','authenticated')::text,true);
  perform set_config('request.jwt.claim.sub',p_user::text,true);
- -- Original finalization rechecks channel access, actual stored size, expiry and reply scope.
+
  result:=public.finish_attachment(p_id,p_parent);
  update public.attachments set verified_type=p_type where id=p_id;
  return result;

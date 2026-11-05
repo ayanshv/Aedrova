@@ -151,7 +151,7 @@ def test_signed_in_meetings_opens_device_setup_and_signout_closes_it(qtbot, tmp_
     window, _ = setup(qtbot, tmp_path)
     window.select_tab(0)
     window.open_meeting_hub()
-    # Rebuilding chat keeps the call bar and the device action available.
+
     window._render_pages()
     assert window.pages.currentIndex() == 0
     assert window.call_buttons["camera"].accessibleName() == "Start video call"

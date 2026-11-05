@@ -211,7 +211,7 @@ def apply_review(review, *, guard=lambda: None):
     except Exception:
         for change in reversed(written):
             target = checked_target(root, change.path)
-            # Never overwrite edits made by somebody else during rollback.
+
             if read_version(target) == change.after:
                 if change.before:
                     shutil.copy2(receipt / "files" / change.path, target)

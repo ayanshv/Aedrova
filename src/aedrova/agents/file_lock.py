@@ -24,8 +24,8 @@ def open_private_file(path, *, truncate=False):
 
 
 def _open_windows(path):
-    # OPEN_REPARSE_POINT opens the link itself, allowing rejection before any write.
-    # DELETE sharing allows leased snapshots to be renamed by their owner.
+
+
     import ctypes
     import msvcrt
     from ctypes import wintypes
@@ -65,7 +65,7 @@ def _open_windows(path):
     except BaseException:
         kernel.CloseHandle(handle)
         raise
-    return fd  # The CRT descriptor now owns the handle.
+    return fd
 
 
 def lock_exclusive(stream):
@@ -83,7 +83,7 @@ def _lock_windows(stream):
 
     stream.seek(0)
     try:
-        # CRT locking permits a one-byte region beyond EOF; no file write needed.
+
         msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
     except OSError as error:
         if error.errno in {errno.EACCES, errno.EAGAIN, errno.EDEADLK}:

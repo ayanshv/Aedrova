@@ -78,7 +78,7 @@ def test_prompt_survives_thinking_result_second_prompt_and_refresh(
         composer.editor.setPlainText(text)
         submit(text)
         assert composer.editor.toPlainText() == ""
-        # Local echo is present before the asynchronous backend has acknowledged it.
+
         assert any(item["body"] == text for item in window.connected.outbox.values())
         view = window.thread_messages if thread else window.messages
         assert text in [item.body for item in view.conversation_model.messages]

@@ -334,7 +334,7 @@ class SocialDialog(AppDialog):
             if not destination:
                 self.status.setText("Choose and save a publishing channel in Accounts first.")
                 return
-            # Keep the ID stable across a lost save response.
+
             if not self.row:
                 self.row = {"id": str(uuid4()), "revision": 0, "state": "draft"}
             body = {

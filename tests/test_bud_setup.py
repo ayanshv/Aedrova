@@ -250,7 +250,7 @@ def test_color_controls_render_after_transition_and_change_preview(editor, qtbot
     assert dialog.custom_color_button.isVisible()
     for tile, value in dialog.swatch_buttons:
         assert tile.isVisible() and tile.width() == 28
-        # Render the real widget; an empty control fails even when its hit area exists.
+
         drawn = tile.grab().toImage()
         sample = drawn.pixelColor(drawn.width() // 2, drawn.height() // 2)
         expected = QColor(original_color(dialog.character.config) if value == "#4388F5" else value)
@@ -513,7 +513,7 @@ def test_required_setup_finishes_only_after_verified_tool_and_final_stage(editor
     gallery.connect_tool()
     assert rows[0]["status"] == "Connected"
     dialog.accept()
-    assert dialog.isVisible()  # A connected grant cannot skip the final handoff.
+    assert dialog.isVisible()
     dialog.next.click()
     assert dialog.pages.currentIndex() == 6
     for status in ("Needs authorization", "Disconnected", "Permission issue", "Error"):
@@ -523,7 +523,7 @@ def test_required_setup_finishes_only_after_verified_tool_and_final_stage(editor
     dialog.current()["status"] = "Connected"
     dialog.name.setText("Changed after authorization")
     dialog.accept()
-    assert dialog.isVisible()  # Old grants cannot authorize changed Bud settings.
+    assert dialog.isVisible()
     dialog.name.setText(rows[0]["name"])
     dialog.accept()
     assert not dialog.isVisible()

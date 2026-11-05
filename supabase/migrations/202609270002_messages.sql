@@ -21,7 +21,7 @@ returns uuid language plpgsql security definer set search_path='' as $$
 declare u uuid := aedrova_private.require_user(); w uuid; old public.messages;
 begin
  select workspace_id into w from public.channels where id=p_channel;
- -- Serialize against membership revocation and other writes in this workspace.
+
  perform 1 from public.workspaces where id=w for update;
  if not aedrova_private.can_read_channel(p_channel)
  or coalesce(aedrova_private.member_role(w),'') not in ('owner','admin','member')

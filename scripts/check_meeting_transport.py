@@ -33,7 +33,7 @@ async def probe(*, relay=False):
     service = api.LiveKitAPI(url, key, secret)
     rooms, sources, tasks, streams = [], [], [], []
     created = False
-    # Static screen shares legitimately send fewer frames than camera video.
+
     minimum = {'microphone': 20, 'camera': 20, 'screen_share': 5}
     received = {peer: {'microphone': 0, 'camera': 0, 'screen_share': 0} for peer in ('a', 'b')}
 
@@ -150,7 +150,7 @@ async def main():
         async with asyncio.timeout(45):
             report = await probe(relay=args.relay)
     except Exception as error:
-        # Native/network errors may contain credential-bearing URLs. Never echo them.
+
         print(transport_failure(error))
         return 1
     Path('work').mkdir(exist_ok=True)

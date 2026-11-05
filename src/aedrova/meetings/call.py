@@ -99,7 +99,7 @@ class CallWorker(QObject):
             phase = "native media initialization"
             self.room = rtc.Room()
             self._events()
-            # ADM provides speaker playout and AEC. No microphone source is created here.
+
             self.audio = rtc.PlatformAudio()
             self._audio_inventory()
             phase = "LiveKit connection"
@@ -115,7 +115,7 @@ class CallWorker(QObject):
             self.tasks.add(heartbeat)
             while not self.stop_requested.is_set():
                 if heartbeat.done():
-                    # Propagate access loss; never continue media without leases.
+
                     heartbeat.result()
                 self._send_frames()
                 await asyncio.sleep(0.03)
@@ -229,8 +229,8 @@ class CallWorker(QObject):
                 )
                 if chunk is None:
                     continue
-                # Skip capture while awaiting the server; bounded capacity discards old frames.
-                # Never queue a stale recording or automatically retry a failed provider call.
+
+
                 if same_capture(chunk.permit, self.speech_permit()):
                     self.emit_speech_state("Processing your speech · capture paused")
                     await asyncio.to_thread(self.client.transcribe, self.meeting, chunk)
@@ -317,7 +317,7 @@ class CallWorker(QObject):
         if self.cleaning or self.stop_requested.is_set():
             return
         if track.kind != rtc.TrackKind.KIND_VIDEO:
-            return  # ADM handles remote audio playback, without an audio recorder.
+            return
         if not self.receive_video:
             publication.set_subscribed(False)
             return
@@ -354,7 +354,7 @@ class CallWorker(QObject):
                     frame.width * 4,
                     QImage.Format.Format_RGBA8888,
                 ).copy()
-                # A bounded latest-frame mailbox avoids flooding the Qt event queue.
+
                 with self.frames_lock:
                     self.frames[key] = image
         except asyncio.CancelledError:
@@ -404,7 +404,7 @@ class CallWorker(QObject):
             try:
                 self.loop.call_soon_threadsafe(self._schedule, kind, enabled)
             except RuntimeError:
-                pass  # The worker loop finished between the GUI check and dispatch.
+                pass
 
     def _schedule(self, kind, enabled):
         if kind in {"consent", "withdraw_text", "end"} or (kind == "microphone" and not enabled):
@@ -619,4 +619,4 @@ class CallWorker(QObject):
                         asyncio.to_thread(self.client.wrapup, self.meeting), 8
                     )
             except Exception:
-                pass  # Durable server lease still expires without heartbeat.
+                pass

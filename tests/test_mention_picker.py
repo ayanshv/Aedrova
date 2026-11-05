@@ -47,8 +47,8 @@ def test_groups_arrow_selection_avatar_and_routing(qtbot):
         r for r in rows if r.data(Qt.ItemDataRole.UserRole) == ("Orbit", "<@dot:d1|Orbit>")
     )
     assert not orbit.icon().isNull()
-    qtbot.keyClick(c.editor, Qt.Key.Key_Down)  # Reviewer
-    qtbot.keyClick(c.editor, Qt.Key.Key_Down)  # Orbit, skipping section heading
+    qtbot.keyClick(c.editor, Qt.Key.Key_Down)
+    qtbot.keyClick(c.editor, Qt.Key.Key_Down)
     qtbot.keyClick(c.editor, Qt.Key.Key_Return)
     assert c.editor.toPlainText() == "@Orbit "
     assert not sent and c.mention_list.isHidden()

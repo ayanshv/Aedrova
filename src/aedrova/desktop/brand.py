@@ -16,8 +16,8 @@ def brand_image():
     image = QImage(str(ASSETS / "aedrova.png"))
     if image.isNull():
         raise RuntimeError("Aedrova brand artwork is missing")
-    # Frame the visible mark, excluding near-transparent export noise.
-    # Keep the original asset intact and leave room around its soft halo.
+
+
     points = [
         (x, y)
         for y in range(image.height())
@@ -30,8 +30,8 @@ def brand_image():
 
 
 def app_icon():
-    # A runtime NSApplication icon overrides Apple's adaptive bundle renditions.
-    # Let Launch Services choose Default/Dark/Clear/Tinted, including Auto mode.
+
+
     resources = Path(sys.executable).parent.parent / "Resources"
     if (
         sys.platform == "darwin"

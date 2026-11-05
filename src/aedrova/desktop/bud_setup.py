@@ -199,9 +199,9 @@ def build_setup(d, window):
         tile.setIconSize(QSize(52, 52))
         tile.setMinimumHeight(86)
         tile.setAccessibleName("Choose " + title + " appearance")
-        # Native accessibility activates checkable buttons through their checked
-        # state. Listen to that state so keyboard/assistive selection also updates
-        # the actual specialty and connector recommendations.
+
+
+
         tile.toggled.connect(lambda checked, v=value: choose_look(d, v) if checked else None)
         grid.addWidget(tile, index // 3, index % 3)
         d.appearance_buttons.append((tile, value))
@@ -293,8 +293,8 @@ def build_setup(d, window):
 
     build_personality(d, personality)
 
-    # Keep profile fields as state holders for existing save/version semantics.
-    # The user-facing tool step is the shared connector gallery, mounted inline.
+
+
     tools = QWidget(panel)
     d.tools_layout = QVBoxLayout(tools)
     d.tools_layout.setContentsMargins(0, 12, 0, 0)
@@ -362,8 +362,8 @@ def build_setup(d, window):
         field.textChanged.connect(d.preview)
     for control in (d.color, d.shape, d.appearance):
         control.currentIndexChanged.connect(d.preview)
-    # Do not composite the entire page: descendant SpringButtons have their own
-    # scale effects, which Cocoa can omit inside a parent opacity effect.
+
+
     d.opacity = QGraphicsOpacityEffect(d.character)
     d.character.setGraphicsEffect(d.opacity)
     d.transition = QPropertyAnimation(d.opacity, b"opacity", d)

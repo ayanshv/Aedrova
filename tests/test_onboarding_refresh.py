@@ -43,7 +43,7 @@ def test_free_activation_is_explicit_scoped_and_cannot_be_double_clicked(
     )
     widget = SettingsDialog(window)
     qtbot.addWidget(widget)
-    # Initial read resolves to no_plan and displays an action for this owner.
+
     _, read_complete = queued.pop()
     read_complete({"status": "no_plan"})
     assert not widget.activate_ai.isHidden()

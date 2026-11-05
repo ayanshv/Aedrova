@@ -88,7 +88,7 @@ def maintain(directory, *, now=None, dry_run=False, max_snapshots=3, protected=(
     now = time.time() if now is None else now
     compared = 0
     deadline = time.monotonic() + 5
-    # Bounded directory work per pass; subsequent builds/maintenance handle the rest.
+
     cursor = root / ".retention-cursor"
     last = ""
     if cursor.is_file() and not cursor.is_symlink() and cursor.stat().st_size <= 36:
@@ -124,7 +124,7 @@ def maintain(directory, *, now=None, dry_run=False, max_snapshots=3, protected=(
                     continue
                 if any(parent.glob("apply-backup-*")):
                     continue
-                # Unknown files can be user recovery material; never discard them.
+
                 if {p.name for p in parent.iterdir()} - {
                     "project",
                     "baseline",
@@ -157,14 +157,14 @@ def maintain(directory, *, now=None, dry_run=False, max_snapshots=3, protected=(
                     continue
                 result["snapshots"].append(str(parent))
                 if not dry_run:
-                    # Rename while holding the lease so new jobs cannot acquire the old path.
+
                     trash = root / (".expired-" + str(uuid4()))
                     parent.rename(trash)
                     shutil.rmtree(trash)
             finally:
                 lease.close()
         except (OSError, ValueError, KeyError, TypeError):
-            # Missing/changed/linked files or active jobs are preserved, never followed.
+
             continue
     if candidates and not dry_run:
         try:

@@ -322,7 +322,7 @@ def test_local_state_is_not_shared_between_app_instances():
 
 
 def test_keyboard_shortcuts_and_focus(window, qtbot):
-    # Activate Qt's test window without stealing focus from the user's foreground app.
+
     with pytest.warns(DeprecationWarning, match="setActiveWindow"):
         QApplication.setActiveWindow(window)
     qtbot.waitUntil(window.isActiveWindow)
@@ -331,7 +331,7 @@ def test_keyboard_shortcuts_and_focus(window, qtbot):
     qtbot.keyClicks(window.dialog.search, "engineering")
     qtbot.keyClick(window.dialog.search, Qt.Key.Key_Return)
     assert window.channel_id == "engineering"
-    # Activate Qt's test window without stealing focus from the user's foreground app.
+
     with pytest.warns(DeprecationWarning, match="setActiveWindow"):
         QApplication.setActiveWindow(window)
     qtbot.waitUntil(window.isActiveWindow)
@@ -381,7 +381,7 @@ def test_spring_motion_reacts_without_moving_layout(window, qtbot):
     assert control.geometry() == original
     qtbot.mousePress(control, Qt.MouseButton.LeftButton)
     qtbot.waitUntil(lambda: control.motion.effect.get_scale() < 0.995)
-    # Release outside the control: test the physical spring without opening a dialog.
+
     from PySide6.QtCore import QPoint
 
     qtbot.mouseRelease(control, Qt.MouseButton.LeftButton, pos=QPoint(-10, -10))
@@ -435,7 +435,7 @@ def test_accent_is_a_small_fraction_of_the_rendered_workspace(window, qtbot, the
     window.set_theme(theme_name)
     image = window.grab().toImage()
     accented = total = 0
-    # Coarse screenshot sampling: strongly chromatic blue, not antialiased neutral text.
+
     for y in range(0, image.height(), 12):
         for x in range(0, image.width(), 12):
             color = image.pixelColor(x, y)
@@ -450,10 +450,10 @@ def test_brand_artwork_icon_and_reduced_motion(window, qtbot):
     artwork = brand_image()
     assert not artwork.isNull()
     assert artwork.hasAlphaChannel()
-    assert artwork.width() < 450  # Transparent source margins do not shrink the mark.
+    assert artwork.width() < 450
     assert not app_icon().pixmap(128, 128).isNull()
     marks = window.findChildren(BrandMark)
-    assert len(marks) == 2  # Header and chat; the old branding footer became the AI team shelf.
+    assert len(marks) == 2
     mark = marks[0]
     mark.animate(1.0)
     qtbot.waitUntil(lambda: mark.get_lift() > 0.5)
@@ -509,7 +509,7 @@ def test_invitation_exit_opens_hidden_chat_dashboard(window, qtbot):
     assert not account.isVisible()
     assert window.tab_buttons[0].isChecked()
     assert account.generated_code.text() == ""
-    # Reopening account preserves the same session-owning dialog instance.
+
     window.show_account()
     assert window.account_dialog is account
 

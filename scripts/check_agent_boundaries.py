@@ -32,8 +32,8 @@ fixture.Handler.do_GET = canary_request
 
 
 def adversarial(self):
-    # Wrap the known fixture's tool arguments to ask the actual shell to escape.
-    # All targets and credentials here are synthetic; no personal files are read.
+
+
     old_dumps = fixture.json.dumps
 
     def dumps(value, *args, **kwargs):
@@ -49,7 +49,7 @@ def adversarial(self):
         if isinstance(value, dict) and value.get("file_path", "").endswith(
             "managed-proof-claude_code.txt"
         ):
-            # Replace Claude's fixture Write with Bash to exercise its actual sandbox.
+
             value = {
                 "timeout": 5000,
                 "command": f"/bin/cat {shlex.quote(str(protected))}; "
@@ -86,8 +86,8 @@ if __name__ == "__main__":
     try:
         fixture.main(verify_claude_edits=not network_probe)
     except SystemExit:
-        # A forbidden network destination can wait in Claude's proxy permission
-        # path. The fixture cancels after 30s; this is not a successful normal build.
+
+
         report = json.loads(Path("work/managed-protocol.json").read_text())
         cancelled = True
         assert network_probe
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     assert all("AEDROVA_BUILD_TOKEN=local-build-token" not in text for text in seen)
     assert not canary, "A sandboxed tool reached the loopback network canary"
     if network_probe:
-        # M13A requires a denial response, not an accepted timeout.
+
         assert not cancelled, "Forbidden network command stalled instead of returning denial"
         print("PASS network canary not reached; Claude command denied without stalling")
     else:

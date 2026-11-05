@@ -64,7 +64,7 @@ class Connection:
 
     @classmethod
     def for_application(cls):
-        # A distributed app cannot be redirected by ambient environment or old QSettings.
+
         if getattr(sys, "frozen", False):
             return cls.from_bundle()
         return cls.from_environment() or cls.from_bundle()
@@ -77,7 +77,7 @@ class IdentityService:
             path = Path(__file__).parents[1] / "desktop/assets/public-config.json"
             configuration = json.loads(path.read_text()) if path.exists() else {}
             meeting_context_enabled = configuration.get("meeting_context_enabled", False)
-            # Internal staging source can opt in; public packaged builds use their manifest.
+
             if (
                 not getattr(sys, "frozen", False)
                 and os.getenv("AEDROVA_DEPLOYMENT_ENVIRONMENT") == "staging"
@@ -176,7 +176,7 @@ class IdentityService:
         try:
             self.client.auth.sign_out({"scope": "local"})
         finally:
-            # Discard the entire client even if remote revocation is unavailable.
+
             self._bud_catalog_cache = {}
             self._bud_catalog_scope = None
             self.user = None
@@ -185,7 +185,7 @@ class IdentityService:
     def _authenticated(self):
         if self.client is None or self.user is None:
             raise PermissionError("Sign in first.")
-        # SDK get_session refreshes expired sessions; validate against Auth on each action.
+
         try:
             session = self.client.auth.get_session()
             if session is None:
@@ -225,7 +225,7 @@ class IdentityService:
             )
         except Exception as error:
             if getattr(error, "code", None) == "PGRST202":
-                # Older hosts must not show an invented plan or allowance.
+
                 return None
             raise
 
@@ -248,7 +248,7 @@ class IdentityService:
             return self.client.rpc("save_workspace_bud", parameters).execute().data
         except Exception as error:
             if getattr(error, "code", None) == "PGRST202":
-                # Older installations can save an identity, but never silently lose notes.
+
                 if parameters.get("p_role") or parameters.get("p_instructions"):
                     raise ValueError(
                         "Bud purpose and instructions need the Buds SQL update. "
@@ -329,7 +329,7 @@ class IdentityService:
             .execute()
             .data
         )
-        # Every query runs with the user's JWT and is filtered by PostgreSQL RLS.
+
         invitations = (
             self.client.table("workspace_invitations")
             .select("id,workspace_id,email,role,expires_at,accepted_at,revoked_at")
@@ -408,7 +408,7 @@ class IdentityService:
         except APIError as exc:
             if exc.code != "PGRST202":
                 raise
-            # Keep established chat working until the owner applies the new migration.
+
             self.interactions_available = False
             return []
         self.interactions_available = True
@@ -463,8 +463,8 @@ class IdentityService:
                 path, avatar, {"content-type": "image/png", "upsert": "false"}
             )
             data = {**data, "avatar_path": path}
-        # A timeout may occur after the profile was saved. Never delete a potentially
-        # published avatar on an uncertain outcome.
+
+
         return self.rpc("save_chat_profile", {"p_data": data})
 
     def avatar_bytes(self, path):
@@ -873,7 +873,7 @@ class IdentityService:
         )
 
     def realtime_credentials(self):
-        # Called only by the serialized transport worker, after a validated read.
+
         session = self.client.auth.get_session()
         return (
             self.connection.url,
@@ -928,16 +928,16 @@ class IdentityService:
                 "/api/files/verify", {"identifier": identifier, "parent": parent}
             )["message"]
         except UploadCancelled:
-            # An interrupted multipart request may leave a private object; never publish it.
+
             try:
                 self.client.storage.from_("aedrova-files").remove([object_path])
                 self.rpc("abandon_attachment", {"p_id": identifier})
             except Exception:
-                pass  # Existing bounded orphan cleanup remains authoritative.
+                pass
             return None
         except Exception:
-            # No automatic publish/retry after ambiguous Storage or verification failures.
-            # Pending bytes are private and use the bounded orphan cleanup lifecycle.
+
+
             raise
 
     def download_attachment(self, identifier):

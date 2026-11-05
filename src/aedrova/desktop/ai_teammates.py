@@ -531,7 +531,7 @@ class TeammatesDialog(AppDialog):
 
     def select_suggested_connector(self):
         if self.connectors.resource.text().strip() or self.connectors.token.text():
-            return  # Never overwrite a connection the user is already configuring.
+            return
         for tool in self.suggested_tools:
             at = self.connectors.kind.findData(tool)
             if at >= 0:

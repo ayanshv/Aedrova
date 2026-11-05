@@ -23,7 +23,7 @@ def run(runner, project, prompt, *, plan, command, env):
     with TemporaryDirectory(prefix="aedrova-approval-runtime-") as home:
         os.chmod(home, 0o700)
         if not runner.managed:
-            # Copy authentication only, never personal config, rules, MCPs or hooks.
+
             source = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))) / "auth.json"
             if source.is_file():
                 destination = Path(home) / "auth.json"
@@ -141,7 +141,7 @@ def run(runner, project, prompt, *, plan, command, env):
                             continue
                         method, params = event["method"], event.get("params") or {}
                         if "id" in event:
-                            # Unknown/new authority requests fail closed. Never acceptForSession.
+
                             same_scope = (
                                 bool(thread and turn)
                                 and params.get("threadId") == thread

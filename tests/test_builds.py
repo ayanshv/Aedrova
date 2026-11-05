@@ -397,7 +397,7 @@ def test_build_plan_then_approval_and_worker_cleanup(qtbot, tmp_path, monkeypatc
     from aedrova.desktop.builds import BuildDialog
 
     window, source = setup(qtbot, tmp_path)
-    # Same authenticated identity, but a deterministic transport for all context pages.
+
     source.context_page = service().context_page
     source.attachments_for = lambda ids: []
     plans = []
@@ -413,8 +413,8 @@ def test_build_plan_then_approval_and_worker_cleanup(qtbot, tmp_path, monkeypatc
             else "Implemented; tests passed."
         )
 
-    # Auto routing must use the same synthetic provider as the mocked runner.
-    # CI deliberately has no installed/authenticated coding CLI.
+
+
     from aedrova.agents.routing import Candidate
 
     monkeypatch.setattr(

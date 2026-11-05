@@ -52,7 +52,7 @@ def executable(name):
 
 
 def environment(*, anthropic=False):
-    # Never forward the desktop backend/session configuration to a coding process.
+
     allowed = {
         "HOME",
         "USER",
@@ -86,7 +86,7 @@ def codex_permissions(project, *, plan):
         str(root): "read" if plan else "write",
         str(root.parent / "workspace-context.jsonl"): "read",
     }
-    # System tool installations contain build dependencies; personal home stays denied.
+
     for path in ("/opt/homebrew", "/usr/local"):
         if Path(path).is_dir():
             paths[path] = "read"
@@ -272,7 +272,7 @@ def pipe_events(process):
                     break
         except OSError:
             if not stopped.is_set():
-                # EOF makes the provider completion check fail closed.
+
                 while not stopped.is_set():
                     try:
                         chunks.put((stream, b""), timeout=0.1)
@@ -335,7 +335,7 @@ class LocalRunner:
     def observe_command(self, command, output, exit_code):
         from aedrova.delivery.evidence import MAX_COMMANDS, command_result, project_fingerprint
 
-        # Keep a visible coverage flag rather than unbounded provider logs.
+
         if len(self.command_results) <= MAX_COMMANDS:
             record = command_result(command, output, exit_code)
             try:
@@ -369,14 +369,14 @@ class LocalRunner:
                 self.cancelled,
                 emit or (lambda _text: None),
             )
-        # Explicit local mode retains the user's configured provider; an included
-        # gateway error never reaches this branch or silently consumes personal usage.
+
+
         return self.run(provider, project, prompt, plan=True)
 
     def codex(self, project, prompt, *, plan):
         if self.managed:
-            # An empty private home prevents an incompatible CLI from silently
-            # consuming the customer's personal ChatGPT login instead of our gateway.
+
+
             with TemporaryDirectory(prefix="aedrova-managed-codex-") as managed_home:
                 return self._codex(project, prompt, plan=plan, managed_home=managed_home)
         return self._codex(project, prompt, plan=plan)
@@ -479,7 +479,7 @@ class LocalRunner:
             if sys.platform == "win32":
                 from aedrova.agents.windows_job import WindowsJob
 
-                # Establish lifetime containment before sending any build instructions.
+
                 job = WindowsJob(process)
                 self.job = job
             if self.cancelled.is_set():
@@ -546,8 +546,8 @@ class LocalRunner:
                             completed = True
                             self.usage = event.get("usage") or {}
                         elif kind == "error":
-                            # The CLI can emit recoverable reconnect errors before success.
-                            # Let its existing retry loop finish; never restart a coding turn.
+
+
                             last_error = str(event.get("message") or event.get("error") or "")
                             self.emit("Codex is recovering; waiting for its final status…")
                         elif kind == "turn.failed":
@@ -603,7 +603,7 @@ class LocalRunner:
             ) from exc
 
         async def permission(tool, data, _context):
-            # Defensive fallback: all supported tools pass the PreToolUse gate below.
+
             return PermissionResultDeny(message="Use the explicit Aedrova tool approval gate.")
 
         tool_count = 0
@@ -678,7 +678,7 @@ class LocalRunner:
 
         clean = {key: "" for key in os.environ}
         clean.update(environment(anthropic=True))
-        # Remove provider credentials from Bash children; the provider process retains auth.
+
         clean["CLAUDE_CODE_SUBPROCESS_ENV_SCRUB"] = (
             "ANTHROPIC_API_KEY,ANTHROPIC_AUTH_TOKEN,AEDROVA_BUILD_TOKEN"
         )
@@ -693,8 +693,8 @@ class LocalRunner:
                     "ANTHROPIC_AUTH_TOKEN": "",
                     "DISABLE_NONESSENTIAL_TRAFFIC": "1",
                     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-                    # Keep a CLI update from silently adding unreviewed gateway
-                    # capabilities or new billable hosted tools.
+
+
                     "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS": "1",
                     "CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK": "1",
                 }
@@ -707,8 +707,8 @@ class LocalRunner:
             tools=["Read", "Glob", "Grep"]
             if plan
             else ["Read", "Glob", "Grep", "Edit", "Write", "Bash"],
-            # PreToolUse still supplies the explicit Aedrova allow/deny decision.
-            # Other permission requests (including new proxy domains) fail immediately.
+
+
             permission_mode="dontAsk",
             can_use_tool=permission,
             hooks={

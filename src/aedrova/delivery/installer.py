@@ -98,7 +98,7 @@ def install(*, progress=lambda _: None, cancelled=lambda: False, root=None, fetc
         for entry, limit in ((binary, MAX_BINARY), (license_file, 100000)):
             if entry.file_size > limit or stat.S_ISLNK(entry.external_attr >> 16):
                 raise ValueError("Invalid GitHub archive member.")
-        # Read only these exact members. Never extract paths from an archive to disk.
+
         executable, license_text = archive.read(binary), archive.read(license_file)
     base = Path(root) if root is not None else install_root()
     destination = base / VERSION / arch

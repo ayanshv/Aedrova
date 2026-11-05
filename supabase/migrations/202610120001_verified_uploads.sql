@@ -1,4 +1,4 @@
--- Server-inspected immutable uploads; existing published attachments remain readable.
+
 begin;
 alter table public.attachments add column verified_type text;
 revoke execute on function public.finish_attachment(uuid,uuid) from public,anon,authenticated;
@@ -13,7 +13,7 @@ begin
  then raise exception 'Upload verification failed' using errcode='42501'; end if;
  perform set_config('request.jwt.claims',json_build_object('sub',p_user,'role','authenticated')::text,true);
  perform set_config('request.jwt.claim.sub',p_user::text,true);
- -- Original finalization rechecks channel access, actual stored size, expiry and reply scope.
+
  result:=public.finish_attachment(p_id,p_parent);
  update public.attachments set verified_type=p_type where id=p_id;
  return result;
@@ -33,7 +33,7 @@ begin
  if a.id is null then return; end if;
  if a.uploader_id is distinct from u or a.message_id is not null
  then raise exception 'Upload cannot be cancelled' using errcode='42501'; end if;
- -- Storage accounting retains the charge until the existing cleanup lease deletes bytes.
+
  delete from public.attachments where id=p_id;
 end $$;
 revoke all on function public.abandon_attachment(uuid) from public,anon;

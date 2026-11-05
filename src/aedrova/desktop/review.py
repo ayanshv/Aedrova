@@ -108,7 +108,7 @@ class ReviewDialog(AppDialog):
         self.set_busy(True)
         self.callback = completed
         self.status.setText("Checking access and preparing the action…")
-        # Reserve the worker immediately so repeated clicks cannot enqueue another action.
+
         self.job = True
 
         def connect():

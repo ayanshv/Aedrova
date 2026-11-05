@@ -161,8 +161,8 @@ async def probe(accounts, origin):
         await asyncio.gather(runs[-1], return_exceptions=True)
         await until(lambda: not first.room.remote_participants)
         report['leave_updates_peer_roster'] = 'passed'
-        # Cloud revocation cutoff must elapse before a genuinely new join token.
-        # Guard sweep is every 3s; lease reuse also waits out its 2s cutoff grace.
+
+
         await asyncio.sleep(8)
         print('Checking leave and authorized rejoin.', flush=True)
         second = await connect(1)

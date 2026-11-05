@@ -150,8 +150,8 @@ sys.stdin.read()
     binary.write_text(f"#!{sys.executable}\n" + body)
     binary.chmod(0o700)
     monkeypatch.setattr("aedrova.agents.runtime.executable", lambda _: str(binary))
-    # Windows cannot execute a POSIX shebang script directly. Keep real stdio,
-    # process-tree cleanup and permission exchange under test through Python.
+
+
     original = subprocess.Popen
 
     def launch(command, *args, **kwargs):

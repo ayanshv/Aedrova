@@ -15,8 +15,8 @@ class BudClient(ManagedClient):
     """Allow a sleeping staging host to wake in the existing background worker."""
 
     def request(self, path, body=None, *, timeout=90):
-        # Only display catalog metadata; never cache messages, grants, resource
-        # contents, OAuth status or permission checks used by agent execution.
+
+
         cache = getattr(self, "_catalog_cache", {})
         cacheable = body is None and path in {"/api/dots/providers", "/api/buds/connectors"}
         if body is not None:
@@ -77,7 +77,7 @@ def mention(text, rows):
         match = mention_match(text, row)
         if match:
             if not text[: match.start()].strip():
-                return row  # The recipient wins over longer names mentioned in the request.
+                return row
             matches.append(row)
     return matches[0] if matches else None
 

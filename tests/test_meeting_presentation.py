@@ -97,7 +97,7 @@ def test_pause_stops_capture_and_waits_for_unpublish_before_resume(qtbot):
     assert dialog.share_paused and not dialog.states["screen"]
     assert not dialog.pause_share_button.isEnabled()
     assert ("screen", False) in worker.calls
-    dialog.media_state("screen", True)  # Late publish receipt cannot undo pause.
+    dialog.media_state("screen", True)
     assert dialog.share_paused and not dialog.states["screen"]
     dialog.media_state("screen", False)
     assert dialog.share_paused and dialog.pause_share_button.isEnabled()

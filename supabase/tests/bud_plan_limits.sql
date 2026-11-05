@@ -1,6 +1,6 @@
 begin;
 create schema if not exists aedrova_billing;
--- Disposable test ledger matching the private backend's verified subscription fields.
+
 create table if not exists aedrova_billing.billing (
  workspace text primary key, plan text, status text, period_start bigint, period_end bigint
 );
@@ -38,7 +38,7 @@ set local role authenticated;
 select pg_temp.assert_cap(public.workspace_bud_capacity(current_setting('test.capw')::uuid)->>'limit'='15','Team cap');
 do $$begin for i in 6..15 loop perform public.save_workspace_bud(null,current_setting('test.capw')::uuid,0,'github','cap/team'||i,'Team '||i); end loop; end$$;
 select pg_temp.at_limit(current_setting('test.capw')::uuid);
--- A subspace shares its subscription capacity, rather than multiplying it.
+
 select set_config('test.capchild',public.create_subspace(current_setting('test.capw')::uuid,'Child')::text,true);
 select pg_temp.assert_cap(public.workspace_bud_capacity(current_setting('test.capchild')::uuid)->>'used'='15','subspaces share capacity');
 select pg_temp.at_limit(current_setting('test.capchild')::uuid);

@@ -223,8 +223,8 @@ class ProductMemory(AppDialog):
             try:
                 return action()
             except Exception as error:
-                # Queue failures otherwise bypass the completion callback. Always restore
-                # controls and clear cached evidence without exposing transport secrets.
+
+
                 return {
                     "error": "Memory request failed",
                     "conflict": getattr(error, "code", None) == "PT409",

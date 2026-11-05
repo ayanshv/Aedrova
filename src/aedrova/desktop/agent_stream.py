@@ -142,8 +142,8 @@ class ActivityRow(QFrame):
             layout.addLayout(body)
 
     def set_message(self, text):
-        # Same safe Markdown parser as ordinary chat, with raw HTML disabled and
-        # image nodes removed. QLabel must not resolve remote or local resources.
+
+
         from aedrova.desktop.conversation import markdown_html
 
         self.message.setProperty("aedrovaSourceText", text)
@@ -325,9 +325,9 @@ class AgentStream(QScrollArea):
             heights.append(row_height if row_height >= 0 else row_layout.sizeHint().height())
         height = max(1, sum(heights) + self.layout.spacing() * max(0, len(heights) - 1))
         if self.inline:
-            # A scroll area otherwise retains its previous viewport/content height
-            # after a long transcript is replaced by a short final response. The
-            # conversation owns scrolling; both must match the live row exactly.
+
+
+
             self.widget().setFixedHeight(height)
             self.setFixedHeight(height)
         return height

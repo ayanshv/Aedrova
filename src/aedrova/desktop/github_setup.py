@@ -187,7 +187,7 @@ class GitHubSetup(AppDialog):
         self.status.setText("Requesting a one-time code from GitHub…")
         self.process = QProcess(self)
         env = github_environment()
-        # Show the browser action here; do not spawn an unattended browser from a worker.
+
         env.update(GH_BROWSER="/usr/bin/true", BROWSER="/usr/bin/true")
         environment = QProcessEnvironment()
         for key, value in env.items():
@@ -211,7 +211,7 @@ class GitHubSetup(AppDialog):
                 "--skip-ssh-key",
             ],
         )
-        # FailedToStart may synchronously clear self.process during start().
+
         if self.process is not None:
             self.process.closeWriteChannel()
             self.timeout.start(10 * 60 * 1000)

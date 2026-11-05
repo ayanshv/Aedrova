@@ -75,7 +75,7 @@ def test_message_drag_copies_partial_multiline_unicode_and_keyboard_selection(qt
     assert cursor and cursor.hasSelection() and not threads
     view.copy_current()
     assert QApplication.clipboard().text() == cursor.selectedText()
-    # Exercise actual paint with the rounded selection, then standard keyboard copy.
+
     assert not view.grab().isNull()
     view.setFocus()
     qtbot.keySequence(view, QKeySequence.StandardKey.SelectAll)
