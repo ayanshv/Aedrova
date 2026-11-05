@@ -80,7 +80,7 @@ class GitHub:
             cwd=Path.home(),
         )
         if result.returncode:
-            # Provider output may include credentials or private response bodies.
+
             raise ValueError(
                 "GitHub request failed. Check gh auth status, repository permissions and "
                 "network access. The remote may have changed; inspect it before retrying."

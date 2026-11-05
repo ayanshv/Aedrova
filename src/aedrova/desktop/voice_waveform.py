@@ -8,7 +8,6 @@ import wave
 from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QColor
 
-# A neutral audio symbol until the user explicitly downloads/plays a recording.
 PLACEHOLDER = tuple(0.15 + 0.7 * abs(math.sin(i * 0.63)) ** 2 for i in range(30))
 
 

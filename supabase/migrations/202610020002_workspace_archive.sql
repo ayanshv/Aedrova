@@ -1,5 +1,5 @@
 begin;
--- Personal organization only. Archive never changes membership, billing or shared data.
+
 create table public.workspace_preferences (
  workspace_id uuid not null,
  user_id uuid not null,
@@ -30,7 +30,7 @@ create function public.set_workspace_archived(p_workspace uuid,p_archived boolea
 returns uuid language plpgsql security definer set search_path='' as $$
 declare u uuid:=aedrova_private.require_user();
 begin
- -- Serialize with membership changes; a removed user cannot recreate a preference.
+
  perform 1 from public.workspaces where id=p_workspace for update;
  if p_archived is null then raise exception 'Choose an archive state' using errcode='22023'; end if;
  if not exists(select 1 from public.workspace_members where workspace_id=p_workspace and user_id=u)

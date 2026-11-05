@@ -42,7 +42,7 @@ class AttachmentPreviews(QObject):
         if not connected:
             return
         epoch = self.epoch
-        # Only a bounded tail; never fetch the whole workspace or an external link.
+
         for message in list(messages)[-8:]:
             identifier, name = message.attachment_id, message.attachment
             if (

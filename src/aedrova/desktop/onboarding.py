@@ -243,7 +243,7 @@ FEATURES = frozenset(feature for step in STEPS for feature in step.features)
 
 
 def fade(widget, reduced):
-    # SpringButton already uses a graphics effect; nested opacity effects hide controls on Qt.
+
     if reduced:
         return
     position = widget.pos()
@@ -261,7 +261,7 @@ def account_key(window):
     return f"onboarding/v{VERSION}/" + (str(user.id) if user else "local-preview")
 
 
-# Public import retained for existing Help/first-run integration.
+
 from aedrova.desktop.zen_onboarding import ZenOnboarding as SetupDialog  # noqa: E402, F401
 
 
@@ -403,7 +403,7 @@ class SpotlightTour(QWidget):
         if target is not self.highlighted_target:
             self.clear_component_highlight()
             if target is not None and target.isVisible() and target.isEnabled():
-                # Never replace a control’s own rendering effect.
+
                 if target.graphicsEffect() is None:
                     self.component_effect = QGraphicsDropShadowEffect(target)
                     self.component_effect.setColor(QColor("#0066FF"))
@@ -415,7 +415,7 @@ class SpotlightTour(QWidget):
             origin = self.parentWidget().mapFromGlobal(target.mapToGlobal(QPoint(0, 0)))
             self.target_rect = QRect(origin, target.size()).intersected(available)
         else:
-            self.target_rect = QRect()  # Never spotlight a hidden or unavailable integration.
+            self.target_rect = QRect()
         self.card.setFixedWidth(min(420, available.width() - 48))
         self.card.adjustSize()
         x = max(24, available.width() - self.card.width() - 28)
@@ -424,9 +424,9 @@ class SpotlightTour(QWidget):
             if self.target_rect.center().y() > available.height() // 2
             else available.height() - self.card.height() - 28
         )
-        # A card-sized child needs no full-window mask. Masking the transparent
-        # overlay can leave an accessible but invisible guide after macOS theme/
-        # layout changes; the component itself already owns its highlight.
+
+
+
         self.setGeometry(x, max(24, y), self.card.width(), self.card.height())
         self.card.move(0, 0)
         self.raise_()

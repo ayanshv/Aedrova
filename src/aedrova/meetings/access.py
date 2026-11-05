@@ -49,7 +49,7 @@ class MeetingAccess:
                 raise ValueError("token")
             payload = token.split(".")[1]
             claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
-            # Server is the trust boundary; these checks prevent confused-room client mistakes.
+
             grant = claims["video"]
             room = f"aedrova-{workspace}-{channel}-{meeting}"
             expiry = result["expires_at"]
@@ -130,7 +130,7 @@ class MeetingClient(ManagedClient):
         try:
             result = self.request("/api/meetings/capabilities")
         except RuntimeError:
-            # Older/offline servers cannot opt a call into new text permissions.
+
             return {"meeting_text": False, "audio_transcription": False}
         return result if isinstance(result, dict) else {"meeting_text": False}
 

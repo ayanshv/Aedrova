@@ -26,9 +26,9 @@ def test_instant_echo_before_dispatch_then_slow_delivery(qtbot, tmp_path):
         message = window.channel.messages[-1]
         assert message.body == "Instant message"
         assert not window.composer.editor.toPlainText()
-        assert not entered.is_set()  # The echo precedes even network dispatch.
+        assert not entered.is_set()
         assert message.id in window.messages.send_animations
-        assert not resets  # Existing rows aren't reconstructed for a tail append.
+        assert not resets
         qtbot.waitUntil(entered.is_set)
         window.composer.editor.setPlainText("Next draft")
         assert window.channel.messages[-1].body == "Instant message"

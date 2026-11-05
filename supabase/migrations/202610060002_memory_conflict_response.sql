@@ -1,5 +1,5 @@
 begin;
--- Explicit stale edits are HTTP conflicts, not retryable transaction failures.
+
 create or replace function public.save_product_memory(p_id uuid,p_workspace uuid,p_channel uuid,p_version integer,
  p_kind text,p_title text,p_body text,p_state text,p_sources jsonb,p_conflict uuid default null,
  p_supersedes uuid default null,p_supersedes_version integer default null) returns uuid

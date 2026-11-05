@@ -533,7 +533,7 @@ class MeetingCall(AppDialog):
         if self.states[kind]:
             self.disable(kind)
             return
-        self.states[kind] = True  # Includes permission/publish pending, cancellable.
+        self.states[kind] = True
         self.controls[kind].setText("Cancel " + kind)
         if kind == "microphone":
             self.mic_epoch += 1
@@ -1096,7 +1096,7 @@ class AudioCall(MeetingCall):
             self.stage.hide()
 
     def remote_frames(self):
-        # Voice calls never display video, even if another participant has video on.
+
         if not self.closed:
             self.worker.take_remote_frames()
 
@@ -1169,7 +1169,7 @@ def open_channel_call(window, *, mode=None):
     if hasattr(worker, "review_ready"):
         worker.review_ready.connect(lambda status: offer_wrapup(window, worker, status))
     window.account_dialog.session_closed.connect(dialog.reject)
-    # A local setup preview cannot compete with call capture for the same device.
+
     setup = getattr(window, "meeting_setup", None)
     if setup and setup.isVisible():
         setup.reject()

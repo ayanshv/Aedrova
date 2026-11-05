@@ -1,5 +1,5 @@
 begin;
--- Shared local-build evidence, never a grant to execute/publish code.
+
 create table public.build_reviews (
  id uuid primary key,
  workspace_id uuid not null references public.workspaces(id) on delete cascade,
@@ -204,7 +204,7 @@ end $$;
 revoke all on function public.record_build_delivery(uuid,uuid,text,text,text) from public,anon;
 grant execute on function public.record_build_delivery(uuid,uuid,text,text,text) to authenticated;
 
--- Withdrawn memory removes its derived shared evidence, including review notes.
+
 create function aedrova_private.purge_memory_build_reviews() returns trigger
 language plpgsql security definer set search_path='' as $$
 begin

@@ -41,7 +41,7 @@ def main():
     archive_path.write_bytes(archive)
     with tarfile.open(archive_path) as bundle:
         bundle.extractall(directory, filter="data")
-    # Thin adapter to the third-party engine; all test logic is versioned SQL.
+
     runner = directory / "run.mjs"
     runner.write_text("""import {PGlite} from './package/dist/index.js';
 import fs from 'node:fs';

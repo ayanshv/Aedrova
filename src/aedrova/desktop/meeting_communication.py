@@ -62,7 +62,7 @@ class MeetingTextSurface(AppDialog):
         QThreadPool.globalInstance().start(job)
 
     def replace_text(self, text):
-        # Preserve selection and scroll position when the server has no new text.
+
         if text == self.text.toPlainText():
             return
         scroll = self.text.verticalScrollBar()
@@ -170,7 +170,7 @@ class MeetingChat(MeetingTextSurface):
         body = self.editor.toPlainText().strip()
         if self.busy or self.sending or not 1 <= len(body) <= 10000:
             return
-        # Retry an ambiguous response with the SAME ID: never duplicate a message.
+
         if not self.pending or self.pending[1] != body:
             self.pending = (str(uuid4()), body)
         identifier = self.pending[0]
@@ -245,7 +245,7 @@ class MeetingCaptions(MeetingTextSurface):
         close.clicked.connect(self.accept)
         actions.addWidget(close)
         self.body.addLayout(actions)
-        # Clear stale permission text BEFORE any network result arrives.
+
         self.guard = QTimer(self)
         self.guard.setInterval(500)
         self.guard.timeout.connect(self.check_consent)
@@ -295,7 +295,7 @@ class MeetingCaptions(MeetingTextSurface):
                 self.text.clear()
                 self.status.setText("Captions unavailable. Reopen the meeting.")
                 return
-            # Latest insertion order, not microphone offsets (speakers' offsets may overlap).
+
             parts = [
                 self.names().get(row["speaker_id"], "Participant") + "\n" + row["body"]
                 for row in reversed(rows)

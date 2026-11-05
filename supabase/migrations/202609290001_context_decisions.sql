@@ -34,7 +34,7 @@ begin
 end $$;
 revoke all on function public.set_context_decision(uuid,text,boolean) from public,anon;
 grant execute on function public.set_context_decision(uuid,text,boolean) to authenticated;
--- Revision counters detect edits/deletions occurring between paged reads.
+
 create table aedrova_private.context_revisions (
  channel_id uuid primary key references public.channels(id) on delete cascade,
  revision bigint not null default 0

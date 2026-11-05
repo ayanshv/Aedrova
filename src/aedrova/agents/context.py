@@ -56,8 +56,8 @@ def gather(
         return service.snapshot()
 
     snapshot = inventory()
-    # The existing dashboard inventory uses PostgREST's default 1,000-row ceiling.
-    # Never advertise an entire workspace if that inventory may have been truncated.
+
+
     if not hasattr(service, "context_snapshot") and len(snapshot["channels"]) >= 1000:
         raise ValueError(
             "The channel inventory reached the alpha limit. "

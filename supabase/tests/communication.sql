@@ -39,7 +39,7 @@ select pg_temp.check_true((select unread=2 from public.unread_counts() where cha
 select public.mark_channel_read(current_setting('test.c')::uuid,(select max(sequence) from public.messages where channel_id=current_setting('test.c')::uuid));
 select public.mark_channel_read(current_setting('test.c')::uuid,0);
 select pg_temp.check_true((select unread=0 from public.unread_counts() where channel_id=current_setting('test.c')::uuid),'read cursor cannot move backwards');
--- Reserve and upload one file. Metadata size comes from Storage, not the attachment caller.
+
 select set_config('test.path',public.reserve_attachment('60000000-0000-0000-0000-000000000001',current_setting('test.dm')::uuid,'notes.txt',3,repeat('a',64)),true);
 select pg_temp.check_true(aedrova_private.can_upload_object(current_setting('test.path')),'reserved owner can upload');
 select pg_temp.check_true(not aedrova_private.can_upload_object('wrong/path'),'unreserved upload denied');

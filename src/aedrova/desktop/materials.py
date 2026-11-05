@@ -59,7 +59,7 @@ class Backdrop(QWidget):
         if key == self._cache_key:
             return self.blurred
         self._cache_key = key
-        # Cache a small flat canvas once per size/theme change.
+
         width, height = max(1, self.width() // 4), max(1, self.height() // 4)
         source = QImage(width, height, QImage.Format.Format_ARGB32_Premultiplied)
         source.fill(QColor(self.theme.canvas))
@@ -95,7 +95,7 @@ class GlassFrame(QFrame):
         painter.setClipping(False)
         painter.setPen(QPen(QColor(self.theme.border), 1))
         if self.layer in ("main", "sidebar"):
-            # Structural divider, not floating nested cards.
+
             painter.drawLine(0, 0, 0, self.height())
         else:
             painter.drawRoundedRect(rect, self.radius, self.radius)

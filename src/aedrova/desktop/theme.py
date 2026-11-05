@@ -99,8 +99,8 @@ def palette(theme: Theme):
     ):
         result.setColor(role, QColor(color))
     if theme.name == "dark":
-        # Qt's built-in neutral roles are also used by loading and native controls.
-        # Keep those roles inside the same surface progression as the QSS widgets.
+
+
         for role, color in (
             (QPalette.ColorRole.Midlight, theme.hover),
             (QPalette.ColorRole.Mid, theme.border),
@@ -119,7 +119,7 @@ def palette(theme: Theme):
 
 
 def stylesheet(t: Theme, *, reduced_transparency=False):
-    # QFontDatabase supplies the platform system family (San Francisco on macOS).
+
     white = t.name == "light"
     capsule = t.bg
     if reduced_transparency:

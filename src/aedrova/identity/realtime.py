@@ -57,7 +57,7 @@ class RealtimeWakeups(QObject):
                         token = latest[2]
                         await client.set_auth(token)
             except Exception:
-                # No tokens, URLs, or provider payloads in logs; polling covers outages.
+
                 pass
             finally:
                 try:

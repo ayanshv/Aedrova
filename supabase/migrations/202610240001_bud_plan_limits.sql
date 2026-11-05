@@ -1,5 +1,5 @@
 begin;
--- Billing is private and backend verified. No client-supplied tier or editable quota.
+
 create table aedrova_private.enterprise_bud_limits (
  workspace_id uuid primary key references public.workspaces(id),
  capacity integer not null check(capacity between 1 and 10000)
@@ -55,7 +55,7 @@ begin
  if tg_op='UPDATE' and old.deleted_at is null and old.workspace_id=new.workspace_id then
  return new; end if;
  root:=aedrova_private.billing_root(new.workspace_id);
- -- One lock for the subscription, including subspaces and concurrent creators.
+
  perform pg_advisory_xact_lock(hashtextextended(root::text,73124001));
  capacity:=aedrova_private.bud_capacity(new.workspace_id);
  if (capacity->>'used')::integer >= (capacity->>'limit')::integer then
@@ -66,7 +66,7 @@ end $$;
 revoke all on function aedrova_private.enforce_bud_capacity() from public,anon,authenticated;
 create trigger workspace_bud_capacity before insert or update of workspace_id,deleted_at
  on public.workspace_dots for each row execute function aedrova_private.enforce_bud_capacity();
--- Replace the old universal cap of 12; the atomic trigger applies all plan caps.
+
 create or replace function public.save_workspace_dot(p_id uuid,p_workspace uuid,p_version integer,p_provider text,p_resource text,p_name text,p_color text default '#4388F5',p_shape text default 'round')
 returns public.workspace_dots language plpgsql security definer set search_path='' as $$
 declare u uuid:=aedrova_private.require_user(); r public.workspace_dots;

@@ -59,7 +59,7 @@ def read_local(root, relative):
         finally:
             for descriptor in reversed(descriptors):
                 os.close(descriptor)
-    # On Windows reject reparse/symlink paths before and after the bounded read.
+
     source = root / relative
     if any(
         (root / Path(*relative.parts[:i])).is_symlink() for i in range(1, len(relative.parts) + 1)
@@ -82,7 +82,7 @@ def project_evidence(folder, question, cancelled=lambda: False):
     candidates, seen = [], 0
     permitted = None
     if (root / ".git").exists():
-        # Respect ignored/untracked-private files as well as our own denylist.
+
         permitted = set(
             git(root, "ls-files", "--cached", "--others", "--exclude-standard", "-z").split("\0")
         )
@@ -123,7 +123,7 @@ def project_evidence(folder, question, cancelled=lambda: False):
         if cancelled():
             raise InterruptedError("Reply stopped.")
         source = root / relative
-        # Reject linked ancestors too, including a link swapped during enumeration.
+
         if any(
             (root / Path(*relative.parts[:i])).is_symlink()
             for i in range(1, len(relative.parts) + 1)
@@ -136,7 +136,7 @@ def project_evidence(folder, question, cancelled=lambda: False):
             text = data.decode("utf-8")
         except (OSError, UnicodeError):
             continue
-        # Never follow a path that changed during the read.
+
         if source.is_symlink() or not source.resolve().is_relative_to(root):
             continue
         text = text[:8000]

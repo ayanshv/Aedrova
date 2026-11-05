@@ -41,7 +41,7 @@ class FramePreview(QWidget):
     def paintEvent(self, event):  # noqa: N802
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        # Stylesheet palettes may substitute AlternateBase on nested scroll widgets.
+
         owner = self.window().parentWidget()
         theme = getattr(owner, 'theme', None)
         background = QColor(theme.surface) if theme else self.palette().color(

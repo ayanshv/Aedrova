@@ -14,7 +14,7 @@ from aedrova.desktop.profile import rounded_profile_photo
 
 def setup(qtbot, tmp_path):
     window, service = connected_setup(qtbot, tmp_path)
-    # Finish the activation poll before measuring the user action itself.
+
     qtbot.wait(50)
     qtbot.waitUntil(lambda: not window.account_dialog.busy)
     return window, service
@@ -90,7 +90,7 @@ def test_channel_creation_queues_once_and_waits_for_server(qtbot, tmp_path, monk
     dialog.create.click()
     dialog.create.click()
     assert len(callbacks) == 1 and dialog.pending
-    assert window.channel_id == "c"  # No invented channel ID or permission.
+    assert window.channel_id == "c"
     data = snapshot()
     data["channels"].append(
         {"id": "new-channel", "workspace_id": "w", "name": "design", "private": False}

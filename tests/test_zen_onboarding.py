@@ -48,7 +48,7 @@ def advance_time(dialog, seconds):
 def test_full_sequence_timing_keyboard_and_dashboard_handoff(flow, qtbot, monkeypatch):
     window, dialog = flow
     dialog.activate()
-    dialog.activate()  # double click cannot advance twice
+    dialog.activate()
     advance_time(dialog, 0.43)
     assert dialog.stage == 1
     qtbot.mouseClick(dialog.primary, Qt.MouseButton.LeftButton)
@@ -69,10 +69,10 @@ def test_full_sequence_timing_keyboard_and_dashboard_handoff(flow, qtbot, monkey
     for stage in range(4, LAST_STAGE):
         assert dialog.stage == stage
         if stage == 7:
-            dialog.setup.automatic.setChecked(False)  # Intro-only journey has no project.
+            dialog.setup.automatic.setChecked(False)
         dialog.activate()
     assert dialog.stage == LAST_STAGE
-    dialog.bud_setup_completed = True  # Connected Bud walkthrough completed before handoff.
+    dialog.bud_setup_completed = True
     advance_time(dialog, 1)
     assert not dialog.isVisible() and not dialog.timer.isActive()
     key = account_key(window)
@@ -412,7 +412,7 @@ def test_google_returns_to_embedded_required_profile_then_project(qtbot, tmp_pat
     assert stored["profile_completed"] and stored["display_name"] == "Maya Chen"
     assert dialog.setup.workspace == "w" and not binding(window)
     account.loaded(service.snapshot())
-    assert dialog.stage == 6  # ordinary refreshes never restart or advance onboarding
+    assert dialog.stage == 6
     window.connected.timer.stop()
 
 

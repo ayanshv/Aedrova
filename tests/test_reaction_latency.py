@@ -42,7 +42,7 @@ def test_reaction_is_visible_before_slow_request_finishes_and_rapid_toggle_wins(
         qtbot.waitUntil(entered.is_set)
         window.react_message("m", "👍", False)
         assert not window.channel.messages[0].reactions
-        # Old polling data must not override the latest local intention.
+
         rows = list(window.connected.cache["c"].values())
         window.connected.apply(window.account_dialog.snapshot, rows, "w", "c")
         assert not window.channel.messages[0].reactions

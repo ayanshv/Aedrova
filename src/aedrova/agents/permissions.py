@@ -39,7 +39,7 @@ def automatic(tool, data, project):
         return True
     if tool != "Bash" or data.get("dangerouslyDisableSandbox"):
         return False
-    # Shell syntax, custom executables and arbitrary Python are human-reviewed.
+
     command = data.get("command", "")
     if not isinstance(command, str) or re.search(r"[;&|`$<>\n\r]", command):
         return False
@@ -52,7 +52,7 @@ def automatic(tool, data, project):
     prefix = args[:3] == ["python", "-m", "pytest"] or args[:3] == ["python3", "-m", "pytest"]
     if not prefix and args[0] != "pytest":
         return False
-    # Loading external plugins/config or pointing a test runner outside its copy needs approval.
+
     flags = {"-q", "-v", "-vv", "-x", "--disable-warnings", "--strict-markers"}
     for arg in args[3:] if prefix else args[1:]:
         if arg in flags:

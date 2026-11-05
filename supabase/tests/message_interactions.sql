@@ -18,7 +18,7 @@ select public.set_context_decision('94000000-0000-0000-0000-000000000011','Erase
 select public.set_message_reaction('94000000-0000-0000-0000-000000000011','👍',true);
 select public.set_message_reaction('94000000-0000-0000-0000-000000000011','👍',true);
 select pg_temp.check_true((select count(*)=1 from public.message_reactions),'reaction retry is idempotent');
--- Unsend also revokes attachment metadata and Storage access.
+
 select set_config('test.path',public.reserve_attachment('94000000-0000-0000-0000-000000000014',current_setting('test.c')::uuid,'notes.txt',3,repeat('a',64)),true);
 insert into storage.objects(bucket_id,name,metadata) values('aedrova-files',current_setting('test.path'),'{"size":3}');
 select public.finish_attachment('94000000-0000-0000-0000-000000000014');

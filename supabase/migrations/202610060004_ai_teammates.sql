@@ -62,7 +62,7 @@ begin
 end $$;
 revoke all on function public.save_ai_teammate(uuid,uuid,integer,jsonb,boolean),public.remove_ai_teammate(uuid,integer) from public,anon;
 grant execute on function public.save_ai_teammate(uuid,uuid,integer,jsonb,boolean),public.remove_ai_teammate(uuid,integer) to authenticated;
--- Both settings RPCs lock the workspace, preventing concurrent name collisions.
+
 create function aedrova_private.guard_builder_teammate_name() returns trigger
 language plpgsql security definer set search_path='' as $$
 begin

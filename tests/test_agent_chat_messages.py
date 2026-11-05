@@ -69,8 +69,8 @@ def test_long_agent_transcript_scrolls_to_last_response(qtbot, tmp_path):
     window.messages.scrollToBottom()
     last = window.agent_feed.rows[-1].message
     viewport = window.messages.viewport()
-    # Offscreen Windows delivers wrapped-label layout after the first 100 ms.
-    # Wait for the actual bottom geometry, retaining the same visibility check.
+
+
     qtbot.waitUntil(
         lambda: window.messages.verticalScrollBar().maximum() > 0
         and last.mapToGlobal(last.rect().bottomLeft()).y()

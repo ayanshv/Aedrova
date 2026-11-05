@@ -173,7 +173,7 @@ def test_chat_trackpad_preserves_small_movements_and_stops_at_edges(qtbot):
 
     wheel(-1)
     wheel(-1)
-    assert bar.value() == 501  # Fractional trackpad pixels must not disappear.
+    assert bar.value() == 501
     wheel(0, Qt.ScrollPhase.ScrollEnd)
     assert view._wheel_remainder == 0
     bar.setValue(0)

@@ -253,7 +253,7 @@ class DeviceCheck(QObject):
             try:
                 handle.stop()
             except RuntimeError:
-                # A vanished Qt device must not prevent the other devices stopping.
+
                 pass
         if kind == 'speaker':
             self.speaker_timer.stop()

@@ -16,7 +16,7 @@ class Candidate:
     latency: float | None = None
     samples: int = 0
     successes: int = 0
-    # Evaluations must be reviewed offline, not learned from unvalidated live traffic.
+
     evaluated: bool = False
 
 
@@ -127,7 +127,7 @@ def choose(
     default = space_default or policy.default
     if default not in PROVIDERS:
         raise ValueError("Invalid Space default")
-    # Compare only complete, approved, sufficiently sampled evaluations for this category.
+
     measured = all(
         row.evaluated
         and row.samples >= policy.minimum_samples
@@ -140,7 +140,7 @@ def choose(
         times = max(1e-9, max(r.latency for r in available.values()))
 
         def score(row):
-            # Wilson lower bound penalizes uncertain quality estimates.
+
             n, z = row.samples, 1.96
             rate = row.successes / n
             quality = (
@@ -167,7 +167,7 @@ class CodingAdapter:
         self.provider, self.runner = provider, runner
 
     def execute(self, project, prompt, *, plan):
-        # Runtime checks cancellation, bounds lifetime and enforces tool approval.
+
         return self.runner.run(self.provider, project, prompt, plan=plan)
 
     def cancel(self):
@@ -191,7 +191,7 @@ def runtime_candidates(*, managed=False):
             installed = importlib.util.find_spec("claude_agent_sdk") is not None and (
                 managed or bool(os.environ.get("ANTHROPIC_API_KEY"))
             )
-        # Installation is only a preflight; live login and budget are verified by existing runtime.
+
         result.append(Candidate(provider, installed))
     return result
 

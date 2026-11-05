@@ -19,7 +19,7 @@ NATIVE = re.compile(
 
 
 def localized_build(text):
-    # Quoted examples and translation questions are content, not coding instructions.
+
     if re.match(
         r"^\s*(?:translate\b|what does\b|what is the meaning\b|explain the (?:word|phrase)\b)",
         text,

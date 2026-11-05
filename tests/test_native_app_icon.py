@@ -12,6 +12,6 @@ def test_only_native_macos_catalog_defers_to_system(tmp_path, monkeypatch, qtbot
     resources.mkdir(parents=True)
     monkeypatch.setattr(brand.sys, "platform", platform)
     monkeypatch.setattr(brand.sys, "executable", str(contents / "MacOS/Aedrova"))
-    assert not brand.app_icon().isNull()  # Missing catalog retains the legacy icon.
+    assert not brand.app_icon().isNull()
     (resources / "Assets.car").write_bytes(b"fixture")
     assert brand.app_icon().isNull() == (platform == "darwin")

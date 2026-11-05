@@ -96,7 +96,7 @@ def test_twelve_marbles_settle_without_respawning_and_hidden_timer_stops(qtbot):
             for b in marbles[i + 1 :]
         )
         > 45
-    )  # The visible orb silhouettes do not intersect.
+    )
     assert all(
         0 <= m.x <= habitat.width() - 56 and -1 <= m.y <= habitat.height() - 56
         for m in habitat.marbles.values()

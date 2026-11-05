@@ -236,7 +236,7 @@ class ContextIndex:
         exact = [s for s in self.sources if reference in {s.citation, s.message_id}]
         if exact:
             return exact[:limit]
-        # Quote individual terms: punctuation/FTS operators can never become query syntax.
+
         terms = list(dict.fromkeys(re.findall(r"[^\W_]+", query.lower(), re.UNICODE)))[:64]
         if not terms:
             return self.sources[:limit]
@@ -251,7 +251,7 @@ class ContextIndex:
     def retrieve(self, query):
         matches = self.search(query)
         selected = {s.citation: s for s in matches}
-        # Retain nearby thread evidence, including contradictions rather than picking a winner.
+
         roots = {s.parent_id or s.message_id for s in matches[:4]}
         related = [s for s in self.sources if (s.parent_id or s.message_id) in roots]
         for source in related[:24]:

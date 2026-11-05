@@ -79,7 +79,7 @@ def main():
         from staging_macos import prepare
 
         interpreter = str(prepare(ROOT, environment))
-    # Separate persisted preferences/project bindings; login sessions stay in memory.
+
     subprocess.run(
         [
             interpreter,

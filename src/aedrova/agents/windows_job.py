@@ -52,7 +52,7 @@ class WindowsJob:
         if not self.handle:
             raise ctypes.WinError(ctypes.get_last_error())
         limits = ExtendedLimits()
-        limits.basic.flags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        limits.basic.flags = 0x2000
         try:
             if not kernel.SetInformationJobObject(
                 self.handle, 9, ctypes.byref(limits), ctypes.sizeof(limits)

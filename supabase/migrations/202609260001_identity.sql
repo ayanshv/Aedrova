@@ -1,5 +1,5 @@
 begin;
--- Milestone 3. Apply to a fresh Supabase project using the migration runner.
+
 create schema if not exists aedrova_private;
 revoke all on schema aedrova_private from public;
 grant usage on schema aedrova_private to authenticated;
@@ -73,7 +73,7 @@ revoke all on public.workspaces, public.workspace_members, public.channels,
  public.channel_members, public.workspace_invitations from public,anon,authenticated;
 grant select on public.workspaces, public.workspace_members, public.channels,
  public.channel_members to authenticated;
--- Invitation hashes never leave the database. Management uses an explicit projection.
+
 grant select(id,workspace_id,email,role,invited_by,expires_at,accepted_at,revoked_at)
  on public.workspace_invitations to authenticated;
 create policy workspace_read on public.workspaces for select to authenticated
@@ -131,7 +131,7 @@ begin
  select * into inv from public.workspace_invitations
  where token_hash=encode(sha256(convert_to(p_token,'UTF8')),'hex');
  if inv.id is null then raise exception 'Invitation unavailable' using errcode='42501'; end if;
- -- Serialize all membership mutations for a workspace, then re-read the invitation.
+
  perform 1 from public.workspaces where id=inv.workspace_id for update;
  select * into inv from public.workspace_invitations where id=inv.id for update;
  select lower(email) into mail from auth.users where id=u;
@@ -140,7 +140,7 @@ begin
  where workspace_id=inv.workspace_id and user_id=inv.invited_by
  and (role='owner' or (role='admin' and inv.role in ('member','guest'))))
  then raise exception 'Invitation unavailable' using errcode='42501'; end if;
- -- A join cannot promote/demote an existing member.
+
  insert into public.workspace_members values(inv.workspace_id,u,inv.role) on conflict do nothing;
  update public.workspace_invitations set accepted_at=now() where id=inv.id;
  return inv.workspace_id;
@@ -196,7 +196,7 @@ begin
  else delete from public.channel_members where channel_id=p_channel and user_id=p_user;
  end if;
 end $$;
--- Default PUBLIC function execution must never expose definer operations to anonymous users.
+
 revoke all on all functions in schema aedrova_private from public,anon;
 grant execute on all functions in schema aedrova_private to authenticated;
 revoke all on function public.create_workspace(text), public.create_channel(uuid,text,boolean),
@@ -208,7 +208,7 @@ grant execute on function public.create_workspace(text), public.create_channel(u
  public.revoke_invitation(uuid),public.set_member_role(uuid,uuid,text),
  public.remove_member(uuid,uuid),public.set_channel_member(uuid,uuid,boolean) to authenticated;
 
--- Object paths: <workspace UUID>/<channel UUID>/<unique object name>. Private bucket only.
+
 insert into storage.buckets(id,name,public) values('aedrova-files','aedrova-files',false);
 create function aedrova_private.can_read_object(path text) returns boolean
 language sql stable security definer set search_path='' as $$
@@ -220,13 +220,13 @@ revoke all on function aedrova_private.can_read_object(text) from public,anon;
 grant execute on function aedrova_private.can_read_object(text) to authenticated;
 create policy aedrova_files_read on storage.objects for select to authenticated
  using (bucket_id='aedrova-files' and aedrova_private.can_read_object(name));
--- No direct client upload/update/delete until the attachment validation milestone.
--- Only server broadcast; clients may subscribe to authorized channel UUID topics.
+
+
 create policy aedrova_channel_events on realtime.messages for select to authenticated
  using (extension='broadcast' and exists(select 1 from public.channels c
  where 'channel:'||c.id::text = realtime.topic() and aedrova_private.can_read_channel(c.id)));
 
--- Human-readable roster without exposing the global auth.users table.
+
 create function public.list_members()
 returns table(workspace_id uuid,user_id uuid,role text,email text)
 language sql stable security definer set search_path='' as $$

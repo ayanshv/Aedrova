@@ -1,4 +1,4 @@
--- Actual resource-scoped Bud adapters; tokens remain in the private service store.
+
 begin;
 alter table public.workspace_dots drop constraint if exists workspace_dots_provider_check;
 alter table public.workspace_dots add constraint workspace_dots_provider_check

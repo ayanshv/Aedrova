@@ -90,7 +90,7 @@ class ContextJob(QRunnable):
                     live,
                     cancelled=self.cancelled.is_set,
                 )
-                # Check fresh membership and profile after external network requests as well.
+
                 authorize(self.service.snapshot(), self.workspace, str(self.service.user.id))
                 fresh = next(
                     (
@@ -227,7 +227,7 @@ class BuildJob(QRunnable):
                     self.teammate,
                     cancelled=self.runner.cancelled.is_set,
                 )
-                # A disconnected/revoked resource may not be used from an earlier plan.
+
                 retained = [
                     line
                     for line in self.context.text.splitlines()
@@ -353,7 +353,7 @@ class BuildJob(QRunnable):
                 try:
                     (self.project.parent / ".last-used").touch(mode=0o600)
                 except OSError:
-                    # Missing/full/unwritable retention metadata must not strand the UI.
+
                     pass
                 finally:
                     retention_lease.close()
@@ -760,8 +760,8 @@ class BuildDialog(AppDialog):
                 self.window.agent_activity(self.workspace, self.status.text())
                 self.set_busy(False)
                 return
-            # Appended conversation does not invalidate a background plan. Its original
-            # evidence must still exist unchanged; edits/deletions/retired decisions do.
+
+
             if (
                 not plan
                 and self.background_run

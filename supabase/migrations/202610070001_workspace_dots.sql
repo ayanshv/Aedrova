@@ -1,4 +1,4 @@
--- Dots are shared capability identities. Secrets live in the private server store.
+
 begin;
 create table if not exists public.workspace_dots (
  id uuid primary key default gen_random_uuid(),
@@ -59,7 +59,7 @@ begin
 end $$;
 revoke all on function aedrova_private.guard_builder_dot_name() from public,anon,authenticated;
 create trigger guard_builder_dot_name before insert or update of nickname on public.workspace_agent_preferences for each row execute function aedrova_private.guard_builder_dot_name();
--- Preserve connected resource identities. No local Keychain token is copied or uploaded.
+
 insert into public.workspace_dots(workspace_id,provider,resource,name,color,shape,created_by)
 select t.workspace_id,c->>'tool',c->>'resource',
  case when row_number() over(partition by t.workspace_id,c->>'tool' order by t.updated_at,t.id)=1 then case c->>'tool' when 'github' then 'GitHub' when 'figma' then 'Figma' else 'Notion' end else case c->>'tool' when 'github' then 'GitHub' when 'figma' then 'Figma' else 'Notion' end||' '||substr(t.id::text,1,6) end,
@@ -67,6 +67,6 @@ select t.workspace_id,c->>'tool',c->>'resource',
 from public.ai_teammates t cross join lateral jsonb_array_elements(coalesce(t.config->'connections','[]'::jsonb)) c
 where t.deleted_at is null and c->>'tool' in ('github','figma','notion')
 on conflict do nothing;
--- Retain legacy records for recovery; the application no longer routes assignments to them.
-comment on table public.ai_teammates is 'Deprecated prototype; connections migrated to workspace_dots. Legacy builds must be reviewed, never silently resumed.';
+
+                                                                                                                                                               ;
 commit;

@@ -280,9 +280,9 @@ def translate(text, target, *, interface=False):
 
         matches = list(PROTECTED.finditer(text))
         if matches:
-            # Preserve sentence context instead of translating fragments such as
-            # "please" in isolation. Only use this result if every marker survives
-            # exactly once; otherwise fall back to untranslated technical spans.
+
+
+
             prefix = "ZXQ"
             while prefix in text:
                 prefix += "X"

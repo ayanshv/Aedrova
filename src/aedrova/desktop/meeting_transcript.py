@@ -118,7 +118,7 @@ class TranscriptReview(AppDialog):
         self.edit.textChanged.connect(self.changed)
         self.decision.toggled.connect(self.changed)
         self.finished.connect(self.finish)
-        # Clear displayed text immediately when an account session closes.
+
         window = parent
         while window is not None:
             account = getattr(window, "account_dialog", None)
@@ -173,7 +173,7 @@ class TranscriptReview(AppDialog):
             self.refresh.setEnabled(True)
             self.meetings.setEnabled(True)
             if "error" in result:
-                # Do not retain stale private evidence when authorization may have failed.
+
                 self.drafts.clear()
                 self.selected_id = None
                 self.rows.clear()

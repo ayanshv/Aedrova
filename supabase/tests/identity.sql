@@ -1,4 +1,4 @@
--- Real PostgreSQL grants, RLS and definer-function checks. Entire test rolls back.
+
 begin;
 insert into auth.users(id,email,email_confirmed_at) values
  ('00000000-0000-0000-0000-000000000001','owner@a.test',now()),
@@ -87,7 +87,7 @@ set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000005';
 select pg_temp.check_true((select count(*)=0 from realtime.messages),'private topic denied to admin');
 select pg_temp.check_true((select count(*)=1 from storage.objects),'admin cannot read private files');
 set local request.jwt.claim.sub='00000000-0000-0000-0000-000000000001';
--- Revoked invitation cannot be redeemed.
+
 select set_config('test.revoked',public.create_invitation(current_setting('test.workspace')::uuid,'outsider@b.test','member'),true);
 select public.revoke_invitation((select id from public.workspace_invitations
  where email='outsider@b.test' order by expires_at desc limit 1));

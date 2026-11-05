@@ -204,7 +204,7 @@ def test_wizard_finishes_once_without_returning_to_create(qtbot, tmp_path):
     widget.provider_continue.click()
     widget.onboarding_ack.setChecked(True)
     widget.finish_onboarding.click()
-    widget.finish_onboarding.click()  # Disabled while request is running.
+    widget.finish_onboarding.click()
     qtbot.waitUntil(lambda: not widget.busy)
     assert len(calls) == 1
     assert widget.workspace_id() == "new"

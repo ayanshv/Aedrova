@@ -157,7 +157,7 @@ class ExecutionQueue(QObject):
                 "A queued build paused because project permissions changed. Review it in Builds."
             )
             return
-        # Persist before any context request or provider process can start.
+
         self.ledger.update(row["id"], "running")
         from aedrova.desktop.builds import _start_background_build
 
@@ -346,7 +346,7 @@ class RunHistory(AppDialog):
             return
         if not self.queue.lease:
             return
-        # Reuse the durable identity, never duplicate the original action automatically.
+
         if row["state"] == "paused":
             self.queue.ledger.update(row["id"], "queued")
         else:

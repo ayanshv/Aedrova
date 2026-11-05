@@ -49,7 +49,7 @@ def test_queued_send_appears_before_network_finishes(qtbot, tmp_path):
     assert window.channel.messages[-1].body == "Instant feedback"
     assert window.channel.messages[-1].delivery == "Sending…"
     release.set()
-    # No timer/poll/manual refresh: completion must drain the queued send immediately.
+
     qtbot.waitUntil(lambda: bool(sends) and not window.account_dialog.busy, timeout=2000)
     assert window.channel.messages[-1].delivery == ""
 

@@ -90,7 +90,7 @@ def fetch_preview(url):
             raise ValueError("Preview unavailable.")
         raw = response.read(100001)
         if len(raw) > 100000:
-            # Only inspect a bounded prefix; OG metadata normally lives in the head.
+
             raw = raw[:100000]
         metadata = Metadata()
         metadata.feed(raw.decode("utf-8", errors="replace"))

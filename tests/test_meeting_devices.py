@@ -118,7 +118,7 @@ def test_close_clears_previews_levels_and_all_resources(qtbot):
     assert all(handle.stopped for _, handle, *_ in backend.started)
     assert dialog.camera_preview.image.isNull() and dialog.screen_preview.image.isNull()
     assert dialog.level.value() == 0
-    # Delayed frames from stopped handles cannot repopulate the hidden dialog.
+
     backend.started[0][2](image)
     backend.started[1][3](99)
     assert dialog.camera_preview.image.isNull() and dialog.level.value() == 0

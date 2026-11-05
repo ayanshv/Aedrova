@@ -46,8 +46,8 @@ def prepare(root: Path, environment: dict[str, str]) -> Path:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
-    # The relocated interpreter needs its original standard library and this
-    # checkout's virtualenv packages. Never copy credentials or a virtualenv.
+
+
     environment["PYTHONHOME"] = sys.base_prefix
     environment["PYTHONPATH"] = os.pathsep.join(
         [str(root / "src"), sysconfig.get_path("purelib"), sysconfig.get_path("platlib")]

@@ -135,7 +135,7 @@ def message_urls(body):
 
 class SafeDocument(QTextDocument):
     def loadResource(self, resource_type, url):
-        # Markdown must never fetch external images or read local files.
+
         return None
 
 
@@ -147,8 +147,8 @@ def markdown_document(text):
 
 def markdown_html(text):
     document = markdown_document(text)
-    # QTextDocument can retain image tags in its HTML export even when loading
-    # the resource was refused. Strip them before handing the result to QLabel.
+
+
     return re.sub(r"<img\b[^>]*>", "", document.toHtml(), flags=re.IGNORECASE)
 
 
@@ -485,8 +485,8 @@ class MessageDelegate(QStyledItemDelegate):
                         Qt.AspectRatioMode.KeepAspectRatio,
                         Qt.TransformationMode.SmoothTransformation,
                     )
-                    # A neutral matte makes transparent dark artwork legible without
-                    # recoloring the user's image or changing its pixels.
+
+
                     painter.fillRect(
                         QRectF(
                             area.x(),
@@ -560,7 +560,7 @@ class MessageView(QListView):
         self.agent_visible = False
         self.agent_anchor = None
         self.source_messages = []
-        self.text_selection = None  # message ID, UTF-16 anchor, UTF-16 position
+        self.text_selection = None
         self.selecting_text = False
         self.allow_threads = allow_threads
         self.setObjectName("Messages")
@@ -726,8 +726,8 @@ class MessageView(QListView):
             if cursor and cursor.hasSelection():
                 event.accept()
                 return
-            # Links keep their normal single-click behavior; ordinary body clicks
-            # place a text caret instead of unexpectedly opening a thread.
+
+
             hit = self.text_hit(event.position().toPoint())
             if hit:
                 index, document, _ = hit
@@ -976,7 +976,7 @@ class MessageView(QListView):
             self.react(identifier, emoji)
 
     def scrollTo(self, index, hint=QListView.ScrollHint.EnsureVisible):  # noqa: N802
-        # Batched layout may not have reached this row yet. Retry when its range grows.
+
         self._scroll_target = QPersistentModelIndex(index)
         self._scroll_hint = hint
         super().scrollTo(index, hint)
@@ -1002,9 +1002,9 @@ class MessageView(QListView):
             and self.visualRect(index).height() > self.viewport().height()
         ):
             self.verticalScrollBar().setValue(self.verticalScrollBar().maximum())
-        # An inline transcript can grow again after Qt lays out its child labels.
-        # Keep the bottom target through those later range changes; explicit user
-        # navigation cancels it, so reading older messages still stays in place.
+
+
+
         if (
             self._scroll_hint != QListView.ScrollHint.PositionAtBottom
             and self.viewport().rect().intersects(self.visualRect(index))
@@ -1016,9 +1016,9 @@ class MessageView(QListView):
 
     def wheelEvent(self, event):  # noqa: N802
         self._scroll_target = None
-        # Variable-height messages make Qt's automatic wheel step enormous.
-        # Keep native trackpad momentum/phases, with gentler pixel movement;
-        # conventional wheels get a bounded 40 px step per notch.
+
+
+
         pixel, angle = event.pixelDelta(), event.angleDelta()
         if event.modifiers() & (
             Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier
@@ -1168,8 +1168,8 @@ class MessageView(QListView):
         offset = self.visualRect(index).top() if index.isValid() else 0
         self._scroll_target = None
         if self.agent_feed:
-            # Qt owns index widgets and deletes them on model reset. Detach the live
-            # transcript first so ordinary realtime refreshes cannot destroy it.
+
+
             self.agent_feed.hide()
             self.agent_feed.setParent(self)
         if self.agent_feed and self.agent_visible:
@@ -1196,8 +1196,8 @@ class MessageView(QListView):
                     self.setIndexWidget(self.model().index(row), holder)
                     self.agent_feed.show()
                     break
-        # Inline agent height may change drastically at completion. Recalculate
-        # the list range after attaching its widget, before restoring scrolling.
+
+
         self.doItemsLayout()
         if at_bottom:
             self.scrollToBottom()
@@ -1251,8 +1251,8 @@ class MessageEditor(QPlainTextEdit):
         self.focus_changed.emit(False)
 
     def event(self, event):
-        # Reserve active-picker keys before window shortcuts (notably Escape).
-        # Cocoa also marks physical arrow keys as keypad keys.
+
+
         if (
             event.type() == QEvent.Type.ShortcutOverride
             and self.completion
@@ -1271,8 +1271,8 @@ class MessageEditor(QPlainTextEdit):
         ):
             event.accept()
             return True
-        # QWidget handles Tab traversal before keyPressEvent. Complete an active
-        # mention here, while keeping ordinary Tab/Shift Tab focus navigation.
+
+
         if (
             event.type() == QEvent.Type.KeyPress
             and event.key() == Qt.Key.Key_Tab
@@ -1304,7 +1304,7 @@ class Composer(QFrame):
         self.setObjectName("Composer")
         self.thread = thread
         self.agent_name = "Aedrova"
-        self.ai_teammates = []  # Legacy fixture compatibility; no production routing.
+        self.ai_teammates = []
         self.dots = []
         self.people = []
         self.mention_tokens = {}
@@ -1457,7 +1457,7 @@ class Composer(QFrame):
             self.suggestion.hide()
 
     def _resize_editor(self, size):
-        # QPlainTextDocumentLayout reports height in visual lines, including wrapping.
+
         height = min(
             134, max(67, ceil(size.height() * self.editor.fontMetrics().lineSpacing()) + 12)
         )
@@ -1565,7 +1565,7 @@ class Composer(QFrame):
             if query and not any(query in str(alias).casefold() for alias in aliases):
                 continue
             if section == "People" and query and query not in name.casefold():
-                # Preserve the existing username mention syntax when searching by handle.
+
                 name = config["username"]
                 token = "<@" + config["user_id"] + "|" + name + ">"
             if group != section:

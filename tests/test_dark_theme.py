@@ -44,7 +44,7 @@ def test_initial_theme_and_switching_preserve_preferences(qtbot, tmp_path):
     assert window.messages.delegate.theme is DARK
     card = window._card("Meeting devices", "Checks stay local.")
     qtbot.addWidget(card)
-    assert card.theme is DARK  # Surfaces created after the theme switch inherit it.
+    assert card.theme is DARK
     window.set_theme("light")
     assert window.theme is LIGHT and settings.value("appearance") == "light"
     window.set_theme("system")

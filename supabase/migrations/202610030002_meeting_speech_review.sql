@@ -1,5 +1,5 @@
 begin;
--- M12D: server-only provenance and human review. Activate only at M14.
+
 alter table public.meeting_transcript_segments drop constraint meeting_transcript_segments_source_check;
 alter table public.meeting_transcript_segments add constraint meeting_transcript_segments_source_check
  check(source in ('participant_text','provider_speech'));
@@ -10,7 +10,7 @@ alter table public.meeting_transcript_segments
  add column review_version integer not null default 0,
  add column confirmed_decision boolean not null default false;
 
--- No audio, credentials or provider response payloads are persisted.
+
 create table aedrova_private.meeting_speech_jobs (
  id uuid primary key, meeting_id uuid not null references public.meetings(id) on delete cascade,
  user_id uuid not null references auth.users(id) on delete cascade,
@@ -62,7 +62,7 @@ begin
  and exists(select 1 from public.meeting_transcript_segments where id=p_id
  and expires_at>clock_timestamp()) then return 'completed'; end if;
  raise exception 'Speech identifier already used' using errcode='42501'; end if;
- -- Serialize this user across meetings before checking outstanding requests.
+
  perform pg_advisory_xact_lock(hashtextextended(p_user::text,7411));
  if exists(select 1 from aedrova_private.meeting_speech_jobs where user_id=p_user
  and state='pending' and deadline>clock_timestamp()) then
@@ -73,7 +73,7 @@ begin
  perform set_config('request.jwt.claim.sub',coalesce(prior,''),true);
  select workspace_id into w from public.channels where id=(select channel_id
  from public.meetings where id=p_meeting);
- -- Serialize budget across concurrent meetings in this workspace.
+
  perform pg_advisory_xact_lock(hashtextextended(w::text,7412));
  if (select coalesce(sum(budget.duration_ms),0) from aedrova_private.meeting_speech_jobs budget
  join public.meetings m on m.id=budget.meeting_id join public.channels c on c.id=m.channel_id
@@ -92,7 +92,7 @@ create function public.finish_meeting_speech(p_user uuid,p_id uuid,p_body text)
  returns uuid language plpgsql security definer set search_path='' as $$
 declare j aedrova_private.meeting_speech_jobs; ai boolean;
 begin
- -- Lock meeting before job: same order as reservation and privacy withdrawal.
+
  perform 1 from public.meetings where id=(select meeting_id
  from aedrova_private.meeting_speech_jobs where id=p_id) for update;
  select * into j from aedrova_private.meeting_speech_jobs where id=p_id for update;
@@ -113,7 +113,7 @@ begin
 end $$;
 revoke all on function public.reserve_meeting_speech(uuid,uuid,uuid,bigint,uuid[],text,integer,integer),
  public.finish_meeting_speech(uuid,uuid,text) from public,anon,authenticated;
--- Restricted backend database role only; no service-role key in the desktop.
+
 do $$ begin if exists(select 1 from pg_roles where rolname='aedrova_website') then
  grant execute on function public.reserve_meeting_speech(uuid,uuid,uuid,bigint,uuid[],text,integer,integer),
  public.finish_meeting_speech(uuid,uuid,text) to aedrova_website;
@@ -155,7 +155,7 @@ begin
  and (source='participant_text' or reviewed_at is not null)
  order by created_at desc,id limit greatest(1,least(coalesce(p_limit,50),50));
 end $$;
--- Expiry also clears provider idempotency metadata. Does not contain raw audio.
+
 create or replace function aedrova_private.expire_meeting_text() returns bigint
 language plpgsql security definer set search_path='' as $$ declare n bigint; begin
  delete from public.meeting_transcript_segments where expires_at<=clock_timestamp();

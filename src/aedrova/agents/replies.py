@@ -16,8 +16,8 @@ def needs_sources(question):
     """
     import re
 
-    # Non-English requests can refer to the same English workspace evidence.
-    # Greetings stay fast; unknown non-Latin questions retain read-only context.
+
+
     greetings = {
         "नमस्ते",
         "हैलो",

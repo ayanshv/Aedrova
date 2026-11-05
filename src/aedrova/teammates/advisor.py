@@ -73,6 +73,6 @@ def advise(role, provider, runner=None):
         from aedrova.agents.checkout import git
 
         git(Path(root), "init")
-        # Synthetic empty folder; this call never receives workspace data or a real project.
+
         (Path(root) / "README.md").write_text("Role suggestion only. No user project.\n")
         return parse_advice(runner.run(provider, Path(root), prompt, plan=True))

@@ -81,7 +81,7 @@ class ChoiceBox(QComboBox):
         self.setMinimumHeight(44)
 
     def setCurrentText(self, text):  # noqa: N802
-        # Programmatic enum selections use canonical captions after localization.
+
         for index, pair in enumerate(self.property("i18n_items") or []):
             if pair[0] == text:
                 self.setCurrentIndex(index)
@@ -93,8 +93,8 @@ class ChoiceBox(QComboBox):
         popup.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
         popup.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         super().showPopup()
-        # Qt owns a separate popup frame outside the list view. Remove its
-        # platform outline as well as the list's frame, in both themes.
+
+
         popup = self.view().window()
         popup.setObjectName("ChoicePopup")
         popup.setStyle(self._popup_style)

@@ -36,7 +36,7 @@ def test_resource_urls_cannot_change_provider_host_or_escape_scope():
         ("notion", "not-a-page"),
         ("unknown", "value"),
     ]:
-        if "?token" in value:  # Queries are ignored and never forwarded to the API.
+        if "?token" in value:
             assert resource_id(kind, value) == "key"
         else:
             with pytest.raises(ValueError):
@@ -143,7 +143,7 @@ def test_editor_requires_connected_tool_and_automatically_suggests_without_grant
     qtbot.waitUntil(lambda: not dialog.busy)
     dialog.role_input.setText("A designer who reviews our brand")
     dialog.role_changed()
-    dialog.role_timer.stop()  # No paid model calls in tests.
+    dialog.role_timer.stop()
     assert dialog.suggested_tools == ["figma"]
     assert dialog.connectors.kind.currentData() == "figma"
     assert not dialog.connectors.rows

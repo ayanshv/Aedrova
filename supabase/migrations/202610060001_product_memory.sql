@@ -29,7 +29,7 @@ alter table public.product_memory_history enable row level security;
 revoke all on public.product_memory, public.product_memory_history from public,anon,authenticated;
 grant select on public.product_memory, public.product_memory_history to authenticated;
 
--- Sources are resolved each time, not cached permission claims from an import/client.
+
 create function aedrova_private.memory_source(p_kind text,p_id uuid) returns jsonb
 language plpgsql stable security definer set search_path='' as $$
 declare c uuid; b text; citation text; extra jsonb:='{}';
@@ -42,8 +42,8 @@ begin
  from public.attachments a join public.messages m on m.id=a.message_id
  where a.id=p_id and m.unsent_at is null;
  elsif p_kind='meeting' then
- -- Meeting context is optional. Never expose unreviewed provider speech when
- -- the later speech-review migration has not been installed either.
+
+
  if to_regclass('public.meeting_transcript_segments') is null then return null; end if;
  select t.channel_id,coalesce(to_jsonb(t)->>'review_body',t.body),
  jsonb_build_object('meeting_id',t.meeting_id,'offset_ms',t.offset_ms)
@@ -181,7 +181,7 @@ begin
 end $$;
 create trigger product_memory_revision after insert or update or delete on public.product_memory
  for each row execute function aedrova_private.bump_context_revision();
--- Remove derived copies/history when the user deletes or withdraws their source.
+
 create function aedrova_private.purge_source_memory() returns trigger
 language plpgsql security definer set search_path='' as $$
 declare k text; identifier uuid;
@@ -205,8 +205,8 @@ create trigger memory_message_delete after delete or update of unsent_at on publ
  for each row execute function aedrova_private.purge_source_memory();
 create trigger memory_attachment_delete after delete on public.attachments
  for each row execute function aedrova_private.purge_source_memory();
--- Attach only if optional meeting context is already installed. Its migration
--- also attaches this trigger when meeting context is installed after memory.
+
+
 do $$ begin
  if to_regclass('public.meeting_transcript_segments') is not null then
  execute 'create trigger memory_meeting_withdrawal after delete or update of ai_allowed

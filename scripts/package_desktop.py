@@ -190,8 +190,8 @@ subprocess.run(
     check=True,
 )
 
-# Qt's macOS permission API requires usage descriptions in the application bundle.
-# Re-sign the outer bundle after editing; preserve the vendor runtime's own signature.
+
+
 bundle = ROOT / "dist/Aedrova.app"
 info_path = bundle / "Contents/Info.plist"
 with info_path.open("rb") as stream:

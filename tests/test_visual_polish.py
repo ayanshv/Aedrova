@@ -24,10 +24,10 @@ def test_dark_scroll_panels_and_live_theme_change(qtbot, tmp_path):
         dialog.show()
         qtbot.wait(10)
         scroll = dialog.findChild(QScrollArea)
-        # Sample an unoccupied corner of the scroll content, not just its palette.
+
         image = scroll.widget().grab().toImage()
         actual, expected = image.pixelColor(2, 2), QColor(DARK.bg)
-        # Native color conversion can round a channel by one on macOS.
+
         assert max(abs(a - b) for a, b in zip(actual.getRgb(), expected.getRgb(), strict=True)) <= 1
         assert dialog.palette().color(QPalette.ColorRole.Window).name().upper() == DARK.elevated
     window.set_theme("light", persist=False)
@@ -104,7 +104,7 @@ def test_compact_chat_keeps_composer_and_footer_separate_during_activity(qtbot, 
     area = window.composer.parentWidget()
     assert area.height() >= area.minimumSizeHint().height()
     footer = area.layout().itemAt(area.layout().count() - 1).widget()
-    assert footer.isHidden()  # Replaced by the integrated composer cue.
+    assert footer.isHidden()
     assert window.composer.command_cue.isVisible()
     assert window.composer.mention_list.isVisible()
     assert window.composer.mention_list.parentWidget() is window

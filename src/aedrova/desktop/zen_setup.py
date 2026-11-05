@@ -495,7 +495,7 @@ class SetupPages(QScrollArea):
             return
         self.login_completed = True
         if account.snapshot.get("workspaces"):
-            # Use the same authenticated dashboard activation as normal sign-in.
+
             account.open_dashboard()
         else:
             self.window.update_profile_button()

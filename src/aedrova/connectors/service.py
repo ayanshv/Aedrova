@@ -105,7 +105,7 @@ class Vault:
 
         if sys.platform != "darwin":
             raise ConnectorError("Secure connector storage currently requires macOS.")
-        self.backend = Keyring()  # Explicit OS backend; never fall back to a plaintext keyring.
+        self.backend = Keyring()
 
     @staticmethod
     def account(user, workspace, teammate, row):
@@ -189,7 +189,7 @@ def read(row, token, fetch=None):
                 {k: i.get(k) for k in ("number", "title", "body", "html_url")} for i in issues[:10]
             ],
         }
-        # Optional README; repo and issue access above are required to verify the grant.
+
         try:
             doc = fetch(root + "/readme", headers)
             if doc.get("encoding") == "base64":

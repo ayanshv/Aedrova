@@ -83,7 +83,7 @@ class CreateChannelDialog(AppDialog):
                     },
                 )
             except Exception:
-                # Never retry a creation automatically after an ambiguous response.
+
                 return None, None
             try:
                 snapshot = self.service.snapshot()
@@ -110,7 +110,7 @@ class CreateChannelDialog(AppDialog):
                     else "Could not confirm creation. Refresh channels before trying again. "
                     "Your channel name is kept."
                 )
-                # Unknown outcomes must not expose a second Create action.
+
                 self.create.clicked.disconnect(self.submit)
                 self.create.clicked.connect(self.close_and_refresh)
                 self.create.setEnabled(True)

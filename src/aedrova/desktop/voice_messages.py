@@ -92,9 +92,9 @@ class VoicePlayer(QWidget):
         self.player.stop()
         self.player.setSource(QUrl())
         self.player.setAudioOutput(None)
-        # Windows media backends may retain a file handle after setSource(empty).
-        # Destroy the backend synchronously before removing the private recording;
-        # deleteLater alone leaves it locked until the next event-loop pass.
+
+
+
         delete(self.player)
         self.temporary.cleanup()
         self.deleteLater()
@@ -214,7 +214,7 @@ class VoiceMessage(Dictation):
         self.strip.layout().insertWidget(0, self.preview)
         self.wave.hide()
         self.show_state("preview", "Ready to send · only shared when you choose")
-        self.tick.start()  # Scope changes discard even a finished recording.
+        self.tick.start()
 
     def send_recording(self):
         if self.state != "preview" or not self.valid(self.epoch):
@@ -239,7 +239,7 @@ class VoiceMessage(Dictation):
             lambda: not self.valid(epoch),
         ):
             self.show_state("uploading", "Sharing your voice message…")
-            self.strip.hide()  # The conversation now shows the pending voice card.
+            self.strip.hide()
 
     def cancel(self):
         super().cancel()

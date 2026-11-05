@@ -1,5 +1,5 @@
 begin;
--- Additive: existing workspaces stay independent; no subscription or usage changes.
+
 create table public.workspace_parents (
  workspace_id uuid primary key references public.workspaces(id),
  parent_id uuid not null references public.workspaces(id),
@@ -69,7 +69,7 @@ begin
  perform aedrova_private.check_user_budget('create_subspace',5,60);
  w:=public.create_workspace(p_name);
  insert into public.workspace_parents values(w,p_parent);
- -- Access is explicit, not inherited: inviting to a subspace never grants parent access.
+
  return w;
 end $$;
 create function public.move_subspace(p_workspace uuid,p_parent uuid,p_expected_parent uuid)
@@ -106,7 +106,7 @@ begin
  if parent_depth+subtree_depth>lim.max_depth
  or total+(case when new_root=old_root then 0 else added end)>lim.max_subspaces then
  raise exception 'Space nesting or subspace limit reached' using errcode='54000'; end if;
- -- Require all subtree members to already belong to the destination billing Space.
+
  if exists(with recursive children(id) as (select p_workspace union all
  select p.workspace_id from children c join public.workspace_parents p on p.parent_id=c.id)
  select 1 from public.workspace_members m join children c on c.id=m.workspace_id

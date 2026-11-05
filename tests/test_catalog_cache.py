@@ -26,7 +26,7 @@ def test_catalog_cache_is_bounded_scoped_and_never_authoritative(monkeypatch):
     assert len(calls) == 1
     for _ in range(2):
         api.request("/api/dots?workspace=private")
-    assert len(calls) == 3  # Access-sensitive state always comes from the server.
+    assert len(calls) == 3
     now[0] = 31
     api.request("/api/buds/connectors")
     assert len(calls) == 4

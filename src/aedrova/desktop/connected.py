@@ -83,8 +83,8 @@ def message_tree(rows, user_id, *, directory=None, attachments=None):
         r["id"]: datetime.fromisoformat(r["created_at"].replace("Z", "+00:00")).timestamp()
         for r in rows
     }
-    # Keep request/response causality even if a server receipt has a slightly
-    # newer timestamp than the desktop clock. Other messages retain sent order.
+
+
     ordered = sorted(
         rows,
         key=lambda r: (
@@ -376,14 +376,14 @@ class ConnectedDashboard(QObject):
         else:
             self.queue.append(action)
         if priority:
-            # Paint the local echo before dispatching any network work.
+
             QTimer.singleShot(0, self.refresh)
         else:
             self.refresh()
         return True
 
     def refresh(self):
-        # A queued refresh can outlive the account dialog during window teardown.
+
         if not isValid(self) or not isValid(self.window) or not isValid(self.account):
             if isValid(self):
                 self.active = False
@@ -404,7 +404,7 @@ class ConnectedDashboard(QObject):
                 self.current_action = None
                 self.failures = 0
                 self.retry_at = 0
-                # A prepared isolated upload session must be closed even after logout.
+
                 if self.active or action_key[0] == "upload":
                     completed(result)
                 if self.active:
@@ -488,7 +488,7 @@ class ConnectedDashboard(QObject):
             self.apply(
                 snapshot, list(self.cache.get(channel_id, {}).values()), workspace_id, channel_id
             )
-            # A cursor only advances through records actually fetched while this chat is visible.
+
             if (
                 channel_id not in getattr(w.collaboration, "manual_unread", set())
                 and w.isActiveWindow()
@@ -694,8 +694,8 @@ class ConnectedDashboard(QObject):
                 w.thread_messages.show_messages([parent, *parent.replies])
 
     def with_agent_replies(self, rows, workspace, channel):
-        # Session-only answers are private to this signed-in desktop. Never upload
-        # an assistant answer disguised as a human message or leak it to another account.
+
+
         replies = self.agent_replies.get((workspace, channel), [])
         ids = {r["id"] for r in rows}
         return list(rows) + [r for r in replies if r["id"] not in ids]
@@ -758,8 +758,8 @@ class ConnectedDashboard(QObject):
                 editor.clear()
                 w._save_drafts()
             self.render_local_messages()
-            # Accepted messages clear optimistically below. A delayed receipt
-            # must never erase a new draft, even if its text happens to match.
+
+
             w.notify("Message sent.")
 
         accepted = self.enqueue(("send", message_id), operation, sent, priority=True)
@@ -946,9 +946,9 @@ class ConnectedDashboard(QObject):
 
             self.enqueue(("dm", workspace, recipient), create, opened)
 
-        # Opening a local picker must never wait behind polling, uploads or an RPC.
-        # This snapshot is scoped to the current session; the mutation still checks
-        # current membership on the server. Normal sync refreshes the directory.
+
+
+
         choose(self.account.snapshot)
 
     def upload(self, path=None, *, parent=None, voice_data=None, completed=None, cancelled=None):
@@ -965,7 +965,7 @@ class ConnectedDashboard(QObject):
                 if origin:
                     warm_upload_verifier(origin)
             except ValueError:
-                pass  # Optional pre-wake must not prevent choosing a file.
+                pass
         if voice_data is None and (not path or isinstance(path, bool)):
             parent = parent or (
                 self.window.thread_id if self.window.thread_composer.editor.hasFocus() else None
@@ -996,7 +996,7 @@ class ConnectedDashboard(QObject):
         if sum(key[0] == "upload" for key in self.pending) >= 10:
             self.window.notify("Finish or dismiss uploads before adding more files.")
             return
-        # Capture context before the dialog/worker runs; changing channels never redirects uploads.
+
         channel = self.window.channel_id
         service = self.account.service
         user_id = str(service.user.id)
@@ -1005,9 +1005,9 @@ class ConnectedDashboard(QObject):
             return False
         identifier = self.pending.setdefault(key, str(uuid4()))
         progress = UploadProgress(composer, Path(path).name)
-        progress.hide()  # The conversation echo owns visible delivery feedback.
-        # A sender-only echo is not a server publication. File validation and
-        # membership checks still complete before teammates can see the message.
+        progress.hide()
+
+
         local_id = "upload-" + identifier
         self.outbox[local_id] = {
             "id": local_id,
@@ -1062,7 +1062,7 @@ class ConnectedDashboard(QObject):
                     progress=progress.updated.emit,
                 )
                 publication = {"shared": bool(result), "message_id": result}
-                # Fetch only the verified message instead of waiting for a workspace snapshot.
+
                 if result and hasattr(transport, "client") and not stopped():
                     try:
                         rows = (
@@ -1078,7 +1078,7 @@ class ConnectedDashboard(QObject):
                         if rows:
                             publication.update(rows=rows, files=files)
                     except Exception:
-                        pass  # Already shared; normal realtime reconciliation can recover metadata.
+                        pass
                 return publication
             except ValueError as error:
                 return {"error": str(error), "rejected": True}
@@ -1113,8 +1113,8 @@ class ConnectedDashboard(QObject):
             if channel not in allowed:
                 self.outbox.pop(local_id, None)
             elif result.get("shared"):
-                # Keep an acknowledged echo if metadata fetching failed, so
-                # eventual realtime delivery cannot make the message disappear.
+
+
                 self.outbox.pop(local_id, None)
                 if local:
                     local["id"] = result["message_id"]

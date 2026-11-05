@@ -222,7 +222,7 @@ class ZenOnboarding(AppDialog):
         QApplication.instance().installEventFilter(self)
         self.timer = QTimer(self)
         self.timer.setTimerType(Qt.TimerType.PreciseTimer)
-        self.timer.setInterval(16)  # ~60 Hz repaint target; actual delivery is OS-dependent.
+        self.timer.setInterval(16)
         self.timer.timeout.connect(self.tick)
         self.finished.connect(self.cleanup)
         QApplication.instance().styleHints().colorSchemeChanged.connect(
@@ -445,7 +445,7 @@ class ZenOnboarding(AppDialog):
 
         if self.finished_once:
             return
-        # Never mark another account as completed if sign-in changes during the preview.
+
         if account_key(self.window) != self.prefix:
             self.reject()
             return
@@ -472,7 +472,7 @@ class ZenOnboarding(AppDialog):
                 elif deferred:
                     self.window.settings.setValue(self.prefix + "/budsDeferred", True)
                     self.bud_setup_completed = (
-                        True  # This handoff may proceed; setup remains deferred.
+                        True
                     )
                     self.complete()
                 else:
@@ -494,7 +494,7 @@ class ZenOnboarding(AppDialog):
         self.window.raise_()
         self.window.activateWindow()
         self.window.select_tab(0)
-        # Window activation and dialog dismissal settle on the next event-loop turn.
+
         QTimer.singleShot(0, self.start_controls_tour)
 
     def start_controls_tour(self):

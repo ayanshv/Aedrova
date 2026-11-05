@@ -1,5 +1,5 @@
 begin;
--- Only workspace administrators choose the shared public announcement channel.
+
 create table public.workspace_meeting_preferences (
  workspace_id uuid primary key references public.workspaces(id) on delete cascade,
  announcement_channel uuid not null references public.channels(id) on delete cascade

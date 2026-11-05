@@ -120,7 +120,7 @@ class ConnectorPanel(QWidget):
                 raise PermissionError("Only owners/admins may change the teammate's resources.")
             credential = token or (github_login_token() if row["tool"] == "github" else "")
             read(row, credential)
-            # Bound to the exact account/workspace/teammate/resource; never shared in config.
+
             Vault().put(user, workspace, identity, row, credential)
             return row
 

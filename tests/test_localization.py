@@ -225,7 +225,7 @@ def test_language_save_uses_isolated_transport_while_account_is_busy(qtbot, tmp_
     source.fork_for_context = lambda: SimpleNamespace(
         user=updated, save_language_preference=persist, close_context=lambda: closed.append(True)
     )
-    # This stays busy throughout: saving must never join or overwrite its job.
+
     window.account_dialog.busy = True
     dialog = show_language_settings(window)
     dialog.findChild(ChoiceBox).setCurrentIndex(1)

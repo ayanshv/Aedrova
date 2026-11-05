@@ -22,7 +22,7 @@ def main():
     migrations = sorted((ROOT / "supabase/migrations").glob("*.sql"))
     for path in migrations:
         sql = path.read_text()
-        # One atomic transaction: do not leave half-installed app migrations.
+
         lines = [
             line for line in sql.splitlines() if line.strip().lower() not in {"begin;", "commit;"}
         ]

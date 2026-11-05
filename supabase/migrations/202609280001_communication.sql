@@ -1,5 +1,5 @@
 begin;
--- Direct conversations use the existing channel access boundary, with immutable participants.
+
 alter table public.channels add column kind text not null default 'channel'
  check(kind in ('channel','dm'));
 alter table public.channels add column dm_low uuid references auth.users;
@@ -51,7 +51,7 @@ language sql stable security definer set search_path='' as $$
  where aedrova_private.member_role(m.workspace_id) in ('owner','admin','member')
  and m.role in ('owner','admin','member')
 $$;
--- Monotonic per-channel cursor. All message writes acquire the workspace lock first.
+
 alter table public.messages add column sequence bigint;
 with numbered as (select id,row_number() over(order by created_at,id) as n from public.messages)
 update public.messages m set sequence=numbered.n from numbered where m.id=numbered.id;
@@ -93,7 +93,7 @@ language sql stable security definer set search_path='' as $$
  and m.sender_id<>auth.uid()
  where aedrova_private.can_read_channel(c.id) group by c.id
 $$;
--- Keyset history; callers can separately page replies for a root outside the current window.
+
 create function public.message_page(p_channel uuid,p_before bigint default null,p_after bigint default null,
  p_parent uuid default null,p_threads boolean default false,p_limit integer default 100)
 returns setof public.messages language plpgsql stable security definer set search_path='' as $$
@@ -111,7 +111,7 @@ begin
  order by sequence desc limit greatest(1,least(coalesce(p_limit,100),200));
  end if;
 end $$;
--- Attachments: reserve a unique object path, upload immutable bytes, then atomically publish.
+
 create table public.attachments (
  id uuid primary key,
  channel_id uuid not null references public.channels on delete cascade,
@@ -190,7 +190,7 @@ begin
  update public.attachments set message_id=m where id=p_id;
  return m;
 end $$;
--- Content-free invalidations on personal topics: cached socket authorization cannot leak chat bodies.
+
 create policy aedrova_user_events on realtime.messages for select to authenticated
  using(extension='broadcast' and realtime.topic()='user:'||auth.uid()::text);
 create function aedrova_private.notify_message() returns trigger language plpgsql security definer
@@ -207,7 +207,7 @@ begin
 end $$;
 create trigger message_notification after insert on public.messages for each row
 execute function aedrova_private.notify_message();
--- Also notify on attachment finalization, after its metadata is visible.
+
 create function aedrova_private.notify_attachment() returns trigger language plpgsql security definer
 set search_path='' as $$
 begin

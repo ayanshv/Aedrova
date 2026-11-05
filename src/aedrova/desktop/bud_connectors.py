@@ -112,8 +112,8 @@ GLYPHS = {
     "vercel": "▲",
 }
 
-# Retain the existing service's default grant lifetime; removing a menu must not
-# silently broaden access. Provider/token expiry and revocation still apply.
+
+
 CONNECTION_HOURS = 24
 
 
@@ -279,9 +279,9 @@ class ConnectorsDialog(AppDialog):
             wrap=True,
         )
         form.addWidget(self.access_note)
-        # Compatibility state for the existing scoped-token verification path.
-        # It is deliberately outside the customer connection screen: normal
-        # customers never enter developer tokens, resource IDs or a lifetime.
+
+
+
         self.legacy_setup = QWidget(self)
         self.legacy_setup.hide()
         legacy = QVBoxLayout(self.legacy_setup)
@@ -724,8 +724,8 @@ class ConnectorsDialog(AppDialog):
                 )
                 action_text = "Manage" if connected else "Connect" if login_ready else "View setup"
                 action = button(action_text)
-                # Disconnect must remain reachable even if new provider sign-in
-                # is unavailable (for example, app configuration was removed).
+
+
                 action.setProperty(
                     "providerAvailable", provider.get("available", False) or connected
                 )
@@ -872,8 +872,8 @@ class ConnectorsDialog(AppDialog):
             owner = self.embedded_owner
             if not owner.current():
                 owner.provider.setCurrentIndex(owner.provider.findData(provider["id"]))
-                # A disconnected draft needs a nonempty legacy metadata field.
-                # This is not an authorization or a readable resource.
+
+
                 owner.resource.setText(
                     "selection/pending" if provider["id"] == "github" else "pending"
                 )
@@ -945,7 +945,7 @@ class ConnectorsDialog(AppDialog):
         self.run(lambda service: client(service).request("/api/buds/oauth/start", body), started)
 
     def request_failed(self):
-        # A failed poll must not strand the primary action on “Check connection”.
+
         if self.oauth_state:
             self.stop_oauth()
             if self.selected_provider:

@@ -12,7 +12,7 @@ from aedrova.desktop.bud_chat import BudChat
 
 def ready_chat(qtbot, tmp_path):
     window, service = setup(qtbot, tmp_path)
-    # Settle initial dashboard sync before replacing its shared fake RPC transport.
+
     qtbot.waitUntil(lambda: bool(window.channel.messages) and not window.account_dialog.busy
                     and not window.connected.current_action and not window.connected.queue)
     history, calls = [], []
@@ -21,7 +21,7 @@ def ready_chat(qtbot, tmp_path):
         calls.append((name, dict(params)))
         if name == "bud_conversation":
             return list(history)
-        assert name == "append_bud_message"  # Never send_message or a channel RPC.
+        assert name == "append_bud_message"
         row = {
             "id": params["p_id"],
             "body": params["p_body"],
@@ -44,7 +44,7 @@ def test_private_history_reopens_without_posting_to_channel(qtbot, tmp_path):
     dialog.answer = answers.append
     dialog.composer.editor.setPlainText("Private idea")
     dialog.send("Private idea")
-    assert dialog.pending_message["p_body"] == "Private idea"  # Immediate local echo.
+    assert dialog.pending_message["p_body"] == "Private idea"
     qtbot.waitUntil(lambda: len(answers) == 1)
     assert history[0]["body"] == "Private idea"
     assert window.channel.messages[0].body == "Hello"

@@ -591,8 +591,8 @@ class AedrovaWindow(QMainWindow):
                     else self.switch_workspace(wid)
                 )
             )
-            # Parent the control before showing it. An unparented visible button
-            # briefly becomes a native window and can switch macOS fullscreen Spaces.
+
+
             self.rail_items.addWidget(item)
             item.setVisible(workspace.id == self.workspace_id)
             self.workspace_buttons[workspace.id] = item
@@ -994,8 +994,8 @@ class AedrovaWindow(QMainWindow):
         self.connected.complete_agent_reply(workspace, channel, text, author, sent_at=sent_at)
 
     def _record_agent_prompt(self, text, composer):
-        # Slash commands retain the private Build Room workflow; only conversational
-        # mentions are shared in their originating channel or thread.
+
+
         if text.lstrip().split(maxsplit=1)[0].casefold() == "/build":
             (composer or self.composer).clear_submission(text)
             self._save_drafts()
@@ -1047,8 +1047,8 @@ class AedrovaWindow(QMainWindow):
         bud_match = mention_match(text, dot) if dot else None
         main_match = agent_mention(text, nickname)
         addressed_bud = bud_match and (not main_match or bud_match.start() <= main_match.start())
-        # A direct Bud mention owns the response, including action-word requests.
-        # Explicit Bud tokens also win when its name matches the main agent's nickname.
+
+
         if dot and (task is None or addressed_bud):
             from aedrova.desktop.dot_analysis import start_analysis
 
@@ -1369,7 +1369,7 @@ class AedrovaWindow(QMainWindow):
         self.dialog.name.setFocus()
 
     def _render_pages(self):
-        # Preserve the selected tab when project settings rebuild its contents.
+
         selected = self.pages.currentIndex()
         builders = (self._project_page, self._builds_page, self._files_page)
         for index, builder in enumerate(builders, 1):
@@ -1933,14 +1933,14 @@ class AedrovaWindow(QMainWindow):
             if not self.account_dialog.busy or getattr(
                 self.account_dialog, "background_job", False
             ):
-                # Reopening must not strand the user on a previous creation
-                # confirmation while a network refresh is pending or fails.
+
+
                 if self.account_dialog.snapshot.get("workspaces"):
                     self.account_dialog.pages.setCurrentIndex(4)
                     self.account_dialog.apply_intent()
-                    # The active dashboard already syncs this session's snapshot.
-                    # Keep settings immediately usable instead of covering cached
-                    # content with a full-page loader on every open.
+
+
+
                     if not self.account_dialog.busy and not (
                         self.connected and self.connected.active
                     ):
@@ -1963,7 +1963,7 @@ class AedrovaWindow(QMainWindow):
             self.select_tab(0)
             QTimer.singleShot(0, self.offer_setup)
             return
-        # Explicit local-preview navigation remains available in demo mode.
+
         self.select_tab(0)
         self.show()
         self.raise_()

@@ -1,5 +1,5 @@
--- Bounded beta storage accounting and service-only orphan deletion leases.
--- Delete bytes through the Storage API, NEVER by deleting storage.objects in SQL.
+
+
 begin;
 create table aedrova_private.storage_usage (
  workspace_id uuid primary key,
@@ -20,8 +20,8 @@ create table aedrova_private.storage_cleanup (
 );
 create index storage_cleanup_ready on aedrova_private.storage_cleanup(ready_at,lease_until);
 alter table public.attachments add column workspace_id uuid;
--- A caller's declared byte_size is untrusted until Storage verifies it at finalization.
--- Reserve the full per-object upload ceiling so undersized declarations cannot bypass quota.
+
+
 alter table public.attachments add column charged_bytes bigint not null default 10485760;
 update public.attachments set charged_bytes=byte_size where message_id is not null;
 update public.attachments a set workspace_id=c.workspace_id from public.channels c where c.id=a.channel_id;
@@ -68,7 +68,7 @@ create function public.claim_storage_cleanup(p_limit integer default 25)
 returns table(object_path text,lease uuid) language plpgsql security definer set search_path='' as $$
 begin
  if p_limit not between 1 and 50 then raise exception 'Invalid cleanup batch'; end if;
- -- Lock and retire expired pending reservations. Finalized files are never selected.
+
  delete from public.attachments where id in (
   select id from public.attachments where message_id is null
   and expires_at<now()-interval '24 hours' order by expires_at for update skip locked limit p_limit

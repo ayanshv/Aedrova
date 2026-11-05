@@ -1,6 +1,6 @@
 begin;
--- End an empty room under the same lock used by joining. Leaving while others
--- remain never ends their meeting or offers a premature review.
+
+
 create or replace function public.leave_meeting(p_meeting uuid) returns void
 language plpgsql security definer set search_path='' as $$
 declare m public.meetings; n integer;
@@ -33,8 +33,8 @@ begin
   'ready',m.ended_at is not null and allowed);
 end $$;
 
--- One explicit confirmation, one transaction. Stale, missing, duplicated or
--- cross-meeting edits roll everything back. Never changes participant AI consent.
+
+
 create function public.confirm_meeting_transcript(p_meeting uuid,p_segments jsonb)
 returns integer language plpgsql security definer set search_path='' as $$
 declare m public.meetings; u uuid:=aedrova_private.require_user(); w uuid; n integer;

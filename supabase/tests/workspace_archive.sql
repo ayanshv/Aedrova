@@ -1,4 +1,4 @@
--- Disposable fixture only. Never apply tests to hosted Supabase.
+
 begin;
 insert into auth.users(id,email,email_confirmed_at) values
  ('92000000-0000-0000-0000-000000000001','owner@archive.test',now()),

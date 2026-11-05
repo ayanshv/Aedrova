@@ -323,7 +323,7 @@ def test_slow_access_heartbeat_keeps_sending_video_and_access_failure_ends_call(
                     await asyncio.sleep(.01)
             before = len(frames)
             await asyncio.sleep(.15)
-            assert len(frames) >= before + 3  # Video advances while HTTP is still blocked.
+            assert len(frames) >= before + 3
             release.set()
             await asyncio.wait_for(run, 2)
             assert problems == ['Cannot access this call. Sign in again.']
@@ -351,7 +351,7 @@ def test_audio_device_choices_use_sdk_ids_and_mute_before_changing(qtbot):
     assert worker.calls[-2:] == [('microphone', False), ('noise_suppression', False)]
     dialog.audio_selected('speaker', '')
     assert dialog.audio_choices['speaker'].currentData() == ''
-    assert worker.calls[-1] == ('noise_suppression', False)  # Revert emits no command.
+    assert worker.calls[-1] == ('noise_suppression', False)
 
 
 def test_video_meeting_joins_muted_by_default_without_removing_audio_call_behavior(qtbot):

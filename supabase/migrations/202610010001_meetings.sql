@@ -1,5 +1,5 @@
 begin;
--- Meetings share channel visibility; joining never consents to transcription or AI reuse.
+
 create table public.meetings (
  id uuid primary key default gen_random_uuid(),
  channel_id uuid not null references public.channels(id) on delete cascade,
@@ -68,7 +68,7 @@ begin
  m:=aedrova_private.lock_meeting(p_meeting);
  if m.ended_at is not null then raise exception 'Meeting has ended'; end if;
  select workspace_id into w from public.channels where id=m.channel_id;
- -- A fresh join resets the joining participant's choices. It is never implicit consent.
+
  insert into public.meeting_participants(meeting_id,user_id,present_until)
  values(m.id,u,clock_timestamp()+interval '60 seconds')
  on conflict(meeting_id,user_id) do update
@@ -84,7 +84,7 @@ declare m public.meetings;
 begin
  m:=aedrova_private.lock_meeting(p_meeting);
  if m.ended_at is not null then raise exception 'Meeting has ended'; end if;
- -- Expired presence needs a new join and new consent; heartbeats cannot resurrect it.
+
  update public.meeting_participants set present_until=clock_timestamp()+interval '60 seconds'
  where meeting_id=m.id and user_id=auth.uid() and present_until>clock_timestamp();
  if not found then raise exception 'Rejoin the meeting' using errcode='42501'; end if;

@@ -306,7 +306,7 @@ class SetupVisual(QWidget):
         elif self.kind == "folder":
             p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
             p.drawImage(QRectF(w / 2 - 90, 10, 180, 120), project_folder_image())
-            # Native overlay stays crisp and follows the active appearance.
+
             cx, cy = w / 2 + 49, 103
             p.setPen(QPen(QColor(theme.border), 1))
             p.setBrush(QColor(theme.surface))

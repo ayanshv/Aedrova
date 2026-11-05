@@ -132,7 +132,7 @@ def test_failed_or_incomplete_reply_never_counts_as_success(monkeypatch, events,
     with pytest.raises(RuntimeError) as error:
         reply(access(), "Hello", threading.Event())
     assert "private-provider-detail" not in str(error.value)
-    assert len(requests) == 1  # No hidden retry or unmetered personal fallback.
+    assert len(requests) == 1
 
 
 class WaitingStream(httpx.AsyncByteStream):

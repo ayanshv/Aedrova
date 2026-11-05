@@ -157,7 +157,7 @@ class DotDialog(AppDialog):
 
         self.finished.connect(closed)
         if recovery:
-            # Only read-only loads may be retried. Never retry a timed-out write.
+
             timer.timeout.connect(stalled)
             timer.start(getattr(self, "_load_timeout_ms", 100000))
 
@@ -181,7 +181,7 @@ class DotDialog(AppDialog):
 
             job = Job(work)
             self.job = job
-            # Keep timed-out workers alive until they close their service context.
+
             jobs = getattr(self, "_bud_jobs", None)
             if jobs is None:
                 jobs = self._bud_jobs = []
@@ -284,7 +284,7 @@ class DotDialog(AppDialog):
                 self.list.setVisible(True)
             else:
                 self.list.setVisible(False)
-                # Local draft remains usable while the host wakes.
+
                 if self.name.text() == draft_name and self.pages.currentIndex() == 0:
                     self.new_dot()
             if self.after_refresh is not None:
@@ -375,7 +375,7 @@ class DotDialog(AppDialog):
         self.update_controls()
 
     def finish_later(self):
-        # Explicit defer is different from closing an unfinished required dialog.
+
         self.deferred_setup = True
         self.reject()
 
@@ -394,7 +394,7 @@ class DotDialog(AppDialog):
         specialty = self.job_role.currentData() or "builder"
         row = self.current()
         old = row.get("role", "") if row else ""
-        # Preserve legacy metadata exactly until the owner changes the role or purpose.
+
         if row and role_for(old) == specialty and purpose_from(old) == self.role.text().strip():
             return old
         return stored_role(specialty, self.role.text())
@@ -629,7 +629,7 @@ class DotDialog(AppDialog):
         )
         self.disconnect.setText("Disconnect my GitHub OAuth access")
         self.disconnect.setEnabled(legacy_access and not busy)
-        # Legacy controls are backing state only; the inline gallery owns the UI.
+
         self.disconnect.hide()
         self.remove.setEnabled(bool(row) and self.admin() and not busy)
         self.remove.setVisible(bool(row) and self.admin())

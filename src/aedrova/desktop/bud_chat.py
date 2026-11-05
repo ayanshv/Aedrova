@@ -236,7 +236,7 @@ class BudChat(AppDialog):
                     author=self.bud["name"],
                     character_config=shelf_rows([self.bud])[0]["config"],
                 )
-                # Saved timestamps, rather than the time the conversation was reopened.
+
                 sent = datetime.fromisoformat(row["created_at"].replace("Z", "+00:00")).astimezone()
                 widget.timestamp.setText(sent.strftime("%I:%M %p · %b %d"))
                 widget.timestamp.setToolTip(sent.isoformat())
@@ -375,7 +375,7 @@ class BudChat(AppDialog):
             return
         self.waiting(False)
         if cancelled or result.get("error"):
-            self.render()  # Partial replies are not saved or presented as completed answers.
+            self.render()
             self.status.setText("Reply stopped." if cancelled else result["text"])
             self.retry.show()
             return
