@@ -69,3 +69,10 @@ jobs:
           python -m pip install uv==0.12.6
           uv sync --locked
           uv run python scripts/test_database.py
+
+      - name: Isolated PostgreSQL backup restoration
+        run: >-
+          uv run python scripts/check_postgres_recovery.py
+          --node node
+          --pglite work/pglite/package/dist/index.js
+          --output work/postgres-recovery.log
