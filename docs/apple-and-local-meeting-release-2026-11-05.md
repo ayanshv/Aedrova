@@ -68,3 +68,11 @@ This removes the need for Aedrova-hosted meeting rooms/guard and speech-provider
 Required for Apple acceptance: open the newest staging login, click Sign in with Apple, choose the intended email-sharing preference, and complete Touch ID or Apple's password/2FA privately. Sharing the email used by the existing workspace can avoid unintentionally creating a separate relay-email identity; do not merge accounts based on display names.
 
 Before public application launch: approve the concrete production provider credential/configuration transfer once its reviewed package is presented; complete any required personal operator/identity disclosures; provide final real-device/clean-machine acceptance. Existing paid production hosting and notary credentials are already completed and must not be requested again. Purchases remain owner-only. Apple's pending notarization decision is external and cannot be replaced by local signature verification.
+
+### November 6 notarization result
+
+The app submission completed successfully: `xcrun stapler validate dist/Aedrova.app` passed and `spctl --assess --type execute -v dist/Aedrova.app` returned `accepted`, source `Notarized Developer ID`. The workflow then built and timestamp-signed `dist/Aedrova.dmg`. Its submission stopped with `No Keychain password item found for profile: Aedrova-Notary`, also reproduced with the explicit login Keychain path. The DMG itself is not certified notarized or ready for publication. Do not submit a duplicate app ZIP.
+
+Owner action after returning: open `work/apple-setup-nov5/Save Notarization Credentials.command`, enter the existing app-specific password privately to restore/validate the Keychain profile, and report success. Then resume only the existing DMG submission/stapling/assessment. No new password needs to be generated unless Apple rejects the existing one. The owner must also finish the fresh Apple sign-in biometric/account-consent step described above. Neither action involves payment.
+
+Final focused native follow-up: 46 tests passed, lint and secret-pattern checks passed. Website Apple/public follow-up: 38 tests passed. These complement the full 1,168-test native candidate run; they do not replace unperformed clean-machine or production acceptance.
