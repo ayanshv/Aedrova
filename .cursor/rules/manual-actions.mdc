@@ -21,15 +21,18 @@ actions, then obtain owner approval before the next milestone.
 
 The owner requests a brief reminder at the end of project responses while the current
 stage is incomplete, including concrete remaining steps. Current execution: Stage 3
-(Security and recovery), authorized November 4, 2026. The owner finished their Stage 2
+(Security and recovery), payment-free checks completed November 5, 2026; awaiting
+owner permission for Stage 4 (production operations). The owner finished their Stage 2
 UI requests. Do not ask for additional Stage 2 fixes unless they reopen that scope.
 
 Read docs/pre-launch-timeline.md and docs/stage-3-security-recovery-2026-11-04.md.
-Stage 3 remains open for hosted database plus Storage backup coverage, an isolated
-hosted restore, deployment/ingress acceptance and any independent review still required.
+Read docs/stage-3-payment-free-closeout-2026-11-05.md for the independent agent
+review, fixed revocation race, hosted staging rate/concurrency checks and encrypted
+backup preparation. Full hosted database/Storage backup activation, isolated restore,
+off-site/key custody and final proxy/multi-instance acceptance remain launch gates.
 Local PostgreSQL recovery does not certify hosted Supabase recovery. The dashboard
-reports Free plans without project backups and an organization quota warning with
-possible restrictions starting November 24, 2026. No purchase is authorized on the
+reports Free plans without project backups. The previous-cycle egress warning names
+November 24, 2026; current-cycle egress reviewed November 5 is below quota (18%). No purchase is authorized on the
 owner's behalf; keep costs at the final owner-paid gate unless the owner acts sooner.
 Claude funding, production meeting guard and real two-device meetings remain final
 launch gates. Buffer supersedes direct Meta/TikTok public approvals for the selected

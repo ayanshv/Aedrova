@@ -28,7 +28,7 @@ Exit: agreed UI issues fixed and visually reviewed on the final staging candidat
 
 ## 3. Security and recovery — Days 5–7
 
-November 4 status: OPEN. Dependency patches, endpoint/credential review and local PostgreSQL recovery are implemented. Hosted database/Storage backup coverage and isolated hosted restoration are still unverified. Supabase displays Free plans without backups and an organization over-quota restriction warning. See `stage-3-security-recovery-2026-11-04.md` for evidence and owner steps. No purchases or production database writes were performed.
+November 5: payment-free review/check/preparation scope completed. Independent agent review found one medium shared-work revocation race, fixed and verified in staging with a real two-connection regression. Hosted throttling/spoof and shared-counter concurrency checks passed. Encrypted backup/restore tooling passed. Current Supabase egress is 18%; the warning concerns the prior cycle. Full production database/Storage backup activation, off-site/key custody, isolated live restore and final proxy/multi-instance acceptance remain before-launch gates. See `stage-3-payment-free-closeout-2026-11-05.md`. Await permission for Stage 4; no payment or production restore performed.
 
 Independent access-boundary review, rate and spending limits, secret/input checks, and an actual isolated backup restoration.
 
