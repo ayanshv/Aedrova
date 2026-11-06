@@ -106,7 +106,7 @@ class MeetingPresentation(AppDialog):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(14)
         outer = layout
-        outer.addWidget(label("Make the call yours.", "title"))
+        outer.addWidget(label("Call appearance", "title"))
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QScrollArea.Shape.NoFrame)

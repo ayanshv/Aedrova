@@ -4,7 +4,7 @@ import math
 from functools import lru_cache
 from pathlib import Path
 
-from PySide6.QtCore import QRectF, Qt
+from PySide6.QtCore import QRectF
 from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
 
 LOOKS = ("builder", "designer", "marketing", "finance", "research", "product")
@@ -36,50 +36,84 @@ def appearance(config):
     return {"squircle": "designer", "cloud": "marketing"}.get(config.get("shape"), "builder")
 
 
-@lru_cache(maxsize=48)
+def smoothstep(low, high, value):
+    t = max(0.0, min(1.0, (value - low) / (high - low)))
+    return t * t * (3 - 2 * t)
+
+
+@lru_cache(maxsize=1)
+def atlas_image():
+    return QImage(str(Path(__file__).parent / "assets/buds/reference-atlas.png"))
+
+
+def tinted_body(tile, look, target, base):
+    """Continuous tint at original resolution; no clipped shadow/highlight bands."""
+    hue = base.hslHueF()
+    base_light = base.lightnessF()
+    target_hue = max(0.0, target.hslHueF())
+
+
+    pivot = max(0.18, min(0.86, base_light + (target.lightnessF() - base_light) * 0.75))
+    saturation_rate = -math.log1p(-target.hslSaturationF() * 0.92) / max(0.1, base.hslSaturationF())
+    for y in range(tile.height()):
+        for x in range(tile.width()):
+            pixel = tile.pixelColor(x, y)
+            if not pixel.alpha():
+                continue
+            h, saturation, light, alpha = pixel.getHslF()
+            distance = (h - hue + 0.5) % 1.0 - 0.5
+            strength = 1 - smoothstep(0.055, 0.12, abs(distance))
+            strength *= smoothstep(0.035, 0.14, saturation) * smoothstep(0.12, 0.32, light)
+
+
+            px, py = x * 512 / tile.width(), y * 512 / tile.height()
+            if look == "builder":
+                strength *= smoothstep(-2, 8, py - (270 - 0.14 * px))
+            elif look == "designer" and px > 390 and py < 225:
+
+
+                strength *= 1 - smoothstep(0.02, 0.045, abs(distance))
+            elif look == "research":
+                radius = math.hypot(px - 365, py - 174)
+                strength *= smoothstep(76, 83, radius)
+            if strength <= 0:
+                continue
+            shaded = (
+                light / base_light * pivot
+                if light <= base_light
+                else pivot + (light - base_light) / (1 - base_light) * (1 - pivot)
+            )
+            tint = QColor.fromHslF(
+                (target_hue + distance * 0.35) % 1.0,
+                -math.expm1(-saturation_rate * saturation),
+                shaded,
+                alpha,
+            )
+
+            pixel.setRgbF(
+                pixel.redF() + (tint.redF() - pixel.redF()) * strength,
+                pixel.greenF() + (tint.greenF() - pixel.greenF()) * strength,
+                pixel.blueF() + (tint.blueF() - pixel.blueF()) * strength,
+                alpha,
+            )
+            tile.setPixelColor(x, y, pixel)
+    return tile
+
+
+@lru_cache(maxsize=32)
 def sprite(look, color=""):
     if look == "research" and color.upper() in {"", "#4388F5", "#9CCCE6"}:
         color = "#70C8B7"
-    atlas = QImage(str(Path(__file__).parent / "assets/buds/reference-atlas.png"))
+    atlas = atlas_image()
     if atlas.isNull():
         return QPixmap()
     index = LOOKS.index(look)
     width, height = atlas.width() // 3, atlas.height() // 2
     tile = atlas.copy((index % 3) * width, (index // 3) * height, width, height)
-
-
     if color and color.upper() not in {"#4388F5", BASE_COLORS[index].upper()}:
-        tile = tile.scaled(
-            160, 160, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
-        )
         target = QColor(color)
-        base = QColor(BASE_COLORS[index])
         if target.isValid():
-            for y in range(tile.height()):
-                for x in range(tile.width()):
-                    pixel = tile.pixelColor(x, y)
-                    h, s, lightness, a = pixel.getHslF()
-                    distance = abs(h - base.hslHueF())
-                    if (
-                        a > 0
-                        and lightness > 0.30
-                        and s > 0.12
-                        and min(distance, 1 - distance) < 0.10
-                    ):
-
-                        pixel.setHslF(
-                            max(0, target.hslHueF()),
-                            min(1, s * target.hslSaturationF() / max(0.1, base.hslSaturationF())),
-                            min(
-                                0.97,
-                                max(
-                                    0.12,
-                                    lightness + (target.lightnessF() - base.lightnessF()) * 0.65,
-                                ),
-                            ),
-                            a,
-                        )
-                        tile.setPixelColor(x, y, pixel)
+            tile = tinted_body(tile, look, target, QColor(BASE_COLORS[index]))
     return QPixmap.fromImage(tile)
 
 
@@ -114,7 +148,7 @@ EYES = {
 }
 
 
-@lru_cache(maxsize=48)
+@lru_cache(maxsize=32)
 def blinking_sprite(look, color=""):
     """Close only the eyes using adjacent satin pixels and the original eye texture."""
     original = sprite(look, color)

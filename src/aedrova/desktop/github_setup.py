@@ -51,7 +51,7 @@ class GitHubSetup(AppDialog):
         layout.setSpacing(18)
         self.brand = BrandMark(58)
         layout.addWidget(self.brand)
-        self.heading = label("Your code. Ready to go.", "heading")
+        self.heading = label("Connect GitHub", "heading")
         layout.addWidget(self.heading)
         self.setup_start = layout.count()
         layout.addWidget(

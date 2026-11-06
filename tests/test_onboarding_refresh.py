@@ -41,7 +41,7 @@ def test_free_activation_is_explicit_scoped_and_cannot_be_double_clicked(
     monkeypatch.setattr(
         "aedrova.desktop.preferences.application_origin", lambda: "https://staging.example"
     )
-    widget = SettingsDialog(window)
+    widget = SettingsDialog(window, scope="workspace")
     qtbot.addWidget(widget)
 
     _, read_complete = queued.pop()
@@ -75,7 +75,7 @@ def test_members_do_not_see_owner_activation_action(qtbot, tmp_path, monkeypatch
     monkeypatch.setattr(
         "aedrova.desktop.preferences.application_origin", lambda: "https://staging.example"
     )
-    widget = SettingsDialog(window)
+    widget = SettingsDialog(window, scope="workspace")
     qtbot.addWidget(widget)
     queued.pop()({"status": "no_plan"})
     assert widget.activate_ai.isHidden()

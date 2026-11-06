@@ -252,3 +252,51 @@ def test_automatic_planning_defaults_on_but_preserves_opt_out(qtbot, tmp_path):
     opted_out = ProjectDialog(window)
     qtbot.addWidget(opted_out)
     assert not opted_out.auto_plan.isChecked()
+
+
+@pytest.mark.parametrize("background", [False, True])
+@pytest.mark.parametrize("method", ["close", "reject"])
+def test_processing_build_window_can_be_dismissed(qtbot, tmp_path, background, method):
+    from aedrova.agents.runtime import LocalRunner
+
+    window, _ = setup(qtbot, tmp_path)
+    dialog = BuildDialog(window)
+    qtbot.addWidget(dialog)
+    dialog.job = SimpleNamespace(runner=LocalRunner(lambda _: None))
+    dialog.pending = True
+    dialog.background_run = background
+    dialog.show()
+    assert dialog.isVisible()
+    getattr(dialog, method)()
+    assert not dialog.isVisible()
+    assert dialog.job.runner.cancelled.is_set() is (not background)
+    assert dialog.background_run is background
+
+    dialog.job = None
+    dialog.pending = False
+
+
+@pytest.mark.parametrize("method", ["close", "reject"])
+def test_busy_review_closes_and_ignores_late_results(qtbot, tmp_path, method):
+    window, _ = setup(qtbot, tmp_path)
+    qtbot.waitUntil(
+        lambda: (
+            not window.account_dialog.busy
+            and not window.connected.current_action
+            and not window.connected.queue
+        )
+    )
+    window.account_dialog.busy = True
+    build = BuildDialog(window)
+    qtbot.addWidget(build)
+    review = ReviewDialog(build)
+    qtbot.addWidget(review)
+    review.show()
+    assert review.job and review.isVisible()
+    getattr(review, method)()
+    assert not review.isVisible() and review.cancelled.is_set()
+    review.callback = lambda _: pytest.fail("Closed review must ignore late results")
+    review.job_finished({"value": "late result"})
+    assert not review.isVisible() and review.job is None
+    window.connected.queue.clear()
+    window.account_dialog.busy = False

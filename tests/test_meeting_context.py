@@ -88,7 +88,7 @@ def test_append_requires_permit_and_never_claims_speaker():
 
 def test_older_server_cannot_enable_text():
     client = MeetingClient("http://127.0.0.1:8090", "fixture")
-    def unavailable(path):
+    def unavailable(path, **kwargs):
         raise RuntimeError("Not found")
     client.request = unavailable
     assert client.capabilities()["meeting_text"] is False

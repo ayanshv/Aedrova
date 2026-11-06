@@ -332,7 +332,7 @@ def test_cross_source_query_job_selects_fetches_and_answers_with_citations(
     job.signals.finished.connect(results.append)
     job.run()
     assert len(calls) == 2 and paths[1] == "/api/dots/tools"
-    assert results == [{"text": "Sign in changed. [" + citation + "]"}]
+    assert results == [{"text": "Sign in changed. [" + citation + "]", "source_channels": ["c"]}]
     assert closed == [True]
 
 

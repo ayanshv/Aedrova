@@ -3,7 +3,7 @@
 import time
 
 from PySide6.QtCore import QRectF, Qt, QTimer
-from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPen
+from PySide6.QtGui import QColor, QFont, QPainter
 from PySide6.QtWidgets import QWidget
 
 from aedrova.desktop.brand import brand_image
@@ -64,15 +64,9 @@ class OpeningScene(QWidget):
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(QColor(0, 0, 0, alpha if t.name == "light" else alpha // 2))
             p.drawRoundedRect(area.translated(0, offset), 26, 26)
-        gradient = QLinearGradient(area.topLeft(), area.bottomRight())
-        gradient.setColorAt(0, QColor(t.elevated))
-        gradient.setColorAt(1, QColor(t.surface))
-        p.setBrush(gradient)
-        p.setPen(QPen(QColor(t.border), 1))
+        p.setBrush(QColor(t.surface))
+        p.setPen(Qt.PenStyle.NoPen)
         p.drawRoundedRect(area, 24, 24)
-        p.setPen(QColor(t.muted))
-        p.setFont(system_font(11, QFont.Weight.Medium))
-        p.drawText(QRectF(-176, -106, 320, 24), "YOUR SPACE")
         for i, (name, glyph) in enumerate(
             (("Conversations", "mention"), ("Projects", "folder"), ("Meetings", "camera"))
         ):
@@ -81,7 +75,7 @@ class OpeningScene(QWidget):
             y = (-72, -28, 68)[i] + 22 * (1 - progress)
             tile = QRectF(x, y, 152, 50)
             p.setOpacity(reveal)
-            p.setPen(QPen(QColor(t.border), 1))
+            p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(QColor(t.elevated))
             p.drawRoundedRect(tile, 12, 12)
             pix = icon(glyph, t.accent).pixmap(19, 19)

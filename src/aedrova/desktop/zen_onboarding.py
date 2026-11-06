@@ -46,7 +46,7 @@ class ZenCanvas(QWidget):
         p.translate(0, lift)
 
         def text(rect, value, size=14, color=None, weight=QFont.Weight.Normal):
-            font = system_font(size, weight, -0.5 if size > 24 else 0)
+            font = system_font(size, weight)
             p.setFont(font)
             p.setPen(QColor(color or t.text))
             p.drawText(rect, Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap, value)
@@ -54,12 +54,12 @@ class ZenCanvas(QWidget):
         titles = (
             (
                 "Welcome to Aedrova",
-                "Your team. With a builder.",
-                "Context, connected.",
+                "Build with your team",
+                "Shared context",
                 "Meet the command menu",
             )
             + tuple(x[0] for x in SETUP_STEPS)
-            + ("You’re ready to make things.",)
+            + ("Your workspace is ready",)
         )
         subtitles = (
             (

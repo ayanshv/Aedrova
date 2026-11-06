@@ -6,12 +6,12 @@ import threading
 from types import SimpleNamespace
 
 import pytest
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QDialog, QMessageBox
 from test_connected import setup
 
 from aedrova.agents.permissions import automatic, normalize
 from aedrova.agents.runtime import LocalRunner
-from aedrova.desktop.agent_permissions import change, mode, sync
+from aedrova.desktop.agent_permissions import FullAccessDialog, change, mode, sync
 from aedrova.desktop.builds import BuildDialog
 
 
@@ -61,10 +61,10 @@ def test_dropdown_scoped_persistent_and_thread_synced(qtbot, tmp_path):
 
 def test_full_access_requires_explicit_selection_confirmation(qtbot, tmp_path, monkeypatch):
     window, _ = setup(qtbot, tmp_path)
-    monkeypatch.setattr(QMessageBox, "question", lambda *a: QMessageBox.StandardButton.No)
+    monkeypatch.setattr(FullAccessDialog, "exec", lambda *a: QDialog.DialogCode.Rejected)
     change(window, "full")
     assert mode(window) == "ask"
-    monkeypatch.setattr(QMessageBox, "question", lambda *a: QMessageBox.StandardButton.Yes)
+    monkeypatch.setattr(FullAccessDialog, "exec", lambda *a: QDialog.DialogCode.Accepted)
     change(window, "full")
     assert mode(window) == "full"
     assert window.thread_composer.permissions.currentData() == "full"
@@ -160,7 +160,6 @@ sys.stdin.read()
         return original(command, *args, **kwargs)
 
     monkeypatch.setattr("aedrova.agents.codex_approvals.subprocess.Popen", launch)
-
 
 
 @pytest.mark.parametrize("allow", [True, False])
@@ -297,3 +296,71 @@ def test_new_project_does_not_inherit_full_authority(qtbot, tmp_path):
     save_binding(window, {"folder": str(tmp_path / "different")})
     assert mode(window) == "ask"
     assert window.composer.permissions.currentData() == "ask"
+
+
+def test_account_change_during_full_confirmation_cannot_save_authority(
+    qtbot, tmp_path, monkeypatch
+):
+    window, service = setup(qtbot, tmp_path)
+
+    def switched(_):
+        service.user = SimpleNamespace(id="different-account")
+        return QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(FullAccessDialog, "exec", switched)
+    change(window, "full")
+    assert window.settings.value("agent-permissions/u/w") is None
+    assert mode(window) == "ask"
+
+
+def test_project_change_during_full_confirmation_cannot_save_authority(
+    qtbot, tmp_path, monkeypatch
+):
+    from aedrova.desktop.projects import save_binding
+
+    window, _ = setup(qtbot, tmp_path)
+    save_binding(window, {"folder": str(tmp_path / "original")})
+
+    def switched(_):
+        save_binding(window, {"folder": str(tmp_path / "different")})
+        return QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(FullAccessDialog, "exec", switched)
+    change(window, "full")
+    assert mode(window) == "ask"
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_full_confirmation_and_permission_label_fit_the_theme(qtbot, tmp_path, theme):
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QStyle, QStyleOptionComboBox
+
+    from aedrova.desktop.theme import permission_warning
+
+    window, _ = setup(qtbot, tmp_path)
+    window.set_theme(theme, persist=False)
+    control = window.composer.permissions
+    window.settings.setValue("agent-permissions/u/w", "full")
+    sync(window)
+    assert control.property("permissionMode") == "full"
+    row = control.findData("full")
+    assert (
+        control.itemData(row, Qt.ItemDataRole.ForegroundRole).name()
+        == permission_warning(window.theme)[0].lower()
+    )
+    window.settings.setValue("agent-permissions/u/w", "ask")
+    sync(window)
+    option = QStyleOptionComboBox()
+    control.initStyleOption(option)
+    area = control.style().subControlRect(
+        QStyle.ComplexControl.CC_ComboBox, option, QStyle.SubControl.SC_ComboBoxEditField, control
+    )
+    assert area.width() >= control.fontMetrics().horizontalAdvance("Ask for approval") + 22
+    dialog = FullAccessDialog(window)
+    qtbot.addWidget(dialog)
+    dialog.show()
+    qtbot.wait(10)
+    assert not dialog.findChildren(QMessageBox)
+    assert dialog.cancel.isDefault() and not dialog.confirm.isDefault()
+    assert dialog.confirm.geometry().right() < dialog.width()
+    dialog.reject()

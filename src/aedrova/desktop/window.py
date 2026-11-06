@@ -25,7 +25,7 @@ from aedrova.desktop.brand import BrandMark, app_icon
 from aedrova.desktop.controls import AppDialog, AppMenu
 from aedrova.desktop.conversation import Composer, MessageView
 from aedrova.desktop.design_system import FlowActions
-from aedrova.desktop.dialogs import CreateDialog, SwitcherDialog, button, icon_button, label
+from aedrova.desktop.dialogs import CreateDialog, button, icon_button, label
 from aedrova.desktop.materials import (
     AdaptiveBento,
     Backdrop,
@@ -62,6 +62,9 @@ class AedrovaWindow(QMainWindow):
         self.setWindowTitle("Aedrova · Northstar Labs · Local preview")
         self.resize(1440, 940)
         self.setMinimumSize(900, 650)
+        from aedrova.desktop.tooltips import install_tooltips
+
+        install_tooltips()
         self.dialog = None
         self.tour = None
         self.workspace_buttons = {}
@@ -80,6 +83,9 @@ class AedrovaWindow(QMainWindow):
         from aedrova.desktop.localization import Localizer
 
         self.localizer = Localizer(self)
+        from aedrova.desktop.meeting_detection import MeetingDetection
+
+        self.meeting_detection = MeetingDetection(self)
 
     @property
     def workspace(self):
@@ -118,16 +124,12 @@ class AedrovaWindow(QMainWindow):
         self.sidebar_toggle.setToolTip("Show or hide channels")
         self.sidebar_toggle.clicked.connect(self.toggle_sidebar)
         top_layout.addWidget(self.sidebar_toggle)
-        self.search_button = button(
-            "Find a conversation · ⌘K",
-            "Jump to channel or workspace",
-        )
-        self.search_button.setObjectName("Search")
-        self.search_button.setToolTip("Find a channel, person, or workspace · ⌘K")
+        from aedrova.desktop.workspace_search import WorkspaceSearch
+
+        self.search_button = WorkspaceSearch(self)
         self.search_button.setMaximumWidth(470)
         self.search_button.setMinimumHeight(36)
         self.search_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.search_button.clicked.connect(self.open_switcher)
         top_layout.addWidget(self.search_button, 1)
         top_layout.addStretch()
         self.connection_badge = label("Local preview", "badge")
@@ -200,20 +202,24 @@ class AedrovaWindow(QMainWindow):
         self.workspace_quick_actions.setAccessibleName("Workspace actions")
         quick_actions = QHBoxLayout(self.workspace_quick_actions)
         quick_actions.setContentsMargins(0, 0, 0, 0)
-        quick_actions.setSpacing(6)
+        quick_actions.setSpacing(0)
+        quick_actions.addStretch(1)
         self.invite_teammates_button = icon_button("invite", "Invite teammates")
         self.invite_teammates_button.clicked.connect(lambda: self.show_account("invite"))
         self.workspace_settings_button = icon_button("settings", "Workspace settings")
         self.workspace_settings_button.clicked.connect(lambda: self.show_account("manage"))
         self.workspace_connectors_button = icon_button("link", "Connectors")
         self.workspace_connectors_button.clicked.connect(lambda: self.open_connectors())
+        self.workspace_people_button = icon_button("people", "People and status")
+        self.workspace_people_button.clicked.connect(lambda: self.collaboration.panel("people"))
         for control in (
             self.invite_teammates_button,
             self.workspace_settings_button,
             self.workspace_connectors_button,
+            self.workspace_people_button,
         ):
             quick_actions.addWidget(control)
-        quick_actions.addStretch()
+            quick_actions.addStretch(1)
         side.addWidget(self.workspace_quick_actions)
         from aedrova.desktop.dots import DotSection
 
@@ -235,7 +241,7 @@ class AedrovaWindow(QMainWindow):
         side.addWidget(self.workspace_tools)
         side.addSpacing(12)
         channels_header = QHBoxLayout()
-        channels_header.addWidget(label("CHANNELS", "section"))
+        channels_header.addWidget(label("Channels", "section"))
         channels_header.addStretch()
         self.create_channel_button = button("+", "Create channel", "icon")
         self.create_channel_button.setFixedSize(25, 25)
@@ -250,7 +256,7 @@ class AedrovaWindow(QMainWindow):
         side.addWidget(self.channel_list, 3)
         side.addSpacing(12)
         dm_header = QHBoxLayout()
-        dm_header.addWidget(label("DIRECT MESSAGES", "section"))
+        dm_header.addWidget(label("Direct messages", "section"))
         dm_header.addStretch()
         self.start_dm_button = button("+", "New direct message", "icon")
         self.start_dm_button.setFixedSize(25, 25)
@@ -263,6 +269,10 @@ class AedrovaWindow(QMainWindow):
         self.dm_list.setAccessibleName("Direct conversations")
         self.dm_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.dm_list.currentItemChanged.connect(self._channel_selected)
+        from aedrova.desktop.bud_dms import open_item as open_bud_dm
+
+        self.dm_list.itemClicked.connect(lambda item: open_bud_dm(self, item))
+        self.dm_list.itemActivated.connect(lambda item: open_bud_dm(self, item))
         side.addWidget(self.dm_list, 2)
         side.addStretch(1)
         body.addWidget(self.sidebar)
@@ -307,8 +317,7 @@ class AedrovaWindow(QMainWindow):
         call_layout.addWidget(self.call_count)
         self.call_buttons = {}
         for kind, title in (
-            ("phone", "Start audio call"),
-            ("camera", "Start video call"),
+            ("notes", "Take meeting notes"),
             ("settings", "Meeting options"),
         ):
             control = button("", title, "icon")
@@ -317,10 +326,7 @@ class AedrovaWindow(QMainWindow):
             if kind == "settings":
                 control.clicked.connect(self.open_call_options)
             else:
-                mode = "audio" if kind == "phone" else "video"
-                control.clicked.connect(
-                    lambda checked=False, mode=mode: self.start_channel_call(mode)
-                )
+                control.clicked.connect(self.take_meeting_notes)
             self.call_buttons[kind] = control
             call_layout.addWidget(control)
         header_layout.addWidget(self.call_bar)
@@ -410,7 +416,7 @@ class AedrovaWindow(QMainWindow):
         empty_layout.addStretch()
         empty_layout.addWidget(BrandMark(76))
         empty_layout.addSpacing(12)
-        empty_heading = label("Every good idea starts\nwith a conversation.", "heading")
+        empty_heading = label("Start a conversation", "heading")
         empty_heading.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
         empty_layout.addWidget(empty_heading)
         empty_layout.addWidget(label("Start the conversation. Send your first message.", "muted"))
@@ -617,6 +623,9 @@ class AedrovaWindow(QMainWindow):
             listing.addItem(item)
             if channel.id == self.channel_id:
                 listing.setCurrentItem(item)
+        from aedrova.desktop.bud_dms import populate as populate_bud_dms
+
+        populate_bud_dms(self)
         self.channel_list.setMaximumHeight(min(280, max(80, self.channel_list.count() * 41)))
         self.dm_list.setMaximumHeight(max(38, min(160, self.dm_list.count() * 41)))
         self.dm_list.setVisible(self.dm_list.count() > 0)
@@ -624,7 +633,7 @@ class AedrovaWindow(QMainWindow):
             listing.blockSignals(False)
 
     def _channel_selected(self, item, previous):
-        if item:
+        if item and item.data(Qt.ItemDataRole.UserRole + 1) != "bud":
             self.switch_channel(item.data(Qt.ItemDataRole.UserRole))
 
     def start_direct_message(self):
@@ -643,6 +652,7 @@ class AedrovaWindow(QMainWindow):
             )
 
     def switch_workspace(self, workspace_id):
+        self.search_button.dismiss()
         if workspace_id == self.workspace_id:
             self.workspace_buttons[workspace_id].setChecked(True)
             return
@@ -1008,10 +1018,12 @@ class AedrovaWindow(QMainWindow):
             self.messages.refresh_agent()
 
     def finish_conversation_response(
-        self, workspace, channel, parent, text, author, prompt_id=None
+        self, workspace, channel, parent, text, author, prompt_id=None, *, source_channels=None
     ):
         self.completed_agent_response = None
-        self.connected.complete_agent_reply(workspace, channel, text, author, parent, prompt_id)
+        self.connected.complete_agent_reply(
+            workspace, channel, text, author, parent, prompt_id, source_channels=source_channels
+        )
         self.agent_feed.clear()
         self.build_activity.hide()
         self.update_agent_cancel()
@@ -1325,10 +1337,7 @@ class AedrovaWindow(QMainWindow):
         menu.exec(self.workspace_title.mapToGlobal(self.workspace_title.rect().bottomLeft()))
 
     def open_switcher(self):
-        self.dialog = SwitcherDialog(self, self.store)
-        self.dialog.chosen.connect(self.jump_to)
-        self.dialog.open()
-        self.dialog.search.setFocus()
+        self.search_button.activate()
 
     def jump_to(self, workspace_id, channel_id):
         self.switch_workspace(workspace_id)
@@ -1380,7 +1389,6 @@ class AedrovaWindow(QMainWindow):
                 from aedrova.desktop.builds import open_build
 
                 page, layout = self._page(
-                    "WORK",
                     "From direction to delivery",
                     "Turn an idea into working code with Codex or Claude, "
                     "grounded in your accessible workspace conversations.",
@@ -1410,8 +1418,7 @@ class AedrovaWindow(QMainWindow):
 
                 data = binding(self)
                 page, layout = self._page(
-                    "YOUR PROJECT",
-                    "Your code, connected.",
+                    "Connect your project",
                     "Connect this workspace to a local project and start builds from conversation.",
                 )
                 layout.addWidget(
@@ -1445,7 +1452,6 @@ class AedrovaWindow(QMainWindow):
                 self.pages.insertWidget(index, page)
             elif self.connected and self.connected.active:
                 page, layout = self._page(
-                    "YOUR WORKSPACE",
                     ("Projects", "Builds", "Files")[index - 1],
                     "Find the files your team has shared in permitted conversations.",
                 )
@@ -1470,7 +1476,7 @@ class AedrovaWindow(QMainWindow):
         self.pages.setCurrentIndex(max(0, selected))
         self._apply_materials()
 
-    def _page(self, eyebrow, title, description):
+    def _page(self, title, description):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -1480,7 +1486,6 @@ class AedrovaWindow(QMainWindow):
         layout = QVBoxLayout(content)
         layout.setContentsMargins(32, 24, 32, 32)
         layout.setSpacing(16)
-        layout.addWidget(label(eyebrow, "section"))
         layout.addWidget(label(title, "heading", wrap=True))
         layout.addWidget(label(description, "muted", wrap=True))
         layout.addSpacing(12)
@@ -1504,16 +1509,14 @@ class AedrovaWindow(QMainWindow):
 
     def _project_page(self):
         page, layout = self._page(
-            "PROJECTS",
-            "Good ideas deserve a home.",
+            "Projects",
             "The context, the decisions, and the next thing you're making.",
         )
         hero = GlassFrame(layer="hero")
         hero_layout = QVBoxLayout(hero)
         hero_layout.setContentsMargins(30, 30, 30, 30)
         hero_layout.setSpacing(16)
-        hero_layout.addWidget(label(f"{self.workspace.name.upper()}  /  SAMPLE PROJECT", "section"))
-        hero_layout.addWidget(label("Less setup.\nMore possibility.", "display", wrap=True))
+        hero_layout.addWidget(label("Sample project", "display", wrap=True))
         hero_layout.addWidget(
             label(
                 "A simpler first five minutes. Three thoughtful steps from an idea to a workspace.",
@@ -1536,7 +1539,7 @@ class AedrovaWindow(QMainWindow):
         tile = DocumentTile("Design principles", "A quieter way to work.", "02")
         tile.clicked.connect(lambda: self.show_document("Design principles.md"))
         connection = self._card(
-            "Your code, connected.",
+            "Connect your project",
             "Repository access is not connected in this local preview.",
         )
         layout.addWidget(AdaptiveBento([hero, tile, connection], asymmetric=True))
@@ -1545,8 +1548,7 @@ class AedrovaWindow(QMainWindow):
 
     def _builds_page(self):
         page, layout = self._page(
-            "WORKSPACE / BUILDS",
-            "From a decision to a working change.",
+            "Builds",
             "Plans, progress and reviews in a connected workspace.",
         )
         layout.addWidget(
@@ -1564,8 +1566,7 @@ class AedrovaWindow(QMainWindow):
 
     def _files_page(self):
         page, layout = self._page(
-            "FILES",
-            "A little shared understanding.",
+            "Files",
             "The references behind the work. Open a sample document to take a closer look.",
         )
         tiles = []
@@ -1584,6 +1585,11 @@ class AedrovaWindow(QMainWindow):
         layout.addWidget(AdaptiveBento(tiles))
         layout.addStretch()
         return page
+
+    def take_meeting_notes(self):
+        from aedrova.desktop.local_meeting_notes import open_local_meeting_notes
+
+        open_local_meeting_notes(self)
 
     def start_channel_call(self, mode):
         from aedrova.desktop.meeting_call import open_channel_call
@@ -1604,6 +1610,14 @@ class AedrovaWindow(QMainWindow):
                 (m for m in current_meetings(self) if m["channel_id"] == self.channel_id), None
             )
         for kind, control in self.call_buttons.items():
+            if kind == "notes":
+                from aedrova.desktop.icons import icon
+
+                control.setIcon(icon("meeting_notes", self.theme.text))
+                control.setIconSize(QSize(20, 20))
+                control.setToolTip("Take notes from Zoom, Meet or Teams")
+                control.setAccessibleName("Take meeting notes")
+                continue
             control.setIcon(meeting_icon(kind, QColor(self.theme.text)))
             control.setIconSize(QSize(20, 20))
             if kind != "settings":
@@ -1619,11 +1633,19 @@ class AedrovaWindow(QMainWindow):
         self.call_count.setAccessibleName(f"{count} call participants")
 
     def open_call_options(self):
+        from aedrova.desktop.local_meeting_notes import open_local_meeting_notes
         from aedrova.desktop.meeting_setup import open_meeting_setup
 
         menu = AppMenu(self)
+        menu.addAction("Take meeting notes…", lambda: open_local_meeting_notes(self))
+        suggestion = menu.addAction("Suggest meeting notes")
+        suggestion.setCheckable(True)
+        suggestion.setChecked(self.meeting_detection.enabled())
+        suggestion.toggled.connect(self.meeting_detection.set_enabled)
         menu.addAction("Check meeting devices…", lambda: open_meeting_setup(self))
         menu.addAction("Meeting settings & transcripts…", self.open_meeting_hub)
+        menu.addAction("Hosted audio call…", lambda: self.start_channel_call("audio"))
+        menu.addAction("Hosted video call…", lambda: self.start_channel_call("video"))
         self.call_options = menu
         menu.popup(
             self.call_buttons["settings"].mapToGlobal(
@@ -1654,13 +1676,16 @@ class AedrovaWindow(QMainWindow):
 
     def _meetings_page(self):
         self.meeting_destination = None
+        from aedrova.desktop.local_meeting_notes import open_local_meeting_notes
         from aedrova.desktop.meeting_setup import open_meeting_setup
 
         page, layout = self._page(
-            "WORKSPACE / MEETINGS",
-            "Make room for the conversation.",
+            "Meetings",
             "Meet in this channel. Device checks are local; calls require the meeting service.",
         )
+        notes_action = button("Take notes in Zoom, Meet or Teams", role="primary")
+        notes_action.clicked.connect(lambda: open_local_meeting_notes(self))
+        layout.addWidget(notes_action)
         layout.addWidget(
             self._card(
                 "Together, in the same room.",

@@ -47,6 +47,13 @@ def test_groups_arrow_selection_avatar_and_routing(qtbot):
         r for r in rows if r.data(Qt.ItemDataRole.UserRole) == ("Orbit", "<@dot:d1|Orbit>")
     )
     assert not orbit.icon().isNull()
+    main_agent = next(r for r in rows if r.data(Qt.ItemDataRole.UserRole) == ("Atlas", "@Atlas"))
+    from PySide6.QtGui import QIcon, QPixmap
+
+    from aedrova.desktop.brand import brand_image
+
+    expected = QIcon(QPixmap.fromImage(brand_image()))
+    assert main_agent.icon().pixmap(30, 30).toImage() == expected.pixmap(30, 30).toImage()
     qtbot.keyClick(c.editor, Qt.Key.Key_Down)
     qtbot.keyClick(c.editor, Qt.Key.Key_Down)
     qtbot.keyClick(c.editor, Qt.Key.Key_Return)

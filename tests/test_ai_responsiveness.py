@@ -214,7 +214,11 @@ def test_greeting_skips_evidence_and_tools_but_rechecks_identity(monkeypatch, ad
     result = []
     job.signals.finished.connect(result.append)
     job.run()
-    assert result == [{"text": "Hello!" if addressed_bud else "Hello! How can I help?"}]
+    assert result == (
+        [{"text": "Hello!", "source_channels": ["c"]}]
+        if addressed_bud
+        else [{"text": "Hello! How can I help?"}]
+    )
     assert len(checks) == 2 and closed == [True]
     assert len(requests) == int(addressed_bud)
 
@@ -330,3 +334,115 @@ def test_lightweight_inventory_is_authenticated_and_user_scoped(monkeypatch):
     assert checked == [True] and result["channels"] == []
     assert [c.args[0] for c in client.table.call_args_list] == ["workspaces", "workspace_members"]
     members.select.return_value.eq.return_value.eq.assert_called_once_with("user_id", "u")
+
+
+@pytest.mark.parametrize("use_bud", [False, True])
+def test_mention_acknowledges_immediately_and_jumps_background_queue(qtbot, tmp_path, use_bud):
+    window, service = setup(qtbot, tmp_path)
+    qtbot.waitUntil(
+        lambda: (
+            not window.account_dialog.busy
+            and not window.connected.current_action
+            and not window.connected.queue
+        )
+    )
+    bud = dot("Orbit") if use_bud else None
+    window.account_dialog.snapshot["dots"] = [bud] if bud else []
+    dashboard = window.connected
+
+    window.account_dialog.busy = True
+    dashboard.enqueue(("inventory", "old-search"), lambda: None, lambda _: None)
+    dashboard.enqueue(("heartbeat", "old"), lambda: None, lambda _: None)
+    text = "@Orbit hello" if bud else "@Aedrova explain Python lists"
+    window.composer.editor.setPlainText(text)
+    window.send_message(text)
+    keys = [action[0][0] for action in dashboard.queue]
+    assert keys == ["send", "agent-start", "inventory", "heartbeat"]
+    assert window.composer.editor.toPlainText() == ""
+    assert window.agent_feed.author_name == ("Orbit" if bud else "Aedrova")
+    assert window.build_activity.isVisible()
+    assert "Preparing response" in window.build_activity.text()
+    assert window.dot_query is not None
+    assert any(row["body"] == text for row in dashboard.outbox.values())
+    assert (
+        window.agent_feed.character_config is not None
+        if bud
+        else (window.agent_feed.character_config is None)
+    )
+    dashboard.queue.clear()
+    window.dot_query = None
+    window.account_dialog.busy = False
+
+
+@pytest.mark.parametrize(
+    "text", ["hey there", "Hey there!", "hi there", "hello again", "HEY", "hiya"]
+)
+def test_local_greetings_need_no_queue_auth_provider_or_workspace_reads(
+    qtbot, tmp_path, monkeypatch, text
+):
+    window, service = setup(qtbot, tmp_path)
+    qtbot.waitUntil(lambda: not window.account_dialog.busy)
+    window.account_dialog.busy = True
+    service.fork_for_context = lambda: pytest.fail("A local greeting needs no auth network call")
+    monkeypatch.setattr(
+        "aedrova.desktop.dot_analysis.QueryJob",
+        lambda *a, **k: pytest.fail("Do not start an AI job for a greeting"),
+    )
+    window.composer.editor.setPlainText("@Aedrova " + text)
+    window.send_message("@Aedrova " + text)
+    qtbot.waitUntil(lambda: window.dot_query is None, timeout=250)
+    replies = window.connected.agent_replies[("w", "c")]
+    assert replies[-1]["body"] == "Hello! How can I help?"
+    assert replies[-1]["_reply_to"] in window.connected.outbox
+    assert all(row[0][0] != "agent-start" for row in window.connected.queue)
+    assert window.composer.editor.toPlainText() == ""
+    assert not window.build_activity.isVisible()
+    window.account_dialog.busy = False
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "hey there, fix my app",
+        "hello show our revenue",
+        "hi there\nread my files",
+        "hey again and run tests",
+    ],
+)
+def test_greeting_shortcut_never_swallow_real_instructions(text):
+    from aedrova.agents.replies import greeting_reply
+
+    assert greeting_reply(text) is None
+
+
+def test_thinking_stays_mounted_through_auth_handoff_and_slow_reply(qtbot, tmp_path, monkeypatch):
+    from aedrova.desktop.dot_analysis import start_analysis
+
+    window, service = setup(qtbot, tmp_path)
+    qtbot.waitUntil(lambda: not window.account_dialog.busy)
+    window.account_dialog.busy = True
+    jobs = []
+    monkeypatch.setattr(
+        "aedrova.desktop.dot_analysis.QThreadPool.start", lambda self, job: jobs.append(job)
+    )
+    assert start_analysis(window, "Explain Python lists")
+    before = window.agent_feed.status_row
+    assert before is not None
+    ready = next(a[2] for a in window.connected.queue if a[0][0] == "agent-start")
+    ready({"service": service})
+    assert jobs and window.agent_feed.status_row is before
+    assert window.build_activity.text() == "Thinking…"
+    assert window.build_activity.isVisible()
+
+    window._load_channel()
+    qtbot.wait(5200)
+    window._load_channel()
+    assert window.agent_feed.status_row is before
+    assert window.build_activity.isVisible()
+    assert window.agent_feed.isVisible()
+    assert window.messages.agent_visible
+    jobs[0].signals.finished.emit({"text": "A list stores ordered values."})
+    assert not window.build_activity.isVisible()
+    assert window.dot_query is None
+    window.connected.queue.clear()
+    window.account_dialog.busy = False

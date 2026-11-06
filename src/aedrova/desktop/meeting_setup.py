@@ -82,7 +82,7 @@ class MeetingSetup(AppDialog):
         layout.setSpacing(18)
         heading = QHBoxLayout()
         heading.addWidget(BrandMark(46))
-        heading.addWidget(label('Make yourself comfortable.', 'title'), 1)
+        heading.addWidget(label('Check your meeting devices', 'title'), 1)
         layout.addLayout(heading)
         layout.addWidget(label('Check your devices before your next conversation.', 'muted'))
         scroll = QScrollArea(self)

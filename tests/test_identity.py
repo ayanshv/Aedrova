@@ -103,6 +103,7 @@ def test_snapshot_requests_personal_active_and_archived_workspaces(monkeypatch):
 
     client.rpc.side_effect = rpc
     service = IdentityService(Connection(URL, KEY), client=client)
+    service.user = SimpleNamespace(id="user")
     monkeypatch.setattr(service, "_authenticated", lambda: None)
     data = service.snapshot()
     assert data["workspaces"][0]["id"] == "active"
@@ -204,3 +205,79 @@ def test_source_staging_context_override_cannot_enable_public_build(
     monkeypatch.setenv("AEDROVA_MEETING_CONTEXT_ENABLED", "true")
     service = IdentityService(Connection(project, KEY), client=Mock())
     assert service.meeting_context_enabled is enabled
+
+
+def test_context_fork_validates_once_on_isolated_client(monkeypatch):
+    source_client = Mock()
+    source_client.auth.get_session.return_value = SimpleNamespace(
+        access_token="private-token", refresh_token="private-refresh"
+    )
+    source = IdentityService(Connection(URL, KEY), client=source_client)
+    source.user = SimpleNamespace(id="user")
+    clone = Mock()
+    clone.client.auth.set_session.return_value = SimpleNamespace(user=SimpleNamespace(id="user"))
+    monkeypatch.setattr("aedrova.identity.service.IdentityService", lambda *a, **kw: clone)
+    assert source.fork_for_context() is clone
+    source_client.auth.get_user.assert_not_called()
+    clone.client.auth.set_session.assert_called_once_with("private-token", "private-refresh")
+    assert clone.user.id == "user"
+
+    clone.client.auth.set_session.return_value = SimpleNamespace(user=SimpleNamespace(id="other"))
+    with pytest.raises(PermissionError, match="Session changed"):
+        source.fork_for_context()
+    clone.close_context.assert_called_once()
+
+
+def test_background_read_validates_once_without_caching_across_actions():
+    client = Mock()
+    client.auth.get_session.return_value = SimpleNamespace(access_token="private")
+    client.auth.get_user.return_value = SimpleNamespace(user=SimpleNamespace(id="user"))
+    source = IdentityService(Connection(URL, KEY), client=client)
+    source.user = SimpleNamespace(id="user")
+    with source.background_read(lambda: False):
+        for _ in range(8):
+            source._authenticated()
+    assert client.auth.get_user.call_count == 1
+    source._authenticated()
+    assert client.auth.get_user.call_count == 2
+    with source.background_read(lambda: False):
+        source._authenticated()
+    assert client.auth.get_user.call_count == 3
+
+
+def test_background_read_yields_before_next_query_and_does_not_log_out():
+    from threading import Event
+
+    from aedrova.identity.service import ReadInterrupted
+
+    interrupted = Event()
+    client = Mock()
+    client.auth.get_session.return_value = SimpleNamespace(access_token="private")
+    client.auth.get_user.return_value = SimpleNamespace(user=SimpleNamespace(id="user"))
+    source = IdentityService(Connection(URL, KEY), client=client)
+    source.user = SimpleNamespace(id="user")
+    first, later = Mock(), Mock()
+    first.execute.side_effect = lambda: interrupted.set() or SimpleNamespace(data=[])
+    with pytest.raises(ReadInterrupted):
+        with source.background_read(interrupted.is_set):
+            source._read(first)
+            source._read(later)
+    first.execute.assert_called_once()
+    later.execute.assert_not_called()
+    assert source.user.id == "user"
+    interrupted.clear()
+    source._authenticated()
+    assert client.auth.get_user.call_count == 2
+
+
+def test_background_read_fails_closed_if_identity_changes():
+    client = Mock()
+    client.auth.get_session.return_value = SimpleNamespace(access_token="private")
+    client.auth.get_user.return_value = SimpleNamespace(user=SimpleNamespace(id="user"))
+    source = IdentityService(Connection(URL, KEY), client=client)
+    source.user = SimpleNamespace(id="user")
+    with pytest.raises(PermissionError, match="account changed"):
+        with source.background_read(lambda: False):
+            source.user = SimpleNamespace(id="other")
+            source._authenticated()
+    assert getattr(source._read_state, "batch", None) is None

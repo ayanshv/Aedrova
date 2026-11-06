@@ -33,7 +33,7 @@ class MeetingPrivacy(AppDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(16)
-        layout.addWidget(label("Your meeting text. Your choice.", "title", wrap=True))
+        layout.addWidget(label("Meeting transcript privacy", "title", wrap=True))
         layout.addWidget(
             label(
                 (

@@ -144,6 +144,54 @@ class ContextIndex:
                     memory_id=item["id"],
                 )
             )
+        for record in records:
+            work = record.get("shared_agent_work")
+            if work is None:
+                continue
+            from aedrova.agents.shared_work import record as checked_record
+
+            checked_record(work, context.workspace_id, context.channel_ids)
+            self._add(
+                Source(
+                    "agent-work:" + work["id"],
+                    work["id"],
+                    channels.get(work["channel_id"], "channel") + " · " + work["agent_name"],
+                    work["body"],
+                    None,
+                    work["created_at"],
+                    "agent_untrusted",
+                    "",
+                    hashlib.sha256(work["body"].encode()).hexdigest(),
+                )
+            )
+        for record in records:
+            build = record.get("shared_build_review")
+            if build is None:
+                continue
+            from aedrova.agents.shared_work import build_record
+
+            build_record(build, context.workspace_id, context.channel_ids)
+            body = json.dumps(
+                {
+                    "review": build["evidence"],
+                    "current": build["current"],
+                    "receipts": build.get("receipts", []),
+                },
+                ensure_ascii=False,
+            )
+            self._add(
+                Source(
+                    "build-review:" + build["id"],
+                    build["id"],
+                    channels.get(build["channel_id"], "channel") + " · Aedrova build review",
+                    body,
+                    None,
+                    build["updated_at"],
+                    "shared_build_untrusted",
+                    "",
+                    hashlib.sha256(body.encode()).hexdigest(),
+                )
+            )
         for identifier, message in messages.items():
             if message["channel_id"] not in context.channel_ids:
                 raise PermissionError("Evidence contains a channel outside this snapshot.")
@@ -291,7 +339,7 @@ def validate_citations(context, plan):
         available = {s.citation for s in index.sources}
         cited = set(
             re.findall(
-                r"(?:message|attachment|meeting|memory):[A-Za-z0-9_-]+"
+                r"(?:build-review|agent-work|message|attachment|meeting|memory):[A-Za-z0-9_-]+"
                 r"|connector:(?:github|figma|notion):[A-Za-z0-9_./-]+"
                 r"|bud:[a-f0-9-]{36}:[a-f0-9-]{36}:[a-z_]+"
                 r"|dot:[a-f0-9-]{36}:[a-z_]+|project:[a-f0-9]{24}",

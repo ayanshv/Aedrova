@@ -154,7 +154,7 @@ def test_signed_in_meetings_opens_device_setup_and_signout_closes_it(qtbot, tmp_
 
     window._render_pages()
     assert window.pages.currentIndex() == 0
-    assert window.call_buttons["camera"].accessibleName() == "Start video call"
+    assert window.call_buttons["notes"].accessibleName() == "Take meeting notes"
     page = window.meeting_hub
     actions = [b for b in page.findChildren(QPushButton) if b.text() == "Check meeting devices"]
     assert len(actions) == 1

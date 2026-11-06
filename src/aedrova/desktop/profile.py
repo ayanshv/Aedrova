@@ -179,7 +179,7 @@ class ProfileDialog(AppDialog):
             return layout
 
         identity = step(
-            "A familiar face.\nA name that feels like you.",
+            "Your profile",
             "This is how your teammates will see you in conversations.",
         )
         preview = QHBoxLayout()
@@ -230,7 +230,7 @@ class ProfileDialog(AppDialog):
         identity.addWidget(language)
         identity.addStretch()
         about = step(
-            "More than a name.",
+            "Your status",
             "A little context helps your teammates get to know you. These details are optional.",
         )
         self.title = QLineEdit(profile.get("title", ""))
@@ -259,7 +259,7 @@ class ProfileDialog(AppDialog):
         optional.clicked.connect(lambda: self.go(2))
         about.addWidget(optional)
         status = step(
-            "Work on your terms.", "Let your team know when you are available, focused, or away."
+            "Your preferences", "Let your team know when you are available, focused, or away."
         )
         self.availability = ChoiceBox()
         self.availability.setAccessibleName("Availability")

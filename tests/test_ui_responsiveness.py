@@ -51,8 +51,8 @@ def test_settings_open_from_cache_during_background_sync(qtbot, tmp_path, monkey
         assert account.isVisible() and account.pages.currentIndex() == 1
         assert account.pages.isEnabled()
         view = account.workspace_settings
-        assert view.sections.count() == 5
-        assert view.sections.currentIndex() == view.pages["agent"]
+        assert view.sections.count() == 10
+        assert view.sections.currentIndex() == view.pages["overview"]
         assert not account.invite_email.isVisible()
         view.buttons["invitations"].click()
         assert account.invite_email.isVisible()
@@ -213,3 +213,73 @@ def test_workspace_settings_accessibility_selection_changes_visible_page(qtbot):
     assert view.sections.currentIndex() == view.pages["account"]
     view.buttons["agent"].setChecked(True)
     assert view.sections.currentIndex() == view.pages["agent"]
+
+
+def test_sync_yields_to_send_without_applying_partial_inventory(qtbot, tmp_path):
+    from contextlib import contextmanager
+    from threading import Event
+
+    from aedrova.identity.service import ReadInterrupted
+
+    window, service = setup(qtbot, tmp_path)
+    dashboard = window.connected
+    qtbot.waitUntil(
+        lambda: (
+            not window.account_dialog.busy and not dashboard.queue and not dashboard.current_action
+        )
+    )
+    original_snapshot = service.snapshot
+    entered, release = Event(), Event()
+    calls = []
+    stop = None
+
+    @contextmanager
+    def batch(interrupted):
+        nonlocal stop
+        stop = interrupted
+        yield
+
+    def slow_snapshot():
+        calls.append("read-start")
+        entered.set()
+        release.wait(2)
+        if stop():
+            calls.append("yield")
+            raise ReadInterrupted()
+        return original_snapshot()
+
+    service.background_read = batch
+    service.snapshot = slow_snapshot
+    service.rpc = lambda name, params: calls.append(name)
+    dashboard.refresh()
+    qtbot.waitUntil(entered.is_set)
+    window.composer.editor.setPlainText("Fast send")
+    window.send_message("Fast send")
+    assert any(r["body"] == "Fast send" for r in dashboard.outbox.values())
+    release.set()
+    qtbot.waitUntil(lambda: "send_message" in calls)
+    assert calls.index("yield") < calls.index("send_message")
+    assert window.workspace_id == "w" and window.channel_id == "c"
+    assert dashboard.active and window.account_dialog.service is service
+    service.snapshot = original_snapshot
+
+
+def test_user_actions_stay_fifo_ahead_of_passive_presence(qtbot, tmp_path):
+    window, _ = setup(qtbot, tmp_path)
+    dashboard = window.connected
+    qtbot.waitUntil(
+        lambda: (
+            not window.account_dialog.busy and not dashboard.queue and not dashboard.current_action
+        )
+    )
+    window.account_dialog.busy = True
+    for key in (("chat", "heartbeat"), ("read", "c"), ("profile", "first"), ("profile", "second")):
+        dashboard.enqueue(key, lambda: None, lambda _: None)
+    assert [r[0] for r in dashboard.queue] == [
+        ("profile", "first"),
+        ("profile", "second"),
+        ("chat", "heartbeat"),
+        ("read", "c"),
+    ]
+    dashboard.queue.clear()
+    window.account_dialog.busy = False

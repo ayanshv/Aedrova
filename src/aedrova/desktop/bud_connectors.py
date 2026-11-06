@@ -195,7 +195,7 @@ class ConnectorsDialog(AppDialog):
         back.clicked.connect(self.accept)
         navigation.addWidget(back)
         navigation.addSpacing(22)
-        navigation.addWidget(label("WORKSPACE", "muted"))
+        navigation.addWidget(label("Workspace", "muted"))
         navigation.addWidget(label("Connectors", "subheading"))
         navigation.addWidget(label("Your tools.\nYour Buds.", "muted", wrap=True))
         navigation.addStretch()
@@ -668,7 +668,7 @@ class ConnectorsDialog(AppDialog):
             groups.setdefault(provider["group"], []).append(provider)
         recommended = recommendation_set(role_for(self.row().get("role", "")))
         for group, providers in groups.items():
-            layout.addWidget(label(group.upper(), "muted"))
+            layout.addWidget(label(group, "muted"))
             grid = QGridLayout()
             grid.setSpacing(14)
             self.grid_layouts.append(grid)

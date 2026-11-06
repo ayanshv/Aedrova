@@ -125,26 +125,26 @@ def test_message_keyboard_activation_and_copy(window, qtbot):
 
 def test_search_dialog_filters_and_navigates_across_workspaces(window, qtbot):
     qtbot.mouseClick(window.search_button, Qt.MouseButton.LeftButton)
-    dialog = window.dialog
-    qtbot.keyClicks(dialog.search, "orbit")
+    dialog = window.search_button
+    qtbot.keyClicks(dialog, "orbit")
     assert dialog.results.count() == 2
-    qtbot.keyClick(dialog.search, Qt.Key.Key_Down)
-    qtbot.keyClick(dialog.search, Qt.Key.Key_Return)
+    qtbot.keyClick(dialog, Qt.Key.Key_Down)
+    qtbot.keyClick(dialog, Qt.Key.Key_Return)
     assert window.workspace_id == "orbit"
     assert window.channel_id == "orbit-design"
-    assert not dialog.isVisible()
+    assert not dialog.menu.isVisible()
 
 
 def test_search_no_matches_and_escape(window, qtbot):
     window.open_switcher()
-    dialog = window.dialog
-    qtbot.keyClicks(dialog.search, "no-such-channel")
-    assert dialog.results.count() == 0
-    assert dialog.empty.isVisible()
-    qtbot.keyClick(dialog.search, Qt.Key.Key_Return)
-    assert dialog.isVisible()
-    qtbot.keyClick(dialog.search, Qt.Key.Key_Escape)
-    assert not dialog.isVisible()
+    search = window.search_button
+    qtbot.keyClicks(search, "no-such-channel")
+    assert search.results.count() == 0
+    assert search.notice.text() == "No results. Try another search."
+    qtbot.keyClick(search, Qt.Key.Key_Return)
+    assert search.menu.isVisible()
+    qtbot.keyClick(search, Qt.Key.Key_Escape)
+    assert not search.menu.isVisible()
     assert window.channel_id == "product"
 
 
@@ -327,9 +327,9 @@ def test_keyboard_shortcuts_and_focus(window, qtbot):
         QApplication.setActiveWindow(window)
     qtbot.waitUntil(window.isActiveWindow)
     QTest.keySequence(window, QKeySequence("Ctrl+K"))
-    qtbot.waitUntil(lambda: window.dialog is not None and window.dialog.isVisible())
-    qtbot.keyClicks(window.dialog.search, "engineering")
-    qtbot.keyClick(window.dialog.search, Qt.Key.Key_Return)
+    qtbot.waitUntil(window.search_button.menu.isVisible)
+    qtbot.keyClicks(window.search_button, "engineering")
+    qtbot.keyClick(window.search_button, Qt.Key.Key_Return)
     assert window.channel_id == "engineering"
 
     with pytest.warns(DeprecationWarning, match="setActiveWindow"):
@@ -374,7 +374,7 @@ def test_selected_workspace_keeps_visible_background_after_theme_changes(window,
 def test_spring_motion_reacts_without_moving_layout(window, qtbot):
     from PySide6.QtCore import QEvent
 
-    control = window.search_button
+    control = window.sidebar_toggle
     original = control.geometry()
     QApplication.sendEvent(control, QEvent(QEvent.Type.Enter))
     assert control.motion.effect.get_scale() == 1.0
@@ -397,9 +397,9 @@ def test_reduce_motion_and_transparency_are_functional_and_saved(window, qtbot):
 
     window.reduce_motion_action.trigger()
     window.reduce_transparency_action.trigger()
-    QApplication.sendEvent(window.search_button, QEvent(QEvent.Type.Enter))
-    assert window.search_button.motion.effect.get_scale() == 1.0
-    assert not window.search_button.motion.enabled
+    QApplication.sendEvent(window.sidebar_toggle, QEvent(QEvent.Type.Enter))
+    assert window.sidebar_toggle.motion.effect.get_scale() == 1.0
+    assert not window.sidebar_toggle.motion.enabled
     assert all(panel.reduced_transparency for panel in window.findChildren(GlassFrame))
     image = window.backdrop.texture()
     assert image.pixelColor(3, image.height() - 4).name() == window.theme.canvas.lower()
@@ -494,7 +494,9 @@ def test_desktop_workspace_actions_use_connected_account(window):
     window.workspace_settings_button.click()
     window.open_connectors = lambda: intents.append("connectors")
     window.workspace_connectors_button.click()
-    assert intents == ["create", "invite", "manage", "connectors"]
+    window.collaboration.panel = lambda section: intents.append(section)
+    window.workspace_people_button.click()
+    assert intents == ["create", "invite", "manage", "connectors", "people"]
 
 
 def test_invitation_exit_opens_hidden_chat_dashboard(window, qtbot):
@@ -521,3 +523,48 @@ def test_workspace_home_dashboard_action(window):
     window.account_dialog.home_dashboard.click()
     assert window.isVisible()
     assert not window.account_dialog.isVisible()
+
+
+def test_header_search_is_inline_live_and_dismisses_outside(window, qtbot):
+    from PySide6.QtWidgets import QLineEdit
+
+    search = window.search_button
+    assert isinstance(search, QLineEdit)
+    window.open_switcher()
+    search.setText("orbit")
+    assert search.results.count() == 2
+    assert not search.menu.isWindow()
+    assert search.menu.parentWidget() is window
+    assert search.hasFocus()
+    window.resize(1000, 700)
+    qtbot.wait(10)
+    assert search.menu.geometry().right() < window.width()
+    qtbot.mouseClick(window.theme_button, Qt.MouseButton.LeftButton)
+    assert not search.menu.isVisible()
+
+
+def test_header_search_rejects_stale_query_and_identity(window, qtbot):
+    from types import SimpleNamespace
+
+    callbacks = []
+    service = SimpleNamespace(user=SimpleNamespace(id="first"), chat_inventory=lambda *a: {})
+    connected = SimpleNamespace(
+        active=True,
+        account=SimpleNamespace(service=service),
+        enqueue=lambda key, operation, done: callbacks.append(done),
+    )
+    window.connected = connected
+    search = window.search_button
+    search.setText("orbit")
+    search.timer.stop()
+    search.remote()
+    search.setText("nothing-matches")
+    search.timer.stop()
+    callbacks[0]({"people": [{"display_name": "Stale person"}]})
+    assert search.results.count() == 0
+    search.remote()
+    service.user.id = "second"
+    callbacks[1]({"people": [{"display_name": "Private person"}]})
+    assert search.results.count() == 0
+    window.connected = None
+    search.dismiss()

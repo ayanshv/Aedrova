@@ -1,5 +1,6 @@
 """Native Dot shelf, provider picker and contextual connection profile."""
 
+from copy import deepcopy
 from datetime import datetime
 from uuid import uuid4
 
@@ -49,6 +50,9 @@ class DotSection(TeamSection):
         open_bud_chat(self.window, row["id"])
 
     def sync(self, rows, workspace):
+        from aedrova.desktop.bud_dms import populate
+
+        populate(self.window)
         cache = getattr(self.window, "dot_connection_states", {})
         user = str(self.window.current_user().id) if self.window.current_user() else ""
         rows = [{**row, **cache.get((user, row["id"], row["version"]), {})} for row in rows]
@@ -76,7 +80,48 @@ class DotDialog(AppDialog):
         build_setup(self, window)
         self.selected_id = selected
         self.preview()
+        self.prime_configuration()
         self.refresh()
+
+    def prime_configuration(self):
+        """Show authorized in-memory config before the connector host responds."""
+        self.rows = deepcopy(
+            [
+                {
+                    "status": "Not checked",
+                    "last_sync": 0,
+                    "tools": {},
+                    "permissions": "Connection access is checked before use.",
+                    **row,
+                }
+                for row in self.window.account_dialog.snapshot.get("dots", [])
+                if row.get("workspace_id") == self.workspace
+            ]
+        )
+        self.list.blockSignals(True)
+        for row in self.rows:
+            if self.provider.findData(row["provider"]) < 0:
+                self.provider.addItem(row["provider"].title(), row["provider"])
+            self.list.addItem(row["name"])
+        index = next((i for i, row in enumerate(self.rows) if row["id"] == self.selected_id), 0)
+        self.list.setCurrentRow(index if self.rows else -1)
+        self.list.setVisible(bool(self.rows))
+        self.list.blockSignals(False)
+        if self.rows:
+            self.select(index)
+            self.status.setText("Saved configuration · refreshing connection availability…")
+
+    def draft_state(self):
+        return (
+            self.selected_id,
+            self.name.text(),
+            self.resource.text(),
+            self.color.currentData(),
+            self.shape.currentData(),
+            self.appearance.currentData(),
+            self.configured_role(),
+            self.configured_instructions(),
+        )
 
     def set_loading(self, target, active, kind="form"):
         gallery = getattr(self, "embedded_connectors", None)
@@ -196,6 +241,7 @@ class DotDialog(AppDialog):
                     not self.window.current_user()
                     or str(self.window.current_user().id) != self.user
                     or self.window.workspace_id != self.workspace
+                    or self.window.account_dialog.service is not source_service
                 ):
                     self.reject()
                     return
@@ -212,16 +258,19 @@ class DotDialog(AppDialog):
             job.signals.finished.connect(finished)
             QThreadPool.globalInstance().start(job)
 
+        source_service = self.window.account_dialog.service
+
         def fork():
             try:
-                return {"service": self.window.account_dialog.service.fork_for_context()}
+                return {"service": source_service.fork_for_context()}
             except Exception:
                 return {"error": "Sign in again before managing Buds."}
 
         accepted = self.window.connected.enqueue(
-            "dot-session-" + str(uuid4()),
+            ("bud-config", str(uuid4())),
             fork,
             ready,
+            priority=True,
         )
         if not accepted:
             recover("Reconnect the workspace before managing Buds.")
@@ -246,6 +295,8 @@ class DotDialog(AppDialog):
     def refresh(self):
         resume_step = self.pages.currentIndex() if self.current() else None
         draft_name = self.name.text()
+        original_draft = self.draft_state()
+        original_step = self.pages.currentIndex()
 
         def fetch(service):
             api = client(service)
@@ -256,9 +307,19 @@ class DotDialog(AppDialog):
             )
 
         def loaded(value):
+            keep_draft = (
+                self.draft_state() != original_draft or self.pages.currentIndex() != original_step
+            )
+            previous_row = deepcopy(self.current()) if keep_draft else None
+            selected_provider = self.provider.currentData()
+            selected_step = self.pages.currentIndex()
             self.providers, self.rows = value[:2]
-            self.capacity = value[2] if len(value) > 2 else None
             self.sync_connection_rows(self.rows)
+            if previous_row:
+
+                self.rows = [r for r in self.rows if r["id"] != previous_row["id"]]
+                self.rows.append(previous_row)
+            self.capacity = value[2] if len(value) > 2 else None
             self.provider.blockSignals(True)
             self.provider.clear()
             for provider in self.providers:
@@ -273,21 +334,33 @@ class DotDialog(AppDialog):
                     ),
                     provider["id"],
                 )
+            if keep_draft:
+                self.provider.setCurrentIndex(self.provider.findData(selected_provider))
             self.provider.blockSignals(False)
-            self.role_changed()
+            if not keep_draft:
+                self.role_changed()
+            self.list.blockSignals(keep_draft)
             self.list.clear()
             for row in self.rows:
                 self.list.addItem(row["name"] + "  ·  " + row["status"])
             index = next((i for i, r in enumerate(self.rows) if r["id"] == self.selected_id), 0)
             if self.rows:
-                self.list.setCurrentRow(index)
+                self.list.setCurrentRow(index if not keep_draft or previous_row else -1)
                 self.list.setVisible(True)
             else:
                 self.list.setVisible(False)
 
-                if self.name.text() == draft_name and self.pages.currentIndex() == 0:
+                if (
+                    not keep_draft
+                    and self.name.text() == draft_name
+                    and self.pages.currentIndex() == 0
+                ):
                     self.new_dot()
-            if self.after_refresh is not None:
+            self.list.blockSignals(False)
+            if keep_draft:
+                self.show_step(selected_step)
+                self.status.setText("Your draft is kept. Saving will verify the latest Bud access.")
+            elif self.after_refresh is not None:
                 step, self.after_refresh = self.after_refresh, None
                 self.show_step(step)
             elif resume_step is not None and self.rows:
@@ -592,14 +665,16 @@ class DotDialog(AppDialog):
             if self.pages.currentIndex() == 5:
                 self.status.setVisible(not busy)
         self.back.setEnabled(not busy)
-        self.list.setEnabled(not busy)
+        self.list.setEnabled(not busy or getattr(self, "_read_only_loading", False))
         local_step = self.pages.currentIndex() < 5
         self.back.setEnabled(not busy or getattr(self, "_read_only_loading", False))
         self.next.setEnabled(
             not busy or (local_step and getattr(self, "_read_only_loading", False))
         )
         self.new.setEnabled(
-            self.admin() and not busy and (not capacity or capacity["remaining"] > 0)
+            self.admin()
+            and (not busy or getattr(self, "_read_only_loading", False))
+            and (not capacity or capacity["remaining"] > 0)
         )
         self.save.setEnabled(
             self.admin()
@@ -833,6 +908,19 @@ class DotDialog(AppDialog):
 def open_dots(window, selected=None):
     if not window.connected or not window.current_user():
         window.notify("Sign in to connect Buds.")
+        return
+    existing = getattr(window, "dots_dialog", None)
+    if (
+        existing
+        and existing.isVisible()
+        and existing.workspace == window.workspace_id
+        and existing.user == str(window.current_user().id)
+    ):
+        if selected and selected != existing.selected_id and not existing.pending:
+            index = next((i for i, row in enumerate(existing.rows) if row["id"] == selected), -1)
+            existing.list.setCurrentRow(index)
+        existing.raise_()
+        existing.activateWindow()
         return
     dialog = DotDialog(window, selected)
     window.dots_dialog = dialog

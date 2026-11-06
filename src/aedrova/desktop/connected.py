@@ -2,8 +2,10 @@
 
 import time
 from collections import deque
+from contextlib import nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Event
 from uuid import uuid4
 
 from PySide6.QtCore import QEvent, QObject, Qt, QThreadPool, QTimer
@@ -131,6 +133,16 @@ def message_tree(rows, user_id, *, directory=None, attachments=None):
     return roots
 
 
+def passive_action(key):
+    """Presence/read receipts should not interrupt a read or delay user actions."""
+    return isinstance(key, tuple) and (
+        key[0] == "read"
+        or key[0] == "chat"
+        and len(key) > 1
+        and key[1] in {"heartbeat", "typing", "seen"}
+    )
+
+
 class ConnectedDashboard(QObject):
     def __init__(self, window, account):
         super().__init__(window)
@@ -145,6 +157,7 @@ class ConnectedDashboard(QObject):
         self.reaction_edits = {}
         self.reaction_jobs = set()
         self.queue = deque()
+        self.sync_interrupt = Event()
         self.current_action = None
         self.last_view = None
         self.cache = {}
@@ -258,6 +271,7 @@ class ConnectedDashboard(QObject):
         if build:
             build.invalidate()
         self.active = False
+        self.sync_interrupt.set()
         self.last_view = None
         self.pages_ready = False
         self.timer.stop()
@@ -267,6 +281,7 @@ class ConnectedDashboard(QObject):
         self.agent_replies.clear()
         self.window.completed_agent_response = None
         self.window.agent_request_origin = None
+        self.window.call_preparing = None
         self.reaction_edits.clear()
         self.reaction_jobs.clear()
         self.queue.clear()
@@ -366,11 +381,20 @@ class ConnectedDashboard(QObject):
             self.window.notify("Too many pending actions. Wait for the connection to recover.")
             return
         action = (key, operation, completed)
+        passive = passive_action(key)
+        if not passive:
+            self.sync_interrupt.set()
         if priority:
             preceding = {"send", "upload"} if key[0] == "upload" else {"send"}
             position = next(
                 (i for i, queued in enumerate(self.queue) if queued[0][0] not in preceding),
                 len(self.queue),
+            )
+            self.queue.insert(position, action)
+        elif not passive:
+
+            position = next(
+                (i for i, row in enumerate(self.queue) if passive_action(row[0])), len(self.queue)
             )
             self.queue.insert(position, action)
         else:
@@ -420,8 +444,9 @@ class ConnectedDashboard(QObject):
         if channel_id and channel_id not in self.cache:
             set_loading(self, w.message_stack, True, "feed")
         reload_metadata = self.last_view is None
+        self.sync_interrupt.clear()
 
-        def operation():
+        def collect():
             snapshot = service.snapshot()
             if hasattr(service, "meeting_activity"):
                 snapshot["meeting_activity"] = service.meeting_activity()
@@ -458,9 +483,20 @@ class ConnectedDashboard(QObject):
             credentials = service.realtime_credentials()
             return snapshot, incoming, files, credentials, interactions
 
+        def operation():
+            from aedrova.identity.service import ReadInterrupted
+
+            batch = getattr(service, "background_read", None)
+            try:
+                with batch(self.sync_interrupt.is_set) if batch else nullcontext():
+                    return collect()
+            except ReadInterrupted:
+
+                return None
+
         def loaded(result):
             set_loading(self, w.message_stack, False)
-            if not self.active:
+            if not self.active or result is None:
                 return
             snapshot, incoming, files, credentials, interactions = result
             self.failures = 0
@@ -624,6 +660,8 @@ class ConnectedDashboard(QObject):
         for listing in (w.channel_list, w.dm_list):
             for i in range(listing.count()):
                 item = listing.item(i)
+                if item.data(Qt.ItemDataRole.UserRole + 1) == "bud":
+                    continue
                 count = unread.get(item.data(Qt.ItemDataRole.UserRole), 0)
                 if count:
                     item.setText(item.text() + f"  ({count})")
@@ -701,7 +739,16 @@ class ConnectedDashboard(QObject):
         return list(rows) + [r for r in replies if r["id"] not in ids]
 
     def complete_agent_reply(
-        self, workspace, channel, text, author, parent=None, prompt_id=None, *, sent_at=None
+        self,
+        workspace,
+        channel,
+        text,
+        author,
+        parent=None,
+        prompt_id=None,
+        *,
+        sent_at=None,
+        source_channels=None,
     ):
         key = (workspace, channel)
         replies = self.agent_replies.setdefault(key, [])
@@ -720,6 +767,44 @@ class ConnectedDashboard(QObject):
         )
         if self.window.workspace_id == workspace and self.window.channel_id == channel:
             self.render_local_messages()
+
+        service = self.account.service
+        if source_channels is not None and hasattr(service, "save_shared_agent_work"):
+            row = next(
+                (
+                    r
+                    for r in self.account.snapshot.get("channels", [])
+                    if r["id"] == channel and r["workspace_id"] == workspace
+                ),
+                None,
+            )
+            if row and row.get("kind", "channel") == "channel":
+                identifier = str(uuid4())
+                parameters = dict(
+                    p_id=identifier,
+                    p_workspace=workspace,
+                    p_channel=channel,
+                    p_agent=author[:80],
+                    p_body=text,
+                    p_sources=sorted(set(source_channels) | {channel}),
+                )
+
+                def save():
+                    try:
+                        return service.save_shared_agent_work(parameters)
+                    except Exception:
+                        return {"failed": True}
+
+                def saved(result):
+                    if isinstance(result, dict) and (
+                        result.get("setup_required") or result.get("failed")
+                    ):
+                        self.window.notify(
+                            "Reply is visible here, but shared agent context could not sync. "
+                            "Check the shared-context database setup and connection."
+                        )
+
+                self.enqueue(("shared-agent-work", identifier), save, saved)
 
     def send(self, text, parent_id=None, *, composer=None):
         w = self.window

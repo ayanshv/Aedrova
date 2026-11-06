@@ -31,7 +31,7 @@ class MeetingWrapup(AppDialog):
         layout.setSpacing(16)
         brand = QHBoxLayout()
         brand.addWidget(BrandMark(28))
-        brand.addWidget(label("MEETING COMPLETE", "muted"), 1)
+        brand.addWidget(label("Meeting complete", "muted"), 1)
         layout.addLayout(brand)
         layout.addWidget(label("Share with Aedrova?", "heading", wrap=True))
         layout.addWidget(label("Review your transcript, make any corrections, then confirm.",

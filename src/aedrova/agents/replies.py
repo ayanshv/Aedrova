@@ -2,10 +2,19 @@
 
 import asyncio
 import json
+import re
 
 import httpx
 
 from aedrova.agents.runtime import BuildCancelled
+
+
+def greeting_reply(question):
+    """Only greeting-only text gets an unprivileged, local canned response."""
+    text = " ".join(question.casefold().split()).strip()
+    if re.fullmatch(r"(?:hi|hello|hey|hiya)(?:\s+(?:there|again))?[!.?…]*", text):
+        return "Hello! How can I help?"
+    return None
 
 
 def needs_sources(question):
@@ -42,7 +51,8 @@ def needs_sources(question):
             r"github|supabase|figma|notion|stripe|instagram|tiktok|vercel|search|"
             r"research|investigate|investigation|current|today|sources|fact.check|"
             r"revenue|balance|customers?|analytics|metrics|latest|recent|changed|updates?|"
-            r"our team|our project|our product|what we|what did|that|those|above)\b",
+            r"agents?|buds?|knowledge|findings|handoff|shared work|our team|our project|"
+            r"our product|what we|what did|that|those|above)\b",
             question,
             re.IGNORECASE,
         )

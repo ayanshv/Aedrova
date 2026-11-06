@@ -1,7 +1,7 @@
 """Visual regressions that previously hid controls or content in narrow/dark layouts."""
 
 from layout_checks import no_horizontal_overflow
-from PySide6.QtCore import QSettings, Qt
+from PySide6.QtCore import QPoint, QSettings, Qt
 from PySide6.QtGui import QColor, QPalette, QTextCursor
 from PySide6.QtWidgets import QLabel, QMessageBox, QScrollArea, QWidget
 from test_connected import setup
@@ -25,8 +25,11 @@ def test_dark_scroll_panels_and_live_theme_change(qtbot, tmp_path):
         qtbot.wait(10)
         scroll = dialog.findChild(QScrollArea)
 
-        image = scroll.widget().grab().toImage()
-        actual, expected = image.pixelColor(2, 2), QColor(DARK.bg)
+        image = dialog.grab().toImage()
+        point = scroll.widget().mapTo(dialog, QPoint(2, 2))
+        scale = image.devicePixelRatio()
+        actual = image.pixelColor(round(point.x() * scale), round(point.y() * scale))
+        expected = QColor(DARK.elevated if isinstance(dialog, SettingsDialog) else DARK.bg)
 
         assert max(abs(a - b) for a, b in zip(actual.getRgb(), expected.getRgb(), strict=True)) <= 1
         assert dialog.palette().color(QPalette.ColorRole.Window).name().upper() == DARK.elevated
@@ -125,7 +128,10 @@ def test_profile_popup_mouse_activation_and_theme(qtbot, tmp_path):
         qtbot.mouseClick(window.profile_button, Qt.MouseButton.LeftButton)
         qtbot.waitUntil(lambda: window.profile_menu.isVisible())
         expected = window.theme.elevated if mode == "dark" else window.theme.bg
-        assert window.profile_menu.palette().color(QPalette.ColorRole.Window) == QColor(expected)
+        from aedrova.desktop.popup_depth import surface_color
+
+        assert surface_color(window.profile_menu) == QColor(expected)
+        assert window.profile_menu.testAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         assert any(action.text() == "Settings…" for action in window.profile_menu.actions())
         window.profile_menu.close()
 

@@ -1,7 +1,7 @@
 """Themed, keyboard-accessible choices, including macOS popup menus."""
 
-from PySide6.QtCore import QRectF, QSize, Qt
-from PySide6.QtGui import QIcon, QPainter, QPainterPath, QPalette, QPen, QPixmap, QRegion
+from PySide6.QtCore import QSize, Qt
+from PySide6.QtGui import QIcon, QPainter, QPainterPath, QPalette, QPen, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -15,13 +15,6 @@ from PySide6.QtWidgets import (
     QStyleFactory,
     QVBoxLayout,
 )
-
-
-def _round_popup(widget):
-    """Clip the native popup window too; CSS only rounds its painted content."""
-    path = QPainterPath()
-    path.addRoundedRect(QRectF(widget.rect()), 16, 16)
-    widget.setMask(QRegion(path.toFillPolygon().toPolygon()))
 
 
 class _PopupStyle(QProxyStyle):
@@ -42,10 +35,8 @@ class _PopupStyle(QProxyStyle):
                 QStyle.PrimitiveElement.PE_FrameWindow,
             )
         ):
-            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(widget.palette().brush(QPalette.ColorRole.Base))
-            painter.drawRoundedRect(QRectF(option.rect), 16, 16)
+
+
             return
         super().drawPrimitive(element, option, painter, widget)
 
@@ -89,22 +80,48 @@ class ChoiceBox(QComboBox):
         super().setCurrentText(text)
 
     def showPopup(self):  # noqa: N802
+        from aedrova.desktop.popup_depth import PADDING, PopupDepth
+
         popup = self.view().window()
         popup.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
+        popup.setWindowFlag(Qt.WindowType.NoDropShadowWindowHint, True)
         popup.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-        super().showPopup()
-
-
-        popup = self.view().window()
         popup.setObjectName("ChoicePopup")
         popup.setStyle(self._popup_style)
+        popup.setPalette(self.palette())
+        popup.clearMask()
         popup.setContentsMargins(0, 0, 0, 0)
+        layout = popup.layout()
+        if layout:
+            layout.setContentsMargins(0, 0, 0, 0)
         if isinstance(popup, QFrame):
             popup.setFrameShape(QFrame.Shape.NoFrame)
             popup.setLineWidth(0)
-        popup.style().unpolish(popup)
-        popup.style().polish(popup)
-        _round_popup(popup)
+        self.view().viewport().setAutoFillBackground(False)
+        if not hasattr(self, "_depth"):
+            self._depth = PopupDepth(popup)
+        self._depth.hide()
+        super().showPopup()
+        geometry = popup.geometry()
+        left, top, right, bottom = PADDING
+        if layout:
+            layout.setContentsMargins(left, top, right, bottom)
+        else:
+            popup.setContentsMargins(left, top, right, bottom)
+        geometry.adjust(-left, -top, right, bottom)
+        available = popup.screen().availableGeometry()
+        geometry.setWidth(min(geometry.width(), available.width()))
+        geometry.setHeight(min(geometry.height(), available.height()))
+        geometry.moveLeft(
+            max(available.left(), min(geometry.left(), available.right() - geometry.width() + 1))
+        )
+        geometry.moveTop(
+            max(available.top(), min(geometry.top(), available.bottom() - geometry.height() + 1))
+        )
+        popup.setGeometry(geometry)
+        self._depth.setGeometry(popup.rect())
+        self._depth.show()
+        self._depth.lower()
 
     def paintEvent(self, event):  # noqa: N802
         super().paintEvent(event)
@@ -154,17 +171,26 @@ class AppMenu(QMenu):
         self.setObjectName("AppMenu")
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setWindowFlag(Qt.WindowType.NoDropShadowWindowHint, True)
         self.setMinimumWidth(220)
         self.setSeparatorsCollapsible(True)
         self.setAttribute(Qt.WidgetAttribute.WA_WindowPropagation, True)
 
     def showEvent(self, event):  # noqa: N802
         super().showEvent(event)
-        _round_popup(self)
+        self.clearMask()
 
     def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
-        _round_popup(self)
+        self.clearMask()
+
+    def paintEvent(self, event):  # noqa: N802
+        from aedrova.desktop.popup_depth import paint_depth
+
+        painter = QPainter(self)
+        paint_depth(painter, self.rect(), self)
+        painter.end()
+        super().paintEvent(event)
 
 
 def choose_teammate(parent, names):

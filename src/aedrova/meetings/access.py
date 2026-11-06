@@ -128,7 +128,7 @@ class MeetingClient(ManagedClient):
 
     def capabilities(self):
         try:
-            result = self.request("/api/meetings/capabilities")
+            result = self.request("/api/meetings/capabilities", timeout=5)
         except RuntimeError:
 
             return {"meeting_text": False, "audio_transcription": False}

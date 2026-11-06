@@ -41,7 +41,7 @@ class ProductMemory(AppDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(28, 24, 28, 24)
         layout.setSpacing(14)
-        layout.addWidget(label("What your team knows.", "heading"))
+        layout.addWidget(label("Product memory", "heading"))
         layout.addWidget(
             label(
                 "Source-backed goals, requirements and decisions. Proposals stay proposals until "

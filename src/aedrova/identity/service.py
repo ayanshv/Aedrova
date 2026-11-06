@@ -6,14 +6,20 @@ import json
 import os
 import re
 import sys
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
+from threading import local
 from urllib.parse import urlparse
 
 import httpx
 from supabase_auth.errors import AuthRetryableError
 
 from supabase import ClientOptions, create_client
+
+
+class ReadInterrupted(Exception):
+    """A read-only background batch yielded to queued interactive work."""
 
 
 @dataclass(frozen=True)
@@ -73,6 +79,7 @@ class Connection:
 class IdentityService:
     def __init__(self, connection, *, client=None, meeting_context_enabled=None):
         self.connection = connection
+        self._read_state = local()
         if meeting_context_enabled is None:
             path = Path(__file__).parents[1] / "desktop/assets/public-config.json"
             configuration = json.loads(path.read_text()) if path.exists() else {}
@@ -106,8 +113,13 @@ class IdentityService:
 
     def fork_for_context(self):
         """Called in the serialized transport worker; never expose tokens to UI/logs."""
-        self._authenticated()
+
+
+        if self.client is None or self.user is None:
+            raise PermissionError("Sign in first.")
         session = self.client.auth.get_session()
+        if session is None:
+            raise PermissionError("Session expired. Sign in again.")
         fork = IdentityService(
             self.connection, meeting_context_enabled=self.meeting_context_enabled
         )
@@ -117,6 +129,9 @@ class IdentityService:
             fork.user = result.user
             if fork.user is None or str(fork.user.id) != str(self.user.id):
                 raise PermissionError("Session changed. Sign in again.")
+
+
+            fork._bud_catalog_owner = getattr(self, "_bud_catalog_owner", self)
             return fork
         except Exception:
             fork.close_context()
@@ -129,10 +144,21 @@ class IdentityService:
             self.user = None
 
     def google_authorization_url(self, redirect):
+        return self.provider_authorization_url("google", redirect)
+
+    def apple_authorization_url(self, redirect):
+        return self.provider_authorization_url("apple", redirect)
+
+    def provider_authorization_url(self, provider, redirect):
+        if provider not in {"google", "apple"}:
+            raise ValueError("Unsupported sign-in provider")
         result = self.client.auth.sign_in_with_oauth(
             {
-                "provider": "google",
-                "options": {"redirect_to": redirect, "scopes": "openid email profile"},
+                "provider": provider,
+                "options": {
+                    "redirect_to": redirect,
+                    "scopes": "email name" if provider == "apple" else "openid email profile",
+                },
             }
         )
         return result.url
@@ -182,7 +208,45 @@ class IdentityService:
             self.user = None
             self.client = None
 
+    def _read_checkpoint(self):
+        batch = getattr(self._read_state, "batch", None)
+        if batch and batch[1]():
+            raise ReadInterrupted()
+        if batch and (self.client is None or self.user is None or str(self.user.id) != batch[0]):
+            raise PermissionError("The signed-in account changed.")
+
+    @contextmanager
+    def background_read(self, interrupted):
+        """One fresh Auth validation per interruptible, read-only sync operation.
+
+        No authorization/metadata result is cached between operations. Each DB
+        request still carries the user's JWT and executes under server RLS.
+        """
+        self._read_checkpoint()
+        if interrupted():
+            raise ReadInterrupted()
+        self._authenticated()
+        previous = getattr(self._read_state, "batch", None)
+        self._read_state.batch = (str(self.user.id), interrupted)
+        try:
+            yield
+            self._read_checkpoint()
+        finally:
+            self._read_state.batch = previous
+
+    def _read(self, query):
+        self._read_checkpoint()
+        value = query.execute().data
+        self._read_checkpoint()
+        return value
+
     def _authenticated(self):
+        self._read_checkpoint()
+        batch = getattr(self._read_state, "batch", None)
+        if batch and self.client is not None and self.user is not None:
+            if str(self.user.id) != batch[0]:
+                raise PermissionError("The signed-in account changed.")
+            return
         if self.client is None or self.user is None:
             raise PermissionError("Sign in first.")
 
@@ -301,15 +365,19 @@ class IdentityService:
         )
 
     def snapshot(self):
+        if getattr(self._read_state, "batch", None):
+            return self._snapshot()
+        with self.background_read(lambda: False):
+            return self._snapshot()
+
+    def _snapshot(self):
         self._authenticated()
-        workspaces = self.client.rpc("list_my_workspaces", {"p_archived": False}).execute().data
+        workspaces = self._read(self.client.rpc("list_my_workspaces", {"p_archived": False}))
         hierarchy_available = True
         for workspace in workspaces:
             try:
-                context = (
+                context = self._read(
                     self.client.rpc("space_billing_context", {"p_workspace": workspace["id"]})
-                    .execute()
-                    .data
                 )
                 workspace.update(context)
             except Exception as error:
@@ -320,32 +388,29 @@ class IdentityService:
                     workspace["billing_unavailable"] = True
                 else:
                     raise
-        archived = self.client.rpc("list_my_workspaces", {"p_archived": True}).execute().data
-        memberships = self.client.rpc("list_members", {}).execute().data
-        channels = (
+        archived = self._read(self.client.rpc("list_my_workspaces", {"p_archived": True}))
+        memberships = self._read(self.client.rpc("list_members", {}))
+        channels = self._read(
             self.client.table("channels")
             .select("id,workspace_id,name,private,kind,dm_low,dm_high")
             .order("name")
-            .execute()
-            .data
         )
-
-        invitations = (
-            self.client.table("workspace_invitations")
-            .select("id,workspace_id,email,role,expires_at,accepted_at,revoked_at")
-            .execute()
-            .data
+        invitations = self._read(
+            self.client.table("workspace_invitations").select(
+                "id,workspace_id,email,role,expires_at,accepted_at,revoked_at"
+            )
         )
         return {
             "ai_teammates": [],
             "dots": self.dots()["items"],
             "user_profile": self.my_profile(),
-            "directory": self.client.rpc("team_directory", {}).execute().data,
-            "unread": self.client.rpc("unread_counts", {}).execute().data,
-            "agent_preferences": self.client.table("workspace_agent_preferences")
-            .select("workspace_id,nickname,provider")
-            .execute()
-            .data,
+            "directory": self._read(self.client.rpc("team_directory", {})),
+            "unread": self._read(self.client.rpc("unread_counts", {})),
+            "agent_preferences": self._read(
+                self.client.table("workspace_agent_preferences").select(
+                    "workspace_id,nickname,provider"
+                )
+            ),
             "space_hierarchy_available": hierarchy_available,
             "workspaces": workspaces,
             "archived_workspaces": archived,
@@ -756,6 +821,35 @@ class IdentityService:
     def record_build_delivery(self, parameters):
         self._authenticated()
         return self.client.rpc("record_build_delivery", parameters).execute().data
+
+    def shared_agent_work(self, workspace, *, identifiers=None):
+        """Fresh RLS read; no private Bud history or cached connector grants."""
+        self._authenticated()
+        try:
+            query = self.client.table("shared_agent_work").select("*").eq("workspace_id", workspace)
+            if identifiers is not None:
+                if not identifiers or len(identifiers) > 30:
+                    raise ValueError("Select up to 30 shared work records.")
+                query = query.in_("id", identifiers)
+            rows = query.order("created_at", desc=True).order("id").limit(30).execute().data
+            return {"items": rows, "setup_required": False}
+        except Exception as error:
+            if getattr(error, "code", None) == "PGRST205":
+                return {"items": [], "setup_required": True}
+            raise
+
+    def save_shared_agent_work(self, parameters):
+        self._authenticated()
+        from aedrova.security.credentials import credential_rules
+
+        if credential_rules(parameters["p_body"].encode()):
+            raise ValueError("Remove credentials before sharing agent work.")
+        try:
+            return self.client.rpc("save_shared_agent_work", parameters).execute().data
+        except Exception as error:
+            if getattr(error, "code", None) == "PGRST202":
+                return {"setup_required": True}
+            raise
 
     def context_revision(self, channel):
         self._authenticated()

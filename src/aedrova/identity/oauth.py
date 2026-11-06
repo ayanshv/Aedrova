@@ -1,10 +1,14 @@
 """Native desktop OAuth: system browser, PKCE, and a short-lived loopback callback."""
 
+import json
+import os
 import secrets
 import socket
+import sys
 import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 from threading import Event, Thread
 from urllib.parse import parse_qs, urlsplit
 
@@ -30,8 +34,27 @@ class LoopbackServer(HTTPServer):
         return connection, address
 
 
-def google_sign_in(service, cancel=None, *, opener=webbrowser.open, timeout=180, port=PORT):
+def apple_login_enabled():
+    config = Path(__file__).parents[1] / "desktop/assets/public-config.json"
+    if not getattr(sys, "frozen", False) and "AEDROVA_APPLE_LOGIN_ENABLED" in os.environ:
+        return os.environ["AEDROVA_APPLE_LOGIN_ENABLED"] == "true"
+    return config.is_file() and json.loads(config.read_text()).get("apple_login_enabled") is True
+
+
+def google_sign_in(service, cancel=None, **options):
+    return provider_sign_in(service, cancel, provider="google", **options)
+
+
+def apple_sign_in(service, cancel=None, **options):
+    return provider_sign_in(service, cancel, provider="apple", **options)
+
+
+def provider_sign_in(
+    service, cancel=None, *, provider, opener=webbrowser.open, timeout=180, port=PORT
+):
     """Runs off the UI thread. Tokens never appear in the browser response or logs."""
+    if provider not in {"google", "apple"}:
+        raise ValueError("Unsupported sign-in provider")
     cancel = cancel or Event()
     path = "/auth/" + secrets.token_urlsafe(32)
     result = {}
@@ -83,7 +106,10 @@ def google_sign_in(service, cancel=None, *, opener=webbrowser.open, timeout=180,
     with LoopbackServer(("127.0.0.1", port), Callback) as server:
         server.timeout = 0.25
         redirect = f"http://127.0.0.1:{server.server_port}{path}"
-        url = service.google_authorization_url(redirect)
+        url = (
+            service.google_authorization_url(redirect) if provider == "google"
+            else service.apple_authorization_url(redirect)
+        )
         if cancel.is_set():
             raise InterruptedError("Sign-in cancelled")
         if not opener(url):
@@ -116,7 +142,7 @@ def google_sign_in(service, cancel=None, *, opener=webbrowser.open, timeout=180,
     if not result:
         raise TimeoutError("Sign-in timed out")
     if "error" in result:
-        raise PermissionError("Google sign-in was not completed")
+        raise PermissionError(f"{provider.title()} sign-in was not completed")
     user = service.finish_google_sign_in(result["code"])
     if cancel.is_set():
         service.sign_out()

@@ -625,3 +625,77 @@ def test_wizard_visits_personality_and_back_keeps_custom_settings(editor):
     _, style, voice = unpack(saved[-1]["p_instructions"])
     assert style["warmth"] == 82 and style["reporting"] == 47
     assert voice == "Precise, calm, curious."
+
+
+def test_saved_bud_config_is_usable_before_any_network_request(qtbot, tmp_path):
+    from test_dots import dot
+
+    window, service = setup(qtbot, tmp_path)
+    qtbot.waitUntil(
+        lambda: (
+            not window.account_dialog.busy
+            and not window.connected.current_action
+            and not window.connected.queue
+        )
+    )
+    bud = dot("Orbit")
+
+    for key in ("status", "last_sync", "tools", "permissions"):
+        bud.pop(key)
+    window.account_dialog.snapshot["dots"] = [bud]
+    window.account_dialog.busy = True
+    dialog = DotDialog(window, bud["id"])
+    qtbot.addWidget(dialog)
+    dialog.show()
+    assert dialog.pending and dialog._read_only_loading
+    assert dialog.current()["id"] == bud["id"]
+    assert dialog.name.text() == "Orbit" and dialog.name.isEnabled()
+    assert dialog.list.isEnabled() and dialog.next.isEnabled()
+    dialog.name.setText("My draft")
+    dialog.next.click()
+    assert dialog.pages.currentIndex() == 3
+    assert dialog.name.text() == "My draft"
+    assert not dialog.save.isEnabled()
+    dialog.reject()
+    window.connected.queue.clear()
+    window.account_dialog.busy = False
+
+
+def test_slow_refresh_keeps_draft_and_original_conflict_version(editor, monkeypatch):
+    from test_dots import dot
+
+    dialog, rows, _, window = editor
+    old = dot("Orbit")
+    rows[:] = [old]
+    dialog.refresh()
+    callbacks = []
+    monkeypatch.setattr(
+        DotDialog, "run", lambda self, operation, done, **kw: callbacks.append(done)
+    )
+    dialog.refresh()
+    dialog.name.setText("My unsaved name")
+    dialog.instructions.setPlainText("Keep this draft")
+    dialog.show_step(3)
+    fresh = dict(old, name="Someone else's update", version=old["version"] + 1)
+    callbacks[0]((dialog.providers, [fresh], None))
+    assert dialog.name.text() == "My unsaved name"
+    assert dialog.instructions.toPlainText() == "Keep this draft"
+    assert dialog.pages.currentIndex() == 3
+    assert dialog.current()["id"] == old["id"]
+    assert dialog.current()["version"] == old["version"]
+    assert window.account_dialog.snapshot["dots"][0]["version"] == fresh["version"]
+
+
+def test_reopening_visible_bud_setup_keeps_draft_without_refetch(editor, monkeypatch):
+    from aedrova.desktop.dots import open_dots
+
+    dialog, _, _, window = editor
+    window.dots_dialog = dialog
+    dialog.name.setText("My draft")
+    dialog.show_step(3)
+    monkeypatch.setattr(
+        DotDialog, "refresh", lambda self: pytest.fail("Do not restart visible setup")
+    )
+    open_dots(window)
+    assert window.dots_dialog is dialog
+    assert dialog.pages.currentIndex() == 3 and dialog.name.text() == "My draft"

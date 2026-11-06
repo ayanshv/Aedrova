@@ -35,7 +35,7 @@ class ReviewDialog(AppDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(14)
-        layout.addWidget(label("From working code to your project.", "heading"))
+        layout.addWidget(label("Review project changes", "heading"))
         layout.addWidget(
             label(
                 "Review every changed file. Applying locally and publishing to GitHub "
@@ -362,12 +362,10 @@ class ReviewDialog(AppDialog):
         self.hide()
 
     def closeEvent(self, event):  # noqa: N802
-        if self.job:
-            self.status.setText("Finishing the approved action. Wait before closing this review.")
-            event.ignore()
-        else:
-            self.revoke()
-            event.accept()
+
+
+        self.revoke()
+        event.accept()
 
     def reject(self):
         self.close()

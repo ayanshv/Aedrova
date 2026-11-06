@@ -36,6 +36,9 @@ jobs:
           uv run ruff check src scripts tests
           uv run python scripts/check_release_secrets.py --tracked
           uv run python -m compileall -q src scripts
+      - name: Compile local meeting audio bridge
+        if: runner.os == 'macOS'
+        run: uv run python scripts/build_meeting_helper.py
       - name: Native process lease safety
         run: uv run pytest -q tests/test_file_lock.py
       - name: Voice recording cleanup safety

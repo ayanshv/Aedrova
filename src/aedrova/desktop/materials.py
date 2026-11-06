@@ -210,7 +210,7 @@ class DocumentTile(SpringButton):
         for y, length in ((73, 21), (81, 21), (89, 14)):
             painter.drawLine(37, y, 37 + length, y)
         painter.setPen(QColor(t.text))
-        painter.setFont(system_font(18, QFont.Weight.DemiBold, -0.3))
+        painter.setFont(system_font(18, QFont.Weight.DemiBold))
         title = painter.fontMetrics().elidedText(
             self.title, Qt.TextElideMode.ElideRight, self.width() - 54
         )

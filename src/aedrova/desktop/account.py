@@ -37,7 +37,7 @@ from aedrova.desktop.controls import AppDialog, ChoiceBox, CodingProviderChoice
 from aedrova.desktop.dialogs import button, icon_button, label
 from aedrova.desktop.onboarding_motion import OnboardingStack
 from aedrova.desktop.welcome_surface import WelcomeSurface
-from aedrova.identity.oauth import google_sign_in
+from aedrova.identity.oauth import apple_login_enabled, apple_sign_in, google_sign_in
 from aedrova.identity.service import Connection, IdentityService
 from aedrova.localization import choice_source
 
@@ -172,9 +172,21 @@ class AccountDialog(AppDialog):
         self.google_button = button("Continue with Google", role="primary")
         self.google_button.setIcon(QIcon(str(Path(__file__).parent / "assets/google-g.png")))
         self.google_button.setIconSize(QSize(18, 18))
-        self.google_button.setMinimumHeight(40)
+        self.google_button.setMinimumHeight(44)
         self.google_button.clicked.connect(self.start_google)
         column.addWidget(self.google_button)
+        self.apple_button = button("Sign in with Apple")
+        self.apple_button.setIcon(QIcon(str(Path(__file__).parent / "assets/apple.svg")))
+        self.apple_button.setIconSize(QSize(18, 18))
+        self.apple_button.setMinimumHeight(44)
+        self.apple_button.setStyleSheet(
+            "QPushButton {background:white;color:black;border:1px solid #d0d0d0;"
+            "border-radius:10px;font-weight:500;text-align:center;} "
+            "QPushButton:hover {background:#f5f5f5;}"
+        )
+        self.apple_button.clicked.connect(self.start_apple)
+        self.apple_button.setVisible(apple_login_enabled())
+        column.addWidget(self.apple_button)
         note = label(
             "Sign in securely in your browser.\nWe’ll bring you straight back to setup.",
             "muted",
@@ -189,6 +201,13 @@ class AccountDialog(AppDialog):
         self.add_page(page)
 
     def start_google(self):
+        self.start_provider("google")
+
+    def start_apple(self):
+        if apple_login_enabled():
+            self.start_provider("apple")
+
+    def start_provider(self, provider):
         if self.busy:
             return
         try:
@@ -205,12 +224,13 @@ class AccountDialog(AppDialog):
 
         def operation():
             self.service = self.factory(connection)
-            return google_sign_in(self.service, self.oauth_cancel)
+            sign_in = apple_sign_in if provider == "apple" else google_sign_in
+            return sign_in(self.service, self.oauth_cancel)
 
         self.run(operation, self.authenticated)
         self.status.show()
         self.status.setText(
-            "Continue with Google in your browser. We’ll bring your workspace here."
+            f"Continue with {provider.title()} in your browser. We’ll bring your workspace here."
         )
 
     def cancel_google(self):
@@ -228,9 +248,33 @@ class AccountDialog(AppDialog):
         self.workspaces.currentIndexChanged.connect(self.render_workspace)
         page.workspace_slot.addWidget(self.workspaces)
         self.account_label = label("", "muted", wrap=True)
+        overview = page.add_section(
+            "overview", "Overview", "Your team, agents and connected work.", "spaces"
+        )
+        self.workspace_summary = label("", "muted", wrap=True)
+        overview.addWidget(self.workspace_summary)
+        metrics = QHBoxLayout()
+        metrics.setSpacing(12)
+        self.workspace_metrics = {}
+        for key, title in (("members", "Members"), ("channels", "Channels"), ("buds", "Buds")):
+            card = QFrame()
+            card.setObjectName("SettingsMetric")
+            card.setStyleSheet(
+                "QFrame#SettingsMetric {background:palette(alternate-base);border:none;"
+                "border-radius:12px;} QLabel {background:transparent;}"
+            )
+            content = QVBoxLayout(card)
+            content.setContentsMargins(18, 16, 18, 16)
+            value = label("0", "heading")
+            content.addWidget(value)
+            content.addWidget(label(title, "muted"))
+            self.workspace_metrics[key] = value
+            metrics.addWidget(card, 1)
+        overview.addLayout(metrics)
+        overview.addStretch(1)
 
         agent = page.add_section(
-            "agent", "Your agent", "Choose how Aedrova builds with your team.", "work"
+            "agent", "AI & model routing", "Workspace defaults for your main agent.", "work"
         )
         agent.addSpacing(8)
         agent.addWidget(label("Agent name", "muted"))
@@ -281,7 +325,7 @@ class AccountDialog(AppDialog):
         channels.addWidget(create_channel)
 
         people = page.add_section(
-            "people", "People & access", "Select a teammate to manage their access.", "smile"
+            "people", "Members & access", "Select a teammate to manage their access.", "people"
         )
         self.members = QListWidget()
         self.members.setProperty("accountList", True)
@@ -419,7 +463,68 @@ class AccountDialog(AppDialog):
         account.addSpacing(8)
         account.addLayout(actions)
         account.addStretch(1)
+        from aedrova.desktop.bud_connectors import open_connectors
+        from aedrova.desktop.dots import open_dots
+        from aedrova.desktop.product_memory import open_memory
+
+        for key, title, detail, symbol, callback in (
+            (
+                "buds",
+                "Buds",
+                "Configure specialized teammates, personality and authorized tools.",
+                "smile",
+                lambda: open_dots(self.parentWidget()),
+            ),
+            (
+                "integrations",
+                "Integrations",
+                "Manage each Bud's connection and granted access.",
+                "link",
+                lambda: open_connectors(self.parentWidget()),
+            ),
+            (
+                "knowledge",
+                "Knowledge & context",
+                "Review shared product memory and project decisions.",
+                "context",
+                lambda: open_memory(self.parentWidget()),
+            ),
+            (
+                "billing",
+                "Billing & credits",
+                "The subscription and AI allowance belong to this workspace.",
+                "activity",
+                self.open_resources,
+            ),
+        ):
+            column = page.add_section(key, title, detail, symbol)
+            action = button("Open " + title.lower(), role="primary")
+            action.clicked.connect(
+                lambda checked=False, target=callback: self.open_workspace_tool(target)
+            )
+            column.addWidget(action)
+            column.addStretch(1)
+        page.show_section("overview")
         self.add_page(page)
+
+    def open_workspace_tool(self, callback):
+        window = self.parentWidget()
+        selected = self.workspace_id()
+        if not window or not window.connected or not window.connected.active:
+            self.status.setText("Open your signed-in workspace before using team tools.")
+            return
+        if selected not in {space.id for space in window.store.workspaces}:
+            self.status.setText("Refresh your workspace access before opening this tool.")
+            return
+        if window.workspace_id != selected:
+            window.switch_workspace(selected)
+        callback()
+
+    def open_resources(self):
+        from aedrova.desktop.preferences import SettingsDialog
+
+        self.resources_dialog = SettingsDialog(self.parentWidget(), scope="workspace")
+        self.resources_dialog.show()
 
     def provider_choice(self):
         choice = CodingProviderChoice()
@@ -434,12 +539,11 @@ class AccountDialog(AppDialog):
         self.onboarding_steps.setMaximumWidth(440)
         layout.addWidget(self.onboarding_steps, alignment=Qt.AlignmentFlag.AlignHCenter)
 
-        def step(kicker, title, subtitle):
+        def step(title, subtitle):
             panel = QWidget()
             column = QVBoxLayout(panel)
             column.setSpacing(14)
             column.addStretch()
-            column.addWidget(label(kicker, "section"))
             heading = label(title, "title", wrap=True)
             heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
             column.addWidget(heading)
@@ -447,7 +551,7 @@ class AccountDialog(AppDialog):
             self.onboarding_steps.addWidget(panel)
             return column
 
-        first = step("STEP 1 OF 3", "A space for your team.", "What would you like to call it?")
+        first = step("Name your workspace", "What would you like to call it?")
         self.onboarding_workspace = self.field("e.g. Northstar Labs")
         self.onboarding_workspace.setMaxLength(80)
         self.onboarding_workspace.setMinimumHeight(48)
@@ -474,8 +578,7 @@ class AccountDialog(AppDialog):
         first.addStretch()
 
         second = step(
-            "STEP 2 OF 3",
-            "Meet your agent.",
+            "Name your agent",
             "Give your team's building partner a name. You can change it later.",
         )
         self.onboarding_nickname = self.field("Agent nickname")
@@ -495,9 +598,7 @@ class AccountDialog(AppDialog):
         second.addWidget(back)
         second.addStretch()
 
-        ready = step(
-            "ALL SET", "Your workspace is ready.", "A little space for your next big idea."
-        )
+        ready = step("Your workspace is ready", "Open your dashboard or invite teammates.")
         self.ready_summary = label("", "title", wrap=True)
         ready.addWidget(self.ready_summary)
         invite = button("Invite teammates", role="primary")
@@ -509,11 +610,10 @@ class AccountDialog(AppDialog):
         ready.addStretch()
 
         invitations = step(
-            "BRING YOUR TEAM",
-            "Better together.",
-            "Create a private invitation for a teammate's Google email.",
+            "Invite teammates",
+            "Create a private invitation for a teammate's email address.",
         )
-        self.setup_email = self.field("Teammate’s Google email")
+        self.setup_email = self.field("Teammate’s email address")
         invitations.addWidget(self.setup_email)
         self.setup_invite = button("Create invitation", role="primary")
         self.setup_invite.clicked.connect(
@@ -556,7 +656,6 @@ class AccountDialog(AppDialog):
 
         self.ai_review_step = self.onboarding_steps.count()
         review = step(
-            "STEP 3 OF 3",
             "How should your agent work?",
             "Choose how builds run on this computer. You can change it later.",
         )
@@ -606,8 +705,8 @@ class AccountDialog(AppDialog):
         join_layout = QVBoxLayout(join_page)
         join_layout.setSpacing(20)
         join_layout.addStretch()
-        join_layout.addWidget(label("Your team is waiting.", "heading"))
-        join_layout.addWidget(label("Use the code shared with your Google email.", "muted"))
+        join_layout.addWidget(label("Join your team", "heading"))
+        join_layout.addWidget(label("Use the code shared with your email address.", "muted"))
         self.onboarding_invite = self.field("Paste invitation code", password=True)
         join_layout.addWidget(self.onboarding_invite)
         join_button = button("Join workspace", role="primary")
@@ -1047,7 +1146,7 @@ class AccountDialog(AppDialog):
             self.begin_onboarding()
         elif intent == "manage" and self.workspace_id():
             self.pages.setCurrentIndex(1)
-            self.workspace_settings.show_section("agent")
+            self.workspace_settings.show_section("overview")
             self.resize(840, 690)
         elif intent == "channel" and self.workspace_id():
             self.pages.setCurrentIndex(1)
@@ -1060,6 +1159,16 @@ class AccountDialog(AppDialog):
 
     def render_workspace(self):
         workspace = self.workspace_id()
+        if hasattr(self, "workspace_summary"):
+            members = sum(r["workspace_id"] == workspace for r in self.snapshot.get("members", []))
+            buds = sum(r["workspace_id"] == workspace for r in self.snapshot.get("dots", []))
+            channels = sum(
+                r["workspace_id"] == workspace for r in self.snapshot.get("channels", [])
+            )
+            self.workspace_summary.setText(self.workspaces.currentText())
+            for key, count in (("members", members), ("channels", channels), ("buds", buds)):
+                self.workspace_metrics[key].setText(str(count))
+
         self.generated_code.clear()
         preference = next(
             (
@@ -1143,6 +1252,9 @@ class AccountDialog(AppDialog):
             if getattr(self, "queued_settings_save", False):
                 return
             self.queued_settings_save = True
+            dashboard = getattr(self.parentWidget(), "connected", None)
+            if dashboard and dashboard.active and getattr(self, "background_job", False):
+                dashboard.sync_interrupt.set()
             service = self.service
             user = str(service.user.id) if service and service.user else None
             self.status.setText("Saving after the current update. Your changes are kept.")

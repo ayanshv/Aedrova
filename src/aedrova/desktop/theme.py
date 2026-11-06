@@ -1,6 +1,7 @@
 """Workroom semantic palette: neutral surfaces, blue action and quiet state hierarchy."""
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from PySide6.QtGui import QColor, QPalette
 
@@ -118,9 +119,16 @@ def palette(theme: Theme):
     return result
 
 
+def permission_warning(theme):
+    """Owner-selected Full access orange with theme-specific subtle surfaces."""
+    return "#ED8B4A", "#3C2B20" if theme.name == "dark" else "#FFF0E4"
+
+
 def stylesheet(t: Theme, *, reduced_transparency=False):
 
+    checkbox = (Path(__file__).parent / "assets/checkbox-checked.svg").as_posix()
     white = t.name == "light"
+    permission_ink, permission_bg = permission_warning(t)
     capsule = t.bg
     if reduced_transparency:
         capsule = t.surface
@@ -187,7 +195,16 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QPushButton#WorkspaceAction:disabled {{ background: transparent; }}
     QComboBox {{ background: {control}; border: 1px solid transparent;
         border-radius: 7px; padding: 10px; min-width: 75px; }}
-    QComboBox#AgentPermissions {{ padding: 4px 8px; }}
+    QComboBox#AgentPermissions {{ padding: 4px 8px; font-size: 12px; min-width: 174px; }}
+    QComboBox#AgentPermissions[permissionMode="full"] {{
+        background: {permission_bg}; color: {permission_ink}; }}
+    QDialog#FullAccessConfirmation {{ background: {t.bg}; }}
+    QDialog#FullAccessConfirmation QLabel[role="heading"] {{ font-size: 22px; }}
+    QLabel#FullAccessScope {{ background: {t.surface}; color: {t.secondary};
+        border-radius: 9px; padding: 10px 12px; font-size: 12px; }}
+    QPushButton#ConfirmFullAccess {{ background: {permission_bg}; color: {permission_ink};
+        border: 1px solid {t.border}; border-radius: 10px; padding: 0 16px; }}
+    QPushButton#ConfirmFullAccess:hover {{ border-color: {permission_ink}; }}
     QComboBox::drop-down {{ border: none; width: 30px; background: transparent; }}
     QComboBox:focus {{ border-color: {t.accent}; }}
     QComboBox::down-arrow {{ image: none; border: none; width: 0px; height: 0px; }}
@@ -195,19 +212,21 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
         border: none; border-radius: 7px; padding: 6px;
         selection-background-color: {t.accent_bg}; selection-color: {t.accent_text};
         outline: none; }}
-    QFrame#ChoicePopup {{ background: {overlay}; border: none;
+    QFrame#ChoicePopup {{ background: transparent; border: none;
         border-radius: 16px; padding: 0; }}
-    QListView#ChoiceList, QListView#ChoiceList:focus {{ border: none; outline: none; }}
+    QListView#ChoiceList, QListView#ChoiceList:focus {{ background: transparent;
+        border: none; outline: none; }}
     QComboBox QAbstractItemView::item {{ min-height: 30px; padding: 5px 12px;
         border-radius: 8px; }}
     QCheckBox {{ spacing: 9px; padding: 4px 0; }}
-    QCheckBox::indicator {{ width: 16px; height: 16px; border: 1px solid {t.muted};
-        border-radius: 5px; background: {t.surface}; }}
-    QCheckBox::indicator:checked {{ background: {t.accent}; border-color: {t.accent}; }}
+    QCheckBox::indicator {{ width: 18px; height: 18px; border: 1px solid {t.muted};
+        border-radius: 7px; background: {t.surface}; }}
+    QCheckBox::indicator:checked {{ image: url("{checkbox}"); border: none;
+        background: transparent; }}
     QProgressBar {{ border: none; border-radius: 3px; background: {t.surface};
         max-height: 6px; min-height: 6px; }}
     QProgressBar::chunk {{ background: {t.accent}; border-radius: 3px; }}
-    QTabWidget::pane {{ border: 1px solid {t.border}; border-radius: 8px; }}
+    QTabWidget::pane {{ border: none; }}
     QTabBar::tab {{ background: {t.surface}; padding: 10px 18px; }}
     QTabBar::tab:selected {{ background: {t.accent_bg}; color: {t.accent_text}; }}
     QListWidget[accountList="true"] {{ background: {t.surface};
@@ -227,8 +246,7 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QLabel[role='title'] {{ font-size: 18px; font-weight: 600; }}
     QLabel[role='display'] {{ font-size: 30px; font-weight: 600; }}
     QLabel[role='heading'] {{ font-size: 24px; font-weight: 600; }}
-    QLabel[role='badge'] {{ color: {t.secondary}; background: {capsule};
-        border-radius: 11px; padding: 5px 10px; font-size: 11px; font-weight: 500; }}
+    QLabel[role='badge'] {{ color: {t.secondary}; font-size: 11px; font-weight: 500; }}
     QLabel[role='error'] {{ color: {"#B4232F" if white else "#FF8A92"}; font-size: 12px; }}
     QFrame#Composer {{ background: {composer}; border: 1px solid {t.border}; border-radius: 14px; }}
     QFrame#Composer[focused='true'] {{ border: 1px solid {t.accent}; }}
@@ -282,11 +300,13 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
         color: {t.bg if white else t.accent_text}; }}
     QPushButton[role='tab'] {{ padding: 9px 12px; border-radius: 0px; font-size: 12px;
         color: {t.secondary}; }}
+    QWidget#Segments QPushButton[role='tab'] {{ min-height: 18px; }}
+    QPushButton#MoreChatTools {{ border-radius: 8px; text-align: center; }}
     QPushButton[role='tab']:checked {{ background: transparent; color: {t.accent_text};
         border: none; border-bottom: 2px solid {t.accent}; font-weight: 600; }}
     QPushButton#Pinned {{ background: {t.accent_bg}; color: {t.secondary};
         border: 1px solid {t.border}; border-radius: 8px; padding: 12px 17px; font-size: 12px; }}
-    QPushButton#Search {{ background: {t.surface}; color: {t.muted}; border: 1px solid {t.border};
+    QLineEdit#Search {{ background: {t.surface}; color: {t.muted}; border: 1px solid {t.border};
         border-radius: 7px; padding: 8px 16px; font-size: 12px; }}
     QListWidget#ConversationRecipients {{ background: transparent; border: none;
         outline: none; padding: 0; }}
@@ -350,8 +370,10 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QFrame#ReactionBar QPushButton {{ border: none; border-radius: 9px;
         background: transparent; padding: 0; margin: 0;
         text-align: center; font-size: 16px; }}
+    QFrame#ReactionBar QPushButton:checked {{ background: {t.accent_bg}; }}
     QFrame#ReactionBar QPushButton:hover {{ background: {t.hover}; }}
     QMenu {{ background: {overlay}; border: none; padding: 8px; border-radius: 16px; }}
+    QMenu#AppMenu {{ background: transparent; border: none; padding: 24px 28px 32px 28px; }}
     QMenu::item {{ padding: 10px 24px 10px 12px; border-radius: 8px; }}
     QMenu::separator {{ height: 1px; background: {t.border}; margin: 6px 8px; }}
     QMenu::item:disabled {{ color: {t.muted}; }}
@@ -389,8 +411,7 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QPlainTextEdit#AgentCommandOutput {{ background: transparent; border: none;
         padding: 4px; font-size: 12px; }}
     QToolTip {{ background: {t.surface if white else overlay}; color: {t.text};
-        border: 1px solid {t.border};
-        padding: 6px; }}
+        border: none; border-radius: 8px; padding: 8px 12px; }}
     QListWidget#DotList {{ border: none; border-radius: 12px;
         background: {t.surface}; padding: 5px; }}
     QListWidget#DotList::item {{ padding: 8px 10px; border: none; border-radius: 6px; }}
