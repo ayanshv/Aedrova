@@ -195,7 +195,7 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QPushButton#WorkspaceAction:disabled {{ background: transparent; }}
     QComboBox {{ background: {control}; border: 1px solid transparent;
         border-radius: 7px; padding: 10px; min-width: 75px; }}
-    QComboBox#AgentPermissions {{ padding: 4px 8px; font-size: 12px; min-width: 174px; }}
+    QComboBox#AgentPermissions {{ padding: 4px 8px; font-size: 12px; min-width: 0px; }}
     QComboBox#AgentPermissions[permissionMode="full"] {{
         background: {permission_bg}; color: {permission_ink}; }}
     QDialog#FullAccessConfirmation {{ background: {t.bg}; }}

@@ -46,6 +46,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPlainTextEdit,
+    QSizePolicy,
     QStyle,
     QStyledItemDelegate,
     QVBoxLayout,
@@ -1391,12 +1392,13 @@ class Composer(QFrame):
         self.mention.setToolTip("Insert @Aedrova · ask your agent to build")
         self.mention.clicked.connect(self.insert_mention)
         from aedrova.agents.permissions import MODES
-        from aedrova.desktop.controls import ChoiceBox
+        from aedrova.desktop.controls import PermissionChoice
 
-        self.permissions = ChoiceBox()
+        self.permissions = PermissionChoice()
         self.permissions.setObjectName("AgentPermissions")
         self.permissions.setAccessibleName("Aedrova agent permissions")
-        self.permissions.setSizeAdjustPolicy(ChoiceBox.SizeAdjustPolicy.AdjustToContents)
+        self.permissions.setSizeAdjustPolicy(PermissionChoice.SizeAdjustPolicy.AdjustToContents)
+        self.permissions.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.permissions.setProperty("permissionMode", "ask")
         self.permissions.setMinimumHeight(30)
         self.permissions.setFixedHeight(30)

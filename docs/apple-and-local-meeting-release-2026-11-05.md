@@ -76,3 +76,11 @@ The app submission completed successfully: `xcrun stapler validate dist/Aedrova.
 Owner action after returning: open `work/apple-setup-nov5/Save Notarization Credentials.command`, enter the existing app-specific password privately to restore/validate the Keychain profile, and report success. Then resume only the existing DMG submission/stapling/assessment. No new password needs to be generated unless Apple rejects the existing one. The owner must also finish the fresh Apple sign-in biometric/account-consent step described above. Neither action involves payment.
 
 Final focused native follow-up: 46 tests passed, lint and secret-pattern checks passed. Website Apple/public follow-up: 38 tests passed. These complement the full 1,168-test native candidate run; they do not replace unperformed clean-machine or production acceptance.
+
+### November 6 Apple acceptance completed
+
+The owner restored the existing notarization profile and completed fresh Apple sign-in. Native staging returned to the existing Beta isolation workspace and loaded its message history. Production Supabase Apple was then enabled with the previously approved, saved credentials; no new data scopes or credential transfer occurred. Public website and final packaged feature flags still need deliberate release configuration.
+
+DMG submission `605ba7a3-9780-47f7-ace9-f50285ef9e8b` is Accepted. DMG stapling, stapler validation and Gatekeeper assessment all passed (`Notarized Developer ID`). `dist/Aedrova.dmg.manifest.json` records its checksum, staging environment, notarized status and `public_release: false`. It is a staging candidate built before the final UI corrections, not the production download. The missing-Keychain and personal Apple sign-in actions above are resolved; do not request them again.
+
+Cross-platform release CI remains a gate: the first Mac suite passed, but Windows/Linux timed out, and diagnostics exposed Windows permission-label clipping. The selector now uses content-based sizing rather than a fixed maximum width; the owner's subsequent compact-arrow request is included in follow-up source. Final green checks and a production-configured rebuild remain required before shipping.

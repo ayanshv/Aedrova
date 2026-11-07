@@ -137,6 +137,11 @@ class ChoiceBox(QComboBox):
         painter.drawPath(path)
 
 
+class PermissionChoice(ChoiceBox):
+    def sizeHint(self):  # noqa: N802
+        return super().sizeHint() + QSize(4, 0)
+
+
 class CodingProviderChoice(ChoiceBox):
     """The same provider identities in onboarding, settings and build controls."""
 
