@@ -1396,7 +1396,7 @@ class Composer(QFrame):
         self.permissions = ChoiceBox()
         self.permissions.setObjectName("AgentPermissions")
         self.permissions.setAccessibleName("Aedrova agent permissions")
-        self.permissions.setMaximumWidth(216)
+        self.permissions.setSizeAdjustPolicy(ChoiceBox.SizeAdjustPolicy.AdjustToContents)
         self.permissions.setProperty("permissionMode", "ask")
         self.permissions.setMinimumHeight(30)
         self.permissions.setFixedHeight(30)
