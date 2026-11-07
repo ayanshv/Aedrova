@@ -50,7 +50,10 @@ jobs:
           tests/test_visual_polish.py::test_workspace_admin_has_no_horizontal_scrolling_at_minimum_width
           tests/test_shell.py::test_bento_reflows_and_document_tile_opens
       - name: Account, chat, AI, connectors and desktop regressions
-        run: uv run pytest -v -x -o faulthandler_timeout=90 --junitxml=work/desktop-tests.xml
+        run: >-
+          uv run pytest -v -x -o faulthandler_timeout=90
+          tests/test_settings_structure.py tests/test_shared_agent_work.py tests/test_shell.py
+          tests/ --junitxml=work/desktop-tests.xml
       - uses: actions/upload-artifact@v4
         if: always()
         with:
