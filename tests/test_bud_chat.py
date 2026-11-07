@@ -13,8 +13,14 @@ from aedrova.desktop.bud_chat import BudChat
 def ready_chat(qtbot, tmp_path):
     window, service = setup(qtbot, tmp_path)
 
-    qtbot.waitUntil(lambda: bool(window.channel.messages) and not window.account_dialog.busy
-                    and not window.connected.current_action and not window.connected.queue)
+    qtbot.waitUntil(
+        lambda: (
+            bool(window.channel.messages)
+            and not window.account_dialog.busy
+            and not window.connected.current_action
+            and not window.connected.queue
+        )
+    )
     history, calls = [], []
 
     def rpc(name, params):
@@ -254,3 +260,76 @@ def test_private_reply_is_persisted_with_bud_identity_and_no_shared_feed(
     assert dialog.history == history and closed == [True]
     assert dialog.host.agent_feed.toPlainText() == ""
     assert dialog.composer.isEnabled()
+
+
+def test_bud_dm_shortcut_survives_rebuild_and_settings_reload(qtbot, tmp_path, monkeypatch):
+    from PySide6.QtCore import QSettings, Qt
+
+    from aedrova.desktop.bud_dms import remember, saved_ids
+
+    window, service = setup(qtbot, tmp_path)
+    qtbot.waitUntil(
+        lambda: (
+            not window.account_dialog.busy
+            and not window.connected.current_action
+            and not window.connected.queue
+        )
+    )
+    bud = dot("Orbit")
+    window.account_dialog.snapshot["dots"] = [bud]
+    remember(window, bud["id"])
+    remember(window, bud["id"])
+    window.settings = QSettings(window.settings.fileName(), QSettings.Format.IniFormat)
+    window._populate_channels()
+    rows = [
+        window.dm_list.item(i)
+        for i in range(window.dm_list.count())
+        if window.dm_list.item(i).data(Qt.ItemDataRole.UserRole + 1) == "bud"
+    ]
+    assert len(rows) == 1 and rows[0].text() == "Orbit"
+    assert not rows[0].icon().isNull()
+    assert saved_ids(window) == [bud["id"]]
+    opened = []
+    monkeypatch.setattr(
+        "aedrova.desktop.bud_chat.open_bud_chat", lambda host, id: opened.append(id)
+    )
+    window.dm_list.itemClicked.emit(rows[0])
+    window.dm_list.itemClicked.emit(rows[0])
+    assert opened == [bud["id"], bud["id"]]
+    assert window.channel_id == "c"
+
+    bud["name"] = "Orbit renamed"
+    window._populate_channels()
+    assert window.dm_list.item(window.dm_list.count() - 1).text() == "Orbit renamed"
+    window.account_dialog.snapshot["dots"] = []
+    window._populate_channels()
+    assert window.dm_list.count() == 0
+
+
+def test_bud_dm_shortcuts_are_account_and_workspace_scoped(qtbot, tmp_path):
+    from aedrova.desktop.bud_dms import populate, remember, saved_ids
+
+    window, service = setup(qtbot, tmp_path)
+    qtbot.waitUntil(
+        lambda: (
+            not window.account_dialog.busy
+            and not window.connected.current_action
+            and not window.connected.queue
+        )
+    )
+    bud = dot("Orbit")
+    window.account_dialog.snapshot["dots"] = [bud]
+    remember(window, bud["id"])
+    service.user.id = "other-user"
+    populate(window)
+    assert saved_ids(window) == [] and window.dm_list.count() == 0
+    service.user.id = "u"
+    window.workspace_id = "other-workspace"
+    populate(window)
+    assert saved_ids(window) == [] and window.dm_list.count() == 0
+    window.workspace_id = "w"
+    populate(window)
+    assert window.dm_list.count() == 1
+    window.connected.active = False
+    populate(window)
+    assert window.dm_list.count() == 0

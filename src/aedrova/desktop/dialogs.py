@@ -18,10 +18,8 @@ def label(text, role="", *, wrap=False):
     from aedrova.desktop.design_system import TYPE
 
     widget = QLabel(text)
-    if role in ("display", "heading"):
-        widget.setFont(system_font(TYPE[role], QFont.Weight.DemiBold, -0.6))
-    elif role == "title":
-        widget.setFont(system_font(TYPE[role], QFont.Weight.DemiBold, -0.25))
+    if role in ("display", "heading", "title"):
+        widget.setFont(system_font(TYPE[role], QFont.Weight.DemiBold))
     widget.setTextFormat(Qt.TextFormat.PlainText)
     widget.setWordWrap(wrap or role in ("heading", "title"))
     if widget.wordWrap() and role not in ("heading", "title"):

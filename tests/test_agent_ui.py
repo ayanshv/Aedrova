@@ -109,3 +109,50 @@ def test_agent_stream_never_overlaps_composer_when_resized(qtbot, tmp_path):
             assert viewport_bottom < composer_top
             assert window.agent_feed.inline
             assert not window.agent_feed.verticalScrollBar().isVisible()
+
+
+def test_popup_depth_keeps_selection_and_stable_geometry(qtbot):
+    from PySide6.QtCore import QPoint
+
+    from aedrova.desktop.theme import palette
+
+    parent = QDialog()
+    qtbot.addWidget(parent)
+    parent.resize(600, 450)
+    choice = ChoiceBox(parent)
+    choice.setGeometry(24, 24, 250, 44)
+    choice.addItems(["First", "Second", "Third"])
+    menu = AppMenu(parent)
+    selected = []
+    menu.addAction("First action", lambda: selected.append("first"))
+    second = menu.addAction("Second action", lambda: selected.append("second"))
+    for theme in (LIGHT, DARK):
+        parent.setPalette(palette(theme))
+        parent.setStyleSheet(stylesheet(theme))
+        parent.show()
+        qtbot.wait(10)
+        sizes = []
+        for _ in range(3):
+            choice.showPopup()
+            qtbot.wait(10)
+            popup = choice.view().window()
+            sizes.append((popup.width(), popup.height()))
+            assert popup.mask().isEmpty()
+            image = popup.grab().toImage()
+            assert image.pixelColor(0, 0).alpha() == 0
+            assert 0 < image.pixelColor(10, image.height() // 2).alpha() < 150
+            assert image.pixelColor(21, image.height() // 2).alpha() == 255
+            choice.hidePopup()
+        assert len(set(sizes)) == 1
+        choice.setCurrentIndex(0)
+        choice.showPopup()
+        qtbot.keyClick(choice.view(), Qt.Key.Key_Down)
+        qtbot.keyClick(choice.view(), Qt.Key.Key_Return)
+        assert choice.currentIndex() == 1
+        menu.popup(parent.mapToGlobal(QPoint(120, 150)))
+        qtbot.wait(10)
+        image = menu.grab().toImage()
+        assert menu.mask().isEmpty() and image.pixelColor(0, 0).alpha() == 0
+        assert 0 < image.pixelColor(10, image.height() // 2).alpha() < 150
+        qtbot.mouseClick(menu, Qt.MouseButton.LeftButton, pos=menu.actionGeometry(second).center())
+        assert selected[-1] == "second"

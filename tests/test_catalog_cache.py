@@ -57,3 +57,33 @@ def test_icon_buttons_have_action_tooltips(qtbot):
     control.setToolTip("Custom help")
     assign(control, "settings")
     assert control.toolTip() == "Custom help"
+
+
+def test_catalog_survives_short_lived_request_clones_but_not_account_changes(monkeypatch):
+    import pytest
+
+    calls = []
+    monkeypatch.setattr(buds, "connector_origin", lambda: "https://example.com")
+    monkeypatch.setattr(
+        ManagedClient,
+        "request",
+        lambda self, path, body=None, **kw: calls.append(path) or {"providers": []},
+    )
+    owner = SimpleNamespace(user=SimpleNamespace(id="u"))
+
+    def clone():
+        return SimpleNamespace(
+            user=SimpleNamespace(id="u"),
+            _bud_catalog_owner=owner,
+            realtime_credentials=lambda: (None, None, "token", "u"),
+        )
+
+    buds.client(clone()).request("/api/dots/providers")
+    buds.client(clone()).request("/api/dots/providers")
+    assert calls == ["/api/dots/providers"]
+    buds.client(clone()).request("/api/dots?workspace=w")
+    buds.client(clone()).request("/api/dots?workspace=w")
+    assert calls.count("/api/dots?workspace=w") == 2
+    owner.user = None
+    with pytest.raises(PermissionError, match="account changed"):
+        buds.client(clone())

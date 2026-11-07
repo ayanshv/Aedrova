@@ -24,6 +24,11 @@ def prepare(root: Path, environment: dict[str, str]) -> Path:
     source = Path(sys.executable).resolve()
     if not binary.exists() or binary.stat().st_mtime_ns != source.stat().st_mtime_ns:
         shutil.copy2(source, binary)
+    helper = root / "work/apple-setup-nov5/aedrova-meeting-audio"
+    if helper.is_file():
+        destination = contents / "Helpers" / helper.name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(helper, destination)
     info = {
         "CFBundleName": "Aedrova Staging",
         "CFBundleDisplayName": "Aedrova Staging",
@@ -35,6 +40,8 @@ def prepare(root: Path, environment: dict[str, str]) -> Path:
         "NSMicrophoneUsageDescription": (
             "Dictate an editable chat draft or enable meeting audio when you choose to."
         ),
+        "NSAudioCaptureUsageDescription": "Transcribe meeting audio locally after you start notes.",
+        "NSScreenCaptureUsageDescription": "Capture meeting audio locally. No video is saved.",
         "NSCameraUsageDescription": "Enable video in a meeting when you choose to.",
     }
     info.update(install_macos_icon(root, contents))

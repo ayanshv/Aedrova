@@ -443,7 +443,6 @@ class BuildDialog(AppDialog):
         layout.setSpacing(14)
         preferences = self.account.snapshot.get("agent_preferences", [])
         pref = next((p for p in preferences if p["workspace_id"] == self.workspace), {})
-        layout.addWidget(label("BUILD TOGETHER", "section"))
         layout.addWidget(label(f"Build with {pref.get('nickname', 'Aedrova')}", "heading"))
         self.introduction = label(
             "Your agent plans, codes and tests using your saved project permissions. "
@@ -843,7 +842,7 @@ class BuildDialog(AppDialog):
             QThreadPool.globalInstance().start(self.job)
 
         accepted = self.window.connected.enqueue(
-            ("build-context", id(self), generation), connect_context, connected
+            ("build-context", id(self), generation), connect_context, connected, priority=True
         )
         if not accepted:
             self.set_busy(False)
@@ -1143,18 +1142,17 @@ class BuildDialog(AppDialog):
             self.hide()
         elif self.pending:
             self.cancel()
+            self.hide()
         else:
             super().reject()
 
     def closeEvent(self, event):  # noqa: N802
-        if self.background_run:
-            self.hide()
-            event.ignore()
-        elif self.pending:
+
+
+        if self.pending and not self.background_run:
             self.cancel()
-            event.ignore()
-        else:
-            super().closeEvent(event)
+        self.hide()
+        event.accept()
 
 
 def open_build(window, task="", *, bud=None):

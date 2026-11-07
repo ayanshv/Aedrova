@@ -9,9 +9,7 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QCheckBox,
     QHBoxLayout,
-    QLabel,
     QLineEdit,
-    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -113,28 +111,20 @@ class ProjectDialog(AppDialog):
         self.job = None
         self.connected_repo = ""
         data = binding(window)
-        self.setWindowTitle("Aedrova · Project connection")
-        self.setMinimumSize(650, 600)
-        self.resize(650, 760)
+        self.setWindowTitle("Aedrova · Project settings")
+        self.setMinimumSize(760, 560)
+        self.resize(940, 740)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        content = QWidget()
-        content.setObjectName("AccountPage")
-        scroll.setWidget(content)
-        outer.addWidget(scroll)
-        layout = QVBoxLayout(content)
-        layout.setContentsMargins(30, 30, 30, 30)
-        layout.setSpacing(16)
-        layout.addWidget(label("A home for your team's code.", "heading"))
-        layout.addWidget(
-            label(
-                "This connection is private to your account on this Mac. Build copies "
-                "protect your current files.",
-                "muted",
-                wrap=True,
-            )
+        from aedrova.desktop.workspace_settings import WorkspaceSettingsView
+
+        self.view = WorkspaceSettingsView(
+            "Project settings",
+            "Private to your account on this device, in " + window.workspace.name + ".",
+        )
+        outer.addWidget(self.view, 1)
+        layout = self.view.add_section(
+            "general", "Project connection", "Build copies protect your current files.", "folder"
         )
         self.folder = QLineEdit(data.get("folder", ""))
         self.folder.setAccessibleName("Project folder")
@@ -172,7 +162,11 @@ class ProjectDialog(AppDialog):
                 wrap=True,
             )
         )
-        layout.addWidget(label("Coding provider", "title"))
+        layout.addStretch(1)
+        layout = self.view.add_section(
+            "ai", "AI configuration", "Project execution follows workspace access rules.", "work"
+        )
+        layout.addWidget(label("Coding provider", "muted"))
         self.provider = CodingProviderChoice()
         self.provider.setAccessibleName("Coding provider")
         preferences = window.account_dialog.snapshot.get("agent_preferences", [])
@@ -182,7 +176,8 @@ class ProjectDialog(AppDialog):
         )
         self.provider.setCurrentIndex(self.provider.findData(data.get("provider", default)))
         layout.addWidget(self.provider)
-        self.auto_plan = QCheckBox("Let my agent plan and execute automatically")
+        self.auto_plan = QCheckBox("Plan and execute automatically")
+        self.auto_plan.setToolTip("Let my agent plan and execute automatically")
         self.auto_plan.setChecked(data.get("background_build", data.get("auto_plan", True)))
         layout.addWidget(self.auto_plan)
         layout.addWidget(
@@ -200,8 +195,13 @@ class ProjectDialog(AppDialog):
         self.status = label(
             "Connect once, then start your next build from chat.", "muted", wrap=True
         )
-        layout.addWidget(self.status)
-        actions = QHBoxLayout()
+        layout.addStretch(1)
+        self.status.setContentsMargins(24, 0, 24, 0)
+        outer.addWidget(self.status)
+        footer = QWidget()
+        footer.setObjectName("SettingsFooter")
+        actions = QHBoxLayout(footer)
+        actions.setContentsMargins(24, 16, 24, 20)
         actions.setSpacing(12)
         disconnect = icon_button("logout", "Disconnect project")
         disconnect.clicked.connect(self.disconnect)
@@ -210,11 +210,7 @@ class ProjectDialog(AppDialog):
         actions.addWidget(disconnect)
         actions.addStretch()
         actions.addWidget(save)
-        layout.addLayout(actions)
-        layout.addStretch(1)
-        for caption in content.findChildren(QLabel):
-            if caption.wordWrap():
-                caption.setMinimumHeight(max(0, caption.heightForWidth(580)))
+        outer.addWidget(footer)
         window.account_dialog.session_closed.connect(self.revoke)
 
     def choose(self):

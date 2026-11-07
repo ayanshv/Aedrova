@@ -276,7 +276,14 @@ class Collaboration(QObject):
             window.workspace_tools_layout.addWidget(control)
             if section == "activity":
                 self.activity_button = control
-        self.more_button = button("•••", "More chat tools", "icon")
+        self.more_button = button("", "More chat tools", "tab")
+        self.more_button.setObjectName("MoreChatTools")
+        self.more_button.setFixedWidth(44)
+        self.more_button.setToolTip("More chat tools")
+        from aedrova.desktop.icons import assign
+
+        assign(self.more_button, "more_chat")
+        self.more_button.setIconSize(QSize(18, 18))
         self.more_button.clicked.connect(self.menu)
         window.primary_tabs_layout.addWidget(self.more_button)
         self.typing_label = label("", "muted")
@@ -329,16 +336,8 @@ class Collaboration(QObject):
             composer.layout().itemAt(composer.layout().count() - 1).layout().insertWidget(
                 4, formatting
             )
-        window.search_button.clicked.disconnect(window.open_switcher)
-        window.search_button.clicked.connect(
-            lambda: self.panel("search") if self.connected() else window.open_switcher()
-        )
-        window.search_button.setText("Search your workspace                          ⌘ F")
-        window.search_button.setToolTip(
-            "Search messages, people, channels and files · ⌘F · ⌘K jumps to a conversation"
-        )
         self.shortcut = QShortcut(QKeySequence("Ctrl+F"), window)
-        self.shortcut.activated.connect(lambda: self.panel("search"))
+        self.shortcut.activated.connect(window.open_switcher)
         self.timer = QTimer(self)
         self.timer.setInterval(2000)
         self.timer.timeout.connect(self.pulse)
@@ -594,6 +593,9 @@ class Collaboration(QObject):
             QTimer.singleShot(0, lambda: self.open_link(link))
 
     def reset(self):
+        self.window.search_button.dismiss()
+        self.window.search_button.clear()
+        self.window.search_button.dismiss()
         people = self.window.pages.widget(4)
         if isinstance(people, ChatPanel):
             people.generation += 1

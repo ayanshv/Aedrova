@@ -44,7 +44,7 @@ class SharedBuilds(AppDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(28, 24, 28, 24)
         layout.setSpacing(12)
-        layout.addWidget(label("Build evidence.", "heading"))
+        layout.addWidget(label("Build evidence", "heading"))
         layout.addWidget(
             label(
                 "Actual file diffs and observed command results. Shared records are visible only "

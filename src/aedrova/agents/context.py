@@ -170,6 +170,32 @@ def gather(
             )
         add(memory_snapshot)
 
+    if hasattr(service, "shared_agent_work"):
+        from aedrova.agents.shared_work import record
+
+        progress("Looking for shared Aedrova and Bud work…")
+        shared = service.shared_agent_work(workspace)
+        if shared.get("setup_required"):
+            progress("Shared agent context needs its database update; using existing evidence…")
+        rows = shared["items"]
+        if len(rows) > 30:
+            raise ValueError("Shared agent work exceeded its retrieval limit.")
+        for row in rows:
+            add(record(row, workspace, channels))
+        if rows:
+            names = ", ".join(dict.fromkeys(r["agent_name"] for r in rows))[:160]
+            progress("Consulting shared work from " + names + "…")
+
+    if hasattr(service, "build_reviews"):
+        from aedrova.agents.shared_work import build_record
+
+        shared_builds = service.build_reviews(workspace)
+        builds = shared_builds["items"][:10]
+        if builds:
+            progress("Reading shared build reviews and delivery receipts…")
+        for row in builds:
+            add(build_record(row, workspace, channels))
+
     meeting_evidence = {}
     for channel in sorted(snapshot["channels"], key=lambda c: c["id"]):
         if channel["id"] not in channels:
@@ -245,6 +271,8 @@ def gather(
                 ):
                     if cancelled():
                         raise InterruptedError("Cancelled")
+                    if attachment["filename"] == "meeting-notes.txt":
+                        progress("Reading reviewed meeting notes shared with this channel…")
                     data = service.download_attachment(attachment["id"])
                     try:
                         entry["content"] = data.decode("utf-8")

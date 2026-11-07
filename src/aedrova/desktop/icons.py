@@ -46,12 +46,37 @@ def icon(name, color):
         p.drawLine(6, 6, 8, 3)
         p.drawLine(8, 3, 13, 3)
         p.drawLine(13, 3, 15, 6)
+    elif name == "pin":
+        path = QPainterPath()
+        path.moveTo(7, 3)
+        path.lineTo(14, 3)
+        path.lineTo(13, 9)
+        path.lineTo(16, 12)
+        path.lineTo(5, 12)
+        path.lineTo(8, 9)
+        path.closeSubpath()
+        p.drawPath(path)
+        p.drawLine(10, 12, 10, 18)
+    elif name == "meeting_notes":
+        p.drawRoundedRect(QRectF(3, 2, 14, 16), 3, 3)
+        p.drawLine(6, 6, 14, 6)
+        for x, height in ((6, 2), (8, 5), (10, 7), (12, 4), (14, 2)):
+            p.drawLine(x, 12 - height // 2, x, 12 + height // 2)
+    elif name == "stop":
+        p.setBrush(QColor(color))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.drawRoundedRect(QRectF(5, 5, 10, 10), 2, 2)
     elif name == "plus":
         p.drawLine(10, 4, 10, 16)
         p.drawLine(4, 10, 16, 10)
     elif name == "chevron":
         p.drawLine(5, 8, 10, 13)
         p.drawLine(10, 13, 15, 8)
+    elif name == "more_chat":
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(color))
+        for x in (4.5, 10, 15.5):
+            p.drawEllipse(QRectF(x - 1.2, 8.8, 2.4, 2.4))
     elif name == "more":
         for x in (5, 10, 15):
             p.drawPoint(x, 10)
@@ -173,6 +198,11 @@ def icon(name, color):
         p.drawLine(3, 10, 17, 10)
         p.drawLine(12, 5, 17, 10)
         p.drawLine(12, 15, 17, 10)
+    elif name == "people":
+        p.drawEllipse(QRectF(3, 3, 6, 6))
+        p.drawEllipse(QRectF(12, 5, 4, 4))
+        p.drawArc(QRectF(1, 10, 10, 12), 0, 180 * 16)
+        p.drawArc(QRectF(11, 11, 8, 10), 0, 180 * 16)
     elif name == "invite":
         p.drawEllipse(QRectF(4, 3, 6, 6))
         p.drawArc(QRectF(2, 10, 10, 12), 0, 180 * 16)
@@ -244,4 +274,11 @@ def refresh(root, theme):
     for control in root.findChildren(QComboBox):
         for index, name in enumerate(control.property("itemIconNames") or []):
             if index < control.count():
-                control.setItemIcon(index, icon(name, theme.secondary))
+                from aedrova.desktop.theme import permission_warning
+
+                color = (
+                    permission_warning(theme)[0] if name == "permission_full" else theme.secondary
+                )
+                control.setItemIcon(index, icon(name, color))
+                if name == "permission_full":
+                    control.setItemData(index, QColor(color), Qt.ItemDataRole.ForegroundRole)

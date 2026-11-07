@@ -10,6 +10,7 @@ import sys
 import tomllib
 from pathlib import Path
 
+from build_meeting_helper import build as build_meeting_helper
 from macos_icon import install as install_macos_icon
 
 from aedrova.agents.managed import application_origin, connector_origin
@@ -44,7 +45,8 @@ if identity:
         "--osx-entitlements-file",
         str(ROOT / "scripts/release-entitlements.plist"),
     ]
-asset_args = []
+meeting_helper = build_meeting_helper(identity)
+asset_args = ["--add-binary", f"{meeting_helper}:aedrova/desktop/assets/bin"]
 codex_binary = Path(os.getenv("AEDROVA_CODEX_BINARY", executable("codex")))
 version = subprocess.run(
     [str(codex_binary), "--version"], check=True, capture_output=True, text=True
@@ -105,7 +107,14 @@ asset_args.extend(
         f"{runtime_manifest}:aedrova/desktop/assets",
     ]
 )
-for asset in ("aedrova.png", "aedrova.icns", "google-g.png", "emoji.json"):
+for asset in (
+    "aedrova.png",
+    "aedrova.icns",
+    "google-g.png",
+    "apple.svg",
+    "checkbox-checked.svg",
+    "emoji.json",
+):
     asset_args.extend(
         ["--add-data", f"{ROOT / 'src/aedrova/desktop/assets' / asset}:aedrova/desktop/assets"]
     )
@@ -131,6 +140,7 @@ if connection:
                 "managed_origin": application_origin(),
                 "connector_origin": connector_origin(),
                 "ai_access_mode": ai_mode,
+                "apple_login_enabled": os.getenv("AEDROVA_APPLE_LOGIN_ENABLED") == "true",
                 "meeting_context_enabled": os.getenv("AEDROVA_MEETING_CONTEXT_ENABLED") == "true",
             }
         )
@@ -151,6 +161,12 @@ subprocess.run(
         "aedrova",
         "--collect-all",
         "claude_agent_sdk",
+        "--collect-all",
+        "faster_whisper",
+        "--collect-all",
+        "av",
+        "--collect-all",
+        "onnxruntime",
         "--collect-all",
         "ctranslate2",
         "--collect-all",
@@ -191,7 +207,6 @@ subprocess.run(
 )
 
 
-
 bundle = ROOT / "dist/Aedrova.app"
 info_path = bundle / "Contents/Info.plist"
 with info_path.open("rb") as stream:
@@ -205,6 +220,8 @@ info.update(
             "version"
         ],
         "LSMinimumSystemVersion": "14.0",
+        "NSAudioCaptureUsageDescription": "Transcribe meeting audio locally when you start notes.",
+        "NSScreenCaptureUsageDescription": "Capture meeting audio locally, without video.",
         "NSCameraUsageDescription": (
             "Use your camera when you enable a meeting or local camera check."
         ),

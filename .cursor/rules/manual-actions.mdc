@@ -20,9 +20,9 @@ actions, then obtain owner approval before the next milestone.
 ## Persistent stage reminder
 
 The owner requests a brief reminder at the end of project responses while the current
-stage is incomplete, including concrete remaining steps. Current execution: Stage 3
-(Security and recovery), payment-free checks completed November 5, 2026; awaiting
-owner permission for Stage 4 (production operations). The owner finished their Stage 2
+stage is incomplete, including concrete remaining steps. Current execution: Apple signing, notarization and Sign in with Apple, authorized
+November 5, 2026. Stage 4 was approved, then paused by the owner for Apple setup.
+Stage 3 payment-free checks are complete and PR #16 merged after all platform CI passed. The owner finished their Stage 2
 UI requests. Do not ask for additional Stage 2 fixes unless they reopen that scope.
 
 Read docs/pre-launch-timeline.md and docs/stage-3-security-recovery-2026-11-04.md.
@@ -37,4 +37,4 @@ owner's behalf; keep costs at the final owner-paid gate unless the owner acts so
 Claude funding, production meeting guard and real two-device meetings remain final
 launch gates. Buffer supersedes direct Meta/TikTok public approvals for the selected
 social publishing path; do not revive those legacy approvals as mandatory blockers.
-Obtain owner approval before starting Stage 4 (production operations).
+Resume the already-approved Stage 4 after the Apple priority is handled. No new approval is needed for that scope.

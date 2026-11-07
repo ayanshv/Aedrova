@@ -2,7 +2,7 @@
 
 import time
 
-from PySide6.QtCore import QEvent, QSize, Qt, QTimer
+from PySide6.QtCore import QEvent, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QImage, QPainter, QPalette, QTransform
 from PySide6.QtWidgets import (
     QAbstractSpinBox,
@@ -65,8 +65,16 @@ def toolbar_control(text):
 
 
 class MeetingCall(AppDialog):
+    retry_requested = Signal()
+
     def __init__(
-        self, parent, worker, *, devices=None, channel_name="Team channel", initial_mode=None,
+        self,
+        parent,
+        worker,
+        *,
+        devices=None,
+        channel_name="Team channel",
+        initial_mode=None,
         channel_chat=None,
     ):
         super().__init__(parent)
@@ -94,6 +102,7 @@ class MeetingCall(AppDialog):
         self.push_to_talk_active = False
         self.devices = devices or DeviceCheck(self)
         self.connected = False
+        self.failed = False
         self.closed = False
         self.states = {kind: False for kind in ("microphone", "camera", "screen")}
         self.mic_epoch = 0
@@ -132,6 +141,10 @@ class MeetingCall(AppDialog):
         self.join = button("Join meeting", role="primary")
         self.join.clicked.connect(self.join_call)
         summary.addWidget(self.join)
+        self.retry_button = button("Try again", role="primary")
+        self.retry_button.clicked.connect(self.retry_requested.emit)
+        self.retry_button.hide()
+        summary.addWidget(self.retry_button)
         layout.addLayout(summary)
         self.stage_row = QHBoxLayout()
         self.stage = SharingCanvas("Waiting for the speaker’s video")
@@ -317,7 +330,7 @@ class MeetingCall(AppDialog):
         self.devices.inventory_changed.connect(self.devices_changed)
         worker.state.connect(self.call_state)
         worker.roster.connect(self.render_roster)
-        worker.problem.connect(self.status.setText)
+        worker.problem.connect(self.call_problem)
         worker.media.connect(self.media_state)
         if hasattr(worker, "audio_devices"):
             worker.audio_devices.connect(self.audio_inventory)
@@ -345,9 +358,12 @@ class MeetingCall(AppDialog):
         return super().event(event)
 
     def eventFilter(self, target, event):
-        if (event.type() in {QEvent.Type.KeyPress, QEvent.Type.KeyRelease}
-                and event.key() == Qt.Key.Key_Space and self.push_to_talk.isChecked()
-                and not isinstance(target, (QComboBox, QLineEdit, QAbstractSpinBox, QCheckBox))):
+        if (
+            event.type() in {QEvent.Type.KeyPress, QEvent.Type.KeyRelease}
+            and event.key() == Qt.Key.Key_Space
+            and self.push_to_talk.isChecked()
+            and not isinstance(target, (QComboBox, QLineEdit, QAbstractSpinBox, QCheckBox))
+        ):
             if not event.isAutoRepeat():
                 if event.type() == QEvent.Type.KeyRelease:
                     self.release_push_to_talk()
@@ -362,6 +378,12 @@ class MeetingCall(AppDialog):
             return
         self.join.setEnabled(False)
         self.worker.start()
+
+    def call_problem(self, text):
+        if not self.closed:
+            if not self.connected:
+                self.failed = True
+            self.status.setText(text)
 
     def call_state(self, state):
         if self.closed:
@@ -504,17 +526,28 @@ class MeetingCall(AppDialog):
         if self.channel_chat is not None:
             from aedrova.desktop.meeting_communication import MeetingChat
 
-            self.open_text_surface("chat", lambda: MeetingChat(
-                self, **self.channel_chat, names=self.names,
-            ))
+            self.open_text_surface(
+                "chat",
+                lambda: MeetingChat(
+                    self,
+                    **self.channel_chat,
+                    names=self.names,
+                ),
+            )
 
     def show_captions(self):
         if self.meeting_text_enabled:
             from aedrova.desktop.meeting_communication import MeetingCaptions
 
-            self.open_text_surface("captions", lambda: MeetingCaptions(
-                self, self.worker, people=lambda: self.people, names=lambda: self.names,
-            ))
+            self.open_text_surface(
+                "captions",
+                lambda: MeetingCaptions(
+                    self,
+                    self.worker,
+                    people=lambda: self.people,
+                    names=lambda: self.names,
+                ),
+            )
 
     def close_text_surfaces(self):
         for dialog in self.text_dialogs.values():
@@ -699,8 +732,12 @@ class MeetingCall(AppDialog):
         self.arrange()
 
     def annotation_point(self, point, new):
-        if (not self.connected or not self.states["screen"] or not self.annotating
-                or self.focused != self.worker.user + "/screen"):
+        if (
+            not self.connected
+            or not self.states["screen"]
+            or not self.annotating
+            or self.focused != self.worker.user + "/screen"
+        ):
             return
         if new:
             self.accepting_stroke = False
@@ -750,8 +787,11 @@ class MeetingCall(AppDialog):
     def present_local(self, kind, frame):
         self.worker.frame(kind, frame)
         key = self.worker.user + ("/screen" if kind == "screen" else "/camera")
-        preview = (frame.transformed(QTransform().scale(-1, 1))
-                   if kind == "camera" and self.mirror_preview else frame)
+        preview = (
+            frame.transformed(QTransform().scale(-1, 1))
+            if kind == "camera" and self.mirror_preview
+            else frame
+        )
         self.tile(key, "Your screen" if kind == "screen" else "You")[1].display(preview)
         self.last_images[key] = preview
         if kind == "screen" and not self.pinned_key:
@@ -853,8 +893,11 @@ class MeetingCall(AppDialog):
         screen = next((key for key in self.last_images if key.endswith("/screen")), None)
         if self.pinned_key not in self.tiles:
             self.pinned_key = None
-        spotlight = (self.view_choice.currentIndex() == 1 or screen is not None
-                     or self.pinned_key is not None)
+        spotlight = (
+            self.view_choice.currentIndex() == 1
+            or screen is not None
+            or self.pinned_key is not None
+        )
         if self.pinned_key:
             self.focused = self.pinned_key
         elif screen:
@@ -865,17 +908,24 @@ class MeetingCall(AppDialog):
         self.stage.setVisible(spotlight)
         self.gallery.setMaximumWidth(280 if spotlight else 16777215)
         columns = 1 if spotlight else 2
-        visible = [(key, box) for key, (box, _) in self.tiles.items()
-                   if self.show_self or key != self.worker.user + "/camera"]
+        visible = [
+            (key, box)
+            for key, (box, _) in self.tiles.items()
+            if self.show_self or key != self.worker.user + "/camera"
+        ]
         for key, (box, _) in self.tiles.items():
             self.pin_buttons[key].setText("Unpin" if self.pinned_key == key else "Pin")
             box.setVisible(any(candidate == key for candidate, _ in visible))
         for index, (_, box) in enumerate(visible):
             self.grid.addWidget(box, index // columns, index % columns)
-        self.stage.drawing = (self.annotating and self.states.get("screen", False)
-                              and self.focused == self.worker.user + "/screen")
-        self.stage.setCursor(Qt.CursorShape.CrossCursor if self.stage.drawing
-                             else Qt.CursorShape.ArrowCursor)
+        self.stage.drawing = (
+            self.annotating
+            and self.states.get("screen", False)
+            and self.focused == self.worker.user + "/screen"
+        )
+        self.stage.setCursor(
+            Qt.CursorShape.CrossCursor if self.stage.drawing else Qt.CursorShape.ArrowCursor
+        )
         if spotlight:
             hidden_self = not self.show_self and self.focused == self.worker.user + "/camera"
             image = None if hidden_self else self.last_images.get(self.focused)
@@ -885,8 +935,11 @@ class MeetingCall(AppDialog):
                 self.stage.clear()
 
     def speaker_changed(self, user):
-        if (not self.pinned_key and user in self.people
-                and not any(key.endswith("/screen") for key in self.last_images)):
+        if (
+            not self.pinned_key
+            and user in self.people
+            and not any(key.endswith("/screen") for key in self.last_images)
+        ):
             self.focused = user + "/camera"
             self.arrange()
 
@@ -951,6 +1004,7 @@ class MeetingCall(AppDialog):
             self.controls[kind].setEnabled(False)
         self.end.setEnabled(False)
         self.join.setVisible(False)
+        self.retry_button.setVisible(self.failed and not self.closed)
         self.timer.stop()
         self.speech_button.setEnabled(False)
         self.privacy_button.setEnabled(False)
@@ -987,14 +1041,24 @@ class AudioCall(MeetingCall):
     """Phone presentation sharing the same authenticated, consent-aware transport."""
 
     def __init__(
-        self, parent, worker, *, devices=None, channel_name="Team channel", initial_mode="audio",
+        self,
+        parent,
+        worker,
+        *,
+        devices=None,
+        channel_name="Team channel",
+        initial_mode="audio",
         channel_chat=None,
     ):
         self.audio_started = None
         self.audio_cards = {}
         super().__init__(
-            parent, worker, devices=devices, channel_name=channel_name, initial_mode="audio",
-            channel_chat=channel_chat
+            parent,
+            worker,
+            devices=devices,
+            channel_name=channel_name,
+            initial_mode="audio",
+            channel_chat=channel_chat,
         )
         self.setWindowTitle("Aedrova · " + channel_name + " audio call")
         self.resize(760, 660)
@@ -1025,7 +1089,7 @@ class AudioCall(MeetingCall):
         audio = QVBoxLayout(self.audio_surface)
         audio.setContentsMargins(24, 28, 24, 28)
         audio.setSpacing(20)
-        audio.addWidget(label("VOICE CALL", "section"), alignment=Qt.AlignmentFlag.AlignCenter)
+        audio.addWidget(label("Voice call", "section"), alignment=Qt.AlignmentFlag.AlignCenter)
         self.duration = label("Connecting…", "title")
         self.duration.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.duration.setAccessibleName("Audio call duration")
@@ -1127,7 +1191,7 @@ class AudioCall(MeetingCall):
             self.duration.setText("Call ended")
 
 
-def open_channel_call(window, *, mode=None):
+def open_channel_call(window, *, mode=None, auto_join=False):
     existing = getattr(window, "meeting_call", None)
     if existing and existing.isVisible():
         existing.raise_()
@@ -1144,35 +1208,110 @@ def open_channel_call(window, *, mode=None):
         window.notify("The Aedrova meeting service is not configured yet.")
         return
     service = window.account_dialog.service
-    token = service.client.auth.get_session().access_token
-    worker = CallWorker(
-        MeetingClient(origin, token),
-        workspace=window.workspace_id,
-        channel=window.channel_id,
-        user=str(service.user.id),
-        parent=window,
-    )
-    call_type = AudioCall if mode == "audio" else MeetingCall
-    dialog = call_type(
-        window,
-        worker,
-        channel_name=window.workspace.name + " / " + window.channel.name,
-        initial_mode=mode,
-        channel_chat=dict(
-            service=service, channel=window.channel_id, user=str(service.user.id),
-            valid=lambda: not dialog.closed and window.account_dialog.service is service,
-        ),
-    )
-    window.meeting_call = dialog
-    from aedrova.desktop.meeting_wrapup import offer_wrapup
+    if getattr(window, "call_preparing", None):
+        window.notify("Preparing your call…")
+        return
+    workspace, channel, user = window.workspace_id, window.channel_id, str(service.user.id)
+    pending = object()
+    window.call_preparing = pending
+    window.notify("Preparing your call…")
 
-    if hasattr(worker, "review_ready"):
-        worker.review_ready.connect(lambda status: offer_wrapup(window, worker, status))
-    window.account_dialog.session_closed.connect(dialog.reject)
+    def prepare():
+        clone = None
+        try:
+            clone = service.fork_for_context()
+            _, _, token, identity = clone.realtime_credentials()
+            if identity != user:
+                return {"error": True}
+            return {"token": token}
+        except Exception:
+            return {"error": True}
+        finally:
+            if clone:
+                clone.close_context()
 
-    setup = getattr(window, "meeting_setup", None)
-    if setup and setup.isVisible():
-        setup.reject()
-    dialog.show()
-    if mode in {"audio", "video"}:
-        QTimer.singleShot(0, dialog.join_call)
+    def ready(result):
+        if getattr(window, "call_preparing", None) is not pending:
+            return
+        window.call_preparing = None
+        if (
+            not window.connected
+            or not window.connected.active
+            or window.account_dialog.service is not service
+            or (window.workspace_id, window.channel_id) != (workspace, channel)
+            or not window.current_user()
+            or str(window.current_user().id) != user
+        ):
+            return
+        if result.get("error"):
+            window.notify("Could not prepare call access. Check your connection and sign in again.")
+            return
+        token = result["token"]
+        worker = CallWorker(
+            MeetingClient(origin, token),
+            workspace=workspace,
+            channel=channel,
+            user=user,
+            parent=window,
+        )
+        call_type = AudioCall if mode == "audio" else MeetingCall
+        dialog = call_type(
+            window,
+            worker,
+            channel_name=window.workspace.name + " / " + window.channel.name,
+            initial_mode=mode,
+            channel_chat=dict(
+                service=service,
+                channel=channel,
+                user=user,
+                valid=lambda: not dialog.closed and window.account_dialog.service is service,
+            ),
+        )
+        window.meeting_call = dialog
+
+        def retry():
+            if window.account_dialog.service is not service or (
+                window.workspace_id,
+                window.channel_id,
+            ) != (workspace, channel):
+                window.notify("Return to the original channel to retry this call.")
+                return
+            dialog.retry_button.setEnabled(False)
+            deadline = time.monotonic() + 12
+
+            def restart():
+                if dialog.closed:
+                    return
+                if worker.thread and worker.thread.is_alive():
+                    if time.monotonic() < deadline:
+                        QTimer.singleShot(100, dialog, restart)
+                    else:
+                        dialog.status.setText(
+                            "The previous call is still leaving. Try again shortly."
+                        )
+                        dialog.retry_button.setEnabled(True)
+                    return
+                dialog.reject()
+                open_channel_call(window, mode=mode, auto_join=True)
+
+            restart()
+
+        dialog.retry_requested.connect(retry)
+        from aedrova.desktop.meeting_wrapup import offer_wrapup
+
+        if hasattr(worker, "review_ready"):
+            worker.review_ready.connect(lambda status: offer_wrapup(window, worker, status))
+        window.account_dialog.session_closed.connect(dialog.reject)
+
+        setup = getattr(window, "meeting_setup", None)
+        if setup and setup.isVisible():
+            setup.reject()
+        dialog.show()
+        if auto_join or mode in {"audio", "video"}:
+            QTimer.singleShot(0, dialog.join_call)
+
+    if not window.connected.enqueue(
+        ("meeting-session", workspace, channel), prepare, ready, priority=True
+    ):
+        window.call_preparing = None
+        window.notify("Reconnect your workspace before starting a call.")

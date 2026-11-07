@@ -9,44 +9,54 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QHBoxLayout,
     QLineEdit,
-    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
 
 from aedrova.agents.managed import ManagedClient, ai_access_mode, application_origin
 from aedrova.desktop.controls import AppDialog, ChoiceBox
-from aedrova.desktop.design_system import FlowActions, section
+from aedrova.desktop.design_system import FlowActions
 from aedrova.desktop.dialogs import button, label
 
 
 class SettingsDialog(AppDialog):
-    def __init__(self, window):
+    def __init__(self, window, *, scope="personal"):
         super().__init__(window)
         self.window = window
-        self.setWindowTitle("Aedrova · Settings")
-        self.setMinimumWidth(560)
+        self.scope = scope
+        title = "Personal settings" if scope == "personal" else "Workspace resources"
+        self.setWindowTitle("Aedrova · " + title)
+        self.setMinimumSize(720, 540)
+        self.resize(920, 740)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
-        content = QWidget()
-        content.setObjectName("AccountPage")
-        scroll.setWidget(content)
-        scroll.viewport().setAutoFillBackground(False)
-        outer.addWidget(scroll)
-        layout = QVBoxLayout(content)
-        self.resize(600, 760)
-        layout.setContentsMargins(30, 30, 30, 30)
-        layout.setSpacing(16)
-        layout.addWidget(label("Settings", "heading"))
-        root_layout = layout
+        outer.setSpacing(0)
+        from aedrova.desktop.workspace_settings import WorkspaceSettingsView
+
+        self.view = WorkspaceSettingsView(
+            title,
+            "Your preferences, across workspaces."
+            if scope == "personal"
+            else "Team tools and included AI for " + window.workspace.name + ".",
+        )
+        outer.addWidget(self.view, 1)
+
+        columns = []
+
+        def section(key, title, detail="", symbol="settings", group="Preferences"):
+            if columns:
+                columns[-1].addStretch(1)
+            column = self.view.add_section(key, title, detail, symbol, group=group)
+            columns.append(column)
+            return column
+
         account = getattr(window, "account_dialog", None)
         self.user = account.service.user if account and account.service else None
         self.account = account
-        if self.user:
-            layout = section(root_layout, "Account", "Your identity across the workspace.")
+        if self.user and scope == "personal":
+            layout = section(
+                "profile", "Profile", "Your identity across workspaces.", "people", "Account"
+            )
             layout.addWidget(label(getattr(self.user, "email", None) or "Google account"))
             layout.addWidget(
                 label(
@@ -73,18 +83,78 @@ class SettingsDialog(AppDialog):
             row.addWidget(self.name, 1)
             row.addWidget(self.save)
             layout.addLayout(row)
-        if self.user:
+        if self.user and scope == "workspace":
             from aedrova.desktop.bud_connectors import open_connectors
 
-            layout = section(root_layout, "Connectors", "Bring your tools into your Buds’ work.")
+            layout = section(
+                "integrations",
+                "Integrations",
+                "Connections remain scoped to each Bud and its authorized tools.",
+                "link",
+                "Connected tools",
+            )
             connectors = button("Manage connectors…", role="outline")
             connectors.clicked.connect(lambda: open_connectors(window))
             layout.addWidget(connectors)
-        if self.user:
+        if scope == "personal":
             layout = section(
-                root_layout,
-                "Data & AI privacy",
-                "Review what reaches AI, disconnect tools, or request a copy or removal.",
+                "appearance", "Appearance", "Choose a comfortable way to work.", "appearance"
+            )
+            self.appearance = ChoiceBox()
+            self.appearance.setAccessibleName("Appearance")
+            for text, value in (("System default", "system"), ("Light", "light"), ("Dark", "dark")):
+                self.appearance.addItem(text, value)
+            self.appearance.setCurrentIndex(self.appearance.findData(window.theme_mode))
+            self.appearance.currentIndexChanged.connect(
+                lambda: window.set_theme(self.appearance.currentData())
+            )
+            layout.addWidget(self.appearance)
+            layout.addStretch(1)
+            layout = section(
+                "accessibility",
+                "Accessibility",
+                "Motion and transparency adapt throughout Aedrova.",
+                "permission_auto",
+            )
+            self.motion = QCheckBox("Reduce motion")
+            self.motion.setChecked(window.reduced_motion)
+            self.motion.toggled.connect(window.reduce_motion_action.setChecked)
+            layout.addWidget(self.motion)
+            self.transparency = QCheckBox("Reduce transparency")
+            self.transparency.setChecked(window.reduced_transparency)
+            self.transparency.toggled.connect(window.reduce_transparency_action.setChecked)
+            layout.addWidget(self.transparency)
+            layout = section(
+                "workflow", "Editor", "Your preferred app for opening project files.", "folder"
+            )
+            self.editor = ChoiceBox()
+            self.editor.setAccessibleName("Preferred editor")
+            for name in ("Visual Studio Code", "Cursor", "Xcode", "Finder"):
+                self.editor.addItem(name)
+            self.editor.setCurrentText(window.settings.value("editor", "Visual Studio Code"))
+            self.editor.currentTextChanged.connect(
+                lambda value: window.settings.setValue("editor", value)
+            )
+            layout.addWidget(self.editor)
+            layout = section(
+                "language",
+                "Language & translation",
+                "Read and write in your preferred language.",
+                "context",
+            )
+            from aedrova.desktop.localization import show_language_settings
+
+            languages = button("Manage languages", role="outline")
+            languages.clicked.connect(lambda: show_language_settings(window))
+            layout.addWidget(languages)
+            layout.addStretch(1)
+        if self.user and scope == "personal":
+            layout = section(
+                "privacy",
+                "Privacy & data",
+                "Review what reaches AI, export information or request deletion.",
+                "permission_ask",
+                "Privacy",
             )
             privacy = button("Review data controls…", role="outline")
             privacy.setAccessibleName("Review Aedrova data and AI privacy controls")
@@ -92,37 +162,15 @@ class SettingsDialog(AppDialog):
                 lambda: QDesktopServices.openUrl(QUrl("https://aedrova.com/data-controls"))
             )
             layout.addWidget(privacy)
-        layout = section(root_layout, "Appearance", "Choose a comfortable way to work.")
-        self.appearance = ChoiceBox()
-        self.appearance.setAccessibleName("Appearance")
-        for text, value in (("Match macOS", "system"), ("Light", "light"), ("Dark", "dark")):
-            self.appearance.addItem(text, value)
-        self.appearance.setCurrentIndex(self.appearance.findData(window.theme_mode))
-        self.appearance.currentIndexChanged.connect(
-            lambda: window.set_theme(self.appearance.currentData())
-        )
-        layout.addWidget(self.appearance)
-        self.motion = QCheckBox("Reduce motion")
-        self.motion.setChecked(window.reduced_motion)
-        self.motion.toggled.connect(window.reduce_motion_action.setChecked)
-        layout.addWidget(self.motion)
-        self.transparency = QCheckBox("Reduce transparency")
-        self.transparency.setChecked(window.reduced_transparency)
-        self.transparency.toggled.connect(window.reduce_transparency_action.setChecked)
-        layout.addWidget(self.transparency)
-        layout = section(root_layout, "Workflow", "Open project files in your preferred editor.")
-        self.editor = ChoiceBox()
-        self.editor.setAccessibleName("Preferred editor")
-        for name in ("Visual Studio Code", "Cursor", "Xcode", "Finder"):
-            self.editor.addItem(name)
-        self.editor.setCurrentText(window.settings.value("editor", "Visual Studio Code"))
-        self.editor.currentTextChanged.connect(
-            lambda value: window.settings.setValue("editor", value)
-        )
-        layout.addWidget(self.editor)
         self.billing_origin = application_origin()
-        if self.user:
-            layout = section(root_layout, "Your team’s plan & AI access")
+        if self.user and scope == "workspace":
+            layout = section(
+                "billing",
+                "Billing & credits",
+                "One workspace subscription covers your team.",
+                "activity",
+                "Plan & governance",
+            )
             if ai_access_mode() == "local":
                 layout.addWidget(
                     label(
@@ -168,9 +216,46 @@ class SettingsDialog(AppDialog):
                 self.activate_ai.hide()
                 layout.addWidget(self.activate_ai)
                 self.load_balance()
-        layout = root_layout
-        self.status = label("Preferences are saved on this Mac.", "muted", wrap=True)
-        layout.addWidget(self.status)
+        if scope == "personal":
+            layout = section(
+                "support", "Help & support", "Get help from the Aedrova team.", "smile", "Support"
+            )
+            for caption, url in (
+                ("Help center", "https://aedrova.com/support"),
+                ("Contact support", "mailto:contact@aedrova.com"),
+                ("Privacy policy", "https://aedrova.com/privacy"),
+                ("Terms of service", "https://aedrova.com/terms"),
+            ):
+                action = button(caption, role="outline")
+                action.clicked.connect(
+                    lambda checked=False, target=url: QDesktopServices.openUrl(QUrl(target))
+                )
+                layout.addWidget(action)
+            layout.addStretch(1)
+            from aedrova import __version__
+
+            layout = section(
+                "about", "About Aedrova", "Your team, plus Agents", "spaces", "Support"
+            )
+            layout.addWidget(label("Version " + __version__, "muted"))
+            website = button("Visit aedrova.com", role="outline")
+            website.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://aedrova.com")))
+            layout.addWidget(website)
+            layout.addStretch(1)
+            self.view.show_section("profile" if self.user else "appearance")
+        elif self.user:
+            self.view.show_section("billing")
+        if columns:
+            columns[-1].addStretch(1)
+        self.status = label(
+            "Preferences save automatically on this device."
+            if scope == "personal"
+            else "Workspace access and limits are enforced by the server.",
+            "muted",
+            wrap=True,
+        )
+        self.status.setContentsMargins(24, 8, 24, 0)
+        outer.addWidget(self.status)
         footer = QWidget()
         footer.setObjectName("SettingsFooter")
         footer_layout = QVBoxLayout(footer)
@@ -328,5 +413,6 @@ class SettingsDialog(AppDialog):
 
     def clear_account(self):
         self.user = None
-        self.name.clear()
+        if hasattr(self, "name"):
+            self.name.clear()
         self.close()

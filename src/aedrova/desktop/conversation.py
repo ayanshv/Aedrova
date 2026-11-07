@@ -31,6 +31,7 @@ from PySide6.QtGui import (
     QPainter,
     QPainterPath,
     QPalette,
+    QPixmap,
     QTextBlockFormat,
     QTextCursor,
     QTextDocument,
@@ -45,6 +46,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPlainTextEdit,
+    QSizePolicy,
     QStyle,
     QStyledItemDelegate,
     QVBoxLayout,
@@ -603,6 +605,17 @@ class MessageView(QListView):
         more.setToolTip("Choose any emoji")
         more.clicked.connect(self.pick_reaction)
         bar.addWidget(more)
+        self.pin_button = SpringButton("")
+        self.pin_button.setFixedSize(32, 32)
+        self.pin_button.setCheckable(True)
+        from aedrova.desktop.icons import assign
+
+        assign(self.pin_button, "pin")
+        self.pin_button.setIconSize(QSize(17, 17))
+        self.pin_button.setAccessibleName("Pin message")
+        self.pin_button.setToolTip("Pin message")
+        self.pin_button.clicked.connect(self.pin_hovered_message)
+        bar.addWidget(self.pin_button)
         self.reaction_bar.hide()
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._context_menu)
@@ -783,6 +796,23 @@ class MessageView(QListView):
         mine = next((r.get("mine", False) for r in message.reactions if r["emoji"] == emoji), False)
         self.reaction_requested.emit(identifier, emoji, not mine)
 
+    def update_pin_action(self, message):
+        title = "Unpin message" if message.pinned else "Pin message"
+        self.pin_button.setChecked(message.pinned)
+        self.pin_button.setToolTip(title)
+        self.pin_button.setAccessibleName(title)
+
+    def pin_hovered_message(self):
+        message = next((m for m in self.model().messages if m.id == self.hover_message), None)
+        if not message or message.unsent or message.delivery or message.id == self.agent_message_id:
+            self.pin_button.setChecked(False)
+            self.reaction_bar.hide()
+            return
+
+        self.update_pin_action(message)
+        self.action_requested.emit("pinned", message.id)
+        self.reaction_bar.hide()
+
     def pick_reaction(self):
         identifier = self.hover_message
         self.reaction_bar.hide()
@@ -812,6 +842,7 @@ class MessageView(QListView):
             self.reaction_bar.hide()
             return
         self.hover_message = message.id
+        self.update_pin_action(message)
         self.reaction_bar.adjustSize()
         self.reaction_bar.move(
             max(0, self.viewport().width() - self.reaction_bar.width() - 16),
@@ -1361,12 +1392,14 @@ class Composer(QFrame):
         self.mention.setToolTip("Insert @Aedrova · ask your agent to build")
         self.mention.clicked.connect(self.insert_mention)
         from aedrova.agents.permissions import MODES
-        from aedrova.desktop.controls import ChoiceBox
+        from aedrova.desktop.controls import PermissionChoice
 
-        self.permissions = ChoiceBox()
+        self.permissions = PermissionChoice()
         self.permissions.setObjectName("AgentPermissions")
         self.permissions.setAccessibleName("Aedrova agent permissions")
-        self.permissions.setMaximumWidth(175)
+        self.permissions.setSizeAdjustPolicy(PermissionChoice.SizeAdjustPolicy.AdjustToContents)
+        self.permissions.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.permissions.setProperty("permissionMode", "ask")
         self.permissions.setMinimumHeight(30)
         self.permissions.setFixedHeight(30)
         from aedrova.desktop.icons import icon
@@ -1578,7 +1611,11 @@ class Composer(QFrame):
             item.setData(Qt.ItemDataRole.UserRole, (name, token))
             item.setToolTip("@" + name + " · " + str(detail or "Teammate"))
             item.setSizeHint(QSize(0, 38))
-            if section == "Buds":
+            if section == "Agents" and token == "@" + self.agent_name:
+                from aedrova.desktop.brand import brand_image
+
+                item.setIcon(QIcon(QPixmap.fromImage(brand_image())))
+            elif section == "Buds":
                 from aedrova.desktop.bud_art import appearance, sprite
 
                 item.setIcon(QIcon(sprite(appearance(config), str(config.get("color", "")))))

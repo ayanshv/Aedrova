@@ -4005,3 +4005,421 @@ activation in Settings, reusing the existing authenticated /api/free endpoint an
 all service eligibility/budget controls, with no automatic purchase/subscription.
 Stage 2 remains open for the owner's next UI fix and combined visual/live review.
 Paid Claude and reliable two-device meetings remain deferred launch gates.
+
+November 1: Stage 2 message-pin shortcut. Added a minimal theme-aware pin icon
+immediately beside the reaction controls in shared conversations and threads.
+It toggles the existing pin/unpin action, with active state, accessible labels
+and Pin/Unpin tooltips. Pending, removed and transient agent messages cannot be
+pinned through this control. Existing shared persistence, pinned-message strip
+and owner/admin server permissions are preserved; no new grant or schema.
+Conversation/pin/collaboration tests: 31 passed; lint and diff checks passed.
+Local source iteration; the running process loads it on its next restart.
+Remaining Stage 2 work: owner's next UI fix and combined light/dark review.
+
+November 1: Stage 2 main-agent mention identity. The @ picker now displays the
+actual transparent Aedrova brand mark beside the primary agent, including when
+its display name is customized. Existing Bud artwork, section grouping, arrow
+navigation, selection and routing tokens are preserved. Mention/pin/chatspace
+regression checks passed. Local UI iteration; visible after staging restarts.
+No migration or provider setup. Stage 2 remaining: next owner-directed UI fix
+and combined light/dark review.
+
+November 1: Stage 2 execution-permission polish. Verified Ask/Approve-for-me/Full
+through the actual BuildDialog decision gate, scoped settings, Codex stdio
+approval exchange and managed runtime protections; Full still cannot bypass
+server usage caps or original-file/publication review. Updated the permission
+selector with a stylesheet minimum width so Qt cannot compress the final letter
+of Ask for approval. Full uses restrained amber text/icon/background in both
+themes and both composers. Replaced the generic question-mark QMessageBox with
+an app-styled project-scope confirmation, compact spacing, readable 44px actions
+and a default cancel choice. A change of account, workspace, project or mode
+while consent is open prevents stale escalation. Existing run invalidation stays.
+Agent/permission/managed/setup/mention/pin tests: 68 passed; server allowance
+tests: 13 passed. Lint/diff checks passed; light/dark popup and selector captures
+inspected in work/onboarding-rebuild/permissions. No funded model run, purchase,
+new grant or migration. Local source iteration, loaded on staging restart.
+Stage 2 remaining: owner's next UI fix and combined visual/live review.
+
+November 1: Stage 2 color refinement. Shifted Full access from muted amber to
+soft orange across the selector, icon and confirmation action in both themes.
+Shared color tokens retain readable contrast; execution permissions are unchanged.
+Local change, visible on staging restart. Remaining: next owner-directed UI fix
+and combined visual review.
+
+November 1: Stage 2 Bud recolor quality. Removed the custom-color-only 160px
+resize: tinted sprites now retain the original 512px resolution, exact alpha
+edges and blink geometry across setup, shelves and mention avatars. Replaced
+hard hue/lightness cutoffs and clipped lightness/saturation offsets with smooth
+hue masks, monotonic shading curves and bounded saturation. Protected the Builder
+cap, Designer bristles and Research lens from accidental body recoloring. Every
+tint starts from the pristine local atlas; atlas/tinted/blinking caches are bounded
+and no new runtime dependency or generated replacement artwork is introduced.
+Art/setup regression suite: 49 passed; final accessory/art suite: 7 passed.
+Inspected six looks across default, red, charcoal, white, purple and mint in
+work/bud-recolor/after.png. No migration or personal/provider setup. Local source
+iteration, loaded after staging restarts. Stage 2 remaining: owner's next UI fix
+and combined light/dark review.
+
+November 1: Stage 2 chat-tools alignment. The More chat tools ellipsis now uses
+the same 38px tab-row sizing and vertical center as Conversation/Project/Work/
+Files/People. A dedicated filled-dot vector gives it clearer visual weight,
+without changing other overflow icons. Retained its tooltip, accessible name,
+keyboard focus and existing menu routing. Native light/dark captures verified
+all six controls share the same vertical center. No migration or personal setup;
+local source loads on staging restart. Remaining: next owner-directed UI fix
+and combined visual review.
+
+November 1: Stage 2 Full access color finalized to owner-specified #ED8B4A
+for text/icons/confirmation accent in both themes, retaining subtle theme-specific
+backgrounds. Permissions unchanged. Local source loads after staging restart.
+Remaining: next owner-directed UI fix and combined visual review.
+
+November 1: Stage 2 popup depth. Replaced hard-clipped rounded masks on shared
+ChoiceBox dropdowns and AppMenu popups with antialiased surfaces and soft layered
+shadows painted into transparent window margins. Disabled duplicate native shadow
+frames; kept keyboard focus/selection styling. Popup panels resolve their actual
+owning theme instead of Fusion's default yellow tooltip palette. Dropdown bounds
+include shadow space, stay on screen and do not grow on repeated opening. Native
+submenu placement and pointer/keyboard selection were checked. The static painted
+shadow uses no continuous blur/timer and is not clipped by a window mask.
+Popup/permission/mention/setup tests: 52 passed; lint and diff checks passed.
+Light/dark captures and alpha-edge checks: work/popup-depth/. No migration or
+personal setup. Local source loads after staging restarts. Stage 2 remaining:
+owner's next UI fix and combined visual/live review.
+
+November 1: Stage 2 workspace shortcuts and live header search. Added a People
+and status shortcut beside Invite, Settings and Connectors, reusing the existing
+authorized directory. Four 44px icons have evenly distributed interior/edge gaps
+(5–6px in both themes). Replaced the header's search button/modal with an editable
+field and anchored child results menu. Local channel/message/file results update
+immediately; online messages/people/files reconcile after a 250ms debounce through
+the existing authenticated chat_inventory service. Existing loaded workspace
+jumping, Cmd/Ctrl F and K, arrow keys, Enter, Escape and outside dismissal remain.
+Remote callbacks check query generation, workspace, connection, service and user;
+workspace switches and collaboration reset clear the menu. Results are bounded,
+queries capped at 256 characters, and network timeout retains local results with
+an honest retry hint. Theme-matched shadow, adaptive height and resize anchoring
+were inspected in light/dark captures under work/workspace-search/. Five focused
+search/keyboard regression tests pass; lint and diff checks pass. No migration,
+provider payment or personal action required. Local source iteration, available
+on staging restart. Stage 2 remains open: next owner-directed UI fix and combined
+light/dark live review. Funded Claude/meetings remain deferred launch gates.
+Final shell/collaboration/chatspace regression run: 66 passed (93 seconds), plus
+five focused search checks after the final spacing adjustment. No live provider
+usage was incurred by these fixture-based checks.
+
+November 1: Stage 2 persistent Bud DM navigation. Bud conversations already saved
+private history through bud_conversation/append_bud_message, but only human DM
+channels populated the sidebar. Added a separate remembered Bud-shortcut list in
+local QSettings, scoped by signed-in user and workspace, with no message content
+stored in settings. Opening a valid Bud or successfully loading its private history
+records its shortcut. Channel rebuilds and Bud shelf refreshes restore matching
+entries with current name/avatar; deleted/inaccessible Buds and other accounts or
+workspaces are filtered out. Clicking the same entry repeatedly or using keyboard
+activation reopens the existing private Bud chat, without creating a shared channel
+or changing human DM navigation. Shared unread counts do not overwrite Bud labels.
+46 Bud-chat/messaging/Bud regressions passed, including settings reload, duplicate
+suppression, rename/deletion and account/workspace isolation. No migration or owner
+setup required. Shortcut placement persists on this installation; private message
+history continues to use the server's existing authorization and storage. Local
+source change, loaded on staging restart. Stage 2 remains open: next owner-directed
+UI fix and combined light/dark live review; funded Claude/meetings remain deferred
+launch gates.
+
+November 1: Stage 2 tooltip depth. Shared widget and list-item tooltips now use
+the dropdowns' painted rounded surface and feathered shadow, with transparent
+margins and duplicate native shadow disabled. Removed the hard border from the
+native fallback stylesheet. Short labels stay on one line; longer hints wrap at
+340px and stay inside screen bounds. Tooltip content remains plain text, does not
+take keyboard focus, and dismisses on leave, input, scrolling or timeout. Inspected
+light/dark captures in work/tooltip-depth and checked text, transparency, theme
+selection and dismissal. Three shell accessibility/keyboard/shortcut regressions
+passed; lint/diff checks passed. No owner action or migration; local source loads
+on staging restart. Stage 2 remaining: next owner-directed UI fix and combined
+light/dark live review. Funded Claude/meeting acceptance remains deferred.
+
+November 1: Stage 2 message/mention startup responsiveness. Traced conversational
+agent startup to the ordinary serialized background-action queue; its identity/
+activity row previously appeared only after context-client authentication finished.
+Agent startup and coding-build context now use the priority queue, behind pending
+message sends and ahead of queued background inventory/heartbeats. Accepted main
+agent/Bud mentions render their actual identity and a truthful Preparing response
+status immediately, retaining optimistic prompt echo and chronological anchoring.
+Preparation failure resolves the pending activity into an actionable response.
+Captured source service, cancellation and pending-request identity checks prevent
+stale preparation callbacks from replacing a newer request. Context cloning drops
+one duplicate Auth validation: the isolated SDK set_session still performs fresh
+server validation/refresh and compares the returned user against the source user;
+workspace/Bud authorization, spending caps and execution approvals remain intact.
+107 responsiveness/mention/context/identity regressions passed, plus 69 build/
+permission/messaging/Bud regressions. Queue-pressure tests verify immediate main
+agent/Bud status with account worker busy and actual send/start priority ordering;
+identity tests verify one validation and fail-closed mismatching identities.
+No live provider spending or hosted latency measurement. A currently running
+network request still finishes before serialized work can proceed; model/provider
+latency remains external. No migration/personal setup. Local source loads on
+staging restart. Stage 2 remains open: next owner-directed functionality/UI fix
+and combined light/dark live review; funded Claude/meetings stay final gates.
+
+November 1: Stage 2 dismiss processing windows. Removed explicit close-event
+blocking from Build Studio and delivery review. X and Escape now hide a processing
+interactive studio immediately while requesting cancellation and retaining worker
+ownership until it settles. Background builds remain running when their progress
+window is dismissed. Closing a review revokes guards for pending/future steps,
+clears sensitive review state and suppresses late UI callbacks; a previously
+approved write already dispatched can still finish and is not falsely reported as
+rolled back. Other inspected account/Bud/settings windows already permit closure.
+Build/review/background/Bud suite: 92 passed and one legacy enqueue test double
+failed on the prior priority keyword; updated that mock and reran the affected
+check plus six new close/Escape/late-callback cases, all 7 passed. Lint/diff checks
+passed. No migration or personal action. Local source loads on staging restart.
+Stage 2 remaining: next owner-directed functionality/UI fix and combined live
+light/dark review; funded Claude/meetings remain final launch gates.
+
+November 1: Stage 2 settings structure/theme. Saved the full owner-provided
+reference in docs/settings-structure-reference-2026-11-01.md. Replaced the personal
+settings scroll dump and workspace icon-only rail with one shared settings shell:
+labeled 18px theme-aware vector navigation, consistent 40px rows, 24px page gutters,
+focused independently scrolling pages, subtle selected states and fixed footers.
+Personal pages cover working profile, appearance, accessibility, editor, language,
+privacy, help and version controls. Connectors and subscription/AI activation are
+now in workspace-scoped resources; original billing authorization and free
+activation guards remain. Workspace opens on an overview with real authorized
+member/channel/Bud counts and routes to AI routing, channels, members/access,
+invitations, account access, Buds, integrations, product memory and billing.
+Workspace tool shortcuts honor the settings selector before opening a tool and
+reject unavailable workspace access. Project settings use the same shell, splitting
+local folder/GitHub connection from AI/autonomy configuration, with Save and
+Disconnect always visible. Their scope is explicitly private to the current
+account/device/workspace; no new shared Space policy or entitlement is invented.
+
+Only supported controls are exposed. The reference's unimplemented notifications,
+MFA/session management, custom roles, SSO, personal AI instructions, audit logs,
+new developer APIs and additional Space/governance controls remain a future
+functional backlog, rather than nonfunctional settings toggles. No payment,
+provider credential, database migration or owner action is required for this UI
+change. Light/dark captures inspected in work/settings-structure/. Scope/isolation,
+responsive lists, live theme, profile save, editor/project persistence and activation
+permissions covered by relevant tests; old palette assertions updated to inspect
+composited transparent surfaces after the prior popup-depth changes. Local source
+loads on staging restart. Stage 2 remains open: next owner-directed functionality/
+UI fix and combined light/dark live review; funded Claude/meetings stay final gates.
+Settings verification: 50 related checks passed in the combined run; the remaining
+visual assertion was adapted to sample the composited transparent surface, then
+10 focused visual/scope/responsive checks passed. After adding overview metric
+cards and the selected-workspace tool guard, all 24 scope/responsive/onboarding/
+UI-responsiveness checks passed. Final lint/diff checks passed. Capture tooling
+flushes deferred deletion/reduces motion so outgoing onboarding snapshots do not
+appear over the settings capture.
+
+November 1: Stage 2 shared request-pipeline latency. Found full dashboard sync
+occupying the serialized transport through many network reads; interactive work
+could wait for the entire snapshot/messages/interactions/files/activity chain.
+Added cooperative read interruption between snapshot requests and read phases:
+queuing an interactive action makes sync yield after its current HTTP request.
+Interrupted batches return no partial inventory, never signal a logout/error and
+resume after the interactive queue drains. Settings saves waiting behind a
+background update also signal interruption. Presence/typing/seen/read receipts do
+not repeatedly preempt sync, and ordinary user actions preserve FIFO order ahead
+of queued passive traffic. Explicit send/upload/build priorities remain intact.
+
+Read batches now perform one fresh Auth validation per batch, on thread-local
+state with user/client identity checks at every checkpoint. No auth/permission
+cache persists across actions. Default workspace snapshots batch their nested
+profile/Bud reads; every DB request still uses the user JWT and server RLS.
+A changed identity, invalid session or denied DB read remains fail-closed.
+Tests verify eight authentication checkpoints use one validation inside a batch,
+then require a fresh validation outside it; interruption avoids subsequent reads,
+preserves the signed-in session and discards partial inventory. Queue-pressure
+integration verifies a send proceeds after yielding rather than waiting for the
+rest of the poll; user-action FIFO stays ahead of presence updates. Live hosted
+latency/provider cold starts are not claimed fixed by client queue changes. An
+already running HTTP request still must finish before the read can yield.
+No migration or payment required. To load the change, quit Aedrova Staging with
+Command-Q and reopen its staging launcher; a running Python process retains old
+code until restarted. Stage 2 remains open: further owner-directed functionality/
+UI fixes and combined live light/dark review; funded Claude/meeting acceptance
+remains deferred to final launch gates.
+Final request-pipeline regression: 166 passed in 34.74 seconds across identity,
+connected dashboard, responsiveness, messaging, uploads, collaboration and Bud
+flows. Lint/diff checks passed. Log: work/request-pipeline/acceptance.log.
+
+November 1: Stage 2 Bud configuration startup. Configuration used to wait for
+provider catalog, live connector-enriched rows and capacity before populating the
+editor. It now immediately displays the current user's authorized in-memory
+workspace configuration, normalizing raw DB rows with an honest Not checked
+connection state rather than inventing grant/tool access. Names, appearance,
+personality and local wizard navigation remain usable while the live read runs;
+save/connect writes still wait for live state and server authorization/cap checks.
+Configuration session preparation now uses interactive queue priority. Reopening
+a visible setup window preserves the draft and stage instead of starting another
+request. Late refreshes preserve edits/navigation, and retain the draft's original
+version so server conflict checks cannot silently overwrite another user's update;
+the shared workspace cache still receives the fresh server rows.
+
+Fixed the display-only 30-second provider catalog cache being discarded on every
+short-lived authenticated context clone. Clones share the original account's
+catalog cache, scoped to backend, user and token; writes, expiry, token rotation
+and account changes invalidate it. Grant status, private resource reads, execution
+permissions and OAuth results remain uncached. Account changes invalidate pending
+configuration results. No migration/payment or private owner setup required.
+98 Bud setup/Bud/client-cache/identity regression checks passed; explicit new
+coverage exercises raw DB configuration before any network response, editing while
+loading, version-conflict preservation and cache reuse across independent clones.
+Additional focused reopening/draft checks cover the visible-window reuse path.
+Live cold-start latency remains a hosting constraint; this removes it from local
+configuration editing, without claiming a connector is ready before authorization.
+Local source loads after Command-Q and restarting Aedrova Staging. Stage 2 remains
+open: next owner-directed functionality/UI fix and combined live light/dark review;
+funded Claude and reliable meeting acceptance remain final launch gates.
+
+## November 1: meeting/call startup repairs and confirmed hosted blocker
+
+Moved meeting session preparation off the UI thread into the prioritized account
+request queue; duplicate clicks coalesce and stale account/workspace/channel
+results cannot open calls. Optional transcription capability discovery runs after
+RTC connects, with a bounded timeout. Failed joins now offer a fresh-worker retry
+that waits for previous cleanup; ordinary hangup cancellation runs cleanup without
+an unhandled cancellation traceback. Device permissions and mandatory access
+leases/guard enforcement remain unchanged.
+
+Read-only Render inspection confirmed aedrova-beta-staging remains Free. After
+initial cold-start timeouts its general health returned 200, while meeting health
+returned 503 unavailable. Live calls therefore remain blocked by the deferred
+always-on API/independent guard/LiveKit setup. No payment or hosted configuration
+change made. Exact owner steps and engineering follow-up are recorded in
+`docs/meeting-repair-status-2026-11-01.md`. Local repairs require restarting the
+latest staging launcher. Stage 2 remains open: remaining owner-directed fixes,
+combined light/dark live review, and eventual funded two-device meeting acceptance.
+135 focused meeting regression checks passed; Ruff and whitespace checks passed.
+Saved evidence: `work/meeting-repair-nov1/acceptance.log`. These are automated local
+checks, not a claim of successful hosted calls or physical-device acceptance.
+
+## November 1: shared Aedrova/Bud work context, pending staging migration
+
+Added durable attributed channel responses to a restricted shared-work log. Both
+Aedrova and Bud workspace retrieval, including coding context, can consult recent
+shared work and existing shared build reviews/delivery receipts with source IDs.
+Thinking names the agents/Buds whose records were actually read. General greetings
+retain their fast path. Prior agent output remains untrusted evidence, never human
+approval or a grant to use another Bud's account/tools. Private Bud DMs and direct/
+group messages are excluded from publication; original private source-channel
+boundaries carry through derived work. Chat responses recheck records/access after
+inference. Writes are bounded, credential-screened, rate-limited and idempotent.
+
+Owner activation required at the end of this task: run
+`supabase/migrations/202611010001_shared_agent_work.sql` in **Aedrova Staging only**,
+then restart the latest staging launcher. No payment/key required. Hosted activation
+and cross-agent live acceptance remain pending; no production change was made.
+See `docs/shared-agent-context.md` for exact behavior, limits and activation steps.
+Stage 2 stays open: remaining owner-directed functionality/UI fixes, the combined
+live light/dark review, and deferred hosted/two-device meeting acceptance.
+Validation: 186 focused tests and disposable PostgreSQL migration/RLS checks passed;
+Ruff and whitespace checks passed. Evidence: `work/shared-agent-context/`.
+
+## November 3: shared-context owner confirmation and platform-neutral website
+
+Owner reports the shared-agent-work staging migration ran and was saved. Mark the
+manual SQL action reported complete; live cross-agent acceptance is still pending.
+No need to repeat the migration. Restart the latest staging launcher if it has not
+been restarted since the implementation.
+
+Website copy now presents Mac and Windows across the homepage, platform FAQ,
+website onboarding, account messaging, navigation and a balanced download page.
+Installer availability remains gated and Windows is accurately marked in preparation.
+59 focused public-page/discovery/waitlist/release checks passed; local light/dark
+browser preview inspected. Website source commit: 390e63f. Stage 2 remains open for
+remaining owner-directed fixes, combined live light/dark review, shared-context live
+acceptance, and deferred hosted/two-device meeting acceptance. Payments stay final.
+Website PR #46 merged into main as `6d48da0b76a295317b3097e10064697420fd41cf`.
+Both required verify checks passed. No branch merge is required from the owner.
+Render auto-deploy `dep-dbkd0je417fc73all1bg` succeeded and is Live. Public homepage
+returned HTTP 200 with “Coming soon for Mac and Windows” and without “Made for Mac”.
+Live screenshot: Aedrova_site/work/platform-copy/home-live.png. Installer readiness
+and waitlist gates remain intact; no payment or additional owner action for this update.
+
+## November 3: instant greeting response and persistent Thinking status
+
+Added a strict greeting-only local reply path for the main agent, including “hey
+there”, “hi there” and “hello again”. It completes on the next UI event-loop turn
+without waiting for the account request queue, context reads, provider activation
+or model inference. It does not claim private facts or execute actions. The user's
+prompt still goes through the normal authorized send queue, and its optimistic
+local echo precedes the response. Real instructions after a greeting cannot match
+this shortcut. Bud requests retain their personality and normal authorization.
+
+Removed the redundant feed/status rebuild during the auth-to-model handoff. The
+same pending status row remains mounted while a real reply is running. A controlled
+slow-response test holds it beyond five seconds, refreshes the channel, checks that
+Thinking remains visible, then verifies it disappears only when the answer arrives.
+
+Owner action: Command-Q the running Aedrova app and reopen
+`work/staging/Open Latest Aedrova Staging.command` to load this local source change.
+No migration, payment or key setup. Actual model/network latency still varies;
+only the recognized static greetings are intentionally instantaneous. Stage 2 stays
+open for the next owner-directed fixes, shared-context live acceptance, combined
+live light/dark review, and deferred reliable/two-device meeting acceptance.
+Validation: 44 focused and 130 combined regression checks passed. Ruff and whitespace
+checks passed. Evidence: `work/greeting-latency-nov3/`. The blocked-queue greeting
+checks require completion within 250 ms; no paid provider calls were made.
+
+## November 3: shorter website and deliberate scroll motion
+
+Website homepage reduced from 16 sections to 7. Five product topics now share an
+accessible tour instead of repeated tall screenshot sections. Kept the original
+brand, actual product captures, founders, feature anchors and honest availability
+and meeting-consent disclosures. Reference review covered Cluely and Shotbase;
+no competitor assets, code, reviews or claims were copied.
+
+Motion uses small entry reveals, restrained staggering, short panel transitions
+and a desktop-only perspective settle. Native scrolling is preserved. Mobile uses
+balanced controls and a compact Bud grid; continuous perspective is disabled.
+Dynamic reduced-motion handling is implemented, with static readable fallback.
+Browser review covered desktop light/dark, 390 px mobile, keyboard switching and
+Meeting anchor selection; no physical-device/OS preference test claimed.
+
+74 focused checks, JavaScript syntax, Ruff, tracked-secret and whitespace checks
+passed. Website PR #47 is running release CI before merge/deployment. No owner
+payment, credentials, migration or personal action required for this update.
+Stage 2 remains open for the next owner-directed fixes, shared-context live
+verification, combined app light/dark review and deferred two-device meetings.
+Website PR #47 merged to main as `47b4e324327be2fbdf04ce30cfdcf3e42852ade5`.
+Both verify jobs passed; updated focused suite: 76 passed. Capture integrity still
+checks all 24 genuine assets; the homepage intentionally uses six light/dark pairs.
+Production rollout verification is pending. No owner branch merge required.
+
+## November 4: owner closes Stage 2 UI requests
+
+The owner said that Stage 2 is finished from their side. Recorded this sign-off in
+`docs/pre-launch-timeline.md`. No additional UI request is pending. This does not
+certify unperformed checks: combined app light/dark review, live shared-context
+verification and deferred two-device meeting acceptance remain open. Stage 3,
+security and recovery, is next and has not been authorized by this sign-off alone.
+The owner’s friend has production Render purchase instructions; the upgrade has
+not been reported complete. No payment or configuration change was performed.
+
+## November 4: Stage 3 security and recovery authorized
+
+The owner authorized Stage 3. Current report: `docs/stage-3-security-recovery-2026-11-04.md`. Dependency vulnerabilities were patched in both locks, with no paid resources enabled. Current working-tree RLS/private-schema and isolated PostgreSQL restore passed; hosted database plus Storage restore remains open. Supabase shows Free plans without backups and an organization quota warning for November 24. No purchase, production data restore, new credential or paid provider call was performed. Stage 4 has not started.
+
+November 5 completion evidence: final local desktop suite 1,161 passed; backend 697 passed; focused security/UI 118 passed. Native PR #15 merged as f3766e9 after macOS/Linux/Windows and PostgreSQL RLS/recovery CI passed. Website PR #57 merged as 58f5e67; staging and production Render deployments observed Live. Current production instance still displays Free. Local evidence: work/stage3-security-nov4/completion.json. Hosted recovery, Supabase quota and ingress/multi-worker acceptance remain open; Stage 4 not started. No payment, production restore or customer-data mutation was performed.
+
+## November 5: Stage 3 payment-free closeout
+
+See docs/stage-3-payment-free-closeout-2026-11-05.md. Independent agent review found one medium shared-work revocation race, addressed by additive 202611050001_shared_work_revocation_lock.sql, applied and verified in staging. A two-connection real PostgreSQL test reproduced the original and denied both revocation paths after the fix. Current hosted login/spoof limits and shared PostgreSQL counter concurrency passed; encrypted archive/recovery acceptance passed and the full backend suite has 708 passes. Supabase usage reviewed: prior-cycle egress warning; current egress 18%, no upgrade performed. Full production backup activation/live restore, off-site/key custody and final proxy/multi-instance fairness remain explicit launch gates. Await owner permission for Stage 4; no payments or production restore.
+
+### November 5: Apple priority and local meeting notes
+
+Owner approved Stage 4, then explicitly paused it to complete Apple signing/notarization and Sign in with Apple. Developer team J64LC76P77 was verified; its Developer ID Application certificate was issued with explicit approval, installed in the login Keychain and recognized as valid. Primary App ID com.aedrova.desktop was registered with approved Sign in with Apple capability. Apple login code is prepared behind a disabled flag; live OAuth, notary credentials/submission and clean-machine acceptance remain open.
+
+Owner then authorized a Granola-style alternative: local notes for existing external calls, before DMG publication, with a minimal side listening/permission capsule. Implementation adds a signed-build native macOS audio bridge, pinned offline Whisper transcription, microphone-activity suggestions, explicit consent/Start/Finish/review/Confirm, bounded local audio handling and existing permission-checked text sharing/context retrieval. Actual audio capture and staged upload/retrieval acceptance are still required. No paid service, public download or hosted-call readiness was activated. Detailed scope, tested evidence and gates: apple-and-local-meeting-release-2026-11-05.md.
+
+### November 6: Apple setup advanced and production launch configuration checked
+
+Owner approved the full remaining Apple authentication workflow and all necessary launch work except payments. Both Services IDs/callbacks and the scoped Apple sign-in key now exist. Staging Supabase Apple is enabled; production credentials are saved with the provider disabled until real staging sign-in completes. Native login reaches Apple's Touch ID/account-consent sheet and cancels cleanly; owner biometric sign-in remains personal. Owner saved notary credentials and unlocked codesign; the complete app signed, and Apple's app notarization is In Progress. DMG workflow continues only after Accepted; no public installer release is claimed.
+
+The approved bounded local audio test captured both sources, transcribed locally, discarded the draft and left no temporary audio directory. Native main call controls now prioritize meeting notes; capsule/permission states share the theme. Production Render is verified paid 0.5c-512mb. Production AI is still disabled and its provider/model settings absent, so compute alone does not close launch gates. The obsolete Free Blueprint override was removed without changing the paid service plan. Owner is away about six hours; consolidate all remaining personal actions at the end, never request secrets in chat or make payments.
+
+November 6 notarization update: Apple accepted the app; stapler validation and Gatekeeper assessment passed. The signed DMG was created but its separate submission failed because the Aedrova-Notary Keychain profile became unavailable. Restore the existing credential privately using the prepared command, then resume the DMG submission; no duplicate app submission or public download. Final focused native 46 tests and website 38 tests passed. Apple biometric sign-in, production readiness and clean-machine acceptance remain open.
+
+November 6 final Apple acceptance: owner restored the credential and completed Sign in with Apple. Existing staging workspace and history loaded; approved production Apple provider enabled. DMG submission 605ba7a3-9780-47f7-ace9-f50285ef9e8b Accepted; stapler and Gatekeeper passed. Artifact remains staging-only with public_release false and requires a final production rebuild. No outstanding personal Apple setup action from this round. Windows/Linux release CI and font sizing corrections remain under verification; public launch gates remain in effect.

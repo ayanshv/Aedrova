@@ -202,6 +202,9 @@ class BudChat(AppDialog):
             self.set_loading(self.feed, False)
             self.history = rows
             self.loaded = True
+            from aedrova.desktop.bud_dms import remember
+
+            remember(self.host, self.bud["id"])
             self.render()
             self.composer.setEnabled(True)
             self.composer.editor.setFocus()
@@ -437,6 +440,9 @@ def open_bud_chat(window, bud_id):
     if not bud:
         window.notify("This Bud is no longer available in your workspace.")
         return
+    from aedrova.desktop.bud_dms import remember
+
+    remember(window, bud_id)
     existing = getattr(window, "bud_chat", None)
     if existing and not existing.closed:
         if existing.bud["id"] == bud_id and existing.current():

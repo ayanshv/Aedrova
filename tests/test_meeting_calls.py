@@ -427,3 +427,102 @@ def test_failed_noise_processing_change_restores_setting_without_media_feedback(
         assert selected == [('noise_suppression', 'true')]
         assert not media and 'private' not in errors[-1]
     asyncio.run(check())
+
+
+def test_failed_join_offers_retry_without_reusing_closed_devices(qtbot):
+    backend, worker, dialog = setup(qtbot)
+    dialog.join_call()
+    worker.problem.emit('Meeting service unavailable. Try again shortly.')
+    worker.ended.emit()
+    assert dialog.retry_button.isVisible()
+    assert not dialog.join.isVisible()
+    assert not backend.permissions
+    with qtbot.waitSignal(dialog.retry_requested):
+        dialog.retry_button.click()
+
+
+def test_call_session_preparation_is_queued_and_discards_changed_channel(qapp, monkeypatch):
+    from aedrova.desktop import meeting_call
+    queued, notices, closed = [], [], []
+    identity = SimpleNamespace(id='u')
+    clone = SimpleNamespace(
+        realtime_credentials=lambda: ('url', 'public', 'private-token', 'u'),
+        close_context=lambda: closed.append(True))
+    service = SimpleNamespace(user=identity, fork_for_context=lambda: clone)
+
+    def enqueue(*args, **kwargs):
+        queued.append((args, kwargs))
+        return True
+
+    window = SimpleNamespace(
+        connected=SimpleNamespace(active=True, enqueue=enqueue),
+        account_dialog=SimpleNamespace(service=service),
+        workspace_id='w', channel_id='c', current_user=lambda: identity,
+        notify=notices.append)
+    monkeypatch.setattr(meeting_call, 'application_origin', lambda: 'https://staging.example')
+    monkeypatch.setattr(meeting_call, 'CallWorker',
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError('stale call opened')))
+    meeting_call.open_channel_call(window, mode='audio')
+    assert window.call_preparing and not closed
+    meeting_call.open_channel_call(window, mode='audio')
+    assert len(queued) == 1
+    args, kwargs = queued[0]
+    assert kwargs['priority'] and args[0] == ('meeting-session', 'w', 'c')
+    result = args[1]()
+    assert result == {'token': 'private-token'} and closed == [True]
+    window.channel_id = 'other'
+    args[2](result)
+    assert window.call_preparing is None
+
+
+def test_optional_capability_request_does_not_delay_media_connection(qapp, monkeypatch):
+    from aedrova.meetings import call
+
+    async def check():
+        started, release = threading.Event(), threading.Event()
+        connections, frames = [], []
+
+        class Room:
+            remote_participants = {}
+            local_participant = SimpleNamespace(identity='u')
+
+            async def connect(self, *args):
+                connections.append(True)
+
+            async def disconnect(self):
+                pass
+
+        def capabilities():
+            started.set()
+            assert release.wait(2)
+            return {'meeting_text': True}
+
+        client = SimpleNamespace(
+            start=lambda _: 'm',
+            join=lambda *a, **k: SimpleNamespace(url='wss://test', token='test'),
+            capabilities=capabilities, pulse=lambda _: {}, leave=lambda _: None)
+        worker = CallWorker(client, workspace='w', channel='c', user='u')
+        worker._events = lambda: None
+        worker._roster = lambda: None
+        worker._send_frames = lambda: frames.append(True)
+        monkeypatch.setattr(call.rtc, 'Room', Room)
+        monkeypatch.setattr(call.rtc, 'PlatformAudio',
+                            lambda: SimpleNamespace(close=lambda: None))
+        run = asyncio.create_task(worker._run())
+        try:
+            async with asyncio.timeout(2):
+                while not started.is_set():
+                    await asyncio.sleep(.01)
+            await asyncio.sleep(.1)
+            assert connections and len(frames) >= 2
+            assert not worker.text_available
+            release.set()
+            async with asyncio.timeout(2):
+                while not worker.text_available:
+                    await asyncio.sleep(.01)
+        finally:
+            release.set()
+            worker.stop()
+            await asyncio.wait_for(run, 2)
+
+    asyncio.run(check())

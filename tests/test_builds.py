@@ -502,7 +502,7 @@ def test_cancel_collection_ignores_late_result(qtbot, tmp_path, monkeypatch):
     window, source = setup(qtbot, tmp_path)
     callbacks = []
     monkeypatch.setattr(
-        window.connected, "enqueue", lambda key, op, done: callbacks.append(done) or True
+        window.connected, "enqueue", lambda key, op, done, **kw: callbacks.append(done) or True
     )
     dialog = BuildDialog(window, "Task")
     qtbot.addWidget(dialog)

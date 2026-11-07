@@ -130,7 +130,7 @@ class TeammatesDialog(AppDialog):
         self.resize(820, 850)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(28, 24, 28, 24)
-        layout.addWidget(label("A little teammate. Real help.", "heading"))
+        layout.addWidget(label("Meet your Buds", "heading"))
         layout.addWidget(
             label(
                 "Mention a teammate to assign work. They use your connected provider "

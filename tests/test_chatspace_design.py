@@ -82,3 +82,58 @@ def test_workspace_tools_are_keyboard_reachable_with_a_quiet_rail(qtbot, tmp_pat
     assert window.memory_button.isVisible() and window.build_history.isVisible()
     assert window.collaboration.activity_button.isVisible()
     assert len([b for b in window.workspace_buttons.values() if b.isVisible()]) == 1
+
+
+def test_pin_icon_next_to_reactions_routes_the_hovered_message(qtbot):
+    view = MessageView()
+    qtbot.addWidget(view)
+    view.resize(680, 400)
+    message = Message("pin-target", "Maya", "MC", "09:00", "Keep this handy")
+    view.show_messages([message])
+    view.show()
+    qtbot.wait(10)
+    qtbot.mouseMove(view.viewport(), view.visualRect(view.model().index(0, 0)).center())
+    assert view.pin_button.isVisible()
+    assert view.pin_button.toolTip() == "Pin message"
+    assert not view.pin_button.icon().isNull()
+    actions = []
+    view.action_requested.connect(lambda action, identifier: actions.append((action, identifier)))
+    view.pin_button.click()
+    assert actions == [("pinned", "pin-target")]
+    assert not message.pinned and not view.pin_button.isChecked()
+    message.pinned = True
+    view.update_pin_action(message)
+    assert view.pin_button.isChecked() and view.pin_button.toolTip() == "Unpin message"
+    view.hover_message = "removed-from-this-channel"
+    view.pin_button.click()
+    assert len(actions) == 1
+
+
+def test_pin_icon_uses_existing_local_and_shared_pin_operations(qtbot, tmp_path):
+    window, service = setup(qtbot, tmp_path)
+    window.connected.timer.stop()
+    qtbot.waitUntil(lambda: bool(window.channel.messages))
+    message = window.channel.messages[0]
+    view = window.messages
+    view.hover_message = message.id
+    calls = []
+    service.rpc = lambda name, parameters: calls.append((name, parameters)) or {}
+    view.pin_button.click()
+    qtbot.waitUntil(lambda: bool(calls))
+    assert calls[0] == (
+        "chat_action",
+        {"p_action": "pinned", "p_data": {"message": message.id, "present": True}},
+    )
+
+
+def test_pin_icon_toggles_local_pin_and_pinned_message_strip(qtbot, tmp_path):
+    from test_chat_collaboration import local
+
+    window = local(qtbot, tmp_path)
+    message = window.store.send(window.workspace_id, window.channel_id, "An important update")
+    window._load_channel()
+    window.messages.hover_message = message.id
+    window.messages.pin_button.click()
+    assert message.pinned and not window.pinned.isHidden()
+    window.messages.pin_button.click()
+    assert not message.pinned

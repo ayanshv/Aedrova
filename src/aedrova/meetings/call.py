@@ -90,12 +90,6 @@ class CallWorker(QObject):
             )
             if self.stop_requested.is_set():
                 return
-            if hasattr(self.client, "capabilities"):
-                capabilities = await asyncio.to_thread(self.client.capabilities)
-                self.text_available = capabilities.get("meeting_text") is True
-                self.text_capability.emit(capabilities.get("meeting_text") is True)
-                self.speech_available = capabilities.get("audio_transcription") is True
-                self.speech_capability.emit(self.speech_available)
             phase = "native media initialization"
             self.room = rtc.Room()
             self._events()
@@ -110,6 +104,8 @@ class CallWorker(QObject):
             self.connected = True
             self.state.emit("Connected · devices are off")
             self._roster()
+            if hasattr(self.client, "capabilities"):
+                self.tasks.add(asyncio.create_task(self._load_capabilities()))
             phase = "access heartbeat"
             heartbeat = asyncio.create_task(self._heartbeat())
             self.tasks.add(heartbeat)
@@ -119,6 +115,9 @@ class CallWorker(QObject):
                     heartbeat.result()
                 self._send_frames()
                 await asyncio.sleep(0.03)
+        except asyncio.CancelledError:
+
+            pass
         except Exception as error:
             if isinstance(error, MeetingRequestError):
                 failure = str(error)
@@ -135,6 +134,21 @@ class CallWorker(QObject):
             if self.wrapup_status:
                 self.review_ready.emit(self.wrapup_status)
 
+    async def _load_capabilities(self):
+
+        try:
+            capabilities = await asyncio.wait_for(
+                asyncio.to_thread(self.client.capabilities), timeout=8
+            )
+        except Exception:
+            capabilities = {}
+        if self.stop_requested.is_set() or self.cleaning:
+            return
+        self.text_available = capabilities.get("meeting_text") is True
+        self.text_capability.emit(self.text_available)
+        self.speech_available = capabilities.get("audio_transcription") is True
+        self.speech_capability.emit(self.speech_available)
+
     async def _heartbeat(self):
         """HTTP authorization must not block the video frame pump."""
         while not self.stop_requested.is_set():
@@ -150,11 +164,15 @@ class CallWorker(QObject):
         if not all(hasattr(self.audio, name) for name in ("recording_devices", "playout_devices")):
             return
         try:
-            self.audio_devices.emit({
-                kind: [{"id": d.id, "name": d.name} for d in method()]
-                for kind, method in (("microphone", self.audio.recording_devices),
-                                     ("speaker", self.audio.playout_devices))
-            })
+            self.audio_devices.emit(
+                {
+                    kind: [{"id": d.id, "name": d.name} for d in method()]
+                    for kind, method in (
+                        ("microphone", self.audio.recording_devices),
+                        ("speaker", self.audio.playout_devices),
+                    )
+                }
+            )
         except Exception:
             self.problem.emit("Audio device list is unavailable. System defaults remain selected.")
 
@@ -444,8 +462,11 @@ class CallWorker(QObject):
                         return
                     device_kind = kind.removesuffix("_device")
                     if kind != "noise_suppression":
-                        method = (self.audio.recording_devices if device_kind == "microphone"
-                                  else self.audio.playout_devices)
+                        method = (
+                            self.audio.recording_devices
+                            if device_kind == "microphone"
+                            else self.audio.playout_devices
+                        )
                         if not isinstance(enabled, str) or enabled not in {d.id for d in method()}:
                             raise ValueError("Device no longer available")
                     if kind != "speaker_device":
@@ -456,8 +477,11 @@ class CallWorker(QObject):
                             raise ValueError("Invalid audio processing setting")
                         self.noise_suppression = enabled
                     else:
-                        setter = (self.audio.set_recording_device if device_kind == "microphone"
-                                  else self.audio.set_playout_device)
+                        setter = (
+                            self.audio.set_recording_device
+                            if device_kind == "microphone"
+                            else self.audio.set_playout_device
+                        )
                         setter(enabled)
                         self.selected_audio[device_kind] = enabled
                         self.audio_selected.emit(device_kind, enabled)

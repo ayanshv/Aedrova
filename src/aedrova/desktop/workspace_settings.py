@@ -1,11 +1,11 @@
-"""Focused workspace settings: one task per section, backed by existing controls."""
+"""Scoped settings with a stable navigation rail and one focused task per page."""
 
 from PySide6.QtCore import QEvent, QSize, Qt
 from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import (
     QButtonGroup,
-    QGridLayout,
-    QLabel,
+    QHBoxLayout,
+    QScrollArea,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -16,74 +16,95 @@ from aedrova.desktop.icons import icon
 
 
 class WorkspaceSettingsView(QWidget):
-    def __init__(self):
+    def __init__(self, title="Workspace settings", detail="Changes here affect your team."):
         super().__init__()
-        outer = QGridLayout(self)
+        self.setObjectName("SettingsView")
+        outer = QVBoxLayout(self)
         outer.setContentsMargins(24, 24, 24, 24)
-        outer.setHorizontalSpacing(20)
-        outer.setVerticalSpacing(20)
-        outer.setColumnMinimumWidth(0, 44)
-        outer.setColumnStretch(1, 1)
-        outer.addWidget(label("Workspace settings", "heading"), 0, 1)
+        outer.setSpacing(20)
+        outer.addWidget(label(title, "heading"))
+        outer.addWidget(label(detail, "muted", wrap=True))
         self.workspace_slot = QVBoxLayout()
         self.workspace_slot.setContentsMargins(0, 0, 0, 0)
-        outer.addLayout(self.workspace_slot, 1, 1)
-        self.navigation = QVBoxLayout()
-        self.navigation.setContentsMargins(0, 0, 0, 0)
-        self.navigation.setSpacing(8)
+        outer.addLayout(self.workspace_slot)
+        body = QHBoxLayout()
+        body.setSpacing(24)
+        outer.addLayout(body, 1)
+        nav_scroll = QScrollArea()
+        nav_scroll.setObjectName("SettingsNavigation")
+        nav_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        nav_scroll.setWidgetResizable(True)
+        nav_scroll.viewport().setAutoFillBackground(False)
+        nav_scroll.setStyleSheet("QScrollArea {background:transparent;border:none;}")
+        nav_scroll.setFixedWidth(188)
+        nav_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         nav = QWidget()
-        nav.setFixedWidth(44)
-        nav.setLayout(self.navigation)
-        outer.addWidget(nav, 2, 0, alignment=Qt.AlignmentFlag.AlignTop)
+        nav.setObjectName("SettingsSidebar")
+        nav.setStyleSheet("QWidget#SettingsSidebar {background:transparent;}")
+        self.navigation = QVBoxLayout(nav)
+        self.navigation.setContentsMargins(0, 0, 8, 0)
+        self.navigation.setSpacing(4)
+        self.navigation.addStretch()
+        nav_scroll.setWidget(nav)
+        body.addWidget(nav_scroll)
         self.sections = QStackedWidget()
-        outer.addWidget(self.sections, 2, 1)
-        outer.setRowStretch(2, 1)
+        body.addWidget(self.sections, 1)
         self.group = QButtonGroup(self)
         self.pages, self.buttons, self.symbols = {}, {}, []
+        self.groups = set()
 
-    def add_section(self, key, title, detail, symbol):
+    def add_section(self, key, title, detail, symbol, *, group=None):
+        if group and group not in self.groups:
+            heading = label(group, "section")
+            heading.setContentsMargins(10, 16 if self.groups else 0, 0, 6)
+            self.navigation.insertWidget(self.navigation.count() - 1, heading)
+            self.groups.add(group)
+        scroll = QScrollArea()
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setWidgetResizable(True)
+        scroll.viewport().setAutoFillBackground(False)
+        scroll.setStyleSheet("QScrollArea {background:transparent;border:none;}")
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         page = QWidget()
+        page.setObjectName("SettingsPage")
+        page.setStyleSheet("QWidget#SettingsPage {background:transparent;}")
         column = QVBoxLayout(page)
-        column.setContentsMargins(0, 0, 0, 0)
+        column.setContentsMargins(0, 0, 4, 12)
         column.setSpacing(16)
         column.addWidget(label(title, "title"))
-        column.addWidget(label(detail, "muted", wrap=True))
-        self.pages[key] = self.sections.addWidget(page)
-        control = button("", accessible="People" if key == "people" else title, role="icon")
-        control.setToolTip(control.accessibleName())
-        control.setFixedSize(44, 44)
+        if detail:
+            column.addWidget(label(detail, "muted", wrap=True))
+        scroll.setWidget(page)
+        self.pages[key] = self.sections.addWidget(scroll)
+        control = button(title, accessible="People" if key == "people" else title)
+        control.setObjectName("SettingsNavButton")
+        control.setToolTip(title)
+        control.setMinimumHeight(40)
         control.setCheckable(True)
         control.setStyleSheet(
-            "QPushButton{text-align:center;padding:0;border-radius:10px;}"
-            "QPushButton:checked{background:palette(highlight);color:palette(highlighted-text);}"
+            "QPushButton {text-align:left;padding:8px 10px;border:none;border-radius:9px;"
+            "background:transparent;font-size:12px;}"
+            "QPushButton:checked {background:palette(highlight);color:palette(highlighted-text);}"
         )
-        control.setIconSize(QSize(20, 20))
+        control.setIconSize(QSize(18, 18))
         self.symbols.append((control, symbol))
-
-
         control.toggled.connect(lambda checked: self.show_section(key) if checked else None)
         self.group.addButton(control)
         self.buttons[key] = control
-        self.navigation.addWidget(control)
+        self.navigation.insertWidget(self.navigation.count() - 1, control)
         self.refresh_icons()
         if len(self.pages) == 1:
             self.show_section(key)
         return column
 
     def refresh_icons(self):
-        color = self.palette().color(QPalette.ColorRole.Text).name()
         for widget, symbol in self.symbols:
-            selected = not isinstance(widget, QLabel) and widget.isChecked()
-            artwork = icon(
-                symbol,
-                self.palette().color(QPalette.ColorRole.HighlightedText).name()
-                if selected
-                else color,
+            role = (
+                QPalette.ColorRole.HighlightedText
+                if widget.isChecked()
+                else QPalette.ColorRole.Text
             )
-            if isinstance(widget, QLabel):
-                widget.setPixmap(artwork.pixmap(22, 22))
-            else:
-                widget.setIcon(artwork)
+            widget.setIcon(icon(symbol, self.palette().color(role).name()))
 
     def changeEvent(self, event):  # noqa: N802
         if event.type() == QEvent.Type.PaletteChange and hasattr(self, "symbols"):

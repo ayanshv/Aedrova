@@ -127,7 +127,14 @@ def test_shared_read_view_clears_evidence_on_account_change(qtbot, tmp_path, evi
     service.build_review_decisions = lambda identifier: []
     dialog = SharedBuilds(window)
     qtbot.addWidget(dialog)
-    qtbot.waitUntil(lambda: bool(dialog.rows))
+    qtbot.waitUntil(lambda: bool(dialog.rows) or not dialog.busy)
+    assert dialog.rows, (
+        dialog.status.text(),
+        dialog.closed,
+        window.account_dialog.busy,
+        window.connected.active,
+        [action[0] for action in window.connected.queue],
+    )
     assert not dialog.share.isVisible()
     assert "Implement addition" in dialog.details.toPlainText()
     window.workspace_id = "other"

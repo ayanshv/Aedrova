@@ -51,7 +51,7 @@ class TranscriptReview(AppDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(14)
-        layout.addWidget(label("From conversation to shared context.", "heading", wrap=True))
+        layout.addWidget(label("Review the meeting transcript", "heading", wrap=True))
         layout.addWidget(
             label(
                 "Review speech before your agent uses it. Corrections keep the "

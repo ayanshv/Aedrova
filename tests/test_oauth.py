@@ -83,7 +83,8 @@ def test_browser_failure_and_timeout_release_listener():
         google_sign_in(FakeService(), opener=lambda _: True, port=0, timeout=0.01)
 
 
-def test_pkce_authorization_and_exchange_use_matching_memory_verifier():
+@pytest.mark.parametrize("provider", ["google", "apple"])
+def test_pkce_authorization_and_exchange_use_matching_memory_verifier(provider):
     requests = []
     user = {
         "id": "00000000-0000-0000-0000-000000000001",
@@ -119,9 +120,10 @@ def test_pkce_authorization_and_exchange_use_matching_memory_verifier():
         ),
     )
     service = IdentityService(Connection("https://example.supabase.co", key), client=client)
-    url = service.google_authorization_url("http://127.0.0.1:43827/auth/random")
+    url = service.provider_authorization_url(provider, "http://127.0.0.1:43827/auth/random")
     query = parse_qs(urlsplit(url).query)
-    assert query["provider"] == ["google"]
+    assert query["provider"] == [provider]
+    assert query["scopes"] == ["email name" if provider == "apple" else "openid email profile"]
     assert query["code_challenge_method"] == ["s256"]
     assert "code_verifier" not in query
     assert service.finish_google_sign_in("callback-code").email == "a@example.com"
@@ -265,3 +267,24 @@ def test_sequential_signins_reuse_closed_port_but_active_listener_is_exclusive()
             finally:
                 cancel.set()
         assert service.exchanged == [code]
+
+
+def test_apple_loopback_reuses_hardened_exchange():
+    from aedrova.identity.oauth import apple_sign_in
+
+    class AppleService(FakeService):
+        def apple_authorization_url(self, redirect):
+            self.redirect = redirect
+            return "https://example.supabase.co/auth/v1/authorize?provider=apple"
+
+    service, opened = AppleService(), Event()
+    with ThreadPoolExecutor() as pool:
+        future = pool.submit(
+            apple_sign_in, service, opener=lambda _: opened.set() or True, port=0, timeout=3
+        )
+        assert opened.wait(2)
+        with urlopen(service.redirect + "?code=apple-code", timeout=2) as response:
+            assert response.status == 200
+            assert b"apple-code" not in response.read()
+        assert future.result(3) == "signed-in-user"
+    assert service.exchanged == ["apple-code"]

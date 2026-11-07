@@ -20,7 +20,7 @@ class ReleaseDialog(AppDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(16)
-        layout.addWidget(label("Ready for what’s next.", "heading", wrap=True))
+        layout.addWidget(label("Release checks", "heading", wrap=True))
         layout.addWidget(label(f"You’re using Aedrova {VERSION}.", "muted"))
         self.status = label(
             "Check for a verified release. Nothing is installed automatically.", "muted", wrap=True

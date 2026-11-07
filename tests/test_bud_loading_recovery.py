@@ -14,9 +14,12 @@ def loader(qtbot):
     qtbot.addWidget(window)
     window.workspace_id = "workspace"
     window.current_user = lambda: SimpleNamespace(id="user")
+    window.account_dialog = SimpleNamespace(service=object())
     queued = []
     window.connected = SimpleNamespace(
-        enqueue=lambda key, operation, completed: queued.append((operation, completed)) or True
+        enqueue=lambda key, operation, completed, **kwargs: (
+            queued.append((operation, completed)) or True
+        )
     )
     dialog = AppDialog(window)
     qtbot.addWidget(dialog)

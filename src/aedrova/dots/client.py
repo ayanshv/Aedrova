@@ -51,11 +51,14 @@ def client(service):
     if str(service.user.id) != user:
         raise PermissionError("Sign in again before using Buds.")
     scope = (origin, user, hashlib.sha256(token.encode()).hexdigest())
-    if getattr(service, "_bud_catalog_scope", None) != scope:
-        service._bud_catalog_scope = scope
-        service._bud_catalog_cache = {}
+    owner = getattr(service, "_bud_catalog_owner", service)
+    if not owner.user or str(owner.user.id) != user:
+        raise PermissionError("Your account changed. Reopen Bud settings.")
+    if getattr(owner, "_bud_catalog_scope", None) != scope:
+        owner._bud_catalog_scope = scope
+        owner._bud_catalog_cache = {}
     api = BudClient(origin, token)
-    api._catalog_cache = service._bud_catalog_cache
+    api._catalog_cache = owner._bud_catalog_cache
     return api
 
 

@@ -244,7 +244,8 @@ class SetupPages(QScrollArea):
                 "a provider does not sign in."
             )
         elif stage == 7:
-            self.automatic = QCheckBox("Let my agent plan and execute automatically")
+            self.automatic = QCheckBox("Plan and execute automatically")
+            self.automatic.setToolTip("Let my agent plan and execute automatically")
             self.automatic.setChecked(
                 self.draft.get("background_build", self.draft.get("auto_plan", True))
             )

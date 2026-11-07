@@ -8,7 +8,7 @@ from aedrova.meetings.devices import DeviceCheck
 
 
 def test_call_bar_replaces_meeting_tab_and_routes_modes(qtbot, tmp_path, monkeypatch):
-    from aedrova.desktop import meeting_call
+    from aedrova.desktop import local_meeting_notes
 
     window, _ = setup(qtbot, tmp_path)
     assert [b.text() for b in window.tab_buttons] == [
@@ -20,21 +20,21 @@ def test_call_bar_replaces_meeting_tab_and_routes_modes(qtbot, tmp_path, monkeyp
     ]
     assert window.pages.count() == 5
     calls = []
-    monkeypatch.setattr(meeting_call, "open_channel_call", lambda owner, **kw: calls.append(kw))
-    window.call_buttons["phone"].click()
-    window.call_buttons["camera"].click()
-    assert calls == [{"mode": "audio"}, {"mode": "video"}]
+    monkeypatch.setattr(local_meeting_notes, "open_local_meeting_notes", calls.append)
+    window.call_buttons["notes"].click()
+    assert calls == [window]
+    assert set(window.call_buttons) == {"notes", "settings"}
     window.account_dialog.snapshot["meeting_activity"] = {
         "meetings": [active(window)],
         "preferences": [],
     }
     update_meeting_ui(window)
     assert window.call_count.text() == "2"
-    assert window.call_buttons["camera"].accessibleName() == "Join video call"
+    assert window.call_buttons["notes"].accessibleName() == "Take meeting notes"
     window.account_dialog.snapshot["meeting_activity"]["meetings"] = []
     update_meeting_ui(window)
     assert window.call_count.isHidden()
-    assert window.call_buttons["phone"].toolTip() == "Start audio call"
+    assert window.call_buttons["notes"].toolTip() == "Take notes from Zoom, Meet or Teams"
     window.open_meeting_hub()
     assert window.meeting_hub.isVisible()
     assert window.meeting_action_layout.count() == 1
@@ -84,6 +84,10 @@ def test_header_call_joins_automatically_and_closed_dialog_cannot_start(
     worker = Worker()
     service.client = SimpleNamespace(
         auth=SimpleNamespace(get_session=lambda: SimpleNamespace(access_token="test-token"))
+    )
+    service.fork_for_context = lambda: SimpleNamespace(
+        realtime_credentials=lambda: ("url", "public", "test-token", service.user.id),
+        close_context=lambda: None,
     )
     monkeypatch.setattr(meeting_call, "application_origin", lambda: "https://meetings.example.com")
     monkeypatch.setattr(meeting_call, "CallWorker", lambda *args, **kw: worker)
