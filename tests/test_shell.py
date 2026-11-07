@@ -16,7 +16,9 @@ from aedrova.desktop.window import AedrovaWindow
 
 @pytest.fixture
 def window(qtbot, tmp_path):
-    QApplication.instance().setStyle("Fusion")
+    app = QApplication.instance()
+    if app.style().objectName().lower() != "fusion":
+        app.setStyle("Fusion")
     settings = QSettings(str(tmp_path / "appearance.ini"), QSettings.Format.IniFormat)
     widget = AedrovaWindow(settings=settings)
     widget.set_theme("light", persist=False)
