@@ -176,7 +176,8 @@ class ProjectDialog(AppDialog):
         )
         self.provider.setCurrentIndex(self.provider.findData(data.get("provider", default)))
         layout.addWidget(self.provider)
-        self.auto_plan = QCheckBox("Let my agent plan and execute automatically")
+        self.auto_plan = QCheckBox("Plan and execute automatically")
+        self.auto_plan.setToolTip("Let my agent plan and execute automatically")
         self.auto_plan.setChecked(data.get("background_build", data.get("auto_plan", True)))
         layout.addWidget(self.auto_plan)
         layout.addWidget(
