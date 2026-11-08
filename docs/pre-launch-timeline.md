@@ -38,6 +38,30 @@ Exit: no unresolved critical/high findings; restore and rollback evidence.
 
 Prepare alerts, support routing, incident response, account deletion, connector revocation and production configuration inventory.
 
+November 7: Stage 4 resumed. The production Render shell probe passed against
+PostgreSQL. Both spending pools were below 90%, no pending inference requests had
+expired, and public readiness passed. Render uses email for failure notifications.
+External delivery and recurring application spending alerts remain to be verified.
+Production checkout, managed AI, hosted meetings and release downloads remain gated.
+Support, security and privacy-request pages responded. Verify support receipt and
+rehearse complete account deletion on disposable staging identities before launch.
+The synthetic restore passed on all 32 migrations and five restored access suites.
+Production Supabase has no scheduled backups on Free and its managed restore to
+a new project requires Pro and physical backups. The hosted drill requires a
+separate target, matching Storage objects and recoverable encryption keys.
+
+Operations follow-up: a rollback-only rehearsal on hosted Supabase staging
+verified that authored messages block direct Auth deletion. After scoped
+cleanup, the disposable account, its sole-owner workspace and its membership
+in a second workspace were removed inside the transaction. The second owner
+and their message survived. This database rehearsal leaves live Auth session
+revocation, actual Storage bytes and private backend/provider cleanup open.
+The recurring spending probe checks both pools and expired pending requests
+every five minutes on production PostgreSQL. Verify live events in Render
+under aedrova-website → Logs using `operations_spending_probe`. Delivering
+`attention_required` to an operator and confirming Render and support mailbox
+receipt are separate acceptance checks.
+
 Exit: owners, runbooks and recovery actions documented; paid activation deferred.
 
 ## 5. Additional minor and sizeable features — Days 8–12 · 3–4 working days
@@ -56,6 +80,12 @@ Exit: signing identities and Apple login configured; Windows signing method sele
 
 Owner completes required production hosting/meeting guard, provider funding and any signing purchases. Finalize Stripe prices/entitlements; verify retries, renewals, failures, upgrades, cancellations and refunds. Complete funded Claude and real two-device meeting acceptance.
 
+The owner deferred Supabase Pro to this gate on November 7. After the owner
+upgrades the Aedrova organization and a physical backup exists, restore it to an
+isolated project, verify the matching Storage objects and encryption keys, and
+record recovery results before the public go/no-go. See
+[the consolidated purchase gate](final-paid-launch-gates.md).
+
 Exit: funded services operate and billing matches approved plans. No payments submitted by the agent.
 
 ## 8. Package, validate and launch — Days 16–20
@@ -71,7 +101,7 @@ No personal action is required to approve or read this plan. When execution resu
 - Apple Developer account: sign in and provide the active team identifier/access when needed; complete any account security confirmation privately. This blocks certificates, notarization and Apple login, not general preparation.
 - Meta/Instagram: complete requested business/access verification in Meta and submit accurate App Review materials. TikTok: provide the real demo and complete public review. Public connector availability remains blocked until approved; alternatively explicitly exclude those connectors from launch.
 - Meetings and installers: provide access to a second device plus a clean Windows/Mac environment at acceptance time. The existing voice-message listening check has passed; repeat it only if audio changes warrant it.
-- Final paid gate only: personally complete hosting/provider/signing payments and Stripe banking/activation as required. These block the corresponding production features.
+- Final paid gate only: personally review and submit the Supabase Pro upgrade in Aedrova organization → Billing, any required restore-project compute, remaining hosting/provider/signing payments and Stripe banking/activation as applicable. These block their corresponding recovery or production checks.
 - Before public commercial release: confirm the actual legal operator and required disclosures. C-Corp formation remains deferred; do not represent Aedrova as incorporated. If the 60-day offer is still advertised, reconcile its actual deadline/eligibility before launch; do not silently restart it.
 
 Feature freeze: after step 5, only launch blockers, security fixes and release corrections. New feature requests go to a post-launch backlog unless explicitly replacing scheduled work. Security and release acceptance apply to every added feature; the feature slot does not waive launch gates.

@@ -42,6 +42,19 @@ def app_icon():
     return QIcon(str(ASSETS / "aedrova.icns"))
 
 
+def paint_brand_mark(painter, rect, *, lift=0.0):
+    image = brand_image()
+    painter.save()
+    painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+    area = rect.adjusted(3, 3, -3, -3)
+    size = image.size().scaled(area.size().toSize(), Qt.AspectRatioMode.KeepAspectRatio)
+    target = QRectF(0, 0, size.width(), size.height())
+    target.moveCenter(area.center())
+    target.translate(0, -1.5 * lift)
+    painter.drawImage(target, image)
+    painter.restore()
+
+
 class BrandMark(QWidget):
     """A quiet mark that lifts on hover; it never implies an active agent."""
 
@@ -88,12 +101,5 @@ class BrandMark(QWidget):
         super().leaveEvent(event)
 
     def paintEvent(self, event):  # noqa: N802
-        image = brand_image()
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        area = QRectF(self.rect()).adjusted(3, 3, -3, -3)
-        size = image.size().scaled(area.size().toSize(), Qt.AspectRatioMode.KeepAspectRatio)
-        target = QRectF(0, 0, size.width(), size.height())
-        target.moveCenter(area.center())
-        target.translate(0, -1.5 * self._lift)
-        painter.drawImage(target, image)
+        paint_brand_mark(painter, QRectF(self.rect()), lift=self._lift)

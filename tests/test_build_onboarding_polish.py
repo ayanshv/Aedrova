@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from PySide6.QtWidgets import QFileDialog
+from PySide6.QtWidgets import QFileDialog, QPushButton
 from test_connected import setup
 
 from aedrova.desktop.controls import choose_project
@@ -34,6 +34,36 @@ def test_working_status_is_in_chat_and_final_result_replaces_transients(qtbot, t
     window.build_dialog = None
 
 
+def test_result_finishing_in_another_channel_stays_with_original_chat(qtbot, tmp_path, monkeypatch):
+    from test_connected import row, snapshot
+
+    window, _ = setup(qtbot, tmp_path)
+    qtbot.waitUntil(lambda: not window.account_dialog.busy)
+    data = snapshot()
+    data["channels"].append(
+        {"id": "other", "workspace_id": "w", "name": "other", "private": False}
+    )
+    window.connected.apply(data, [row()], "w", "c")
+    monkeypatch.setattr(window.connected, "refresh", lambda: None)
+    window.build_dialog = SimpleNamespace(
+        workspace="w", pending=True, invalidated=False, background_transition=False
+    )
+    window.activity_channel = "c"
+    window.agent_activity("w", "Reading your team’s decisions…")
+    assert window.messages.agent_visible
+    window.switch_channel("other")
+    assert not window.messages.agent_visible
+    window.build_dialog.pending = False
+    window.finish_agent_response("w", "Built the feature.")
+    assert window.agent_feed.status_row is None
+    assert not window.messages.agent_visible
+    assert window.message_stack.currentIndex() == 1
+    assert window.connected.agent_replies[("w", "c")][0]["body"] == "Built the feature."
+    window.switch_channel("c")
+    assert window.messages.agent_visible
+    window.build_dialog = None
+
+
 def test_project_picker_requests_native_folder_dialog(monkeypatch):
     calls = []
     monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args: calls.append(args) or "")
@@ -51,18 +81,27 @@ def test_finished_build_keeps_results_and_removes_live_activity(qtbot, tmp_path)
     window.build_dialog = dialog
     dialog.pending = True
     window.agent_activity("w", "Working on the project…")
-    window.agent_event("w", "Running: python3 -m pytest")
+    dialog.progress("Running: python3 -m pytest")
+    response = "Feature implemented.\n\n## Verification\n\n- `pytest` passed."
     dialog.finished(
         {
             "ok": True,
-            "text": "Feature implemented. Four tests passed.",
+            "text": response,
             "project": tmp_path,
             "baseline": "",
             "changes": "feature.py",
+            "commands": [{"state": "passed"}, {"state": "failed"}, {"state": "unverified"}],
         },
         False,
     )
-    assert window.agent_feed.toPlainText() == "Feature implemented. Four tests passed."
+    assert window.agent_feed.toPlainText().startswith(response)
+    assert "1 passed · 1 failed · 1 unverified" in window.agent_feed.toPlainText()
+    assert dialog.report_tabs.currentWidget() is dialog.response
+    assert "<h2" in dialog.response.toHtml()
+    assert "Running:" not in dialog.response.toPlainText()
+    assert "Running: python3 -m pytest" in dialog.output.toPlainText()
+    actions = window.agent_feed.reply_row.findChildren(QPushButton)
+    assert [action.text() for action in actions] == ["Review changes"]
     assert not window.agent_feed.running and window.agent_feed.status_row is None
     dialog.pending = True
     window.agent_activity("w", "Trying again…")

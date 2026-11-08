@@ -20,10 +20,11 @@ class MeetingDetection(QObject):
         self.snoozed_until = 0
         self.capsule = None
         self.timer = QTimer(self)
-        self.timer.setInterval(20000)
+        self.timer.setInterval(4000)
         self.timer.timeout.connect(self.poll)
         if sys.platform == "darwin" and QApplication.platformName() != "offscreen":
             self.timer.start()
+            QTimer.singleShot(0, self.poll)
         QApplication.instance().aboutToQuit.connect(self.hide_suggestion)
 
     def hide_suggestion(self):
@@ -49,16 +50,20 @@ class MeetingDetection(QObject):
         self.window.settings.setValue("meetings/localNotesSuggestions", value)
         if not value:
             self.hide_suggestion()
+        elif self.timer.isActive():
+            self.poll()
+
+    def can_suggest(self):
+        dialog = getattr(self.window, "local_meeting_notes", None)
+        return (
+            self.enabled()
+            and self.window.isVisible()
+            and time.monotonic() >= self.snoozed_until
+            and not (dialog and (dialog.isVisible() or dialog.capture.active))
+        )
 
     def poll(self):
-        dialog = getattr(self.window, "local_meeting_notes", None)
-        if (
-            self.job
-            or not self.enabled()
-            or not self.window.isVisible()
-            or time.monotonic() < self.snoozed_until
-            or (dialog and (dialog.isVisible() or dialog.capture.active))
-        ):
+        if self.job or not self.can_suggest():
             return
         self.job = ReviewJob(possible_meeting_apps, error="Meeting detection unavailable.")
         self.job.signals.result.connect(self.detected)
@@ -67,11 +72,12 @@ class MeetingDetection(QObject):
     def detected(self, result):
         self.job = None
         data = result.get("value") or {}
-        if self.enabled() and data.get("active") and data.get("names"):
+        if self.can_suggest() and data.get("active") and data.get("names"):
             self.ensure_capsule()
             self.capsule.set_state("Take meeting notes?")
             self.capsule.pulse.pending = False
-            self.capsule.show_on_side()
+            if not self.capsule.isVisible():
+                self.capsule.show_on_side()
         else:
             self.hide_suggestion()
 

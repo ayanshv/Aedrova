@@ -6,7 +6,7 @@ from contextlib import nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
 from threading import Event
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from PySide6.QtCore import QEvent, QObject, Qt, QThreadPool, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
@@ -123,6 +123,7 @@ def message_tree(rows, user_id, *, directory=None, attachments=None):
             pinned=bool(row.get("pinned")),
             sender_id=row["sender_id"],
             agent=bool(row.get("agent_name")),
+            bud_avatar=row.get("_bud_avatar"),
         )
     roots = []
     for row in ordered:
@@ -154,8 +155,10 @@ class ConnectedDashboard(QObject):
         self.upload_pool.setMaxThreadCount(2)
         self.outbox = {}
         self.agent_replies = {}
+        self.saved_agent_replies = {}
         self.reaction_edits = {}
         self.reaction_jobs = set()
+        self.pending_pins = {}
         self.queue = deque()
         self.sync_interrupt = Event()
         self.current_action = None
@@ -202,13 +205,7 @@ class ConnectedDashboard(QObject):
         return False
 
     def reset_notice(self):
-        if self.active:
-            self.window.notice.setText(
-                "Shared chat · ⌘⇧M direct message · ⌘⇧U attach file · "
-                "⌘⇧S save selected file · ⌘⇧H older messages"
-            )
-        else:
-            self.window._reset_notice()
+        self.window._reset_notice()
 
     def stop_realtime(self):
         from aedrova.desktop.loading import set_loading
@@ -279,11 +276,16 @@ class ConnectedDashboard(QObject):
         self.pending.clear()
         self.outbox.clear()
         self.agent_replies.clear()
+        self.saved_agent_replies.clear()
+        self.window.messages.reply_feedback.clear()
+        self.window.thread_messages.reply_feedback.clear()
+        self.window.messages.build_summaries.clear()
         self.window.completed_agent_response = None
         self.window.agent_request_origin = None
         self.window.call_preparing = None
         self.reaction_edits.clear()
         self.reaction_jobs.clear()
+        self.pending_pins.clear()
         self.queue.clear()
         self.current_action = None
         self.cache.clear()
@@ -452,6 +454,7 @@ class ConnectedDashboard(QObject):
                 snapshot["meeting_activity"] = service.meeting_activity()
             allowed = {c["id"] for c in snapshot["channels"]}
             incoming = []
+            reply_history = {}
             if channel_id in allowed:
                 for thread in [None] + ([parent] if parent else []):
                     sequences = [r["sequence"] for r in cached.values() if r["parent_id"] == thread]
@@ -460,6 +463,16 @@ class ConnectedDashboard(QObject):
                             channel_id, after=max(sequences) if sequences else None, parent=thread
                         )
                     )
+                    if hasattr(service, "agent_reply_history"):
+                        try:
+                            history = service.agent_reply_history(workspace_id, channel_id, thread)
+                        except Exception as error:
+                            from aedrova.identity.service import ReadInterrupted
+
+                            if isinstance(error, ReadInterrupted):
+                                raise
+                            history = []
+                        reply_history[(workspace_id, channel_id, thread)] = history
             ids = list(
                 dict.fromkeys(
                     [r["id"] for r in incoming] + (list(cached) if reload_metadata else [])
@@ -481,7 +494,7 @@ class ConnectedDashboard(QObject):
                     {**c, **channel_details.get(c["id"], {})} for c in snapshot["channels"]
                 ]
             credentials = service.realtime_credentials()
-            return snapshot, incoming, files, credentials, interactions
+            return snapshot, incoming, files, credentials, interactions, reply_history
 
         def operation():
             from aedrova.identity.service import ReadInterrupted
@@ -498,10 +511,21 @@ class ConnectedDashboard(QObject):
             set_loading(self, w.message_stack, False)
             if not self.active or result is None:
                 return
-            snapshot, incoming, files, credentials, interactions = result
+            snapshot, incoming, files, credentials, interactions, reply_history = result
             self.failures = 0
             self.retry_at = 0
             allowed = {c["id"] for c in snapshot["channels"]}
+            self.saved_agent_replies = {
+                key: rows for key, rows in self.saved_agent_replies.items() if key[1] in allowed
+            }
+            for key, rows in reply_history.items():
+                if self.saved_agent_replies.get(key) != rows:
+                    self.last_view = None
+                    self.saved_agent_replies[key] = rows
+                persisted = {"agent-" + row["id"] for row in rows}
+                self.agent_replies[key[:2]] = [
+                    row for row in self.agent_replies.get(key[:2], []) if row["id"] not in persisted
+                ]
             self.cache = {c: rows for c, rows in self.cache.items() if c in allowed}
             self.files = {m: f for m, f in self.files.items() if f["channel_id"] in allowed}
             if channel_id in allowed:
@@ -618,7 +642,7 @@ class ConnectedDashboard(QObject):
         self.reaction_edits = {
             k: v for k, v in self.reaction_edits.items() if k[0] in allowed_channels
         }
-        rows = self.reaction_overlay(rows, channel_id)
+        rows = self.pin_overlay(self.reaction_overlay(rows, channel_id), channel_id)
         self.account.snapshot = snapshot
         if hasattr(w, "collaboration"):
             w.collaboration.sync(snapshot)
@@ -675,9 +699,10 @@ class ConnectedDashboard(QObject):
 
             cursor = w.composer.editor.textCursor()
             end = len(w.composer.editor.toPlainText().encode("utf-16-le")) // 2
-            cursor.setPosition(min(anchor, end))
-            cursor.setPosition(min(position, end), QTextCursor.MoveMode.KeepAnchor)
-            w.composer.editor.setTextCursor(cursor)
+            if (cursor.position(), cursor.anchor()) != (position, anchor):
+                cursor.setPosition(min(anchor, end))
+                cursor.setPosition(min(position, end), QTextCursor.MoveMode.KeepAnchor)
+                w.composer.editor.setTextCursor(cursor)
         if w.thread_id:
             parent = next((m for m in w.channel.messages if m.id == w.thread_id), None)
             if parent:
@@ -694,10 +719,7 @@ class ConnectedDashboard(QObject):
             w.collaboration.previews.load(preview_messages)
         w.composer.setEnabled(bool(w.channel_id))
         if not w.notice_timer.isActive():
-            w.notice.setText(
-                "Shared chat · ⌘⇧M direct message · ⌘⇧U attach file · "
-                "⌘⇧S save selected file · ⌘⇧H older messages"
-            )
+            self.reset_notice()
 
     def render_local_messages(self):
         w = self.window
@@ -710,7 +732,7 @@ class ConnectedDashboard(QObject):
             for r in self.outbox.values()
             if r["channel_id"] == w.channel_id and r["id"] not in ids
         ]
-        rows = self.reaction_overlay(rows, w.channel_id)
+        rows = self.pin_overlay(self.reaction_overlay(rows, w.channel_id), w.channel_id)
         names = {
             r["user_id"]: r["display_name"]
             for r in self.account.snapshot.get("directory", [])
@@ -723,20 +745,35 @@ class ConnectedDashboard(QObject):
             attachments=self.files,
         )
         w.messages.show_messages(w.channel.messages)
+        w.sync_pinned_banner()
         if hasattr(w, "collaboration"):
             w.collaboration.previews.load(w.channel.messages)
-        w.message_stack.setCurrentIndex(0 if w.messages.model().rowCount() else 1)
+        w.message_stack.setCurrentIndex(
+            0 if w.messages.model().rowCount() or w.messages.agent_visible else 1
+        )
         if w.thread_id:
             parent = next((m for m in w.channel.messages if m.id == w.thread_id), None)
             if parent:
                 w.thread_messages.show_messages([parent, *parent.replies])
 
     def with_agent_replies(self, rows, workspace, channel):
-
-
-        replies = self.agent_replies.get((workspace, channel), [])
+        replies = list(self.agent_replies.get((workspace, channel), []))
+        parents = (None, self.window.thread_id) if self.window.thread_id else (None,)
+        for parent in parents:
+            for item in self.saved_agent_replies.get((workspace, channel, parent), ()):
+                replies.append({
+                    **item,
+                    "id": "agent-" + item["id"],
+                    "sender_id": "agent:" + item["agent_name"],
+                    "_bud_avatar": item.get("bud_avatar"),
+                    "_reply_to": item.get("prompt_id"),
+                    "sequence": 0,
+                })
         ids = {r["id"] for r in rows}
-        return list(rows) + [r for r in replies if r["id"] not in ids]
+        live = getattr(self.window, "completed_agent_response", None)
+        if live and live[:2] == (workspace, channel):
+            ids.add(live[5])
+        return list(rows) + list({r["id"]: r for r in replies if r["id"] not in ids}.values())
 
     def complete_agent_reply(
         self,
@@ -749,14 +786,23 @@ class ConnectedDashboard(QObject):
         *,
         sent_at=None,
         source_channels=None,
+        response_id=None,
+        bud_avatar=None,
+        share=True,
     ):
         key = (workspace, channel)
+        try:
+            identifier = str(UUID((response_id or "").removeprefix("agent-")))
+        except ValueError:
+            identifier = str(uuid4())
+        avatar = dict(bud_avatar or {})
         replies = self.agent_replies.setdefault(key, [])
         replies.append(
             {
-                "id": "agent-" + str(uuid4()),
+                "id": "agent-" + identifier,
                 "sender_id": "agent:" + author,
                 "agent_name": author,
+                "_bud_avatar": avatar,
                 "body": text,
                 "channel_id": channel,
                 "parent_id": parent,
@@ -769,7 +815,30 @@ class ConnectedDashboard(QObject):
             self.render_local_messages()
 
         service = self.account.service
-        if source_channels is not None and hasattr(service, "save_shared_agent_work"):
+        if hasattr(service, "save_agent_reply"):
+            parameters = dict(
+                p_id=identifier, p_workspace=workspace, p_channel=channel, p_parent=parent,
+                p_prompt=prompt_id, p_agent=author[:80], p_body=text, p_avatar=avatar,
+                p_sources=sorted(set(source_channels or ()) - {channel}),
+            )
+
+            def save_history(parameters=parameters):
+                try:
+                    return service.save_agent_reply(parameters) == identifier
+                except Exception:
+                    return False
+
+            def history_saved(saved):
+                if not saved:
+                    self.window.notify("This reply could not be saved to history.")
+
+            if not self.enqueue(("agent-reply", identifier), save_history, history_saved):
+                history_saved(False)
+
+        if (
+            share and parent is None and source_channels is not None
+            and hasattr(service, "save_shared_agent_work")
+        ):
             row = next(
                 (
                     r
@@ -779,7 +848,6 @@ class ConnectedDashboard(QObject):
                 None,
             )
             if row and row.get("kind", "channel") == "channel":
-                identifier = str(uuid4())
                 parameters = dict(
                     p_id=identifier,
                     p_workspace=workspace,
@@ -869,6 +937,69 @@ class ConnectedDashboard(QObject):
         view.scrollToBottom()
         view.animate_sent(message_id)
         return message_id
+
+    def pin_overlay(self, rows, channel):
+        return [
+            {**row, "pinned": self.pending_pins[(channel, row["id"])]}
+            if not row.get("unsent_at") and (channel, row["id"]) in self.pending_pins
+            else row
+            for row in rows
+        ]
+
+    def set_pin(self, message_id, present):
+        channel = self.window.channel_id
+        row = self.cache.get(channel, {}).get(message_id)
+        if not row or row.get("unsent_at") or message_id in self.outbox:
+            self.window.notify("This message must finish sending before it can be pinned.")
+            return
+        service = self.account.service
+        if getattr(service, "collaboration_available", None) is False:
+            self.window.notify("Run the chat collaboration SQL migration, then restart Aedrova.")
+            return
+        key = (channel, message_id)
+        already_pending = key in self.pending_pins
+        self.pending_pins[key] = present
+        self.render_local_messages()
+        if not already_pending:
+            self.submit_pin(key)
+
+    def submit_pin(self, key):
+        channel, message_id = key
+        service = self.account.service
+        present = self.pending_pins[key]
+
+        def operation():
+            try:
+                service.rpc("chat_action", {
+                    "p_action": "pinned", "p_data": {"message": message_id, "present": present},
+                })
+                return True
+            except Exception:
+                return False
+
+        def completed(accepted):
+            if self.account.service is not service or key not in self.pending_pins:
+                return
+            row = self.cache.get(channel, {}).get(message_id)
+            if accepted and row is not None:
+                self.cache[channel][message_id] = {**row, "pinned": present}
+            if self.pending_pins[key] != present:
+                self.submit_pin(key)
+                return
+            self.pending_pins.pop(key)
+            self.last_view = None
+            if self.window.channel_id == channel:
+                self.render_local_messages()
+                if not accepted:
+                    self.window.notify(
+                        "Pin change could not be confirmed. Check your access and retry."
+                    )
+
+        if not self.enqueue(("pin", *key), operation, completed, priority=True):
+            self.pending_pins.pop(key, None)
+            if self.window.channel_id == channel:
+                self.render_local_messages()
+                self.window.notify("Pin change could not be queued. Try again shortly.")
 
     def reaction_overlay(self, rows, channel):
         edits = [(key, value) for key, value in self.reaction_edits.items() if key[0] == channel]

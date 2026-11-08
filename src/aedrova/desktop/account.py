@@ -57,10 +57,25 @@ class AccountJob(QRunnable):
             result = self.operation()
             success = True
         except Exception as error:
+            import httpx
+
             from aedrova.identity.errors import retryable
 
-
-            result, success = {"retryable": retryable(error)}, False
+            code = str(getattr(error, "code", ""))
+            status = str(getattr(error, "status", getattr(error, "status_code", "")))
+            reason = "failed"
+            if isinstance(error, (httpx.ConnectError, ConnectionError)):
+                reason = "offline"
+            elif isinstance(error, (httpx.TimeoutException, TimeoutError)) or status in (
+                "408",
+                "504",
+            ):
+                reason = "timeout"
+            elif status == "401" or code == "PGRST301":
+                reason = "session"
+            elif status == "403" or code == "42501" or isinstance(error, PermissionError):
+                reason = "denied"
+            result, success = {"retryable": retryable(error), "reason": reason}, False
         finally:
             self.operation = None
 
@@ -87,7 +102,10 @@ class AccountDialog(AppDialog):
         self.factory = factory
         self.service = None
         self.busy = False
+        self.job_kind = None
+        self.workspace_write_unconfirmed = False
         self.pending_intent = None
+        self.pending_workspace = None
         self.creation_workspace = None
         self.oauth_cancel = None
         self.awaiting_sign_in_snapshot = False
@@ -116,6 +134,10 @@ class AccountDialog(AppDialog):
             wrap=True,
         )
         layout.addWidget(self.status)
+        self.recover_workspace = button("Reload workspaces", role="outline")
+        self.recover_workspace.clicked.connect(self.refresh)
+        self.recover_workspace.hide()
+        layout.addWidget(self.recover_workspace, alignment=Qt.AlignmentFlag.AlignLeft)
         self.pages = OnboardingStack(self)
         self.pages.setObjectName("AccountPages")
         layout.addWidget(self.pages)
@@ -221,11 +243,12 @@ class AccountDialog(AppDialog):
             return
         self.oauth_cancel = Event()
         self.cancel_login.show()
+        appearance = self.settings.value("appearance", "system", type=str)
 
         def operation():
             self.service = self.factory(connection)
             sign_in = apple_sign_in if provider == "apple" else google_sign_in
-            return sign_in(self.service, self.oauth_cancel)
+            return sign_in(self.service, self.oauth_cancel, appearance=appearance)
 
         self.run(operation, self.authenticated)
         self.status.show()
@@ -543,7 +566,7 @@ class AccountDialog(AppDialog):
             panel = QWidget()
             column = QVBoxLayout(panel)
             column.setSpacing(14)
-            column.addStretch()
+            column.addSpacing(8)
             heading = label(title, "title", wrap=True)
             heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
             column.addWidget(heading)
@@ -704,7 +727,7 @@ class AccountDialog(AppDialog):
         join_page = QWidget()
         join_layout = QVBoxLayout(join_page)
         join_layout.setSpacing(20)
-        join_layout.addStretch()
+        join_layout.setContentsMargins(24, 24, 24, 24)
         join_layout.addWidget(label("Join your team", "heading"))
         join_layout.addWidget(label("Use the code shared with your email address.", "muted"))
         self.onboarding_invite = self.field("Paste invitation code", password=True)
@@ -763,7 +786,7 @@ class AccountDialog(AppDialog):
         self.home_invite.clicked.connect(self.show_simple_invite)
         actions.addWidget(self.home_invite)
         self.home_settings = self.workspace_icon("settings", "Workspace settings")
-        self.home_settings.clicked.connect(lambda: self.pages.setCurrentIndex(1))
+        self.home_settings.clicked.connect(lambda: self.show_workspace_intent("manage"))
         actions.addWidget(self.home_settings)
         actions.addStretch()
         self.archive_workspace = self.workspace_icon("archive", "Archive workspace for me")
@@ -793,9 +816,8 @@ class AccountDialog(AppDialog):
         centered.addStretch()
         centered.addWidget(content, 1)
         centered.addStretch()
-        layout.addStretch(1)
         layout.addLayout(centered)
-        layout.addStretch(2)
+        layout.addStretch()
         self.add_page(page)
 
     def confirm_archive(self):
@@ -1035,12 +1057,14 @@ class AccountDialog(AppDialog):
     def workspace_id(self):
         return self.workspaces.currentData()
 
-    def run(self, operation, success, *, background=False):
+    def run(self, operation, success, *, background=False, kind=None):
         if self.busy:
             return
         self.busy = True
+        self.job_kind = kind
         self.background_job = background
         if not background:
+            self.recover_workspace.hide()
             self.pages.setEnabled(False)
             self.set_loading(self.pages, True)
         self.success = success
@@ -1059,18 +1083,58 @@ class AccountDialog(AppDialog):
         if ok:
             self.success(result)
         else:
-            self.last_error_retryable = bool(result and result.get("retryable"))
-            self.status.setText(
-                "Request unsuccessful. Check your connection or permissions.\n"
-                "Refresh before retrying a timed-out action."
-            )
-            if cancelled:
-                self.status.setText("Sign-in cancelled. You can try again whenever you’re ready.")
-            self.clear_connected()
+            self.show_request_failure(result or {}, cancelled)
             self.operation_failed.emit()
             if self.service is None or self.service.user is None:
                 self.pages.setCurrentIndex(0)
+        if (
+            ok
+            and self.pending_intent
+            and self.service
+            and self.service.user
+            and self.snapshot["workspaces"]
+        ):
+            self.show_workspace_intent(self.pending_intent, self.pending_workspace)
         self.operation_finished.emit()
+
+    def show_request_failure(self, result, cancelled):
+        self.last_error_retryable = bool(result.get("retryable"))
+        reason = result.get("reason")
+        signed_in = bool(self.service and self.service.user)
+        if getattr(self, "background_job", False) and signed_in:
+            return
+        write = self.job_kind == "workspace_write"
+        if cancelled:
+            message = "Sign-in cancelled. You can try again whenever you’re ready."
+        elif not signed_in:
+            message = "Sign-in didn’t finish. Check your connection and try again."
+        elif reason == "session":
+            message = "Your session expired. Sign out and sign in again to continue."
+        elif reason == "denied":
+            message = "You don’t have access to complete this action. Check with a workspace admin."
+        elif write and self.last_error_retryable:
+            self.workspace_write_unconfirmed = True
+            message = (
+                "We couldn’t confirm that your change saved. Your input is still here. "
+                "Reload and check the workspace before trying again."
+            )
+        elif write:
+            message = "Your change couldn’t be saved. Review your input and try again."
+        elif reason == "offline":
+            message = "Couldn’t connect to your workspaces. Check your connection and reload."
+        elif reason == "timeout":
+            message = "Loading your workspaces took too long. Reload to try again."
+        else:
+            message = "Couldn’t load your workspaces. Reload to try again."
+        if (
+            not signed_in
+            or reason == "session"
+            or (not write and not self.last_error_retryable)
+        ):
+            self.clear_connected()
+        self.status.setText(message)
+        if signed_in and self.job_kind in ("workspace_read", "workspace_write"):
+            self.recover_workspace.setVisible(reason != "session")
 
     def authenticated(self, user):
         if user is None:
@@ -1085,12 +1149,45 @@ class AccountDialog(AppDialog):
         self.refresh()
 
     def refresh(self):
+        if not self.service or not self.service.user:
+            return
         self.generated_code.clear()
-        self.run(self.service.snapshot, self.loaded)
+        page = self.pages.currentIndex()
+        checking_write = self.workspace_write_unconfirmed
+
+        def refreshed(snapshot):
+            if checking_write:
+                self.pending_workspace = None
+                self.populate_workspaces(snapshot, self.workspace_id())
+                self.pages.setCurrentIndex(page)
+                self.status.setText(
+                    "Workspaces reloaded. Check whether your change is there before trying again."
+                )
+                self.workspace_write_unconfirmed = False
+                self.snapshot_loaded.emit()
+            else:
+                self.loaded(snapshot)
+
+        self.run(self.service.snapshot, refreshed, kind="workspace_read")
 
     def loaded(self, snapshot):
+        self.recover_workspace.hide()
         previous = getattr(self, "pending_workspace", None) or self.workspace_id()
         self.pending_workspace = None
+        self.populate_workspaces(snapshot, previous)
+        self.pages.setCurrentIndex(
+            4 if snapshot["workspaces"] or snapshot.get("archived_workspaces") else 2
+        )
+        if not snapshot["workspaces"]:
+            self.onboarding_steps.setCurrentIndex(0)
+        self.status.setText("Connected")
+        self.apply_intent()
+        self.snapshot_loaded.emit()
+        if self.awaiting_sign_in_snapshot and self.service and self.service.user:
+            self.awaiting_sign_in_snapshot = False
+            self.sign_in_ready.emit()
+
+    def populate_workspaces(self, snapshot, previous):
         self.snapshot = snapshot
         self.space_parent.clear()
         self.space_parent.addItem("Independent Space · separate plan and AI", None)
@@ -1126,19 +1223,14 @@ class AccountDialog(AppDialog):
         self.home_invite.setEnabled(bool(snapshot["workspaces"]))
         self.home_settings.setEnabled(bool(snapshot["workspaces"]))
         self.render_workspace()
-        self.pages.setCurrentIndex(
-            4 if snapshot["workspaces"] or snapshot.get("archived_workspaces") else 2
-        )
-        if not snapshot["workspaces"]:
-            self.onboarding_steps.setCurrentIndex(0)
-        self.status.setText("Connected")
+
+    def show_workspace_intent(self, intent, workspace=None):
+        self.pending_intent = intent
+        self.pending_workspace = None
+        self.populate_workspaces(self.snapshot, workspace or self.workspace_id())
+        if intent not in ("manage", "channel") or not self.workspace_id():
+            self.pages.setCurrentIndex(4)
         self.apply_intent()
-        self.snapshot_loaded.emit()
-        if self.awaiting_sign_in_snapshot and self.service and self.service.user:
-            self.awaiting_sign_in_snapshot = False
-            self.sign_in_ready.emit()
-
-
 
     def apply_intent(self):
         intent, self.pending_intent = self.pending_intent, None
@@ -1248,6 +1340,10 @@ class AccountDialog(AppDialog):
         self.revoke_invitation_button.setVisible(self.invitations.count() > 0)
 
     def mutate(self, name, parameters, *, configuration=None, created_workspace=None):
+        if self.workspace_write_unconfirmed:
+            self.status.setText("Reload and check the workspace before trying this change again.")
+            self.recover_workspace.show()
+            return
         if self.busy:
             if getattr(self, "queued_settings_save", False):
                 return
@@ -1398,7 +1494,7 @@ class AccountDialog(AppDialog):
                     "this will not create another workspace."
                 )
 
-        self.run(operation, completed)
+        self.run(operation, completed, kind="workspace_write")
 
     def member_action(self, action):
         member = self.members.currentItem()
@@ -1431,6 +1527,8 @@ class AccountDialog(AppDialog):
             self.mutate("revoke_invitation", {"p_invitation": item.data(Qt.ItemDataRole.UserRole)})
 
     def clear_connected(self):
+        self.workspace_write_unconfirmed = False
+        self.recover_workspace.hide()
         self.snapshot = {
             "workspaces": [],
             "channels": [],
@@ -1455,10 +1553,17 @@ class AccountDialog(AppDialog):
         self.setup_email.clear()
 
     def sign_out(self):
-        if self.busy:
+        connected = getattr(self.parent(), "connected", None)
+        saving_replies = (
+            connected and connected.active
+            and any(action[0][0] == "agent-reply" for action in connected.queue)
+        )
+        if self.busy or saving_replies:
             if not getattr(self, "logout_pending", False):
                 self.logout_pending = True
                 self.operation_finished.connect(self.finish_pending_logout)
+            if saving_replies and not self.busy:
+                connected.refresh()
             return
         service = self.service
         self.service = None

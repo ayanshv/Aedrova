@@ -39,7 +39,8 @@ def possible_meeting_apps():
     data = json.loads(result.stdout)
     return {
         "names": [
-            name for name in data.get("names", []) if name in {"Zoom", "Teams", "Webex", "Browser"}
+            name for name in data.get("names", [])
+            if name in {"Zoom", "Teams", "Webex", "Browser", "Google Meet"}
         ],
         "active": data.get("active") is True,
     }

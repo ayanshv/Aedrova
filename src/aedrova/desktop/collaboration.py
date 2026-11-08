@@ -1,13 +1,14 @@
 """Chat actions and shared collaboration surfaces; transport stays off the UI thread."""
 
 import http.client
+import math
 import re
 import time
 from pathlib import Path
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
-from PySide6.QtCore import QEvent, QObject, QSize, Qt, QTimer, QUrl
+from PySide6.QtCore import QEvent, QObject, QPointF, QSize, Qt, QTimer, QUrl
 from PySide6.QtGui import (
     QColor,
     QDesktopServices,
@@ -21,6 +22,8 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QApplication,
+    QFrame,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -34,6 +37,69 @@ from shiboken6 import isValid
 from aedrova.desktop.controls import AppDialog, AppMenu, ChoiceBox
 from aedrova.desktop.conversation import SafeDocument
 from aedrova.desktop.dialogs import button, label
+
+
+class TypingBubble(QFrame):
+    def __init__(self):
+        super().__init__()
+        self.setObjectName("TypingBubble")
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(11, 5, 36, 5)
+        self.caption = label("", "muted")
+        layout.addWidget(self.caption)
+        self.phase = 0
+        self.animation = QTimer(self)
+        self.animation.setInterval(45)
+        self.animation.timeout.connect(self.advance)
+        self.hide()
+
+    def text(self):
+        return self.accessibleName()
+
+    def setText(self, text):  # noqa: N802
+        self.caption.setText(text.removesuffix("…"))
+        self.setAccessibleName(text)
+        self.setVisible(bool(text))
+        self.sync_motion()
+
+    def sync_motion(self):
+        if self.isVisible() and not QApplication.instance().property("reduceMotion"):
+            if not self.animation.isActive():
+                self.animation.start()
+        else:
+            self.animation.stop()
+            self.phase = 0
+            self.update()
+
+    def showEvent(self, event):  # noqa: N802
+        super().showEvent(event)
+        self.sync_motion()
+
+    def hideEvent(self, event):  # noqa: N802
+        self.animation.stop()
+        super().hideEvent(event)
+
+    def advance(self):
+        self.phase = (self.phase + 1) % 24
+        self.update()
+
+    def paintEvent(self, event):  # noqa: N802
+        super().paintEvent(event)
+        from aedrova.desktop.theme import LIGHT
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(LIGHT.accent))
+        for index in range(3):
+            offset = (
+                max(0, math.sin((self.phase - index * 3) * math.tau / 24)) * 4
+                if self.animation.isActive()
+                else 0
+            )
+            painter.drawEllipse(
+                QPointF(self.width() - 27 + index * 8, self.height() / 2 - offset), 2, 2
+            )
 
 
 def availability_label(value):
@@ -263,6 +329,7 @@ class Collaboration(QObject):
         self.dialogs = []
         self.local_saved = set()
         self.last_typing = 0
+        self.typing_channel = None
         self.last_heartbeat = 0
         self.channel_seen = None
         self.notification_ids = set()
@@ -286,8 +353,12 @@ class Collaboration(QObject):
         self.more_button.setIconSize(QSize(18, 18))
         self.more_button.clicked.connect(self.menu)
         window.primary_tabs_layout.addWidget(self.more_button)
-        self.typing_label = label("", "muted")
-        window.conversation_header_layout.addWidget(self.typing_label)
+        self.typing_label = TypingBubble()
+        window.composition.insertWidget(0, self.typing_label, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.typing_expiry = QTimer(self)
+        self.typing_expiry.setSingleShot(True)
+        self.typing_expiry.setInterval(8000)
+        self.typing_expiry.timeout.connect(lambda: self.typing_label.setText(""))
         for view in (window.messages, window.thread_messages):
             view.action_requested.connect(self.action)
             view.link_requested.connect(self.preview_link)
@@ -324,17 +395,15 @@ class Collaboration(QObject):
                     paths, window.thread_messages if c.thread else window.messages
                 )
             )
-            people_button = button("⌄", "Mention a teammate or channel", "icon")
-            people_button.setFixedSize(24, 29)
-            people_button.clicked.connect(lambda checked=False, c=composer: self.mention_menu(c))
-            composer.layout().itemAt(composer.layout().count() - 1).layout().insertWidget(
-                3, people_button
+            more = button("", "More message tools", "icon")
+            more.setFixedSize(30, 29)
+            more.setToolTip("More message tools")
+            assign(more, "more_chat")
+            more.clicked.connect(
+                lambda checked=False, c=composer, b=more: self.composer_menu(c, b)
             )
-            formatting = button("Aa", "Formatting", "icon")
-            formatting.setFixedSize(30, 29)
-            formatting.clicked.connect(lambda checked=False, c=composer: self.format_menu(c))
             composer.layout().itemAt(composer.layout().count() - 1).layout().insertWidget(
-                4, formatting
+                3, more
             )
         self.shortcut = QShortcut(QKeySequence("Ctrl+F"), window)
         self.shortcut.activated.connect(window.open_switcher)
@@ -574,23 +643,41 @@ class Collaboration(QObject):
         window.workspace_tools_toggle.setText(
             "Workspace tools" + (f" · {data['unseen']}" if data.get("unseen") else "") + "  ⌄"
         )
-        names = {p["user_id"]: p["display_name"] for p in people}
-        typing = [
-            names.get(t["user_id"], "A teammate")
-            for t in data.get("typing", [])
-            if t["channel_id"] == window.channel_id
-        ]
-        self.typing_label.setText(
-            ", ".join(typing[:3]) + (" is typing…" if len(typing) == 1 else " are typing…")
-            if typing
-            else ""
-        )
+        self.typing_expiry.start()
+        self.render_typing()
         if self.channel_seen != window.channel_id:
             self.manual_unread.clear()
             self.channel_seen = window.channel_id
         if self.pending_link and people:
             link, self.pending_link = self.pending_link, None
             QTimer.singleShot(0, lambda: self.open_link(link))
+
+    def render_typing(self):
+        user = self.window.current_user()
+        if (
+            not user
+            or not self.typing_expiry.isActive()
+            or self.scope_workspace != self.window.workspace_id
+        ):
+            self.typing_label.setText("")
+            return
+        names = {p["user_id"]: p["display_name"] for p in self.data.get("people", [])}
+        writers = list(
+            dict.fromkeys(
+                t["user_id"]
+                for t in self.data.get("typing", [])
+                if t["channel_id"] == self.window.channel_id and t["user_id"] != str(user.id)
+            )
+        )
+        if not writers:
+            self.typing_label.setText("")
+            return
+        shown = [names.get(writer, "A teammate")[:24] for writer in writers[:2]]
+        if len(writers) > 2:
+            shown.append(f"{len(writers) - 2} more")
+        self.typing_label.setText(
+            ", ".join(shown) + (" is typing…" if len(writers) == 1 else " are typing…")
+        )
 
     def reset(self):
         self.window.search_button.dismiss()
@@ -620,7 +707,9 @@ class Collaboration(QObject):
         self.allowed_channels.clear()
         self.activity_button.setText("Activity")
         self.window.workspace_tools_toggle.setText("Workspace tools  ⌄")
-        self.typing_label.clear()
+        self.typing_expiry.stop()
+        self.typing_channel = None
+        self.typing_label.setText("")
         for composer in (self.window.composer, self.window.thread_composer):
             composer.people = []
             composer.mention_tokens.clear()
@@ -661,12 +750,6 @@ class Collaboration(QObject):
                 self.request(
                     "profile", {"status": own.get("status", ""), "availability": availability}
                 )
-        if (
-            self.window.composer.editor.hasFocus()
-            and self.window.composer.editor.toPlainText().strip()
-        ):
-            self.typing(self.window.composer)
-
     def typing(self, composer):
         if (
             not self.connected()
@@ -676,10 +759,14 @@ class Collaboration(QObject):
             return
         now = time.monotonic()
         active = bool(composer.editor.toPlainText().strip()) and composer.editor.hasFocus()
-        if active and now - self.last_typing < 3:
+        channel = self.window.channel_id
+        if active and self.typing_channel == channel and now - self.last_typing < 3:
+            return
+        if not active and self.typing_channel != channel:
             return
         self.last_typing = now
-        self.request("typing", {"channel": self.window.channel_id, "active": active})
+        self.typing_channel = channel if active else None
+        self.request("typing", {"channel": channel, "active": active})
 
     def menu(self):
         menu = AppMenu(self.window)
@@ -729,9 +816,12 @@ class Collaboration(QObject):
             )
             self.window.notify("Message link copied. Access still requires workspace membership.")
         elif action in ("saved", "pinned"):
-            if not self.connected():
+            connected = self.connected()
+            if not connected:
                 setattr(message, action, not getattr(message, action))
                 self.window._refresh_interactions()
+            elif action == "pinned":
+                connected.set_pin(identifier, not message.pinned)
             else:
                 self.request(
                     action, {"message": identifier, "present": not getattr(message, action)}
@@ -1375,8 +1465,13 @@ class Collaboration(QObject):
         menu.exec(composer.mention.mapToGlobal(composer.mention.rect().topLeft()))
         composer.editor.setFocus()
 
-    def format_menu(self, composer):
+    def composer_menu(self, composer, anchor):
         menu = AppMenu(self.window)
+        menu.addAction("Mention a teammate or channel", lambda: self.mention_menu(composer))
+        menu.addAction("Insert emoji", composer.insert_emoji)
+        formatting = AppMenu(menu)
+        formatting.setTitle("Formatting")
+        menu.addMenu(formatting)
         for name, before, after in [
             ("Bold", "**", "**"),
             ("Italic", "*", "*"),
@@ -1385,10 +1480,10 @@ class Collaboration(QObject):
             ("List", "\n- ", ""),
             ("Link", "[", "](https://)"),
         ]:
-            menu.addAction(
+            formatting.addAction(
                 name, lambda checked=False, b=before, a=after: self.format(composer, b, a)
             )
-        menu.exec(composer.mapToGlobal(composer.rect().topLeft()))
+        menu.exec(anchor.mapToGlobal(anchor.rect().topLeft()))
 
     def format(self, composer, before, after):
         cursor = composer.editor.textCursor()

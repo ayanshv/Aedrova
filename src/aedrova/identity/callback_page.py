@@ -10,8 +10,19 @@ CSP = (
 )
 
 
-@lru_cache(maxsize=2)
-def render_callback(success=True):
+@lru_cache(maxsize=6)
+def render_callback(success=True, *, appearance="system"):
+    if appearance not in ("light", "dark"):
+        appearance = "system"
+    color_scheme = "light dark" if appearance == "system" else appearance
+    dark_palette = """--bg:#000;--ink:#f5f5f7;--muted:#a1a1a6;
+--glass:rgba(28,28,30,.78);--line:rgba(255,255,255,.08);--shadow:rgba(0,0,0,.35);
+--shine:rgba(255,255,255,.06)"""
+    dark_styles = f":root {{{dark_palette}}}"
+    if appearance == "system":
+        dark_styles = f"@media(prefers-color-scheme:dark) {{{dark_styles}}}"
+    elif appearance == "light":
+        dark_styles = ""
     logo = Path(__file__).parents[1] / "desktop" / "assets" / "aedrova.png"
     image = base64.b64encode(logo.read_bytes()).decode("ascii")
     heading = "Your space is waiting." if success else "Let’s try that again."
@@ -25,11 +36,12 @@ def render_callback(success=True):
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light dark">
+<meta name="color-scheme" content="{color_scheme}">
 <title>Aedrova · Your space to build</title>
 <style>
-:root {{color-scheme: light dark; --bg:#f5f5f7; --ink:#1d1d1f; --muted:#6e6e73;
---glass:rgba(255,255,255,.72); --line:rgba(0,0,0,.06); --shadow:rgba(34,45,80,.08)}}
+:root {{color-scheme:{color_scheme}; --bg:#f5f5f7; --ink:#1d1d1f; --muted:#6e6e73;
+--glass:rgba(255,255,255,.72); --line:rgba(0,0,0,.06); --shadow:rgba(34,45,80,.08);
+--shine:rgba(255,255,255,.35)}}
 * {{box-sizing:border-box}} body {{margin:0; min-height:100svh; display:grid; place-items:center;
 background:var(--bg);
  color:var(--ink);
@@ -48,7 +60,7 @@ radial-gradient(ellipse at 52% 77%,rgba(124,171,241,.2),transparent 55%);
 filter:blur(48px)}}
 main {{position:relative; width:min(100%,560px); text-align:center; border-radius:24px;
 padding:34px 48px 44px; background:var(--glass); border:1px solid var(--line);
-box-shadow:0 24px 90px var(--shadow),inset 0 1px 0 rgba(255,255,255,.35);
+box-shadow:0 24px 90px var(--shadow),inset 0 1px 0 var(--shine);
 backdrop-filter:blur(24px);
  -webkit-backdrop-filter:blur(24px);
  animation:arrive .65s ease-out both}}
@@ -85,9 +97,7 @@ text-align:center}}
 @keyframes arrive {{from {{opacity:0;
 transform:translateY(10px)}} to {{opacity:1;
 transform:translateY(0)}}}}
-@media(prefers-color-scheme:dark) {{:root {{--bg:#000;--ink:#f5f5f7;--muted:#a1a1a6;
---glass:rgba(28,28,30,.78);--line:rgba(255,255,255,.08);--shadow:rgba(0,0,0,.35)}}
-main {{box-shadow:0 24px 90px var(--shadow),inset 0 1px 0 rgba(255,255,255,.06)}}}}
+{dark_styles}
 @media(max-width:420px) {{main {{padding:28px 24px 32px}} .mark {{margin-top:16px}}}}
 @media(prefers-reduced-motion:reduce) {{main {{animation:none}}}}
 @media(prefers-reduced-transparency:reduce) {{main {{background:var(--bg);backdrop-filter:none}}}}

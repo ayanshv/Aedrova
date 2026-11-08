@@ -25,6 +25,7 @@ from aedrova.agents.runtime import BuildCancelled, LocalRunner
         "Who are you?",
         "Explain Python list comprehensions",
         "Draft a launch plan",
+        "Let’s make a calculator 👍",
     ],
 )
 def test_general_conversation_needs_no_sources(question):
@@ -40,10 +41,74 @@ def test_general_conversation_needs_no_sources(question):
         "Read the Notion file",
         "Explain that",
         "Check GitHub issues",
+        "What were we building?",
+        "What are we working on?",
+        "Where did we leave off?",
+        "What was the last thing we were building?",
     ],
 )
 def test_evidence_questions_keep_retrieval(question):
     assert needs_sources(question)
+
+
+def test_build_recap_uses_recent_chat_and_shared_review_without_keyword_matches(monkeypatch):
+    from aedrova.desktop.dot_analysis import QueryJob
+
+    context_reads = []
+    message = {
+        "id": "recent1",
+        "channel_id": "c",
+        "sequence": 10,
+        "parent_id": None,
+        "body": "The beta needs offline notebook editing and queued sync.",
+    }
+    review = {
+        "id": "review1",
+        "workspace_id": "w",
+        "channel_id": "c",
+        "source_channels": ["c"],
+        "evidence": {"task": "Offline notebook editing", "checks": ["Sync test pending"]},
+        "current": True,
+        "updated_at": "2026-11-07",
+    }
+
+    def recent(channel):
+        context_reads.append(channel)
+        return [message]
+
+    service = SimpleNamespace(
+        user=SimpleNamespace(id="u"),
+        context_snapshot=lambda *args: snapshot(),
+        search_context=lambda *_: [],
+        recent_context=recent,
+        attachments_for=lambda _: [],
+        build_reviews=lambda _: {"items": [review]},
+        close_context=lambda: None,
+    )
+    monkeypatch.setattr("aedrova.desktop.dot_analysis.application_ai_origin", lambda: "")
+    monkeypatch.setattr(
+        "aedrova.desktop.dot_analysis.client",
+        lambda *_: pytest.fail("A basic recap should not need a connector request."),
+    )
+
+    def answer(self, provider, project, prompt, **kwargs):
+        records = [json.loads(line) for line in kwargs["context"].splitlines()]
+        assert {"message": message} in records
+        assert {"shared_build_review": review} in records
+        assert 'Current channel ID: "c"' in prompt
+        return (
+            "We were building offline notebook editing [message:recent1]. "
+            "Sync testing was still pending [build-review:review1]."
+        )
+
+    monkeypatch.setattr(LocalRunner, "answer", answer)
+    job = QueryJob(service, "w", "c", "what were we building", "codex")
+    results = []
+    job.signals.finished.connect(results.append)
+    job.run()
+    assert context_reads == ["c"]
+    assert results and not results[0].get("error"), results
+    assert "offline notebook editing" in results[0]["text"]
 
 
 @pytest.mark.parametrize("name", ["Aedrova", "Atlas"])
@@ -240,6 +305,8 @@ def test_stream_updates_replace_one_message(qtbot):
     feed.set_reply("Hel")
     feed.set_reply("Hello")
     assert len(feed.rows) == 1 and feed.toPlainText() == "Hello"
+    feed.set_reply("Hello\nAEDROVA_CH")
+    assert "AEDROVA_CH" not in feed.reply_row.message.text()
     feed.finish_with_result("Hello!")
     assert len(feed.rows) == 1 and feed.toPlainText() == "Hello!"
 
@@ -354,6 +421,7 @@ def test_mention_acknowledges_immediately_and_jumps_background_queue(qtbot, tmp_
     dashboard.enqueue(("inventory", "old-search"), lambda: None, lambda _: None)
     dashboard.enqueue(("heartbeat", "old"), lambda: None, lambda _: None)
     text = "@Orbit hello" if bud else "@Aedrova explain Python lists"
+    window.agent_clock.started = window.agent_clock.now() - 900
     window.composer.editor.setPlainText(text)
     window.send_message(text)
     keys = [action[0][0] for action in dashboard.queue]
@@ -362,6 +430,7 @@ def test_mention_acknowledges_immediately_and_jumps_background_queue(qtbot, tmp_
     assert window.agent_feed.author_name == ("Orbit" if bud else "Aedrova")
     assert window.build_activity.isVisible()
     assert "Preparing response" in window.build_activity.text()
+    assert window.agent_clock.text() == "0:00"
     assert window.dot_query is not None
     assert any(row["body"] == text for row in dashboard.outbox.values())
     assert (
@@ -434,6 +503,13 @@ def test_thinking_stays_mounted_through_auth_handoff_and_slow_reply(qtbot, tmp_p
     assert window.build_activity.text() == "Thinking…"
     assert window.build_activity.isVisible()
 
+    jobs[0].signals.progress.emit("Checking workspace access…")
+    jobs[0].signals.progress.emit("Reading shared work…")
+    assert window.agent_feed.rows == [before]
+    assert window.build_activity.text() == "Reading shared work…"
+    assert "checking which workspace sources" in before.work_notes.text()
+    assert "other Buds" in before.work_notes.text()
+
     window._load_channel()
     qtbot.wait(5200)
     window._load_channel()
@@ -444,5 +520,9 @@ def test_thinking_stays_mounted_through_auth_handoff_and_slow_reply(qtbot, tmp_p
     jobs[0].signals.finished.emit({"text": "A list stores ordered values."})
     assert not window.build_activity.isVisible()
     assert window.dot_query is None
+    assert window.agent_feed.status_row is None
+    assert "A list stores ordered values." in window.agent_feed.toPlainText() or any(
+        m.body == "A list stores ordered values." for m in window.messages.source_messages
+    )
     window.connected.queue.clear()
     window.account_dialog.busy = False

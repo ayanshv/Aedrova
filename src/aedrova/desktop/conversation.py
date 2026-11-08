@@ -24,6 +24,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import (
     QAbstractTextDocumentLayout,
     QColor,
+    QCursor,
     QFont,
     QFontMetrics,
     QIcon,
@@ -35,6 +36,7 @@ from PySide6.QtGui import (
     QTextBlockFormat,
     QTextCursor,
     QTextDocument,
+    QTextOption,
 )
 from PySide6.QtWidgets import (
     QApplication,
@@ -49,14 +51,25 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QStyle,
     QStyledItemDelegate,
+    QToolTip,
     QVBoxLayout,
     QWidget,
 )
 
 from aedrova.desktop.attachment_previews import preview_height
+from aedrova.desktop.brand import paint_brand_mark
 from aedrova.desktop.controls import AppMenu
 from aedrova.desktop.emojis import QUICK_EMOJI, pick_emoji
 from aedrova.desktop.materials import SpringButton, system_font
+from aedrova.desktop.response_actions import (
+    ACTION_PREFIX,
+    REPLY_ACTION_LABELS,
+    SOURCE_PREFIX,
+    append_response_actions,
+    citations,
+    compact_citations,
+    response_parts,
+)
 from aedrova.desktop.theme import LIGHT, Theme
 
 MESSAGE_ROLE = Qt.ItemDataRole.UserRole + 1
@@ -141,17 +154,52 @@ class SafeDocument(QTextDocument):
         return None
 
 
-def markdown_document(text):
+def markdown_document(text, *, base_font=None):
     document = SafeDocument()
+    if base_font is not None:
+        document.setDefaultFont(base_font)
     document.setMarkdown(text, QTextDocument.MarkdownFeature.MarkdownNoHTML)
     return document
 
 
-def markdown_html(text):
-    document = markdown_document(text)
+def space_agent_response(document):
+    block = document.begin()
+    while block.isValid():
+        layout = block.blockFormat()
+        list_item = block.textList() is not None
+        top_margin = 14 if layout.headingLevel() else 6
+        if block.blockNumber() == 0 or list_item:
+            top_margin = 0
+        layout.setTopMargin(top_margin)
+        layout.setBottomMargin(3 if list_item else 6)
+        layout.setLineHeight(130, QTextBlockFormat.LineHeightTypes.ProportionalHeight.value)
+        layout.setNonBreakableLines(False)
+        QTextCursor(block).setBlockFormat(layout)
+        block = block.next()
 
 
-    return re.sub(r"<img\b[^>]*>", "", document.toHtml(), flags=re.IGNORECASE)
+def markdown_html(text, *, base_font=None, agent=False, options=None, rating="", file_summary=None):
+    document = markdown_document(text, base_font=base_font)
+    action_images = set()
+    if options is not None:
+        palette = QApplication.palette()
+        dark = palette.color(QPalette.ColorRole.Window).lightness() < 128
+        action_images = append_response_actions(
+            document, options, rating,
+            choice_color="#8fbcff" if dark else "#1759bf",
+            action_color=palette.color(QPalette.ColorRole.PlaceholderText).name(),
+            file_summary=file_summary,
+            card_background=palette.color(QPalette.ColorRole.AlternateBase).name(),
+        )
+    elif agent:
+        compact_citations(document, color=QApplication.palette().link().color().name())
+    if agent:
+        space_agent_response(document)
+    def keep_action_image(match):
+        source = re.search(r'\bsrc="([^"]+)"', match.group())
+        return match.group() if source and source[1] in action_images else ""
+
+    return re.sub(r"<img\b[^>]*>", keep_action_image, document.toHtml(), flags=re.IGNORECASE)
 
 
 class MessageDelegate(QStyledItemDelegate):
@@ -165,7 +213,9 @@ class MessageDelegate(QStyledItemDelegate):
         width = max(80, min(880, width))
         display = self.view.display_body(message)
         hint = self.view.translation_hint(message)
-        key = (message.id, display, hint, width, self.theme.name)
+        rating = self.view.reply_feedback.get(message.id, "")
+        summary = self.view.build_summaries.get(message.id, (None, None, None))[1]
+        key = (message.id, display, hint, width, self.theme.name, message.agent, rating, summary)
         if key not in self.documents:
             document = SafeDocument()
             document.setDefaultFont(font(14))
@@ -173,6 +223,9 @@ class MessageDelegate(QStyledItemDelegate):
                 "a { color: " + self.theme.accent + "; } pre { white-space: pre-wrap; }"
             )
             document.setDocumentMargin(0)
+            wrap = document.defaultTextOption()
+            wrap.setWrapMode(QTextOption.WrapMode.WrapAtWordBoundaryOrAnywhere)
+            document.setDefaultTextOption(wrap)
             text = re.sub(
                 r"<@(?:dot:|ai:)?([a-f0-9-]{36})\|([^>\n]{1,80})>",
                 lambda m: "@" + m[2],
@@ -188,7 +241,7 @@ class MessageDelegate(QStyledItemDelegate):
                 text += "\n\n_" + hint + "_"
             document.setMarkdown(text, QTextDocument.MarkdownFeature.MarkdownNoHTML)
             previews = ""
-            for url in message_urls(message.body):
+            for url in message_urls(message.body) if not message.agent else ():
                 parsed = urlsplit(url)
                 if parsed.hostname:
                     title = parsed.hostname + (parsed.path[:70] if parsed.path != "/" else "")
@@ -203,31 +256,47 @@ class MessageDelegate(QStyledItemDelegate):
                 preview_cursor = QTextCursor(document)
                 preview_cursor.movePosition(QTextCursor.MoveOperation.End)
                 preview_cursor.insertHtml(previews)
+            if message.agent:
+                append_response_actions(
+                    document, response_parts(message.body)[1], rating,
+                    choice_color="#8fbcff" if self.theme.name == "dark" else "#1759bf",
+                    action_color=self.theme.secondary,
+                    file_summary=summary,
+                    card_background=self.theme.surface,
+                )
+                space_agent_response(document)
             block = document.begin()
             anchor_ranges = []
             while block.isValid():
-                cursor = QTextCursor(block)
-                block_format = block.blockFormat()
-                block_format.setLineHeight(
-                    135, QTextBlockFormat.LineHeightTypes.ProportionalHeight.value
-                )
-                block_format.setTopMargin(1)
-                block_format.setBottomMargin(2)
-                block_format.setNonBreakableLines(False)
-                cursor.setBlockFormat(block_format)
+                if not message.agent:
+                    block_format = block.blockFormat()
+                    block_format.setLineHeight(
+                        135, QTextBlockFormat.LineHeightTypes.ProportionalHeight.value
+                    )
+                    block_format.setTopMargin(1)
+                    block_format.setBottomMargin(2)
+                    block_format.setNonBreakableLines(False)
+                    QTextCursor(block).setBlockFormat(block_format)
                 fragments = block.begin()
                 while not fragments.atEnd():
                     fragment = fragments.fragment()
                     if fragment.isValid() and fragment.charFormat().isAnchor():
-                        anchor_ranges.append((fragment.position(), fragment.length()))
+                        action = fragment.charFormat().anchorHref()
+                        color = self.theme.accent
+                        if action.startswith(ACTION_PREFIX):
+                            if not action.startswith(ACTION_PREFIX + "choice-"):
+                                color = self.theme.muted
+                            elif self.theme.name == "dark":
+                                color = "#8fbcff"
+                        anchor_ranges.append((fragment.position(), fragment.length(), color))
                     fragments += 1
                 block = block.next()
-            for start, length in anchor_ranges:
+            for start, length, color in anchor_ranges:
                 cursor = QTextCursor(document)
                 cursor.setPosition(start)
                 cursor.setPosition(start + length, QTextCursor.MoveMode.KeepAnchor)
                 style = cursor.charFormat()
-                style.setForeground(QColor(self.theme.accent))
+                style.setForeground(QColor(color))
                 cursor.mergeCharFormat(style)
             document.setTextWidth(width)
             self.documents[key] = document
@@ -346,9 +415,13 @@ class MessageDelegate(QStyledItemDelegate):
                     QRectF(x, y, 34, 34), Qt.AlignmentFlag.AlignCenter, message.initials
                 )
             if message.agent:
-                from aedrova.desktop.brand import brand_image
+                bud_avatar = self.view.agent_bud_avatar(message)
+                if bud_avatar:
+                    from aedrova.desktop.ai_teammates import paint_character
 
-                painter.drawImage(QRectF(x, y, 34, 34), brand_image())
+                    paint_character(painter, QRectF(x, rect.y() + 10, 34, 32), bud_avatar)
+                else:
+                    paint_brand_mark(painter, QRectF(x, rect.y() + 10, 34, 34))
             photo = getattr(self.view, "avatar_images", {}).get(
                 getattr(self.view, "avatar_paths", {}).get(message.sender_id)
             )
@@ -545,6 +618,7 @@ class MessageView(QListView):
     action_requested = Signal(str, str)
     files_dropped = Signal(list)
     link_requested = Signal(str)
+    agent_choice_requested = Signal(str, str)
 
     def __init__(self, parent=None, *, allow_threads=True):
         super().__init__(parent)
@@ -561,6 +635,9 @@ class MessageView(QListView):
         self.agent_message_id = None
         self.agent_visible = False
         self.agent_anchor = None
+        self.bud_avatars = {}
+        self.reply_feedback = {}
+        self.build_summaries = OrderedDict()
         self.source_messages = []
         self.text_selection = None
         self.selecting_text = False
@@ -751,8 +828,7 @@ class MessageView(QListView):
                         event.position().y() - rect.y() - self.delegate.body_offset(index),
                     )
                 )
-                if link and urlsplit(link).scheme in ("https", "http"):
-                    self.link_requested.emit(link)
+                self.activate_message_link(index.data(MESSAGE_ROLE), link)
             event.accept()
             return
         self._click_position = event.position().toPoint()
@@ -776,8 +852,7 @@ class MessageView(QListView):
                 return
         body_top = rect.top() + self.delegate.body_offset(index)
         link = document.documentLayout().anchorAt(QPointF(point.x() - 74, point.y() - body_top))
-        if link and urlsplit(link).scheme in ("https", "http"):
-            self.link_requested.emit(link)
+        if self.activate_message_link(message, link):
             return
         if (
             message.attachment_id
@@ -788,6 +863,116 @@ class MessageView(QListView):
             self.action_requested.emit("attachment", message.id)
             return
         self._request_thread(index)
+
+    def activate_message_link(self, message, link):
+        if message.agent and link.startswith((ACTION_PREFIX, SOURCE_PREFIX)):
+            self.activate_reply_action(message.id, message.author, message.body, link)
+            return True
+        if link and urlsplit(link).scheme in ("https", "http"):
+            self.link_requested.emit(link)
+            return True
+        return False
+
+    def activate_reply_action(self, identifier, author, raw, link, *, row=None):
+        if link.startswith(SOURCE_PREFIX):
+            citation = link.removeprefix(SOURCE_PREFIX)
+            if citation in citations(raw):
+                self.open_reply_source(citation)
+            return
+        action = link.removeprefix(ACTION_PREFIX)
+        body, options = response_parts(raw)
+        if action in ("copy", "copy-markdown"):
+            text = body if action == "copy-markdown" else markdown_document(body).toPlainText()
+            if options:
+                text += "\n\n" + "\n".join(f"{i}. {option}" for i, option in enumerate(options, 1))
+            QApplication.clipboard().setText(text)
+            window = self.window()
+            if hasattr(window, "notify"):
+                window.notify("Response copied.")
+        elif action in ("good", "bad"):
+            rating = "" if self.reply_feedback.get(identifier) == action else action
+            self.reply_feedback[identifier] = rating
+            if row:
+                row.rating = rating
+                row.set_message(row.summary)
+                self.agent_feed.changed.emit()
+            else:
+                self.viewport().update()
+        elif action == "more":
+            menu = AppMenu(self)
+            for key, label in (
+                ("copy", "Copy response"),
+                ("copy-markdown", "Copy as Markdown"),
+                ("good", "Good response"),
+                ("bad", "Bad response"),
+            ):
+                menu.addAction(
+                    label,
+                    lambda checked=False, key=key: self.activate_reply_action(
+                        identifier, author, raw, ACTION_PREFIX + key, row=row
+                    ),
+                )
+            for option in options:
+                menu.addAction(
+                    option.replace("&", "&&"),
+                    lambda checked=False, option=option:
+                    self.agent_choice_requested.emit(author, option),
+                )
+            if identifier in self.build_summaries:
+                menu.addAction(
+                    "View changes",
+                    lambda: self.activate_reply_action(
+                        identifier, author, raw, ACTION_PREFIX + "changes", row=row
+                    ),
+                )
+            menu.exec(QCursor.pos())
+        elif action == "changes":
+            item = self.build_summaries.get(identifier)
+            window = self.window()
+            if item and item[0] == window.workspace_id and item[2]:
+                item[2]()
+        elif action.startswith("choice-") and action[7:] in ("0", "1", "2", "3", "4"):
+            index = int(action[7:])
+            if index < len(options):
+                self.agent_choice_requested.emit(author, options[index])
+
+    def remember_build_summary(self, identifier, workspace, summary, open_changes):
+        self.build_summaries[identifier] = (workspace, summary, open_changes)
+        if len(self.build_summaries) > 30:
+            self.build_summaries.popitem(last=False)
+
+    def open_reply_source(self, citation):
+        window = self.window()
+        kind, identifier = citation.split(":", 1)
+        connected = getattr(window, "connected", None)
+        if kind not in {"message", "attachment"} or not connected or not connected.active:
+            QApplication.clipboard().setText(citation)
+            if hasattr(window, "notify"):
+                window.notify("Source reference copied.")
+            return
+        service, workspace = connected.account.service, window.workspace_id
+        if not hasattr(service, "memory_source"):
+            return
+
+        def resolved(source):
+            if window.workspace_id != workspace or connected.account.service is not service:
+                return
+            if not source:
+                window.notify("This source is no longer available.")
+                return
+            from aedrova.desktop.collaboration import message_link
+
+            window.collaboration.open_link(message_link(
+                workspace, source["channel_id"], source.get("message_id", identifier)
+            ))
+
+        def fetch():
+            try:
+                return service.memory_source(kind, identifier)
+            except Exception:
+                return None
+
+        connected.enqueue(("reply-source", citation), fetch, resolved, priority=True)
 
     def react(self, identifier, emoji):
         message = next((m for m in self.model().messages if m.id == identifier), None)
@@ -819,6 +1004,22 @@ class MessageView(QListView):
         emoji = pick_emoji(self)
         if emoji:
             self.react(identifier, emoji)
+
+    def viewportEvent(self, event):  # noqa: N802
+        if event.type() == QEvent.Type.ToolTip:
+            hit = self.text_hit(event.pos())
+            if hit:
+                index, document, _ = hit
+                rect = self.visualRect(index)
+                point = QPointF(
+                    event.pos().x() - rect.x() - 74,
+                    event.pos().y() - rect.top() - self.delegate.body_offset(index),
+                )
+                title = REPLY_ACTION_LABELS.get(document.documentLayout().anchorAt(point))
+                if title:
+                    QToolTip.showText(event.globalPos(), title, self.viewport())
+                    return True
+        return super().viewportEvent(event)
 
     def mouseMoveEvent(self, event):  # noqa: N802
         if (
@@ -898,8 +1099,14 @@ class MessageView(QListView):
             self.text_selection = None
             self.viewport().update()
             event.accept()
-        elif event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            self._request_thread(self.currentIndex())
+        elif event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Right):
+            index = self.currentIndex()
+            message = index.data(MESSAGE_ROLE)
+            if message and message.agent and message.id != self.agent_message_id:
+                if event.key() != Qt.Key.Key_Right:
+                    self.activate_message_link(message, ACTION_PREFIX + "more")
+            else:
+                self._request_thread(index)
             event.accept()
         elif event.matches(QKeySequence.StandardKey.Copy):
             self.copy_current()
@@ -927,6 +1134,10 @@ class MessageView(QListView):
         self.setCurrentIndex(index)
         if self.text_selection and self.text_selection[0] != index.data(MESSAGE_ROLE).id:
             self.text_selection = None
+        message = index.data(MESSAGE_ROLE)
+        if message.agent and message.id != self.agent_message_id:
+            self.activate_message_link(message, ACTION_PREFIX + "more")
+            return
         menu = AppMenu(self)
         if (
             self.allow_threads
@@ -1102,12 +1313,27 @@ class MessageView(QListView):
 
     def set_theme(self, theme: Theme):
         self.delegate.theme = theme
+        row = getattr(getattr(self, "agent_feed", None), "reply_row", None)
+        if row and row.response_id:
+            row.set_message(row.summary)
         self.viewport().update()
 
     def attach_agent_feed(self, feed):
         self.agent_feed = feed
         feed.make_inline()
         feed.changed.connect(self.refresh_agent)
+        feed.reply_action.connect(self.activate_live_reply_action)
+
+    def agent_bud_avatar(self, message):
+        if message.bud_avatar is not None:
+            return message.bud_avatar
+        return self.bud_avatars.get(message.author.casefold())
+
+    def activate_live_reply_action(self, row, link):
+        if self.agent_visible and row is self.agent_feed.reply_row:
+            self.activate_reply_action(
+                row.response_id, row.author.text(), row.summary, link, row=row
+            )
 
     def set_agent_visible(self, visible):
         self.agent_visible = visible
@@ -1135,10 +1361,11 @@ class MessageView(QListView):
         return None
 
     def display_body(self, message):
+        body = response_parts(message.body)[0] if message.agent else message.body
         localizer = self.reader_localizer()
         if not localizer or message.id in localizer.originals or message.unsent:
-            return message.body
-        return localizer.text(message.body)
+            return body
+        return localizer.text(body)
 
     def translation_hint(self, message):
         localizer = self.reader_localizer()
@@ -1146,13 +1373,14 @@ class MessageView(QListView):
             return ""
         from aedrova.localization import LANGUAGES
 
+        original = response_parts(message.body)[0] if message.agent else message.body
         translated = self.display_body(message)
-        if translated != message.body:
+        if translated != original:
             return (
                 localizer.text("Translated", interface=True) + " · " + LANGUAGES[localizer.language]
             )
         if message.id in localizer.originals:
-            if localizer.text(message.body) != message.body:
+            if localizer.text(original) != original:
                 return localizer.text("Original text", interface=True)
             return ""
         state = localizer.translation_state(message.body)
@@ -1382,6 +1610,10 @@ class Composer(QFrame):
         self.mention_list.itemClicked.connect(lambda _: self.complete_mention())
         layout.addWidget(self.suggestion)
         layout.addWidget(self.editor)
+        self.message_limit = QLabel("Limit: 10,000 characters")
+        self.message_limit.setProperty("role", "muted")
+        self.message_limit.hide()
+        layout.addWidget(self.message_limit)
         bottom = QHBoxLayout()
         self.mention = SpringButton("@")
         self.mention.setProperty("role", "icon")
@@ -1391,41 +1623,14 @@ class Composer(QFrame):
         self.mention.setAccessibleName("Mention Aedrova")
         self.mention.setToolTip("Insert @Aedrova · ask your agent to build")
         self.mention.clicked.connect(self.insert_mention)
-        from aedrova.agents.permissions import MODES
         from aedrova.desktop.controls import PermissionChoice
 
         self.permissions = PermissionChoice()
-        self.permissions.setObjectName("AgentPermissions")
-        self.permissions.setAccessibleName("Aedrova agent permissions")
-        self.permissions.setSizeAdjustPolicy(PermissionChoice.SizeAdjustPolicy.AdjustToContents)
         self.permissions.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        self.permissions.setProperty("permissionMode", "ask")
         self.permissions.setMinimumHeight(30)
         self.permissions.setFixedHeight(30)
-        from aedrova.desktop.icons import icon
-
-        names = ["permission_ask", "permission_auto", "permission_full"]
-        self.permissions.setProperty("itemIconNames", names)
-        self.permissions.setIconSize(QSize(16, 16))
-        color = self.permissions.palette().windowText().color().name()
-        for name, (value, (title, description)) in zip(names, MODES.items(), strict=True):
-            self.permissions.addItem(icon(name, color), title, value)
-            self.permissions.setItemData(
-                self.permissions.count() - 1, description, Qt.ItemDataRole.ToolTipRole
-            )
-        self.permissions.setToolTip(MODES["ask"][1])
         bottom.addWidget(self.permissions)
         bottom.addWidget(self.mention)
-        self.emoji = SpringButton("☺")
-        self.emoji.setProperty("role", "icon")
-        self.emoji.setFixedSize(30, 29)
-        self.emoji.setAccessibleName("Insert emoji")
-        self.emoji.setToolTip("Choose an emoji")
-        self.emoji.clicked.connect(self.insert_emoji)
-        bottom.addWidget(self.emoji)
-        self.hint = QLabel("↵ send  ·  ⇧↵ new line")
-        self.hint.setProperty("role", "muted")
-        bottom.addWidget(self.hint)
         bottom.addStretch()
         self.send = SpringButton("Reply" if thread else "Send")
         self.send.setProperty("role", "primary")
@@ -1439,10 +1644,7 @@ class Composer(QFrame):
         layout.addLayout(bottom)
         from aedrova.desktop.icons import assign
 
-        for control, name in ((self.mention, "mention"), (self.emoji, "smile")):
-            assign(control, name)
-            if control is not self.mention:
-                control.setText("")
+        assign(self.mention, "mention")
         assign(self.send, "send")
 
     def insert_emoji(self):
@@ -1453,10 +1655,14 @@ class Composer(QFrame):
 
     def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
-        if hasattr(self, "hint"):
-            self.hint.setVisible(self.width() >= 650)
-            self.mention.setText("Ask " + self.agent_name if self.width() >= 500 else "")
+        if hasattr(self, "mention"):
+            self.update_mention_label()
             self._position_mentions()
+
+    def update_mention_label(self):
+        title = "Ask " + self.agent_name
+        width = self.mention.fontMetrics().horizontalAdvance(title)
+        self.mention.setText(title if self.width() >= 500 and width <= 145 else "")
 
     def moveEvent(self, event):  # noqa: N802
         super().moveEvent(event)
@@ -1502,7 +1708,7 @@ class Composer(QFrame):
         mention = "@" + self.agent_name
         self.suggestion.setText(f"{mention}    ·    Tab or ↵")
         self.suggestion.setAccessibleName(f"Complete mention {mention}. Tab or Return.")
-        self.mention.setText("Ask " + self.agent_name)
+        self.update_mention_label()
         self.command_cue.setText(
             ("IN THIS THREAD" if self.thread else "TO YOUR TEAM")
             + "  ·  @"
@@ -1702,10 +1908,7 @@ class Composer(QFrame):
         self.send.setEnabled(
             (bool(text) or bool(getattr(self, "attachment_drafts", []))) and len(text) <= 10_000
         )
-        if len(text) > 10_000:
-            self.hint.setText("Limit: 10,000 characters")
-        else:
-            self.hint.setText("↵ send  ·  ⇧↵ new line")
+        self.message_limit.setVisible(len(text) > 10_000)
 
     def _submit(self):
         for card, publish in list(getattr(self, "attachment_drafts", [])):

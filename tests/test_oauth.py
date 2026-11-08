@@ -28,12 +28,14 @@ class FakeService:
         return "signed-in-user"
 
 
-def test_loopback_ignores_wrong_path_and_exchanges_only_valid_code():
+@pytest.mark.parametrize("appearance", ["light", "dark", "system"])
+def test_loopback_ignores_wrong_path_and_exchanges_only_valid_code(appearance):
     service = FakeService()
     opened = Event()
     with ThreadPoolExecutor() as pool:
         future = pool.submit(
-            google_sign_in, service, opener=lambda _: opened.set() or True, port=0, timeout=3
+            google_sign_in, service, opener=lambda _: opened.set() or True, port=0, timeout=3,
+            appearance=appearance,
         )
         assert opened.wait(2)
         origin = service.redirect.rsplit("/auth/", 1)[0]
@@ -48,6 +50,9 @@ def test_loopback_ignores_wrong_path_and_exchanges_only_valid_code():
             body = response.read()
             assert b"valid-code" not in body
             assert b"Your space is waiting." in body
+            scheme = "light dark" if appearance == "system" else appearance
+            assert f'<meta name="color-scheme" content="{scheme}">'.encode() in body
+            assert (b"--bg:#000" in body) == (appearance != "light")
         assert future.result(3) == "signed-in-user"
     assert service.exchanged == ["valid-code"]
 

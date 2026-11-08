@@ -6,6 +6,7 @@ from uuid import uuid4
 from PySide6.QtCore import Qt, QThreadPool, QTimer
 from PySide6.QtWidgets import QCheckBox, QHBoxLayout, QScrollArea, QVBoxLayout, QWidget
 
+from aedrova.desktop.agent_activity import WorkNotes
 from aedrova.desktop.agent_stream import ActivityRow
 from aedrova.desktop.controls import AppDialog
 from aedrova.desktop.conversation import Composer
@@ -87,6 +88,8 @@ class BudChat(AppDialog):
         self.rows.setSpacing(12)
         self.feed.setWidget(content)
         layout.addWidget(self.feed, 1)
+        self.work_notes = WorkNotes()
+        layout.addWidget(self.work_notes)
         self.status = label("", "muted", wrap=True)
         layout.addWidget(self.status)
         actions = QHBoxLayout()
@@ -348,18 +351,31 @@ class BudChat(AppDialog):
             )
             self.job = job
             self.reply_preview = None
+            self.work_notes.clear()
+            self.work_notes.record("Preparing response")
             self.waiting(True)
             self.stop.show()
             job.signals.reply.connect(lambda text: self.preview_reply(job, text))
+            job.signals.progress.connect(lambda text: self.show_work(job, text))
             job.signals.finished.connect(lambda result: self.answered(question, result))
             QThreadPool.globalInstance().start(job)
 
         self.request(self.service.fork_for_context, ready)
 
+    def show_work(self, job, text):
+        if (
+            self.current()
+            and self.job is job
+            and self.reply_preview is None
+            and not job.runner.cancelled.is_set()
+        ):
+            self.work_notes.record(text)
+
     def preview_reply(self, job, text):
         if not self.current() or self.job is not job or job.runner.cancelled.is_set():
             return
         if self.reply_preview is None:
+            self.work_notes.clear()
             self.reply_preview = ActivityRow(
                 text,
                 author=self.bud["name"],
@@ -374,6 +390,7 @@ class BudChat(AppDialog):
         cancelled = self.job.runner.cancelled.is_set()
         self.job = None
         self.stop.hide()
+        self.work_notes.clear()
         if not self.current():
             return
         self.waiting(False)
@@ -409,6 +426,7 @@ class BudChat(AppDialog):
         if self.closed:
             return
         self.closed = True
+        self.work_notes.clear()
         self.host.account_dialog.session_closed.disconnect(self.reject)
         timer = getattr(self, "request_timer", None)
         if timer is not None:

@@ -3,6 +3,7 @@
 import json
 import threading
 import time
+from contextlib import nullcontext
 from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
@@ -12,11 +13,15 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
+    QDialog,
     QHBoxLayout,
     QLineEdit,
     QMessageBox,
     QPlainTextEdit,
+    QTabWidget,
+    QTextEdit,
     QVBoxLayout,
+    QWidget,
 )
 
 from aedrova.agents.checkout import changes, git, prepare
@@ -24,10 +29,25 @@ from aedrova.agents.context import authorize, gather
 from aedrova.agents.file_lock import open_private_file
 from aedrova.agents.managed import ManagedClient, ai_access_mode, application_ai_origin
 from aedrova.agents.retrieval import retrieval_record, validate_citations
-from aedrova.agents.runtime import BuildCancelled, LocalRunner, instructions
-from aedrova.desktop.controls import AppDialog, CodingProviderChoice, choose_project
+from aedrova.agents.runtime import (
+    CLARIFICATION,
+    BuildCancelled,
+    LocalRunner,
+    clarification_question,
+    instructions,
+)
+from aedrova.desktop.clarification import ClarificationForm
+from aedrova.desktop.controls import (
+    AppDialog,
+    CodingProviderChoice,
+    PermissionChoice,
+    choose_project,
+)
+from aedrova.desktop.conversation import markdown_html
 from aedrova.desktop.design_system import FlowActions
 from aedrova.desktop.dialogs import button, label
+from aedrova.desktop.materials import system_font
+from aedrova.identity.service import ReadInterrupted
 
 
 class Signals(QObject):
@@ -60,8 +80,9 @@ class ContextJob(QRunnable):
 
     def run(self):
         try:
-            result = {
-                "context": gather(
+            batch = getattr(self.service, "background_read", None)
+            with batch(self.cancelled.is_set) if batch else nullcontext():
+                context = gather(
                     self.service,
                     self.workspace,
                     self.cancelled.is_set,
@@ -69,7 +90,7 @@ class ContextJob(QRunnable):
                     query=self.query,
                     preferred_channel=self.preferred_channel,
                 )
-            }
+            result = {"context": context}
             if self.teammate:
                 live = next(
                     (
@@ -115,6 +136,8 @@ class ContextJob(QRunnable):
                 if user != str(self.service.user.id):
                     raise PermissionError("Your build account changed. Sign in again.")
                 result["managed"] = ManagedClient(self.managed_origin, access)
+        except ReadInterrupted:
+            result = {"error": "Context collection cancelled."}
         except (PermissionError, ValueError, InterruptedError, TimeoutError) as exc:
             result = {"error": str(exc)}
         except Exception:
@@ -321,16 +344,29 @@ class BuildJob(QRunnable):
                 recheck(self.dot_client, self.context)
             if self.runner.cancelled.is_set():
                 raise BuildCancelled()
-            if self.plan:
+            question = clarification_question(result) if self.plan else None
+            if question and credential_rules(json.dumps(question, ensure_ascii=False).encode()):
+                raise ValueError("The agent’s question contained a credential and was hidden.")
+            if self.plan and not question:
                 validate_citations(self.context, result)
             outcome = {
                 "ok": True,
-                "text": result,
+                "text": question["title"] if question else result,
+                "question": question,
                 "project": self.project,
                 "changes": changes(self.project),
                 "commands": self.runner.command_results,
                 "baseline": git(self.project, "rev-parse", "HEAD").strip(),
             }
+            if not self.plan:
+                from aedrova.delivery.files import make_review
+
+                try:
+                    outcome["file_summary"] = make_review(self.project).file_summary() or (
+                        0, 0, 0, ()
+                    )
+                except (OSError, ValueError):
+                    pass  # The review dialog can explain why these files need attention.
         except BuildCancelled:
             outcome = {
                 "ok": False,
@@ -420,6 +456,8 @@ class BuildDialog(AppDialog):
         self.user = str(self.account.service.user.id)
         self.context = self.job = self.project = None
         self.approved_plan = ""
+        self.clarification = None
+        self.question_form = None
         self.baseline = ""
         self.pending = False
         self.collection_cancelled = threading.Event()
@@ -437,7 +475,7 @@ class BuildDialog(AppDialog):
         self.run_id = None
         self.execution_queue = None
         self.setWindowTitle("Aedrova · Build with your team’s context")
-        self.resize(800, 740)
+        self.resize(720, 505)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(14)
@@ -445,68 +483,101 @@ class BuildDialog(AppDialog):
         pref = next((p for p in preferences if p["workspace_id"] == self.workspace), {})
         layout.addWidget(label(f"Build with {pref.get('nickname', 'Aedrova')}", "heading"))
         self.introduction = label(
-            "Your agent plans, codes and tests using your saved project permissions. "
-            "Enable automatic planning and execution in Project settings to begin.",
+            "Aedrova builds in a separate copy. Review changes before applying them.",
             "muted",
             wrap=True,
         )
-        if ai_access_mode() == "local":
-            self.introduction.setText(
-                self.introduction.text() + " This internal build uses your local provider login."
-            )
         layout.addWidget(self.introduction)
+        self.request_toggle = button("Show build request", role="outline")
+        self.request_toggle.setCheckable(True)
+        self.request_toggle.setChecked(True)
+        self.request_toggle.hide()
+        self.request_toggle.toggled.connect(self.show_build_request)
+        layout.addWidget(self.request_toggle, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.setup_fields = QWidget()
+        setup = QVBoxLayout(self.setup_fields)
+        setup.setContentsMargins(0, 0, 0, 0)
+        setup.setSpacing(12)
+        layout.addWidget(self.setup_fields)
+        self.request = QPlainTextEdit(task)
+        self.request.setAccessibleName("Build request")
+        self.request.setObjectName("BuildRequest")
+        self.request.setPlaceholderText("What would you like to build?")
+        self.request.setMaximumHeight(110)
+        setup.addWidget(self.request)
         row = QHBoxLayout()
+        row.addWidget(label("Project", "muted"))
         self.repository = QLineEdit()
-        self.repository.setPlaceholderText("Choose a project folder")
+        self.repository.setPlaceholderText("No project selected")
         self.repository.setAccessibleName("Project folder")
         self.repository.setReadOnly(True)
-        self.choose = button("Project settings", role="outline")
+        self.choose = button("Set up project", role="outline")
         self.choose.clicked.connect(self.configure_project)
+        self.repository.textChanged.connect(
+            lambda path: self.choose.setText("Project settings" if path else "Set up project")
+        )
         row.addWidget(self.repository, 1)
         row.addWidget(self.choose)
         self.provider = CodingProviderChoice()
         self.provider.setCurrentIndex(self.provider.findData(pref.get("provider", "auto")))
-        row.addWidget(self.provider)
-        layout.addLayout(row)
-        layout.addWidget(label("What would you like to build?", "title"))
-        self.request = QPlainTextEdit(task)
-        self.request.setAccessibleName("Build request")
-        self.request.setObjectName("BuildRequest")
-        self.request.setPlaceholderText("What should we build? Include how you’ll know it works.")
-        self.request.setMaximumHeight(110)
-        layout.addWidget(self.request)
-        self.consent = QCheckBox("Share accessible workspace context with the selected AI provider")
-        layout.addWidget(self.consent)
-        self.consent.hide()
+        setup.addLayout(row)
+        self.permissions = PermissionChoice()
+        setup.addWidget(self.permissions, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.permissions.currentIndexChanged.connect(self.change_permissions)
+        self.consent = QCheckBox("Share accessible team context with the AI provider")
+        self.consent.setToolTip(
+            "This may include private chats you can access and small text attachments."
+        )
+        setup.addWidget(self.consent)
+        details_button = button("Build details", role="outline")
+        details_button.setCheckable(True)
+        setup.addWidget(details_button, alignment=Qt.AlignmentFlag.AlignLeft)
+        details = QWidget()
+        details_layout = QVBoxLayout(details)
+        details_layout.setContentsMargins(0, 0, 0, 0)
+        details_layout.addWidget(self.provider, alignment=Qt.AlignmentFlag.AlignLeft)
         self.sources_button = button("Workspace context & decisions", role="outline")
         self.sources_button.clicked.connect(self.open_context)
-        layout.addWidget(self.sources_button)
-        layout.addWidget(
+        details_layout.addWidget(self.sources_button, alignment=Qt.AlignmentFlag.AlignLeft)
+        details_layout.addWidget(
             label(
-                "Context includes your accessible private chats and small text attachments. "
-                "Coding happens in a separate local copy of your project files. Your original "
-                "folder stays intact. Codex runs without network access for commands; Claude asks "
-                "before edits and commands. Review changes after building; local "
-                "application and GitHub "
-                "publication each require your approval.",
+                "Context can include private chats you can access and small text attachments. "
+                "Your selected project permissions govern commands. Applying changes and "
+                "publishing to GitHub each need your approval.",
                 "muted",
                 wrap=True,
             )
         )
-        self.status = label(
-            "Describe what you want to build. Your agent handles the plan and execution.",
-            "muted",
-            wrap=True,
-        )
+        if ai_access_mode() == "local":
+            details_layout.addWidget(label("Uses your local provider login.", "muted"))
+        details.hide()
+        details_button.toggled.connect(details.setVisible)
+        setup.addWidget(details)
+        self.entry_spacer = QWidget()
+        layout.addWidget(self.entry_spacer, 1)
+        self.status = label("", "muted", wrap=True)
         self.status.setAccessibleName("Build status")
         layout.addWidget(self.status)
+        self.question_slot = QVBoxLayout()
+        layout.addLayout(self.question_slot)
+        self.report_tabs = QTabWidget()
+        self.report_tabs.setAccessibleName("Build response and activity")
+        self.response = QTextEdit()
+        self.response.setObjectName("BuildResponse")
+        self.response.setFont(system_font(14))
+        self.response.setReadOnly(True)
+        self.response.setAccessibleName("Agent response")
+        self.response.setPlaceholderText("The agent’s plan and results will appear here.")
+        self.report_tabs.addTab(self.response, "Response")
         self.output = QPlainTextEdit()
+        self.last_progress = ""
         self.output.setReadOnly(True)
-        self.output.setPlaceholderText(
-            "Your plan, live activity and test results will appear here."
-        )
+        self.output.setAccessibleName("Build activity")
+        self.output.setPlaceholderText("Commands and build activity will appear here.")
         self.output.document().setMaximumBlockCount(5000)
-        layout.addWidget(self.output, 1)
+        self.report_tabs.addTab(self.output, "Activity")
+        layout.addWidget(self.report_tabs, 1)
+        self.report_tabs.hide()
         actions = FlowActions()
         self.plan_button = button("Plan internally", role="primary")
         self.build_button = button("Approve plan && build", role="primary")
@@ -514,7 +585,9 @@ class BuildDialog(AppDialog):
         self.folder_button = button("Open build folder", role="outline")
         self.build_button.setEnabled(False)
         self.cancel_button.setEnabled(False)
+        self.cancel_button.hide()
         self.folder_button.setEnabled(False)
+        self.folder_button.hide()
         for control in (
             self.plan_button,
             self.build_button,
@@ -532,10 +605,14 @@ class BuildDialog(AppDialog):
         self.build_button.clicked.connect(lambda: self.start(False))
         self.cancel_button.clicked.connect(self.cancel)
         self.folder_button.clicked.connect(self.open_folder)
-        self.review_button = button("Review & deliver…", role="outline")
+        self.review_button = button("Review changes", role="primary")
         self.review_button.setEnabled(False)
+        self.review_button.hide()
         self.review_button.clicked.connect(self.open_review)
-        layout.addWidget(self.review_button)
+        actions.addWidget(self.review_button)
+        self.question_spacer = QWidget()
+        self.question_spacer.hide()
+        layout.addWidget(self.question_spacer, 1)
         self.account.session_closed.connect(self.invalidate)
         QApplication.instance().aboutToQuit.connect(self.cancel)
         self.request.textChanged.connect(self.invalidate_plan)
@@ -552,6 +629,8 @@ class BuildDialog(AppDialog):
         if saved.get("background_build") or saved.get("auto_plan"):
             self.consent.setChecked(True)
         self.provider.setEnabled(False)
+        self.sync_permissions()
+        self.request.setFocus()
 
     def configure_project(self):
         from aedrova.desktop.projects import open_project
@@ -561,18 +640,127 @@ class BuildDialog(AppDialog):
                 "Switch back to this workspace before changing its project settings."
             )
             return
-        open_project(self.window)
+        dialog = open_project(self.window)
+        if dialog:
+            dialog.finished.connect(self.refresh_project)
+
+    def refresh_project(self, result):
+        from aedrova.desktop.projects import binding
+
+        if self.invalidated or result != QDialog.DialogCode.Accepted:
+            return
+        saved = binding(self.window, self.workspace)
+        if saved.get("folder", "") != self.binding_folder:
+            self.binding_folder = saved.get("folder", "")
+            self.repository.setText(self.binding_folder)
+        self.provider.setCurrentIndex(self.provider.findData(saved.get("provider", "auto")))
+        self.consent.setChecked(bool(saved.get("background_build") or saved.get("auto_plan")))
+        self.sync_permissions()
+
+    def sync_permissions(self):
+        from aedrova.desktop.agent_permissions import mode, sync_choice
+
+        user = self.window.current_user()
+        enabled = bool(
+            user
+            and str(user.id) == self.user
+            and self.window.workspace_id == self.workspace
+            and not self.invalidated
+            and self.binding_folder_matches()
+        )
+        value = mode(self.window, self.workspace) if enabled else "ask"
+        sync_choice(self.permissions, value, enabled)
+
+    def binding_folder_matches(self):
+        from aedrova.desktop.projects import binding
+
+        saved = binding(self.window, self.workspace).get("folder", "")
+        return bool(saved and saved == getattr(self, "binding_folder", ""))
+
+    def change_permissions(self, _index):
+        from aedrova.desktop.agent_permissions import change
+
+        if self.permissions.isEnabled() and self.binding_folder_matches():
+            change(self.window, self.permissions.currentData())
 
     def launch_autonomous(self):
-        from aedrova.desktop.projects import binding, open_project
+        from aedrova.desktop.projects import binding
 
+        if self.clarification:
+            self.resume_with_answer()
+            return
         if self.workspace != self.window.workspace_id:
             self.status.setText("Switch back to this workspace before starting its build.")
             return
-        if not binding(self.window, self.workspace).get("background_build"):
-            open_project(self.window)
+        if self.approved_plan:
+            self.start(False)
             return
-        start_background_build(self.window, self.request.toPlainText())
+        if not self.request.toPlainText().strip():
+            self.status.setText("Describe what you want to build.")
+            self.request.setFocus()
+            return
+        if not self.repository.text():
+            self.configure_project()
+            return
+        if not binding(self.window, self.workspace).get("background_build"):
+            self.start(True)
+            return
+        start_background_build(
+            self.window, self.request.toPlainText(), bud=getattr(self, "bud", None)
+        )
+
+    def clear_question(self):
+        self.clarification = None
+        if self.question_form:
+            self.question_slot.removeWidget(self.question_form)
+            self.question_form.hide()
+            self.question_form.deleteLater()
+            self.question_form = None
+            self.introduction.show()
+            self.request_toggle.setChecked(True)
+            self.show_build_request(True)
+            self.report_tabs.show()
+            self.question_spacer.hide()
+
+    def show_build_request(self, visible):
+        self.setup_fields.setVisible(visible)
+        self.request_toggle.setText("Hide build request" if visible else "Show build request")
+
+    def resume_with_answer(self):
+        if not self.clarification or self.pending or self.invalidated:
+            return
+        user = self.window.current_user()
+        if (
+            not user
+            or str(user.id) != self.user
+            or self.workspace != self.window.workspace_id
+        ):
+            self.status.setText("Return to this workspace to answer.")
+            return
+        if self.background_run and not self.background_authorized():
+            self.cancel()
+            self.status.setText("Project permissions changed. Start a new build after setup.")
+            return
+        answers = self.question_form.answers()
+        if answers is None:
+            self.status.setText("Complete the required fields to continue.")
+            return
+        from aedrova.security.credentials import credential_rules
+
+        exchange = json.dumps(
+            {"agent_question": self.clarification["title"], "user_answers": answers},
+            ensure_ascii=False,
+        )
+        if credential_rules(exchange.encode()):
+            self.status.setText("Remove the credential from your answer before continuing.")
+            return
+        task = self.request.toPlainText().rstrip() + "\n\nClarification\n" + exchange
+        if len(task) > 20000:
+            self.status.setText("Shorten the answer to stay under the 20,000-character limit.")
+            return
+        self.clear_question()
+        self.request.setPlainText(task)
+        self.start(True)
 
     def background_authorized(self):
         from aedrova.desktop.projects import binding
@@ -598,16 +786,23 @@ class BuildDialog(AppDialog):
         if generation != self.generation or not self.background_run:
             return
         if not self.background_authorized():
-            self.background_run = False
-            self.status.setText("Project permissions changed. Send a new request after setup.")
-            self.window.agent_activity(self.workspace, self.status.text())
+            self.stop_before_run("Project permissions changed. Send a new request after setup.")
             return
         self.start(False)
 
     def open_review(self):
         from aedrova.desktop.review import ReviewDialog
 
-        if self.project and self.successful_build and not self.pending and not self.invalidated:
+        user = self.window.current_user()
+        if (
+            user
+            and str(user.id) == self.user
+            and self.window.workspace_id == self.workspace
+            and self.project
+            and self.successful_build
+            and not self.pending
+            and not self.invalidated
+        ):
             if self.review_dialog and not self.review_dialog.cancelled.is_set():
                 self.review_dialog.show()
                 self.review_dialog.raise_()
@@ -628,6 +823,7 @@ class BuildDialog(AppDialog):
         if not self.pending:
             self.approved_plan = ""
             self.build_button.setEnabled(False)
+            self.start_button.setText("Start build")
 
     def choose_folder(self):
         path = choose_project(self, self.repository.text())
@@ -648,15 +844,27 @@ class BuildDialog(AppDialog):
         ):
             control.setEnabled(not busy and not self.invalidated)
         self.build_button.setEnabled(not busy and bool(self.approved_plan) and not self.invalidated)
-        self.cancel_button.setEnabled(busy)
+        if self.clarification:
+            for control in (self.choose, self.request, self.consent):
+                control.setEnabled(False)
+        self.cancel_button.setVisible(busy or bool(self.clarification))
+        self.cancel_button.setEnabled(busy or bool(self.clarification))
         self.review_button.setEnabled(not busy and self.successful_build and not self.invalidated)
+        self.review_button.setVisible(self.successful_build and not self.invalidated)
+        self.folder_button.setVisible(bool(self.project) and not self.invalidated)
         if self.invalidated:
             self.window.build_activity.hide()
         elif busy:
+            self.entry_spacer.hide()
+            self.report_tabs.show()
             self.window.agent_activity(self.workspace, "Working · view progress")
         self.window.update_agent_cancel()
 
     def start(self, plan):
+        user = self.window.current_user()
+        if not user or str(user.id) != self.user or self.workspace != self.window.workspace_id:
+            self.status.setText("Return to this workspace to run the build.")
+            return
         if self.review_dialog and self.review_dialog.job:
             self.status.setText("Finish the active delivery action before starting another build.")
             return
@@ -664,7 +872,10 @@ class BuildDialog(AppDialog):
             self.review_dialog.revoke()
         if self.context_browser and not self.context_browser.closed:
             self.context_browser.close()
-        if self.pending or self.invalidated:
+        if self.pending or self.invalidated or self.clarification:
+            return
+        if getattr(self.window, "dot_query", None):
+            self.status.setText("Wait for the current response before starting a build.")
             return
         if not self.request.toPlainText().strip():
             self.status.setText("Enter what you want the AI to build in the request field above.")
@@ -680,17 +891,35 @@ class BuildDialog(AppDialog):
             )
             self.consent.setFocus()
             return
-        if len(self.request.toPlainText()) > 20000:
+        request = self.request.toPlainText().strip()
+        if len(request) > 20000:
             self.status.setText("Keep your build request under 20,000 characters.")
+            return
+        from aedrova.security.credentials import credential_rules
+
+        if credential_rules(request.encode()):
+            self.status.setText("Remove the credential from your request before starting.")
             return
         if not plan and not self.approved_plan:
             return
+        if plan:
+            if not self.background_run:
+                self.window.archive_finished_agent()
+                self.window.agent_feed.clear()
+                self.window.activity_channel = self.origin_channel
+                from aedrova.desktop.dots import shelf_rows
+
+                bud = getattr(self, "bud", None)
+                self.window.agent_feed.character_config = (
+                    shelf_rows([bud])[0]["config"] if bud else None
+                )
+            self.window.agent_clock.reset()
         self.generation += 1
         generation = self.generation
         self.collection_cancelled = threading.Event()
         cancelled = self.collection_cancelled
         self.set_busy(True)
-        self.status.setText("Checking access and gathering workspace context…")
+        self.status.setText("Checking workspace access…")
         self.window.agent_activity(self.workspace, self.status.text())
         if plan:
             self.successful_build = False
@@ -701,10 +930,15 @@ class BuildDialog(AppDialog):
                 saved["provider"] = self.provider.currentData()
                 save_binding(self.window, saved, self.workspace)
             self.output.clear()
+            self.response.clear()
+            self.last_progress = ""
             self.project = None
             self.context = None
             self.folder_button.setEnabled(False)
+            self.folder_button.hide()
+            self.review_button.hide()
             self.approved_plan = ""
+        self.report_tabs.setCurrentWidget(self.output)
         service = self.account.service
 
         def connect_context():
@@ -724,9 +958,7 @@ class BuildDialog(AppDialog):
                     close()
                 return
             if "error" in result:
-                self.status.setText(result["error"])
-                self.window.agent_activity(self.workspace, result["error"])
-                self.set_busy(False)
+                self.stop_before_run(result["error"])
                 return
             job = ContextJob(
                 result["service"],
@@ -734,7 +966,7 @@ class BuildDialog(AppDialog):
                 cancelled,
                 generation,
                 result.get("managed_origin", ""),
-                query=self.request.toPlainText(),
+                query=request,
                 preferred_channel=self.origin_channel,
                 teammate=getattr(self, "teammate", None),
             )
@@ -748,16 +980,22 @@ class BuildDialog(AppDialog):
             if generation != self.generation or not self.pending or self.invalidated:
                 return
             if "error" in result:
-                self.status.setText(result["error"])
-                self.window.agent_activity(self.workspace, result["error"])
-                self.set_busy(False)
+                self.stop_before_run(result["error"])
                 return
             context = result["context"]
+            user = self.window.current_user()
+            if (
+                not user
+                or str(user.id) != self.user
+                or context.user_id != self.user
+                or self.account.service is not service
+            ):
+                self.invalidate()
+                return
             if self.background_run and not self.background_authorized():
-                self.background_run = False
-                self.status.setText("Project permissions changed. Send a new request after setup.")
-                self.window.agent_activity(self.workspace, self.status.text())
-                self.set_busy(False)
+                self.stop_before_run(
+                    "Project permissions changed. Send a new request after setup."
+                )
                 return
 
 
@@ -774,12 +1012,10 @@ class BuildDialog(AppDialog):
                 context.text != self.context.text or context.channel_ids != self.context.channel_ids
             ):
                 self.approved_plan = ""
-                self.status.setText(
+                self.stop_before_run(
                     "Workspace context changed. Send a new build request "
                     "to use the latest requirements."
                 )
-                self.window.agent_activity(self.workspace, self.status.text())
-                self.set_busy(False)
                 return
             self.context = context
             memory = next(
@@ -800,7 +1036,7 @@ class BuildDialog(AppDialog):
             self.job = BuildJob(
                 context,
                 self.repository.text(),
-                self.request.toPlainText().strip(),
+                request,
                 self.provider.currentData(),
                 plan,
                 self.project,
@@ -845,12 +1081,24 @@ class BuildDialog(AppDialog):
             ("build-context", id(self), generation), connect_context, connected, priority=True
         )
         if not accepted:
-            self.set_busy(False)
-            self.status.setText("The connection is busy. Please retry in a moment.")
+            self.stop_before_run("The connection is busy. Please retry in a moment.")
+
+    def stop_before_run(self, text):
+        self.background_run = False
+        self.set_busy(False)
+        self.status.setText(text)
+        self.response.setPlainText(text)
+        self.report_tabs.setCurrentWidget(self.response)
+        if self.window.agent_feed.status_row is not None:
+            self.window.finish_agent_response(self.workspace, text)
 
     @Slot(str)
     def context_progress(self, text):
-        if self.pending and not self.invalidated and not self.collection_cancelled.is_set():
+        current = self.context_jobs.get(self.generation)
+        if (
+            current and self.sender() is current.signals and self.pending
+            and not self.invalidated and not self.collection_cancelled.is_set()
+        ):
             self.status.setText(text)
             self.window.agent_activity(self.workspace, text)
 
@@ -869,22 +1117,36 @@ class BuildDialog(AppDialog):
 
     @Slot(str)
     def progress(self, text):
-        if not self.invalidated:
-            if not self.output.toPlainText().endswith(text[-50000:]):
-                self.output.appendPlainText(text[-50000:])
-                teammate = getattr(self, "teammate", None)
-                reporting = teammate["config"]["reporting"] if teammate else "detailed"
-                now = time.monotonic()
-                if reporting != "quiet" and (
-                    reporting == "detailed" or now - getattr(self, "last_teammate_update", 0) > 2
-                ):
-                    self.window.agent_event(self.workspace, text)
-                    self.last_teammate_update = now
+        if self.invalidated or text.lstrip().partition("\n")[0].strip() == CLARIFICATION:
+            return
+        line = text[-50000:]
+        if not line or line == self.last_progress:
+            return
+        self.last_progress = line
+        self.output.appendPlainText(line)
+        teammate = getattr(self, "teammate", None)
+        reporting = teammate["config"]["reporting"] if teammate else "detailed"
+        now = time.monotonic()
+        if reporting != "quiet" and (
+            reporting == "detailed" or now - getattr(self, "last_teammate_update", 0) > 2
+        ) and not self.collection_cancelled.is_set():
+            self.window.agent_event(self.workspace, text)
+            self.last_teammate_update = now
 
     @Slot(object)
     def permission(self, request):
         try:
-            if self.invalidated or not self.pending or self.job.runner.cancelled.is_set():
+            job = self.job
+            user = self.window.current_user()
+            if (
+                self.invalidated
+                or not self.pending
+                or not job
+                or job.runner.cancelled.is_set()
+                or not user
+                or str(user.id) != self.user
+                or self.window.workspace_id != self.workspace
+            ):
                 return
             from aedrova.agents.permissions import automatic
             from aedrova.desktop.agent_permissions import mode
@@ -894,31 +1156,41 @@ class BuildDialog(AppDialog):
                 return
             if self.background_run and not self.background_authorized():
                 return
+            project = getattr(job, "project", None) or self.project
             if selected == "full" or (
-                selected == "auto" and automatic(request["tool"], request["data"], self.project)
+                selected == "auto"
+                and project
+                and automatic(request["tool"], request["data"], project)
             ):
                 request["allow"] = True
                 return
-            permission_runner = self.job.runner
             box = QMessageBox(self)
             self.permission_box = box
             self.window.agent_activity(self.workspace, "Action needs your approval")
             box.setWindowTitle("Aedrova · Approve agent action")
             box.setTextFormat(Qt.TextFormat.PlainText)
-            box.setText(
-                f"Allow {request['tool']} in this build?\nReview the exact action below. "
-                "Do not approve pushes, deployments or credential access."
-            )
+            box.setText(f"Allow {request['tool']} in this build?")
+            detail = request["data"].get("command") or request["data"].get("file_path")
+            if isinstance(detail, str):
+                box.setInformativeText(detail[:320] + ("…" if len(detail) > 320 else ""))
             box.setDetailedText(json.dumps(request["data"], indent=2))
             box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             box.setDefaultButton(QMessageBox.StandardButton.No)
             box.button(QMessageBox.StandardButton.Yes).setText("Allow once")
             box.button(QMessageBox.StandardButton.No).setText("Deny")
+            approved = box.exec() == QMessageBox.StandardButton.Yes
+            current = self.window.current_user()
             request["allow"] = (
-                box.exec() == QMessageBox.StandardButton.Yes
+                approved
                 and not self.invalidated
-                and not permission_runner.cancelled.is_set()
+                and self.pending
+                and self.job is job
+                and not job.runner.cancelled.is_set()
+                and current
+                and str(current.id) == self.user
+                and self.window.workspace_id == self.workspace
                 and mode(self.window, self.workspace) == selected
+                and (not self.background_run or self.background_authorized())
             )
         finally:
             self.permission_box = None
@@ -939,13 +1211,42 @@ class BuildDialog(AppDialog):
         if self.invalidated:
             self.set_busy(False)
             self.output.clear()
+            self.response.clear()
             return
         self.folder_button.setEnabled(bool(self.project))
-        self.progress(result["text"])
+        if plan and result["ok"] and result.get("question"):
+            self.clarification = result["question"]
+            self.approved_plan = ""
+            self.question_form = ClarificationForm(self.clarification, self.resume_with_answer)
+            self.question_slot.addWidget(self.question_form)
+            self.introduction.hide()
+            self.request_toggle.hide()
+            self.setup_fields.hide()
+            self.report_tabs.hide()
+            self.question_spacer.show()
+            self.set_busy(False)
+            self.status.setText("Waiting for your answer")
+            self.start_button.setText("Send answer")
+            self.window.agent_activity(self.workspace, "Build paused · answer a question")
+            self.show()
+            self.raise_()
+            self.question_form.focus_first()
+            return
+        if result["ok"]:
+            self.response.setHtml(markdown_html(result["text"], base_font=self.response.font()))
+        else:
+            self.response.setPlainText(result["text"])
+        self.report_tabs.setCurrentWidget(self.response)
+        self.request_toggle.show()
+        self.request_toggle.setChecked(False)
         if result["ok"]:
             self.approved_plan = result["text"] if plan else ""
             self.status.setText(
-                "Plan prepared. Your agent will continue using the saved execution setting."
+                (
+                    "Plan ready. Starting the build…"
+                    if self.background_run
+                    else "Review the plan, then approve it to start the build."
+                )
                 if plan
                 else "Run complete. Review the agent’s test results and local changes."
             )
@@ -956,16 +1257,16 @@ class BuildDialog(AppDialog):
             if not plan:
                 self.successful_build = True
                 self.repository.setText(str(self.project))
-                self.progress("Local changes:\n" + result["changes"])
-                self.progress(
-                    "Ready for your next request. New plans will start from this "
-                    "build's files so you can keep iterating."
-                )
+                if result["changes"].strip():
+                    self.output.appendPlainText("Local changes\n" + result["changes"])
         else:
             self.approved_plan = ""
             self.status.setText("Run stopped. See the details below.")
             self.window.agent_activity(self.workspace, "Needs attention · open to continue")
         self.set_busy(False)
+        self.start_button.setText(
+            "Approve plan and build" if self.approved_plan else "Start build"
+        )
         analysis = bool(
             getattr(self, "teammate", None) and self.teammate["config"]["role"] != "engineering"
         )
@@ -984,7 +1285,47 @@ class BuildDialog(AppDialog):
             QTimer.singleShot(0, lambda: self.continue_background(generation))
         else:
             self.background_run = False
-            self.window.finish_agent_response(self.workspace, result["text"])
+            summary = result.get("file_summary") if result["ok"] and not plan else None
+            generation = self.generation
+            queue, run_id = self.execution_queue, self.run_id
+
+            def review_current_build():
+                if self.generation == generation and not self.invalidated:
+                    self.open_review()
+                elif queue and run_id and queue.identity() == self.user:
+                    queue.show_history(selected_run=run_id)
+                else:
+                    self.window.notify("This build’s review is no longer open.")
+
+            text = result["text"]
+            if result["ok"] and not plan:
+                commands = result.get("commands", [])
+                passed = sum(check.get("state") == "passed" for check in commands)
+                failed = sum(check.get("state") == "failed" for check in commands)
+                unknown = len(commands) - passed - failed
+                verification = (
+                    f"{passed} passed · {failed} failed · {unknown} unverified"
+                    if commands else "No command results were recorded."
+                )
+                text += f"\n\n**Recorded command results**  \n{verification}"
+            self.window.finish_agent_response(
+                self.workspace, text,
+                source_channels=self.context.channel_ids if self.context else (),
+                file_summary=summary,
+                open_changes=review_current_build if summary else None,
+            )
+            if (
+                result["ok"]
+                and self.successful_build
+                and not plan
+                and not summary
+                and self.window.workspace_id == self.workspace
+            ):
+                feed = self.window.agent_feed
+                review = button("Review changes", role="outline")
+                review.clicked.connect(review_current_build)
+                feed.reply_row.column.addWidget(review, alignment=Qt.AlignmentFlag.AlignLeft)
+                feed.changed.emit()
         self.window.build_activity.configure(
             self.window.theme, self.window.reduced_motion, self.background_transition
         )
@@ -1088,28 +1429,39 @@ class BuildDialog(AppDialog):
             if self.context_browser and not self.context_browser.closed:
                 self.context_browser.check_access(snapshot)
             allowed = authorize(snapshot, self.workspace, self.user)
+            if self.origin_channel not in allowed:
+                self.invalidate()
+                return
             if self.context and not self.context.channel_ids <= allowed:
                 raise PermissionError()
         except PermissionError:
             self.invalidate()
 
     def invalidate(self):
+        active = self.pending or self.background_transition or self.clarification
         self.invalidated = True
         if self.review_dialog:
             self.review_dialog.revoke()
         if self.context_browser:
             self.context_browser.revoke()
         self.cancel()
+        if active and getattr(self.window, "build_dialog", None) is self:
+            self.window.agent_feed.clear()
         self.context = None
         self.approved_plan = ""
         self.request.clear()
         self.output.clear()
+        self.response.clear()
         self.folder_button.setEnabled(False)
         self.set_busy(bool(self.job))
         self.status.setText("Workspace access changed or you signed out. This build has stopped.")
         self.hide()
 
     def cancel(self):
+        if not (self.pending or self.background_transition or self.clarification):
+            return
+        self.clear_question()
+        self.start_button.setText("Start build")
         self.background_run = False
         self.background_transition = False
         self.collection_cancelled.set()
@@ -1123,7 +1475,7 @@ class BuildDialog(AppDialog):
         self.status.setText("Cancellation requested. Waiting for the provider to stop…")
         if not self.invalidated:
             self.window.agent_activity(
-                self.workspace, "Cancelled · partial files remain for review"
+                self.workspace, "Stopping…" if self.job else "Cancelled"
             )
             if not self.job:
                 self.window.finish_agent_response(
@@ -1165,6 +1517,11 @@ def open_build(window, task="", *, bud=None):
             else start_background_build(window, task)
         )
     existing = getattr(window, "build_dialog", None)
+    if existing and existing.clarification and existing.workspace == window.workspace_id:
+        existing.show()
+        existing.raise_()
+        existing.question_form.focus_first()
+        return not task
     if existing and existing.pending:
         existing.show()
         existing.raise_()
@@ -1179,7 +1536,9 @@ def open_build(window, task="", *, bud=None):
             and getattr(existing, "bud", None) == bud
         ):
             if task and not existing.pending:
+                existing.origin_channel = window.channel_id
                 existing.request.setPlainText(task)
+                existing.request_toggle.setChecked(True)
             existing.show()
             existing.raise_()
             existing.activateWindow()
@@ -1214,7 +1573,7 @@ def start_background_build(window, task, *, bud=None):
     )
 
 
-def _start_background_build(window, task, *, teammate=None, bud=None):
+def _start_background_build(window, task, *, teammate=None, bud=None, origin_channel=None):
     """A chat mention never opens a dialog or starts a second overlapping run."""
     from aedrova.desktop.projects import binding
 
@@ -1270,7 +1629,8 @@ def _start_background_build(window, task, *, teammate=None, bud=None):
     dialog.background_settings = (saved["folder"], saved.get("provider", "codex"), True)
     dialog.background_run = True
     window.agent_clock.reset()
-    window.activity_channel = window.channel_id
+    dialog.origin_channel = origin_channel or window.channel_id
+    window.activity_channel = dialog.origin_channel
     from aedrova.desktop.dots import shelf_rows
 
     window.agent_feed.character_config = (

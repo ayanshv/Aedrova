@@ -75,6 +75,7 @@ class ExecutionQueue(QObject):
             return False
         if bud:
             saved["bud"] = dict(bud)
+        saved["origin_channel"] = self.window.channel_id
         try:
             run_id, fresh = self.ledger.enqueue(user, self.window.workspace_id, task, saved)
         except ValueError as exc:
@@ -97,7 +98,7 @@ class ExecutionQueue(QObject):
         self.last_user = user
         if self.active:
             dialog = self.active[1]
-            if dialog.pending or dialog.background_transition:
+            if dialog.pending or dialog.background_transition or dialog.clarification:
                 return
             run_id, _ = self.active
             state = (
@@ -116,6 +117,7 @@ class ExecutionQueue(QObject):
         current = getattr(self.window, "build_dialog", None)
         if current and (
             current.pending
+            or current.clarification
             or current.background_transition
             or (current.review_dialog and current.review_dialog.job)
         ):
@@ -133,11 +135,16 @@ class ExecutionQueue(QObject):
             return
         row = queued[0]
         try:
-            authorize(self.window.account_dialog.snapshot, row["workspace"], user)
+            allowed = authorize(self.window.account_dialog.snapshot, row["workspace"], user)
         except PermissionError:
             self.ledger.update(row["id"], "paused")
             return
         pinned = json.loads(row["settings"])
+        origin_channel = pinned.pop("origin_channel", None)
+        if origin_channel and origin_channel not in allowed:
+            self.ledger.update(row["id"], "paused")
+            self.window.notify("The original conversation is unavailable. Start a new build.")
+            return
         bud = pinned.pop("bud", None)
         if bud and not live_bud(self.window, bud, row["workspace"]):
             self.ledger.update(row["id"], "paused")
@@ -162,13 +169,10 @@ class ExecutionQueue(QObject):
         from aedrova.desktop.builds import _start_background_build
 
         try:
-            started = (
-                _start_background_build(self.window, row["task"], bud=bud)
-                if bud
-                else _start_background_build(self.window, row["task"], teammate=teammate)
-                if teammate
-                else _start_background_build(self.window, row["task"])
-            )
+            options = {"origin_channel": origin_channel} if origin_channel else {}
+            if bud:
+                options["bud"] = bud
+            started = _start_background_build(self.window, row["task"], **options)
         except Exception:
             self.ledger.update(row["id"], "failed")
             self.window.notify("Could not start the queued build. Review it in Builds.")
@@ -181,13 +185,18 @@ class ExecutionQueue(QObject):
         else:
             self.ledger.update(row["id"], "failed")
 
-    def show_history(self):
+    def show_history(self, *, selected_run=None):
         if not self.identity():
             self.window.notify("Sign in to view your builds.")
             return
         if self.dialog:
             self.dialog.close()
         self.dialog = RunHistory(self)
+        if selected_run:
+            for index, row in enumerate(self.dialog.rows):
+                if row["id"] == selected_run:
+                    self.dialog.list.setCurrentRow(index)
+                    break
         self.dialog.show()
 
 
@@ -298,7 +307,9 @@ class RunHistory(AppDialog):
             and latest.workspace == self.workspace
             and getattr(latest, "run_id", None) == row["id"]
         ):
-            lines.extend([latest.status.text(), latest.output.toPlainText(), ""])
+            lines.extend([latest.status.text(), latest.response.toPlainText(), ""])
+            if latest.output.toPlainText().strip():
+                lines.extend(["Build activity", latest.output.toPlainText(), ""])
         elif row["state"] in {"failed", "interrupted", "cancelled"}:
             lines.extend(
                 [
@@ -322,6 +333,7 @@ class RunHistory(AppDialog):
         if not row or row["state"] not in {"paused", "failed", "interrupted", "cancelled"}:
             return
         saved = json.loads(row["settings"])
+        saved.pop("origin_channel", None)
         bud = saved.pop("bud", None)
         if bud and not live_bud(self.queue.window, bud, self.workspace):
             self.queue.window.notify("Bud settings changed. Send a fresh request.")
@@ -383,6 +395,7 @@ class RunHistory(AppDialog):
             )
             return
         saved = json.loads(row["settings"])
+        saved.pop("origin_channel", None)
         bud = saved.pop("bud", None)
         if bud and not live_bud(self.queue.window, bud, self.workspace):
             self.queue.window.notify("Bud settings changed. Send a fresh request.")

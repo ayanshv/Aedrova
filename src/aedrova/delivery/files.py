@@ -35,6 +35,25 @@ class Change:
             + self.path
         )
 
+    def line_counts(self):
+        before = self.before.data if self.before else b""
+        after = self.after.data if self.after else b""
+        if len(before) + len(after) > 1024 * 1024 or b"\0" in before or b"\0" in after:
+            return None, None
+        try:
+            old = before.decode().splitlines(keepends=True)
+            new = after.decode().splitlines(keepends=True)
+        except UnicodeDecodeError:
+            return None, None
+        added = removed = 0
+        for operation, old_start, old_end, new_start, new_end in (
+            difflib.SequenceMatcher(None, old, new).get_opcodes()
+        ):
+            if operation != "equal":
+                added += new_end - new_start
+                removed += old_end - old_start
+        return added, removed
+
     def diff(self):
         old = self.before.data if self.before else b""
         new = self.after.data if self.after else b""
@@ -71,6 +90,17 @@ class Review:
     source: Path
     changes: tuple[Change, ...]
     digest: str
+
+    def file_summary(self, limit=6):
+        if not self.changes:
+            return None
+        rows = [(change.path, *change.line_counts()) for change in self.changes]
+        return (
+            len(rows),
+            sum(added or 0 for _, added, _ in rows),
+            sum(removed or 0 for _, _, removed in rows),
+            tuple(rows[:limit]),
+        )
 
 
 def inventory(root):
