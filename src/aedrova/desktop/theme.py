@@ -68,17 +68,17 @@ DARK = Theme(
     "#F2F2F2",
     "#BDBDBD",
     "#B0B0B0",
-    "#79A7FF",
+    LIGHT.accent,
     "#353535",
     "#D6D6D6",
-    "#181818",
+    LIGHT.primary_text,
     ("#383838", "#303030", "#3E3E3E", "#353535"),
     "#1E1E1E",
     "#303030",
     "#292929",
     "#F5F6F8",
-    "#89B2FF",
-    "#6796F3",
+    LIGHT.accent_hover,
+    LIGHT.accent_pressed,
 )
 
 
@@ -142,6 +142,7 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QFrame#DictationStrip, QFrame#UploadProgress {{ background: {t.canvas};
         border: none; border-radius: 10px; }}
     QFrame#DictationStrip QLabel {{ color: {t.text}; font-size: 12px; }}
+    QFrame#TypingBubble {{ background: {t.surface}; border-radius: 12px; }}
     QProgressBar#UploadMeter {{ border: none; background: {t.surface};
         height: 3px; max-height: 3px; border-radius: 1px; }}
     QProgressBar#UploadMeter::chunk {{ background: {t.accent}; border-radius: 1px; }}
@@ -274,6 +275,19 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QSlider::handle:horizontal:hover {{ background: {t.accent_bg}; }}
     QSlider::handle:horizontal:focus {{ border: 3px solid {t.accent}; }}
     QSlider::handle:horizontal:disabled {{ border-color: {t.muted}; }}
+    QFrame#BudStyleCard {{ background: {t.surface}; border: none; border-radius: 12px; }}
+    QLabel#BudStyleValue {{ color: {t.text}; background: {t.hover};
+        border-radius: 8px; padding: 3px 8px; font-weight: 600; }}
+    QLabel#BudVoicePreview {{ color: {t.text}; background: {t.accent_bg};
+        border-left: 3px solid {t.accent}; border-radius: 8px; padding: 8px 12px; }}
+    QSlider#BudStyleSlider::groove:horizontal {{ background: {t.border}; height: 8px;
+        border-radius: 4px; }}
+    QSlider#BudStyleSlider::sub-page:horizontal {{ background: {t.accent}; border-radius: 4px; }}
+    QSlider#BudStyleSlider::handle:horizontal {{ background: {t.accent}; width: 19px;
+        border: 3px solid {t.bg}; margin: -8px 0; border-radius: 12px; }}
+    QSlider#BudStyleSlider::handle:horizontal:hover {{ background: {t.accent_hover}; }}
+    QSlider#BudStyleSlider::handle:horizontal:focus {{ border-color: {t.text}; }}
+    QSlider#BudStyleSlider::handle:horizontal:disabled {{ background: {t.muted}; }}
     QFrame#CallBar {{ background: transparent; border: none;
         border-radius: 10px; }}
     QWidget#Segments {{ background: transparent; border: none;
@@ -333,7 +347,8 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QListWidget#Switcher {{ background: transparent; border: none; }}
     QListWidget#Switcher::item {{ padding: 14px; border-radius: 7px; }}
     QListWidget#Switcher::item:selected {{ background: {t.accent_bg}; color: {t.accent_text}; }}
-    QPlainTextEdit {{ background: {t.surface}; border: 1px solid {t.border}; border-radius: 7px;
+    QPlainTextEdit, QTextEdit#BuildResponse {{ background: {t.surface};
+        border: 1px solid {t.border}; border-radius: 7px;
         padding: 8px; selection-background-color: {t.accent_bg}; {placeholder} }}
     QPlainTextEdit#ComposerEditor, QPlainTextEdit#ComposerEditor:focus {{
         background: transparent; border: 1px solid transparent; }}
@@ -402,6 +417,8 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QToolButton#CallControl[danger='true'] {{ color: {"#B4232F" if white else "#FF8A92"}; }}
     QScrollArea#AgentStream, QWidget#AgentStreamContent,
     QFrame#AgentMessage {{ background: transparent; border: none; }}
+    QLabel#AgentWorkNotes {{ color: {t.secondary}; padding: 3px 0 8px 0;
+        background: transparent; }}
     QFrame#AgentTool {{ background: {t.surface}; border: 1px solid {t.border};
         border-radius: 7px; }}
     QPushButton#AgentDisclosure {{ background: transparent; border: none;

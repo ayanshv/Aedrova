@@ -822,6 +822,28 @@ class IdentityService:
         self._authenticated()
         return self.client.rpc("record_build_delivery", parameters).execute().data
 
+    def agent_reply_history(self, workspace, channel, parent=None):
+        self._authenticated()
+        try:
+            query = (
+                self.client.table("my_agent_replies").select("*")
+                .eq("workspace_id", workspace).eq("channel_id", channel)
+            )
+            query = query.eq("parent_id", parent) if parent else query.is_("parent_id", "null")
+            return query.order("created_at", desc=True).order("id").limit(200).execute().data
+        except Exception as error:
+            if getattr(error, "code", None) == "PGRST205":
+                return []
+            raise
+
+    def save_agent_reply(self, parameters):
+        self._authenticated()
+        from aedrova.security.credentials import credential_rules
+
+        if credential_rules(parameters["p_body"].encode()):
+            raise ValueError("Remove credentials before saving an agent reply.")
+        return self.client.rpc("save_agent_reply", parameters).execute().data
+
     def shared_agent_work(self, workspace, *, identifiers=None):
         """Fresh RLS read; no private Bud history or cached connector grants."""
         self._authenticated()

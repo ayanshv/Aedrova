@@ -50,7 +50,14 @@ def apple_sign_in(service, cancel=None, **options):
 
 
 def provider_sign_in(
-    service, cancel=None, *, provider, opener=webbrowser.open, timeout=180, port=PORT
+    service,
+    cancel=None,
+    *,
+    provider,
+    opener=webbrowser.open,
+    timeout=180,
+    port=PORT,
+    appearance="system",
 ):
     """Runs off the UI thread. Tokens never appear in the browser response or logs."""
     if provider not in {"google", "apple"}:
@@ -86,10 +93,10 @@ def provider_sign_in(
             codes = query.get("code", [])
             if len(codes) == 1 and codes[0] and len(codes[0]) <= 4096 and "error" not in query:
                 result["code"] = codes[0]
-                page = render_callback(True)
+                page = render_callback(True, appearance=appearance)
             elif "error" in query:
                 result["error"] = True
-                page = render_callback(False)
+                page = render_callback(False, appearance=appearance)
             else:
                 self.send_error(400)
                 return

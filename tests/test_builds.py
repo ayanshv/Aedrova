@@ -431,13 +431,14 @@ def test_build_plan_then_approval_and_worker_cleanup(qtbot, tmp_path, monkeypatc
     qtbot.addWidget(dialog)
     dialog.repository.setText(str(repository))
     dialog.consent.setChecked(True)
-    dialog.start(True)
+    dialog.start_button.click()
     qtbot.waitUntil(lambda: not dialog.pending, timeout=10000)
     assert dialog.build_button.isEnabled(), dialog.output.toPlainText()
     assert plans == [True]
     assert not (dialog.project.parent / "workspace-context.jsonl").exists()
     assert not (dialog.project / "feature.py").exists()
-    dialog.start(False)
+    assert dialog.start_button.text() == "Approve plan and build"
+    dialog.start_button.click()
     qtbot.waitUntil(lambda: not dialog.pending, timeout=10000)
     assert plans == [True, False]
     assert (dialog.project / "feature.py").read_text() == "value = 42\n"

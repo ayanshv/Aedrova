@@ -115,6 +115,9 @@ def test_compact_chat_keeps_composer_and_footer_separate_during_activity(qtbot, 
         window.composer.mention_list.geometry().bottom()
         < window.composer.mapTo(window, window.composer.rect().topLeft()).y()
     )
+    assert window.notice.isHidden()
+    window.notify("Connection interrupted. Retrying…")
+    qtbot.waitUntil(window.notice.isVisible)
     assert window.notice.mapTo(window, window.notice.rect().topLeft()).y() > (
         window.composer.mapTo(window, window.composer.rect().bottomLeft()).y()
     )

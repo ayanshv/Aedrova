@@ -17,7 +17,7 @@ jobs:
       matrix:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 45 || 25 }}
     env:
       QT_QPA_PLATFORM: offscreen
     steps:
@@ -62,6 +62,26 @@ jobs:
         with:
           name: desktop-tests-${{ matrix.os }}
           path: work/desktop-tests.xml
+  windows-preview:
+    name: Windows preview package
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install uv==0.12.6
+          uv sync --locked
+      - run: uv run python scripts/package_windows_preview.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Aedrova-Windows-internal-preview
+          path: dist/windows-preview
+          if-no-files-found: error
   database:
     name: PostgreSQL RLS checks
     runs-on: ubuntu-latest

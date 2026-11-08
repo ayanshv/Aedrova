@@ -57,10 +57,13 @@ def test_usage_unknown_not_zero_and_scoped(tmp_path):
     ledger = RunLedger(tmp_path)
     run, _ = ledger.enqueue("u", "w", "Build", {})
     ledger.record_usage(run, "planning", "codex", 1.5, {"input_tokens": 40})
+    ledger.record_usage(run, "planning", "codex", 2.0, {"input_tokens": 60, "output_tokens": 20})
     ledger.record_usage(run, "building", "codex", 3, {"output_tokens": -2})
     rows = ledger.usage(run, "u", "w")
     assert len(rows) == 2
-    assert next(r for r in rows if r["phase"] == "planning")["input_tokens"] == 40
+    planning = next(r for r in rows if r["phase"] == "planning")
+    assert planning["input_tokens"] == 100
+    assert planning["seconds"] == 3.5
     assert all(r["output_tokens"] is None for r in rows)
     assert not ledger.usage(run, "other", "w")
     assert not ledger.usage(run, "u", "other")

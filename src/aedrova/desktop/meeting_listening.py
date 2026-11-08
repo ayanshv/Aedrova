@@ -58,6 +58,7 @@ class ListeningCapsule(QWidget):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+        self.setAttribute(Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow)
         self.setWindowTitle("Aedrova meeting notes")
         self.setFixedSize(344, 104)
         layout = QHBoxLayout(self)

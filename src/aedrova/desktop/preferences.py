@@ -27,7 +27,7 @@ class SettingsDialog(AppDialog):
         title = "Personal settings" if scope == "personal" else "Workspace resources"
         self.setWindowTitle("Aedrova · " + title)
         self.setMinimumSize(720, 540)
-        self.resize(920, 740)
+        self.resize(820, 600)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
@@ -259,7 +259,7 @@ class SettingsDialog(AppDialog):
         footer = QWidget()
         footer.setObjectName("SettingsFooter")
         footer_layout = QVBoxLayout(footer)
-        footer_layout.setContentsMargins(24, 16, 24, 16)
+        footer_layout.setContentsMargins(24, 10, 24, 12)
         actions = FlowActions()
         footer_layout.addLayout(actions)
         outer.addWidget(footer)

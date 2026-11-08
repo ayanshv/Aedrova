@@ -157,7 +157,12 @@ class RunLedger:
 
         with self.connect() as db:
             db.execute(
-                "INSERT OR REPLACE INTO usage VALUES (?,?,?,?,?,?)",
+                """INSERT INTO usage VALUES (?,?,?,?,?,?)
+                ON CONFLICT(run_id,phase) DO UPDATE SET
+                    provider=excluded.provider,
+                    seconds=usage.seconds + excluded.seconds,
+                    input_tokens=usage.input_tokens + excluded.input_tokens,
+                    output_tokens=usage.output_tokens + excluded.output_tokens""",
                 (
                     run_id,
                     phase,

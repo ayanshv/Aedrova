@@ -28,6 +28,7 @@ def test_review_and_apply_preserve_unrelated_changes_and_backup(build):
     source, project = build
     review = make_review(project)
     assert len(review.changes) == 2
+    assert review.file_summary() == (2, 2, 1, (("existing.py", 1, 1), ("new.py", 1, 0)))
     assert "+value = 2" in review.changes[0].diff()
     (source / "untouched.txt").write_text("edited while building")
     receipt = apply_review(review)

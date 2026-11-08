@@ -23,6 +23,13 @@ it unlocks. Include every applicable item, including:
 
 - Production hosting upgrades and the separately deployed meeting guard worker;
   any temporary paid staging capacity necessary for isolated acceptance.
+- **Supabase Pro for the Aedrova organization.** At the final purchase gate, the
+  owner reviews and submits the upgrade in Supabase → Aedrova → Billing. Check
+  the displayed subscription and any separate restore-project compute charges
+  before submitting either. Once a production physical backup is available,
+  restore it to a separate project and verify the matching Storage backup,
+  recoverable encryption keys, access controls and recovery time. The upgrade
+  alone does not complete hosted recovery.
 - Anthropic API credits or a separately approved invoicing arrangement. Existing
   OpenAI billing need not change merely because another provider needs funding.
 - Any other required metered service activation, funded API account, paid quota,
@@ -46,8 +53,8 @@ funded operating budget before metered features are enabled.
 1. Finish payment-free preparation and tests; record paid-dependent checks as open.
 2. Consolidate the necessary paid actions for owner review and personal submission.
 3. Once funded/configured, run the dependent isolated staging/live-account/device
-   checks, including actual Claude coding and reliable meetings. Do not substitute
-   mock tests or provider metadata for these results.
+   checks, including the hosted restore, actual Claude coding and reliable
+   meetings. Do not substitute mock tests or provider metadata for these results.
 4. Close the remaining release-candidate, signing and clean-machine gates and
    obtain the required approval for Step 10 production promotion.
 5. Promote the verified candidate, pass production smoke checks, then separately

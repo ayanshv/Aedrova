@@ -4,6 +4,42 @@ import AVFoundation
 import ScreenCaptureKit
 import CoreMedia
 import CoreAudio
+import ApplicationServices
+
+let browserIDs = ["com.apple.Safari", "com.google.Chrome", "com.microsoft.edgemac",
+                  "org.mozilla.firefox", "com.brave.Browser", "company.thebrowser.Browser"]
+
+func isBrowser(_ id: String) -> Bool {
+    browserIDs.contains { id == $0 || id.hasPrefix($0 + ".") }
+}
+
+@MainActor func frontGoogleMeet() -> Bool {
+    guard let front = NSWorkspace.shared.frontmostApplication,
+          let id = front.bundleIdentifier, isBrowser(id) else { return false }
+    func isMeetTitle(_ title: String) -> Bool {
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return title.caseInsensitiveCompare("Google Meet") == .orderedSame ||
+            title.range(of: #"^(?:Google Meet|Meet)\s*[-–—|]\s*\S"#,
+                        options: [.regularExpression, .caseInsensitive]) != nil
+    }
+    if AXIsProcessTrusted() {
+        let app = AXUIElementCreateApplication(front.processIdentifier)
+        var value: CFTypeRef?
+        if AXUIElementCopyAttributeValue(app, kAXFocusedWindowAttribute as CFString, &value) == .success,
+           let value = value, CFGetTypeID(value) == AXUIElementGetTypeID() {
+            let window = unsafeBitCast(value, to: AXUIElement.self)
+            var title: CFTypeRef?
+            if AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &title) == .success,
+               let title = title as? String, isMeetTitle(title) { return true }
+        }
+    }
+    let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements],
+                                           kCGNullWindowID) as? [[String: Any]] ?? []
+    return windows.first {
+        $0[kCGWindowOwnerPID as String] as? pid_t == front.processIdentifier &&
+        $0[kCGWindowLayer as String] as? Int == 0
+    }.flatMap { $0[kCGWindowName as String] as? String }.map(isMeetTitle) ?? false
+}
 
 let outputLock = NSLock()
 func emit(_ event: [String: Any]) {
@@ -94,8 +130,10 @@ final class AudioOutput: NSObject, SCStreamOutput, SCStreamDelegate {
         if CommandLine.arguments.contains("--detect") {
             let known = ["us.zoom.xos": "Zoom", "com.microsoft.teams2": "Teams",
                          "com.microsoft.teams": "Teams", "com.cisco.webexmeetingsapp": "Webex"]
-            var names: [String] = []
-            var active = false
+            let meet = frontGoogleMeet()
+            var names = meet ? ["Google Meet"] : []
+            var active = meet
+            let safariFront = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.apple.Safari"
             if #available(macOS 14.2, *) {
                 var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyProcessObjectList,
                     mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
@@ -126,8 +164,8 @@ final class AudioOutput: NSObject, SCStreamOutput, SCStreamDelegate {
                             if bundleStatus == noErr, let bundle = bundle {
                                 let id = bundle as String
                                 if let name = known[id] { names.append(name); active = true }
-                                else if ["com.apple.Safari", "com.google.Chrome", "com.microsoft.edgemac",
-                                         "org.mozilla.firefox"].contains(where: { id.hasPrefix($0) }) {
+                                else if isBrowser(id) ||
+                                    (safariFront && id.hasPrefix("com.apple.WebKit.")) {
                                     names.append("Browser"); active = true
                                 }
                             }

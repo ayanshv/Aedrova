@@ -402,7 +402,24 @@ def test_bud_build_keeps_addressed_identity(qtbot, tmp_path, monkeypatch, name, 
     assert window.agent_feed.rows[-1].author.text() == row["name"]
     from aedrova.desktop.ai_teammates import Character
 
-    assert window.agent_feed.rows[-1].findChild(Character) is not None
+    character = window.agent_feed.rows[-1].findChild(Character)
+    assert character is not None
+    from test_connected import row as chat_row
+
+    window.connected.cache["c"] = {
+        "later": {**chat_row("later"), "created_at": "2099-01-01T00:00:00Z"},
+    }
+    window.connected.render_local_messages()
+    assert window.agent_feed.reply_row.findChild(Character) is character
+    window.agent_feed.character_config = None
+    window.archive_finished_agent()
+    reply = next(
+        message
+        for message in window.messages.source_messages
+        if message.agent and message.body == "Repository summary"
+    )
+    assert window.messages.agent_bud_avatar(reply) == character.config
+    assert window.messages.source_messages[-1].id == "later"
     window.dot_query = None
 
 

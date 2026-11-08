@@ -82,20 +82,27 @@ def mode(window, workspace=None):
     return normalize(window.settings.value(setting, "ask")) if setting else "ask"
 
 
+def sync_choice(control, value, enabled):
+    control.blockSignals(True)
+    control.setCurrentIndex(control.findData(value))
+    control.setToolTip(MODES[value][1])
+    control.setProperty("permissionMode", value)
+    control.style().unpolish(control)
+    control.style().polish(control)
+    control.update()
+    control.setEnabled(enabled)
+    control.blockSignals(False)
+
+
 def sync(window):
-    value = mode(window)
+    value, enabled = mode(window), bool(key(window))
     for composer in (window.composer, window.thread_composer):
         control = getattr(composer, "permissions", None)
         if control:
-            control.blockSignals(True)
-            control.setCurrentIndex(control.findData(value))
-            control.setToolTip(MODES[value][1])
-            control.setProperty("permissionMode", value)
-            control.style().unpolish(control)
-            control.style().polish(control)
-            control.update()
-            control.setEnabled(bool(key(window)))
-            control.blockSignals(False)
+            sync_choice(control, value, enabled)
+    build = getattr(window, "build_dialog", None)
+    if build and hasattr(build, "sync_permissions"):
+        build.sync_permissions()
 
 
 def change(window, value):

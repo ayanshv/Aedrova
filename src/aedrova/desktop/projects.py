@@ -44,7 +44,11 @@ def save_binding(window, data, workspace=None):
 
         window.settings.remove(f"agent-permissions/{user.id}/{scope}")
         dialog = getattr(window, "build_dialog", None)
-        if dialog and dialog.workspace == scope and dialog.pending:
+        if (
+            dialog
+            and dialog.workspace == scope
+            and (dialog.pending or dialog.clarification or dialog.approved_plan)
+        ):
             dialog.invalidate()
         if scope == window.workspace_id:
             from aedrova.desktop.agent_permissions import sync
@@ -310,3 +314,4 @@ def open_project(window):
         return
     window.project_dialog = ProjectDialog(window)
     window.project_dialog.show()
+    return window.project_dialog

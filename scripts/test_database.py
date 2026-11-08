@@ -111,7 +111,9 @@ try {
    'supabase/tests/bud_plan_limits.sql',
    'supabase/migrations/202611010001_shared_agent_work.sql',
    'supabase/migrations/202611050001_shared_work_revocation_lock.sql',
-   'supabase/tests/shared_agent_work.sql']) {
+   'supabase/tests/shared_agent_work.sql',
+   'supabase/migrations/202611070001_agent_reply_history.sql',
+   'supabase/tests/agent_reply_history.sql']) {
   let sql = fs.readFileSync(file,'utf8');
   // Reproduce the already-activated original function, then verify its additive
   // conflict-response upgrade before running the lifecycle tests.

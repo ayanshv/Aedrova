@@ -6,8 +6,10 @@ from datetime import datetime
 from math import ceil
 from pathlib import Path
 from urllib.parse import urlsplit
+from uuid import uuid4
 
 from PySide6.QtCore import QSize, Qt, QTimer, Signal
+from PySide6.QtGui import QCursor
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -17,15 +19,20 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QToolTip,
     QVBoxLayout,
     QWidget,
 )
 
+from aedrova.desktop.agent_activity import WorkNotes, activity_icon
 from aedrova.desktop.brand import BrandMark
+from aedrova.desktop.icons import assign
 from aedrova.desktop.materials import system_font
 
 
 class ActivityRow(QFrame):
+    reply_action = Signal(object, str)
+
     def __init__(
         self,
         summary,
@@ -36,10 +43,16 @@ class ActivityRow(QFrame):
         author="Aedrova",
         character_config=None,
         markdown=True,
+        streaming=False,
     ):
         super().__init__()
         self.sent_at = datetime.now().astimezone()
         self.summary = summary
+        self.character_config = dict(character_config) if character_config else None
+        self.response_id = None
+        self.rating = ""
+        self.file_summary = None
+        self.streaming = streaming
         self.pending = pending
         self.status = "running" if pending else "done"
         if not pending and details.startswith("$ "):
@@ -84,11 +97,11 @@ class ActivityRow(QFrame):
             layout.setSpacing(6)
             body = QHBoxLayout()
             body.setSpacing(12)
-            if character_config:
+            if self.character_config:
                 from aedrova.desktop.ai_teammates import Character
 
                 avatar = Character(
-                    character_config,
+                    self.character_config,
                     reduced_motion=QApplication.instance().property("reduceMotion") is True,
                 )
                 avatar.setFixedSize(34, 32)
@@ -119,6 +132,7 @@ class ActivityRow(QFrame):
             header.addStretch()
             column.addLayout(header)
             self.message = QLabel(summary)
+            self.message.setFont(system_font(14))
             if markdown:
                 self.message.setTextFormat(Qt.TextFormat.RichText)
                 self.set_message(summary)
@@ -131,11 +145,11 @@ class ActivityRow(QFrame):
                 | Qt.TextInteractionFlag.LinksAccessibleByKeyboard
             )
             self.message.linkActivated.connect(self.open_source)
+            self.message.linkHovered.connect(self.show_action_tooltip)
             self.message.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-            self.message.setMargin(2)
+            self.message.setMargin(0)
             self.message.setWordWrap(True)
             self.message.setAccessibleName("Agent update")
-            self.message.setFont(system_font(14))
             self.message.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
             column.addWidget(self.message)
             body.addLayout(column, 1)
@@ -145,12 +159,40 @@ class ActivityRow(QFrame):
 
 
         from aedrova.desktop.conversation import markdown_html
+        from aedrova.desktop.response_actions import response_parts, streaming_body
 
-        self.message.setProperty("aedrovaSourceText", text)
-        self.message.setProperty("aedrovaTranslatingStream", self.pending)
-        self.message.setText(markdown_html(text))
+        body = streaming_body(text) if self.streaming else text
+        options = None
+        if self.response_id:
+            body, options = response_parts(text)
+        self.message.setProperty("aedrovaSourceText", body)
+        self.message.setProperty("aedrovaReplyOptions", options)
+        self.message.setProperty("aedrovaReplyRating", self.rating)
+        self.message.setProperty("aedrovaFileSummary", self.file_summary)
+        self.message.setProperty("aedrovaTranslatingStream", self.streaming or self.pending)
+        self.message.setText(
+            markdown_html(
+                body, base_font=self.message.font(), agent=True, options=options,
+                rating=self.rating, file_summary=self.file_summary,
+            )
+        )
+
+    def show_action_tooltip(self, link):
+        from aedrova.desktop.response_actions import REPLY_ACTION_LABELS
+
+        title = REPLY_ACTION_LABELS.get(link)
+        if self.response_id and title:
+            QToolTip.showText(QCursor.pos(), title, self.message)
+        elif not link:
+            QToolTip.hideText()
 
     def open_source(self, value):
+        from aedrova.desktop.response_actions import ACTION_PREFIX, SOURCE_PREFIX
+
+        if value.startswith((ACTION_PREFIX, SOURCE_PREFIX)):
+            if self.response_id:
+                self.reply_action.emit(self, value)
+            return
         try:
             parsed = urlsplit(value)
             if (
@@ -168,6 +210,7 @@ class ActivityRow(QFrame):
 
     def expand(self, expanded):
         marker = {"running": "◦", "done": "✓", "failed": "!", "stopped": "□"}[self.status]
+        assign(self.toggle, activity_icon(self.summary))
         self.toggle.setText(f"{'▾' if expanded else '▸'}  {marker}  {self.summary}")
         self.toggle.setToolTip(self.summary)
         self.details.setVisible(expanded)
@@ -182,6 +225,7 @@ class ActivityRow(QFrame):
 
 class AgentStream(QScrollArea):
     changed = Signal()
+    reply_action = Signal(object, str)
 
     def __init__(self):
         super().__init__()
@@ -277,6 +321,7 @@ class AgentStream(QScrollArea):
         self.running.clear()
 
     def add_event(self, text):
+        self.record_work(text)
         if text.startswith("Running:"):
             command = text.removeprefix("Running:").strip()
             row = ActivityRow("Running " + command[:180], command, tool=True, pending=True)
@@ -344,19 +389,32 @@ class AgentStream(QScrollArea):
                 text, author=author, character_config=self.character_config
             )
             self.status_row.message.hide()
-            self.status_row.column.addWidget(self.status_controls)
-            self.status_controls.show()
+            if self.status_controls is not None:
+                self.status_row.column.addWidget(self.status_controls)
+                self.status_controls.show()
+            self.status_row.work_notes = WorkNotes()
+            self.status_row.column.addWidget(self.status_row.work_notes)
+            self.status_row.work_notes.record(text)
             self.add_row(self.status_row)
         else:
             self.status_row.summary = text
+            self.record_work(text)
+
+    def record_work(self, text):
+        if (
+            self.status_row
+            and getattr(self, "reply_row", None) not in self.rows
+            and self.status_row.work_notes.record(text)
+        ):
             self.changed.emit()
 
-    def finish_with_result(self, text):
+    def finish_with_result(self, text, *, file_summary=None):
         for transient in list(self.rows):
             if transient is self.status_row or getattr(transient, "is_reply", False):
                 continue
             self.layout.removeWidget(transient)
             self.rows.remove(transient)
+            transient.hide()
             transient.deleteLater()
         if self.status_row is not None:
             row = self.status_row
@@ -366,22 +424,35 @@ class AgentStream(QScrollArea):
             if self.status_controls:
                 self.status_controls.hide()
                 self.status_controls.setParent(self)
+            row.hide()
             row.deleteLater()
             self.status_row = None
         self.set_reply(text)
         if self.reply_row:
+            self.reply_row.response_id = "agent-" + str(uuid4())
+            self.reply_row.rating = ""
+            self.reply_row.file_summary = file_summary
+            self.reply_row.streaming = False
+            self.reply_row.set_message(text)
             self.reply_row.message.setProperty("aedrovaTranslatingStream", False)
+            self.changed.emit()
 
     def set_reply(self, text):
         """Update a single streaming response without adding activity-log rows."""
+        if self.status_row and self.status_row.work_notes.notes:
+            self.status_row.work_notes.clear()
         if not getattr(self, "reply_row", None) or self.reply_row not in self.rows:
             self.reply_row = ActivityRow(
-                text, author=self.author_name, character_config=self.character_config
+                text,
+                author=self.author_name,
+                character_config=self.character_config,
+                streaming=True,
             )
             self.reply_row.is_reply = True
+            self.reply_row.reply_action.connect(self.reply_action)
             self.reply_row.message.setProperty("aedrovaTranslatingStream", True)
             self.add_row(self.reply_row)
-        else:
+        elif self.reply_row.summary != text:
             self.reply_row.summary = text
             self.reply_row.set_message(text)
             self.reply_row.message.setProperty("aedrovaTranslatingStream", True)

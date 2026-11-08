@@ -1,5 +1,6 @@
 """Mentions collect full permitted context and build without displaying the studio."""
 
+import json
 import threading
 
 import pytest
@@ -73,6 +74,56 @@ def test_legacy_planning_consent_does_not_authorize_coding(qtbot, tmp_path):
     assert window.agent_setup_needed
     assert "Project settings" in window.build_activity.text()
     assert window.composer.editor.toPlainText()
+
+
+def test_agent_question_pauses_build_until_answered(qtbot, tmp_path, monkeypatch):
+    window, _, root = configured(qtbot, tmp_path, monkeypatch)
+    runs = []
+
+    def run(self, provider, project, prompt, *, plan):
+        runs.append(plan)
+        if len(runs) == 1:
+            return "AEDROVA_CLARIFICATION\n" + json.dumps(
+                {
+                    "title": "What should the greeting say?",
+                    "fields": [
+                        {"label": "Greeting", "type": "text"},
+                        {"label": "Audience", "type": "single", "options": ["Team", "Visitors"]},
+                        {"label": "Include", "type": "multiple", "options": ["Name", "Date"]},
+                    ],
+                }
+            )
+        assert "Welcome aboard" in prompt
+        assert '"answer": "Team"' in prompt and '"answer": ["Name"]' in prompt
+        if plan:
+            return "Add the greeting to hello.py. [message:requirement]"
+        (project / "hello.py").write_text("print('Welcome aboard')\n")
+        return "Built the greeting."
+
+    monkeypatch.setattr(LocalRunner, "run", run)
+    assert start_background_build(window, "Build the requested greeting")
+    dialog = window.build_dialog
+    qtbot.waitUntil(lambda: bool(dialog.clarification), timeout=10000)
+    assert dialog.isVisible()
+    assert dialog.start_button.text() == "Send answer"
+    assert not dialog.approved_plan
+    window.execution_queue.tick()
+    assert window.execution_queue.active[1] is dialog
+    assert runs == [True]
+    from PySide6.QtWidgets import QCheckBox
+
+    _, greeting = dialog.question_form.inputs[0]
+    _, audience = dialog.question_form.inputs[1]
+    _, choices = dialog.question_form.inputs[2]
+    greeting.setText("Welcome aboard")
+    audience.setCurrentIndex(1)
+    dialog.start_button.click()
+    assert dialog.clarification and runs == [True]
+    choices.findChildren(QCheckBox)[0].setChecked(True)
+    dialog.start_button.click()
+    qtbot.waitUntil(lambda: dialog.successful_build, timeout=10000)
+    assert runs == [True, True, False]
+    assert not (root / "hello.py").exists()
 
 
 def test_new_messages_do_not_interrupt_existing_background_plan(qtbot, tmp_path, monkeypatch):
@@ -214,7 +265,7 @@ def test_provider_failure_stays_in_chat(qtbot, tmp_path, monkeypatch):
     qtbot.waitUntil(lambda: not window.build_dialog.pending, timeout=5000)
     assert not window.build_dialog.isVisible()
     assert "Needs attention" in window.build_activity.text()
-    assert "Provider login required" in window.build_dialog.output.toPlainText()
+    assert "Provider login required" in window.build_dialog.response.toPlainText()
 
 
 def test_background_uses_saved_folder_not_manual_studio_override(qtbot, tmp_path, monkeypatch):

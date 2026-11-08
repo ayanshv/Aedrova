@@ -57,7 +57,13 @@ class DotSection(TeamSection):
         user = str(self.window.current_user().id) if self.window.current_user() else ""
         rows = [{**row, **cache.get((user, row["id"], row["version"]), {})} for row in rows]
         self.title.setText("Buds" + (f" · {len(rows)}" if rows else ""))
-        self.habitat.sync(shelf_rows(rows), workspace)
+        display_rows = shelf_rows(rows)
+        self.habitat.sync(display_rows, workspace)
+        avatars = {row["name"].casefold(): row["config"] for row in display_rows}
+        for view in (self.window.messages, self.window.thread_messages):
+            if view.bud_avatars != avatars:
+                view.bud_avatars = avatars
+                view.viewport().update()
         for marble in self.habitat.marbles.values():
             row = marble.widget.row
             marble.widget.setAccessibleName("Open " + row["name"] + " Bud")
