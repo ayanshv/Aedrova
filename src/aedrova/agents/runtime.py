@@ -33,7 +33,12 @@ def network_command(command):
 
 def executable(name):
     if name == "codex" and getattr(sys, "frozen", False):
-        bundled = Path(__file__).parent / "bin" / "codex"
+        root = Path(__file__).parent
+        bundled = (
+            root / "windows-codex" / "bin" / "codex.exe"
+            if sys.platform == "win32"
+            else root / "bin" / "codex"
+        )
         if bundled.is_file() and os.access(bundled, os.X_OK):
             return str(bundled)
         raise ValueError("The bundled coding runtime is missing. Reinstall Aedrova.")
@@ -95,6 +100,8 @@ def codex_permissions(project, *, plan):
         if binary.is_file():
             paths[str(binary)] = "read"
             paths[str(binary.parent)] = "read"
+    if sys.platform == "win32" and getattr(sys, "frozen", False):
+        paths[str(runtime.parent.parent)] = "read"
     paths[str(root / ".git")] = "read"
     for private in (".claude", ".codex", ".agents"):
         paths[str(root / private)] = "deny"
@@ -505,6 +512,8 @@ class LocalRunner:
             command[2:2] = ["-c", "features." + feature + "=false"]
         command[2:2] = ["-c", 'web_search="disabled"']
         provider_env = environment()
+        if sys.platform == "win32" and getattr(sys, "frozen", False):
+            provider_env["CODEX_MANAGED_PACKAGE_ROOT"] = str(Path(command[0]).parent.parent)
         if self.managed:
             access = self.managed
             overrides = {
