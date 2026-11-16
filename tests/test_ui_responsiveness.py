@@ -67,16 +67,21 @@ def test_settings_open_from_cache_during_background_sync(qtbot, tmp_path, monkey
 
 def test_channel_plus_opens_focused_form_without_backend_work(qtbot, tmp_path, monkeypatch):
     window, service = setup(qtbot, tmp_path)
-    service.snapshot = lambda: pytest.fail("No network required to open form")
-    window.create_channel_button.click()
-    dialog = window.channel_create_dialog
-    qtbot.addWidget(dialog)
-    assert dialog.isVisible() and not dialog.create.isEnabled()
-    assert not window.account_dialog.isVisible()
-    dialog.name.setText("design")
-    assert dialog.create.isEnabled()
-    window.create_channel_button.click()
-    assert window.channel_create_dialog is dialog
+    qtbot.waitUntil(lambda: not window.account_dialog.busy, timeout=20000)
+    with monkeypatch.context() as transport:
+        transport.setattr(
+            service, "snapshot", lambda: pytest.fail("No network required to open form")
+        )
+        transport.setattr(window.account_dialog, "busy", True)
+        window.create_channel_button.click()
+        dialog = window.channel_create_dialog
+        qtbot.addWidget(dialog)
+        assert dialog.isVisible() and not dialog.create.isEnabled()
+        assert not window.account_dialog.isVisible()
+        dialog.name.setText("design")
+        assert dialog.create.isEnabled()
+        window.create_channel_button.click()
+        assert window.channel_create_dialog is dialog
 
 
 def test_channel_creation_queues_once_and_waits_for_server(qtbot, tmp_path, monkeypatch):
