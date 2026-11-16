@@ -111,20 +111,27 @@ def test_provider_mismatch_stops_before_spawn(tmp_path, monkeypatch):
         runner.run("codex", tmp_path, "request", plan=True)
 
 
-def test_packaged_runtime_prefers_bundled_codex_and_fails_closed_if_missing(tmp_path, monkeypatch):
+@pytest.mark.parametrize(
+    ("platform", "runtime_path"),
+    [("darwin", "bin/codex"), ("win32", "windows-codex/bin/codex.exe")],
+)
+def test_packaged_runtime_prefers_bundled_codex_and_fails_closed_if_missing(
+    tmp_path, monkeypatch, platform, runtime_path
+):
     import sys
 
     import aedrova.agents.runtime as runtime
 
     monkeypatch.setattr(runtime, "__file__", str(tmp_path / "runtime.py"))
     monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "platform", platform)
     monkeypatch.setattr(
         runtime.shutil, "which", lambda _: pytest.fail("No external runtime fallback")
     )
     with pytest.raises(ValueError, match="bundled"):
         runtime.executable("codex")
-    bundled = tmp_path / "bin/codex"
-    bundled.parent.mkdir()
+    bundled = tmp_path / runtime_path
+    bundled.parent.mkdir(parents=True)
     bundled.write_text("synthetic executable fixture")
     bundled.chmod(0o700)
     assert runtime.executable("codex") == str(bundled)

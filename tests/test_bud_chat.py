@@ -107,6 +107,8 @@ def test_coworker_picker_creates_and_reopens_server_dm(qtbot, tmp_path, monkeypa
     opened = []
 
     def rpc(name, params):
+        if name == "mark_channel_read":
+            return None
         assert name == "start_direct_message" and params == {"p_workspace": "w", "p_user": "v"}
         opened.append(True)
         if len(opened) == 1:

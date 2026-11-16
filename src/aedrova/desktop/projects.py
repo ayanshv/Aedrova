@@ -44,7 +44,11 @@ def save_binding(window, data, workspace=None):
 
         window.settings.remove(f"agent-permissions/{user.id}/{scope}")
         dialog = getattr(window, "build_dialog", None)
-        if dialog and dialog.workspace == scope and dialog.pending:
+        if (
+            dialog
+            and dialog.workspace == scope
+            and (dialog.pending or dialog.clarification or dialog.approved_plan)
+        ):
             dialog.invalidate()
         if scope == window.workspace_id:
             from aedrova.desktop.agent_permissions import sync
@@ -166,7 +170,7 @@ class ProjectDialog(AppDialog):
         layout = self.view.add_section(
             "ai", "AI configuration", "Project execution follows workspace access rules.", "work"
         )
-        layout.addWidget(label("Coding provider", "muted"))
+        layout.addWidget(label("Coding provider for this project", "muted"))
         self.provider = CodingProviderChoice()
         self.provider.setAccessibleName("Coding provider")
         preferences = window.account_dialog.snapshot.get("agent_preferences", [])
@@ -174,7 +178,8 @@ class ProjectDialog(AppDialog):
             (p.get("provider", "auto") for p in preferences if p["workspace_id"] == self.workspace),
             "auto",
         )
-        self.provider.setCurrentIndex(self.provider.findData(data.get("provider", default)))
+        current = self.provider.findData(data.get("provider", default))
+        self.provider.setCurrentIndex(current if current >= 0 else self.provider.findData("auto"))
         layout.addWidget(self.provider)
         self.auto_plan = QCheckBox("Plan and execute automatically")
         self.auto_plan.setToolTip("Let my agent plan and execute automatically")
@@ -259,8 +264,19 @@ class ProjectDialog(AppDialog):
         ):
             return
         try:
-            root = Path(self.folder.text()).expanduser().resolve(strict=True)
+            folder = self.folder.text().strip()
+            if not folder:
+                self.folder.setFocus()
+                raise ValueError("Choose a project folder to save this connection.")
+            try:
+                root = Path(folder).expanduser().resolve(strict=True)
+            except OSError as error:
+                self.folder.setFocus()
+                raise ValueError(
+                    "That folder is unavailable. Choose an accessible project folder."
+                ) from error
             if not root.is_dir() or root in {Path.home(), Path(root.anchor)}:
+                self.folder.setFocus()
                 raise ValueError("Choose a specific project folder.")
             repo = repository_name(self.repository.text()) if self.repository.text().strip() else ""
             data = binding(self.window, self.workspace)
@@ -310,3 +326,4 @@ def open_project(window):
         return
     window.project_dialog = ProjectDialog(window)
     window.project_dialog.show()
+    return window.project_dialog

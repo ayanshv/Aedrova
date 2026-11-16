@@ -356,6 +356,11 @@ def test_full_confirmation_and_permission_label_fit_the_theme(qtbot, tmp_path, t
         QStyle.ComplexControl.CC_ComboBox, option, QStyle.SubControl.SC_ComboBoxEditField, control
     )
     assert area.width() >= control.fontMetrics().horizontalAdvance("Ask for approval") + 22
+    control.showPopup()
+    qtbot.wait(10)
+    view = control.view()
+    assert view.viewport().width() >= view.sizeHintForColumn(0)
+    control.hidePopup()
     dialog = FullAccessDialog(window)
     qtbot.addWidget(dialog)
     dialog.show()

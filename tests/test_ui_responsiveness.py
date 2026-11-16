@@ -22,33 +22,37 @@ def setup(qtbot, tmp_path):
 
 def test_dm_picker_opens_from_session_cache_even_while_transport_busy(qtbot, tmp_path, monkeypatch):
     window, service = setup(qtbot, tmp_path)
+    qtbot.waitUntil(lambda: not window.account_dialog.busy, timeout=20000)
     window.account_dialog.snapshot["directory"] = [
         {"workspace_id": "w", "user_id": "peer", "display_name": "Morgan"},
         {"workspace_id": "foreign", "user_id": "stranger", "display_name": "Hidden"},
     ]
-    service.snapshot = lambda: pytest.fail("Opening a picker must not fetch a snapshot")
     chosen = []
     monkeypatch.setattr(
         "aedrova.desktop.connected.choose_conversation",
         lambda _, people, buds: chosen.append(people) or None,
     )
-    monkeypatch.setattr(window.connected, "enqueue", lambda *a, **k: pytest.fail("No queue wait"))
-    window.account_dialog.busy = True
-    try:
+    with monkeypatch.context() as transport:
+        transport.setattr(
+            service, "snapshot", lambda: pytest.fail("Opening a picker must not fetch a snapshot")
+        )
+        transport.setattr(window.connected, "enqueue", lambda *a, **k: pytest.fail("No queue wait"))
+        transport.setattr(window.account_dialog, "busy", True)
         window.start_dm_button.click()
         assert [p["user_id"] for p in chosen[0]] == ["peer"]
-    finally:
-        window.account_dialog.busy = False
 
 
 def test_settings_open_from_cache_during_background_sync(qtbot, tmp_path, monkeypatch):
     window, _ = setup(qtbot, tmp_path)
     account = window.account_dialog
     monkeypatch.setattr(account, "refresh", lambda: pytest.fail("No blocking refresh on open"))
+    account.workspaces.clear()
+    account.home_workspaces.clear()
     account.busy, account.background_job = True, True
     try:
-        window.show_account("manage")
+        window.workspace_settings_button.click()
         assert account.isVisible() and account.pages.currentIndex() == 1
+        assert account.workspace_id() == window.workspace_id
         assert account.pages.isEnabled()
         view = account.workspace_settings
         assert view.sections.count() == 10
@@ -63,16 +67,21 @@ def test_settings_open_from_cache_during_background_sync(qtbot, tmp_path, monkey
 
 def test_channel_plus_opens_focused_form_without_backend_work(qtbot, tmp_path, monkeypatch):
     window, service = setup(qtbot, tmp_path)
-    service.snapshot = lambda: pytest.fail("No network required to open form")
-    window.create_channel_button.click()
-    dialog = window.channel_create_dialog
-    qtbot.addWidget(dialog)
-    assert dialog.isVisible() and not dialog.create.isEnabled()
-    assert not window.account_dialog.isVisible()
-    dialog.name.setText("design")
-    assert dialog.create.isEnabled()
-    window.create_channel_button.click()
-    assert window.channel_create_dialog is dialog
+    qtbot.waitUntil(lambda: not window.account_dialog.busy, timeout=20000)
+    with monkeypatch.context() as transport:
+        transport.setattr(
+            service, "snapshot", lambda: pytest.fail("No network required to open form")
+        )
+        transport.setattr(window.account_dialog, "busy", True)
+        window.create_channel_button.click()
+        dialog = window.channel_create_dialog
+        qtbot.addWidget(dialog)
+        assert dialog.isVisible() and not dialog.create.isEnabled()
+        assert not window.account_dialog.isVisible()
+        dialog.name.setText("design")
+        assert dialog.create.isEnabled()
+        window.create_channel_button.click()
+        assert window.channel_create_dialog is dialog
 
 
 def test_channel_creation_queues_once_and_waits_for_server(qtbot, tmp_path, monkeypatch):
@@ -179,6 +188,36 @@ def test_pending_channel_form_is_cleared_on_signout(qtbot, tmp_path):
     dialog.name.setText("private draft")
     window.account_dialog.session_closed.emit()
     assert not dialog.isVisible() and dialog.name.text() == ""
+
+
+def test_uncertain_workspace_save_requires_read_only_recovery(qtbot, tmp_path):
+    window, service = setup(qtbot, tmp_path)
+    account = window.account_dialog
+    window.connected.timer.stop()
+    account.show()
+    account.pages.setCurrentIndex(2)
+    account.onboarding_workspace.setText("Orbit")
+    calls = []
+
+    def timed_out(name, _):
+        calls.append(name)
+        raise TimeoutError()
+
+    service.rpc = timed_out
+    parameters = {"p_name": "Orbit", "p_nickname": "Aedrova", "p_provider": "auto"}
+    account.mutate("onboard_workspace", parameters)
+    qtbot.waitUntil(lambda: not account.busy)
+    assert account.recover_workspace.isVisible()
+    assert "couldn’t confirm" in account.status.text()
+    account.mutate("onboard_workspace", parameters)
+    assert calls == ["onboard_workspace"]
+
+    account.recover_workspace.click()
+    qtbot.waitUntil(lambda: not account.busy)
+    assert calls == ["onboard_workspace"]
+    assert not account.workspace_write_unconfirmed
+    assert account.onboarding_workspace.text() == "Orbit"
+    assert account.pages.currentIndex() == 2
 
 
 def test_queued_settings_save_is_cancelled_when_signout_requested(qtbot, tmp_path):

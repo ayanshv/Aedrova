@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from aedrova.agents.managed import application_origin
-from aedrova.desktop.brand import BrandMark
+from aedrova.desktop.brand import BrandLockup
 from aedrova.desktop.controls import AppDialog, ChoiceBox
 from aedrova.desktop.design_system import FlowActions
 from aedrova.desktop.dialogs import button, label
@@ -119,7 +119,7 @@ class MeetingCall(AppDialog):
         layout.setContentsMargins(22, 20, 22, 18)
         layout.setSpacing(14)
         heading = QHBoxLayout()
-        heading.addWidget(BrandMark(32))
+        heading.addWidget(BrandLockup(32))
         heading.addWidget(label(channel_name, "title", wrap=True), 1)
         self.view_choice = ChoiceBox(self)
         self.view_choice.addItems(["Gallery view", "Speaker view"])

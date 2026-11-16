@@ -2,11 +2,11 @@
 
 import time
 
-from PySide6.QtCore import QRectF, Qt, QTimer
+from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QPainter
 from PySide6.QtWidgets import QWidget
 
-from aedrova.desktop.brand import brand_image
+from aedrova.desktop.brand import paint_brand_lockup
 from aedrova.desktop.bud_art import paint_bud
 from aedrova.desktop.icons import icon
 from aedrova.desktop.materials import system_font
@@ -84,11 +84,7 @@ class OpeningScene(QWidget):
             p.setPen(QColor(t.text))
             p.drawText(tile.adjusted(42, 0, -8, 0), Qt.AlignmentFlag.AlignVCenter, name)
         p.setOpacity(1 if self.flow.reduced else ease(elapsed / 0.9))
-        side = 88 + 14 * progress
-        p.drawImage(QRectF(-side / 2, -side / 2 - 20, side, side), brand_image())
-        p.setFont(system_font(13, QFont.Weight.DemiBold))
-        p.setPen(QColor(t.text))
-        p.drawText(QRectF(-90, 44, 180, 26), Qt.AlignmentFlag.AlignCenter, "Aedrova")
+        paint_brand_lockup(p, QPointF(0, 0), 49 + 8 * progress, 27, QColor(t.text))
         for i, role in enumerate(("builder", "research", "product")):
             p.setOpacity(1 if self.flow.reduced else ease((elapsed - 0.8 - i * 0.15) / 1.1))
             paint_bud(p, QRectF(-108 + i * 76, 84, 64, 64), {"appearance": role}, phase=0)

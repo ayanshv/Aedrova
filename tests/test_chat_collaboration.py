@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import pytest
 from PySide6.QtCore import QSettings
 from PySide6.QtGui import QTextCursor
-from test_connected import setup
+from test_connected import row, setup
 
 from aedrova.desktop.collaboration import ChatPanel, message_link
 from aedrova.desktop.conversation import Composer, SafeDocument, message_urls
@@ -56,6 +56,40 @@ def test_local_edit_save_quote_and_forward_retains_threads(qtbot, tmp_path):
     assert len(message.replies) == 1
     window.collaboration.action("saved", message.id)
     assert not message.saved
+
+
+def test_shared_pin_updates_before_rpc_and_rolls_back_a_rejected_change(
+    qtbot, tmp_path, monkeypatch
+):
+    window, service = setup(qtbot, tmp_path)
+    dashboard = window.connected
+    dashboard.cache["c"] = {"m": row()}
+    dashboard.render_local_messages()
+    jobs = []
+    calls = []
+
+    def enqueue(key, operation, completed, *, priority=False):
+        assert priority
+        jobs.append((operation, completed))
+        return True
+
+    monkeypatch.setattr(dashboard, "enqueue", enqueue)
+    service.rpc = lambda _name, params: calls.append(params["p_data"]["present"])
+    window.collaboration.action("pinned", "m")
+    assert window.channel.messages[0].pinned
+    assert not window.pinned.isHidden()
+    assert calls == []
+    window.collaboration.action("pinned", "m")
+    assert not window.channel.messages[0].pinned
+    assert window.pinned.isHidden()
+    operation, completed = jobs.pop(0)
+    completed(operation())
+    assert not window.channel.messages[0].pinned
+    operation, completed = jobs.pop(0)
+    completed(False)
+    assert calls == [True]
+    assert window.channel.messages[0].pinned
+    assert not window.pinned.isHidden()
 
 
 def test_mentions_display_names_but_send_user_ids(qtbot):
@@ -117,6 +151,14 @@ def test_activity_typing_people_and_signout_clear_private_state(qtbot, tmp_path)
     }
     window.collaboration.sync(data)
     assert window.collaboration.typing_label.text() == "Maya is typing…"
+    window.channel_id = "different-channel"
+    window.collaboration.render_typing()
+    assert not window.collaboration.typing_label.text()
+    window.channel_id = "c"
+    window.collaboration.render_typing()
+    window.set_reduced_motion(True)
+    assert window.collaboration.typing_label.text() == "Maya is typing…"
+    assert not window.collaboration.typing_label.animation.isActive()
     assert window.collaboration.activity_button.text() == "Activity · 2"
     assert window.composer.people[0]["display_name"] == "Maya"
     window.collaboration.panel("activity")

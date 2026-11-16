@@ -27,6 +27,7 @@ class Message:
     pinned: bool = False
     sender_id: str = ""
     agent: bool = False
+    bud_avatar: dict | None = None
 
 
 @dataclass

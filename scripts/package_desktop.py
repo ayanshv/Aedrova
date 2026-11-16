@@ -33,11 +33,14 @@ if ai_mode not in {"local", "included"}:
 if release_identity and ai_mode != "included":
     raise ValueError("Public paid builds require included AI access; local fallback is forbidden.")
 identity = release_identity or preview_identity
+connection = Connection.from_environment() or Connection.from_bundle()
 if release_identity:
     if not identity.startswith("Developer ID Application:"):
         raise ValueError("Public distribution requires a Developer ID Application identity.")
     if not application_origin().startswith("https://"):
         raise ValueError("Public builds require the configured HTTPS managed service origin.")
+    if not connection:
+        raise ValueError("Public builds require a Supabase URL and publishable key.")
 if identity:
     signing_args = [
         "--codesign-identity",
@@ -109,9 +112,11 @@ asset_args.extend(
 )
 for asset in (
     "aedrova.png",
+    "aedrova-wordmark.svg",
     "aedrova.icns",
     "google-g.png",
     "apple.svg",
+    "google-play.svg",
     "checkbox-checked.svg",
     "emoji.json",
 ):
@@ -128,7 +133,6 @@ asset_args.extend(
         f"{ROOT / 'src/aedrova/desktop/assets/connectors'}:aedrova/desktop/assets/connectors",
     ]
 )
-connection = Connection.from_environment() or Connection.from_bundle()
 if connection:
     config_path = ROOT / "work" / "public-config.json"
     config_path.parent.mkdir(parents=True, exist_ok=True)

@@ -69,7 +69,7 @@ def test_guided_profile_saves_fields_and_updates_account(qtbot, tmp_path):
 
     service.save_full_profile = Mock(side_effect=save)
     service.snapshot = lambda: {**original_snapshot(), "user_profile": dict(saved_profile)}
-    dialog = ProfileDialog(window, window.account_dialog, onboarding=True)
+    dialog = ProfileDialog(window, window.account_dialog)
     qtbot.addWidget(dialog)
     dialog.show()
     dialog.name.setText("Maya Chen")

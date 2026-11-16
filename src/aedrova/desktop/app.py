@@ -63,6 +63,7 @@ def main():
     if args.thread:
         window.open_pinned()
     if account_first:
+        window.enable_guided_onboarding = not args.smoke_report
         window.show_account()
     if args.smoke_report:
 

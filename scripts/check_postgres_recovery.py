@@ -30,6 +30,8 @@ def main():
     checks = list(CHECKS)
     if any(path.name.endswith("_shared_agent_work.sql") for path in migrations):
         checks.append("shared_agent_work")
+    if any(path.name.endswith("_agent_reply_history.sql") for path in migrations):
+        checks.append("agent_reply_history")
     tests = [ROOT / "supabase/tests" / (name + ".sql") for name in checks]
     with TemporaryDirectory(prefix="aedrova-recovery-") as directory:
         folder = Path(directory)

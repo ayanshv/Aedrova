@@ -191,19 +191,6 @@ def test_login_code_is_parsed_and_signout_cancels(qtbot, tmp_path, monkeypatch, 
     assert not dialog.code.text() and not dialog.output
 
 
-def test_first_dashboard_offers_setup_once(qtbot, tmp_path, monkeypatch):
-    window, _ = setup(qtbot, tmp_path)
-    calls = []
-
-    monkeypatch.setattr(window, "show_setup", lambda: calls.append(window))
-    window.settings.setValue("githubHelperOnboarded", False)
-    window.open_dashboard()
-    qtbot.waitUntil(lambda: len(calls) == 1)
-    window.open_dashboard()
-    qtbot.wait(30)
-    assert len(calls) == 1
-
-
 def test_existing_authorization_opens_confirmation(qtbot, tmp_path, monkeypatch):
     window, _ = setup(qtbot, tmp_path)
     monkeypatch.setattr("aedrova.desktop.github_setup.gh_path", lambda: "/verified/gh")

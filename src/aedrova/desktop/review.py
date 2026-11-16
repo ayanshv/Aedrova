@@ -20,7 +20,7 @@ from aedrova.delivery.preview import StaticPreview
 from aedrova.desktop.controls import AppDialog
 from aedrova.desktop.design_system import FlowActions
 from aedrova.desktop.dialogs import button, label
-from aedrova.desktop.projects import Job, binding, open_editor
+from aedrova.desktop.projects import Job, binding, open_editor, open_project
 
 
 class ReviewDialog(AppDialog):
@@ -74,6 +74,10 @@ class ReviewDialog(AppDialog):
         remote.addWidget(self.prepare_button)
         remote.addWidget(self.publish_button)
         layout.addLayout(remote)
+        self.connect_repository = button("Connect a GitHub repository…", role="outline")
+        self.connect_repository.clicked.connect(self.open_project_connection)
+        self.connect_repository.hide()
+        layout.addWidget(self.connect_repository)
         self.evidence_button = button("Requirements & shared evidence…", role="outline")
         self.evidence_button.clicked.connect(self.open_evidence)
         layout.addWidget(self.evidence_button)
@@ -267,8 +271,11 @@ class ReviewDialog(AppDialog):
             return
         repo = binding(self.window, self.studio.workspace).get("repository")
         if not repo:
-            self.status.setText("Connect a GitHub repository in Projects first.")
+            self.status.setText("Connect a repository to publish this review.")
+            self.connect_repository.show()
+            self.connect_repository.setFocus()
             return
+        self.connect_repository.hide()
         self.run(
             lambda guard: prepare_publication(
                 GitHub(), repo, self.review, self.studio.request.toPlainText()
@@ -276,6 +283,12 @@ class ReviewDialog(AppDialog):
             self.prepared,
             publishing=True,
         )
+
+    def open_project_connection(self):
+        if self.window.workspace_id != self.studio.workspace:
+            self.status.setText("Switch back to this review’s workspace to connect a repository.")
+            return
+        open_project(self.window)
 
     def prepared(self, publication):
         self.publication = publication

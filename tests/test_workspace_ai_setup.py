@@ -14,7 +14,6 @@ def review(widget, *, automatic=False):
     widget.begin_onboarding()
     widget.onboarding_workspace.setText("New team")
     widget.advance_onboarding()
-    widget.provider_continue.click()
     widget.onboarding_workflow.setCurrentIndex(widget.onboarding_workflow.findData(automatic))
     widget.onboarding_ack.setChecked(True)
 

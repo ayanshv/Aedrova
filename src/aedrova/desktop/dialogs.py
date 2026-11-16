@@ -49,6 +49,27 @@ def button(text, accessible="", role=""):
     return widget
 
 
+def apple_sign_in_button():
+    from PySide6.QtCore import QSize
+    from PySide6.QtGui import QIcon
+
+    from aedrova.desktop.brand import ASSETS
+
+    control = button("Sign in with Apple")
+    control.setIcon(QIcon(str(ASSETS / "apple.svg")))
+    control.setIconSize(QSize(18, 18))
+    control.setMinimumHeight(44)
+    control.setStyleSheet(
+        "QPushButton {background:white;color:black;border:1px solid #d0d0d0;"
+        "border-radius:10px;font-weight:500;text-align:center;} "
+        "QPushButton:hover {background:#f5f5f5;} "
+        "QPushButton:pressed {background:#e5e5e5;} "
+        "QPushButton:focus {border-color:#246bfd;} "
+        "QPushButton:disabled {background:#ededed;color:#676767;}"
+    )
+    return control
+
+
 def icon_button(name, title, *, primary=False):
     """Compact action with a visible glyph, tooltip and full accessible label."""
     from PySide6.QtCore import QSize

@@ -5,7 +5,7 @@ from uuid import uuid4
 from PySide6.QtWidgets import QCheckBox, QHBoxLayout, QLineEdit, QVBoxLayout
 from shiboken6 import isValid
 
-from aedrova.desktop.brand import BrandMark
+from aedrova.desktop.brand import BrandLockup
 from aedrova.desktop.controls import AppDialog
 from aedrova.desktop.dialogs import button, label
 
@@ -24,7 +24,7 @@ class CreateChannelDialog(AppDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(16)
-        layout.addWidget(BrandMark(40))
+        layout.addWidget(BrandLockup(40, 20))
         layout.addWidget(label("Create a new channel", "heading"))
         layout.addWidget(label("A place for a project, topic or team.", "muted", wrap=True))
         self.name = QLineEdit()

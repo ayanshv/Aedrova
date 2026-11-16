@@ -450,6 +450,7 @@ class IdentityService:
             "set_agent_preferences",
             "create_channel",
             "create_invitation",
+            "create_workspace_join_code",
             "accept_invitation",
             "revoke_invitation",
             "set_member_role",
@@ -821,6 +822,50 @@ class IdentityService:
     def record_build_delivery(self, parameters):
         self._authenticated()
         return self.client.rpc("record_build_delivery", parameters).execute().data
+
+    def agent_reply_history(self, workspace, channel, parent=None):
+        self._authenticated()
+        try:
+            query = (
+                self.client.table("my_agent_replies").select("*")
+                .eq("workspace_id", workspace).eq("channel_id", channel)
+            )
+            query = query.eq("parent_id", parent) if parent else query.is_("parent_id", "null")
+            return query.order("created_at", desc=True).order("id").limit(200).execute().data
+        except Exception as error:
+            if getattr(error, "code", None) == "PGRST205":
+                return []
+            raise
+
+    def save_agent_reply(self, parameters):
+        self._authenticated()
+        from aedrova.security.credentials import credential_rules
+
+        if credential_rules(parameters["p_body"].encode()):
+            raise ValueError("Remove credentials before saving an agent reply.")
+        return self.client.rpc("save_agent_reply", parameters).execute().data
+
+    def publish_chat_agent_reply(self, reply):
+        self._authenticated()
+        self.client.rpc("publish_chat_agent_reply", {"p_reply": reply}).execute()
+
+    def report_chat_agent_progress(self, prompt, phase):
+        self._authenticated()
+        self.client.rpc(
+            "report_chat_agent_progress", {"p_prompt": prompt, "p_phase": phase}
+        ).execute()
+
+    def chat_agent_progress(self, channel):
+        self._authenticated()
+        try:
+            return (
+                self.client.table("chat_agent_progress").select("author_id,parent_id,phase")
+                .eq("channel_id", channel).order("expires_at", desc=True).limit(12).execute().data
+            )
+        except Exception as error:
+            if getattr(error, "code", None) == "PGRST205":
+                return []
+            raise
 
     def shared_agent_work(self, workspace, *, identifiers=None):
         """Fresh RLS read; no private Bud history or cached connector grants."""

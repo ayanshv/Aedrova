@@ -136,7 +136,7 @@ class WorkspaceSearch(QLineEdit):
                 and scope == self.current_scope()
             ):
                 self.generation += 1
-                self.render(data)
+                self.render(data, preserve_selection=True)
 
         def timed_out():
             if (
@@ -153,7 +153,19 @@ class WorkspaceSearch(QLineEdit):
             loaded,
         )
 
-    def render(self, data):
+    @staticmethod
+    def result_key(item):
+        if item is None:
+            return None
+        data = item.data(Qt.ItemDataRole.UserRole)
+        if "channel" in data:
+            return ("channel", data["workspace"], data["channel"])
+        if "person" in data:
+            return ("person", data["person"].get("user_id"))
+        return ("message", data["message"].get("id"))
+
+    def render(self, data, *, preserve_selection=False):
+        selection = self.result_key(self.results.currentItem()) if preserve_selection else None
         self.results.clear()
         channels = list(self.local_channels)
         seen = {(c["workspace"], c["id"]) for c in channels}
@@ -174,10 +186,15 @@ class WorkspaceSearch(QLineEdit):
                 {"message": message},
             )
         if self.results.count():
-            self.results.setCurrentRow(0)
+            row = next(
+                (i for i in range(self.results.count())
+                 if self.result_key(self.results.item(i)) == selection),
+                0,
+            ) if selection else 0
+            self.results.setCurrentRow(row)
         self.position_menu()
         self.notice.setText(
-            "↑ ↓ to browse · Enter to open"
+            "↑ ↓ Browse · Enter Open · Esc Close"
             if self.results.count()
             else "No results. Try another search."
         )
@@ -198,6 +215,7 @@ class WorkspaceSearch(QLineEdit):
         self.dismiss()
         if "channel" in data:
             self.host.jump_to(data["workspace"], data["channel"])
+            self.host.composer.editor.setFocus()
         elif "person" in data:
             self.host.collaboration.profile(data["person"])
         else:
