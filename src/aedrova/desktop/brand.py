@@ -39,7 +39,7 @@ def app_icon():
         and (resources / "Assets.car").is_file()
     ):
         return QIcon()
-    return QIcon(str(ASSETS / "aedrova.icns"))
+    return QIcon(str(ASSETS / ("aedrova.ico" if sys.platform == "win32" else "aedrova.icns")))
 
 
 class BrandMark(QWidget):
