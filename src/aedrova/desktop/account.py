@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 from threading import Event
+from urllib.parse import urlsplit
 
 from PySide6.QtCore import (
     QObject,
@@ -11,6 +12,7 @@ from PySide6.QtCore import (
     QSize,
     Qt,
     QThreadPool,
+    QTimer,
     Signal,
     Slot,
 )
@@ -32,9 +34,9 @@ from PySide6.QtWidgets import (
 )
 from shiboken6 import isValid
 
-from aedrova.desktop.brand import BrandMark
+from aedrova.desktop.brand import BrandLockup
 from aedrova.desktop.controls import AppDialog, ChoiceBox, CodingProviderChoice
-from aedrova.desktop.dialogs import button, icon_button, label
+from aedrova.desktop.dialogs import apple_sign_in_button, button, icon_button, label
 from aedrova.desktop.onboarding_motion import OnboardingStack
 from aedrova.desktop.welcome_surface import WelcomeSurface
 from aedrova.identity.oauth import apple_login_enabled, apple_sign_in, google_sign_in
@@ -57,10 +59,25 @@ class AccountJob(QRunnable):
             result = self.operation()
             success = True
         except Exception as error:
+            import httpx
+
             from aedrova.identity.errors import retryable
 
-
-            result, success = {"retryable": retryable(error)}, False
+            code = str(getattr(error, "code", ""))
+            status = str(getattr(error, "status", getattr(error, "status_code", "")))
+            reason = "failed"
+            if isinstance(error, (httpx.ConnectError, ConnectionError)):
+                reason = "offline"
+            elif isinstance(error, (httpx.TimeoutException, TimeoutError)) or status in (
+                "408",
+                "504",
+            ):
+                reason = "timeout"
+            elif status == "401" or code == "PGRST301":
+                reason = "session"
+            elif status == "403" or code == "42501" or isinstance(error, PermissionError):
+                reason = "denied"
+            result, success = {"retryable": retryable(error), "reason": reason}, False
         finally:
             self.operation = None
 
@@ -87,8 +104,12 @@ class AccountDialog(AppDialog):
         self.factory = factory
         self.service = None
         self.busy = False
+        self.job_kind = None
+        self.workspace_write_unconfirmed = False
         self.pending_intent = None
+        self.pending_workspace = None
         self.creation_workspace = None
+        self.pending_team_invite_workspace = None
         self.oauth_cancel = None
         self.awaiting_sign_in_snapshot = False
         QApplication.instance().aboutToQuit.connect(self.cancel_google)
@@ -106,8 +127,8 @@ class AccountDialog(AppDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(28, 24, 28, 24)
         top = QHBoxLayout()
-        top.addWidget(BrandMark(36))
-        top.addWidget(label("Aedrova", "title"))
+        brand = BrandLockup(36, 20)
+        top.addWidget(brand)
         top.addStretch()
         layout.addLayout(top)
         self.status = label(
@@ -116,6 +137,10 @@ class AccountDialog(AppDialog):
             wrap=True,
         )
         layout.addWidget(self.status)
+        self.recover_workspace = button("Reload workspaces", role="outline")
+        self.recover_workspace.clicked.connect(self.refresh)
+        self.recover_workspace.hide()
+        layout.addWidget(self.recover_workspace, alignment=Qt.AlignmentFlag.AlignLeft)
         self.pages = OnboardingStack(self)
         self.pages.setObjectName("AccountPages")
         layout.addWidget(self.pages)
@@ -123,6 +148,8 @@ class AccountDialog(AppDialog):
         self._workspace_page()
         self._onboarding_page()
         self._home_page()
+        self.pages.currentChanged.connect(lambda page: brand.setVisible(page != 0))
+        brand.setVisible(self.pages.currentIndex() != 0)
         self.cancel_login = button("Cancel sign-in")
         self.cancel_login.hide()
         self.cancel_login.clicked.connect(self.cancel_google)
@@ -130,6 +157,9 @@ class AccountDialog(AppDialog):
         close = self.workspace_icon("close", "Close")
         close.clicked.connect(self.accept)
         layout.addWidget(close, alignment=Qt.AlignmentFlag.AlignRight)
+        for page in (self.pages.widget(0), self.pages.widget(2), self.pages.widget(3)):
+            for control in page.findChildren(QPushButton):
+                control.setProperty("onboardingAction", True)
         for control in self.findChildren(QPushButton):
             control.setAutoDefault(False)
         self.onboarding_workspace.returnPressed.connect(self.advance_onboarding)
@@ -162,8 +192,8 @@ class AccountDialog(AppDialog):
         column = QVBoxLayout(card)
         column.setContentsMargins(24, 28, 24, 28)
         column.setSpacing(16)
-        column.addWidget(BrandMark(40), alignment=Qt.AlignmentFlag.AlignHCenter)
-        heading = label("Get started with Aedrova", "title")
+        column.addWidget(BrandLockup(52, 26), alignment=Qt.AlignmentFlag.AlignHCenter)
+        heading = label("Get started", "title")
         heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
         column.addWidget(heading)
         subtitle = label("Your team’s context. Put to work.", "muted", wrap=True)
@@ -175,15 +205,7 @@ class AccountDialog(AppDialog):
         self.google_button.setMinimumHeight(44)
         self.google_button.clicked.connect(self.start_google)
         column.addWidget(self.google_button)
-        self.apple_button = button("Sign in with Apple")
-        self.apple_button.setIcon(QIcon(str(Path(__file__).parent / "assets/apple.svg")))
-        self.apple_button.setIconSize(QSize(18, 18))
-        self.apple_button.setMinimumHeight(44)
-        self.apple_button.setStyleSheet(
-            "QPushButton {background:white;color:black;border:1px solid #d0d0d0;"
-            "border-radius:10px;font-weight:500;text-align:center;} "
-            "QPushButton:hover {background:#f5f5f5;}"
-        )
+        self.apple_button = apple_sign_in_button()
         self.apple_button.clicked.connect(self.start_apple)
         self.apple_button.setVisible(apple_login_enabled())
         column.addWidget(self.apple_button)
@@ -221,11 +243,12 @@ class AccountDialog(AppDialog):
             return
         self.oauth_cancel = Event()
         self.cancel_login.show()
+        appearance = self.settings.value("appearance", "system", type=str)
 
         def operation():
             self.service = self.factory(connection)
             sign_in = apple_sign_in if provider == "apple" else google_sign_in
-            return sign_in(self.service, self.oauth_cancel)
+            return sign_in(self.service, self.oauth_cancel, appearance=appearance)
 
         self.run(operation, self.authenticated)
         self.status.show()
@@ -536,14 +559,18 @@ class AccountDialog(AppDialog):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(24, 24, 24, 24)
         self.onboarding_steps = OnboardingStack(self)
-        self.onboarding_steps.setMaximumWidth(440)
-        layout.addWidget(self.onboarding_steps, alignment=Qt.AlignmentFlag.AlignHCenter)
+        self.onboarding_steps.setMinimumWidth(400)
+        self.onboarding_steps.setMaximumWidth(460)
+        layout.addWidget(
+            self.onboarding_steps,
+            alignment=Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop,
+        )
 
         def step(title, subtitle):
             panel = QWidget()
             column = QVBoxLayout(panel)
             column.setSpacing(14)
-            column.addStretch()
+            column.addSpacing(8)
             heading = label(title, "title", wrap=True)
             heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
             column.addWidget(heading)
@@ -551,7 +578,7 @@ class AccountDialog(AppDialog):
             self.onboarding_steps.addWidget(panel)
             return column
 
-        first = step("Name your workspace", "What would you like to call it?")
+        first = step("Name your workspace", "Give your team a place to work together.")
         self.onboarding_workspace = self.field("e.g. Northstar Labs")
         self.onboarding_workspace.setMaxLength(80)
         self.onboarding_workspace.setMinimumHeight(48)
@@ -560,14 +587,14 @@ class AccountDialog(AppDialog):
         self.space_parent.setAccessibleName("Independent Space or shared subspace")
         self.space_parent.addItem("Independent Space · separate plan and AI", None)
         first.addWidget(self.space_parent)
-        first.addWidget(
-            label(
-                "One subscription covers your team. A subspace shares its parent’s plan "
-                "and AI capacity. Creating either never charges your card.",
-                "muted",
-                wrap=True,
-            )
+        self.space_note = label(
+            "A subspace shares its parent’s plan and AI capacity.", "muted", wrap=True
         )
+        first.addWidget(self.space_note)
+        self.space_parent.currentIndexChanged.connect(
+            lambda: self.space_note.setVisible(bool(self.space_parent.currentData()))
+        )
+        self.space_note.hide()
         self.name_continue = button("Continue", role="primary")
         self.name_continue.setMinimumHeight(48)
         self.name_continue.clicked.connect(self.advance_onboarding)
@@ -577,34 +604,59 @@ class AccountDialog(AppDialog):
         first.addWidget(join)
         first.addStretch()
 
-        second = step(
-            "Name your agent",
-            "Give your team's building partner a name. You can change it later.",
-        )
-        self.onboarding_nickname = self.field("Agent nickname")
+        self.ai_review_step = self.onboarding_steps.count()
+        review = step("Set up your agent", "Choose how Aedrova can work in this workspace.")
+        review.setSpacing(11)
+        review.addWidget(label("Agent nickname"))
+        self.onboarding_nickname = self.field("Aedrova")
+        self.onboarding_nickname.setAccessibleName("Agent nickname")
         self.onboarding_nickname.setMaxLength(32)
         self.onboarding_nickname.setText("Aedrova")
-        self.onboarding_nickname.setMinimumHeight(48)
-        second.addWidget(self.onboarding_nickname)
-        second.addWidget(label("Powered by", "muted"))
+        review.addWidget(self.onboarding_nickname)
+        review.addWidget(label("Model"))
         self.onboarding_provider = self.provider_choice()
-        second.addWidget(self.onboarding_provider)
-        self.provider_continue = button("Continue", role="primary")
-        self.provider_continue.setMinimumHeight(48)
-        self.provider_continue.clicked.connect(self.review_ai_setup)
-        second.addWidget(self.provider_continue)
-        back = button("Back")
-        back.clicked.connect(lambda: self.onboarding_steps.setCurrentIndex(0))
-        second.addWidget(back)
-        second.addStretch()
+        review.addWidget(self.onboarding_provider)
+        self.onboarding_model = label("", "muted", wrap=True)
+        review.addWidget(self.onboarding_model)
+        review.addWidget(label("Build workflow on this device"))
+        self.onboarding_workflow = ChoiceBox()
+        self.onboarding_workflow.setAccessibleName("AI build workflow")
+        self.onboarding_workflow.addItem("Plan and execute in the background", True)
+        self.onboarding_workflow.addItem("Review the plan before building", False)
+        review.addWidget(self.onboarding_workflow)
+        self.onboarding_permission = label("", "muted", wrap=True)
+        review.addWidget(self.onboarding_permission)
+        review.addWidget(
+            label(
+                "Applying changes to original files and publishing still require approval.",
+                "muted",
+                wrap=True,
+            )
+        )
+        self.onboarding_ack = QCheckBox("I’ve reviewed and allow this AI setup")
+        review.addWidget(self.onboarding_ack)
+        self.finish_onboarding = button("Create workspace", role="primary")
+        self.finish_onboarding.setMinimumHeight(48)
+        self.finish_onboarding.setEnabled(False)
+        self.finish_onboarding.clicked.connect(self.complete_onboarding)
+        back_ai = button("Back", role="outline")
+        back_ai.clicked.connect(lambda: self.onboarding_steps.setCurrentIndex(0))
+        actions = QHBoxLayout()
+        actions.addWidget(back_ai)
+        actions.addWidget(self.finish_onboarding, 1)
+        review.addLayout(actions)
+        self.onboarding_ack.toggled.connect(self.finish_onboarding.setEnabled)
+        self.onboarding_workflow.currentIndexChanged.connect(self.update_ai_review)
+        self.onboarding_provider.currentIndexChanged.connect(self.update_ai_review)
+        self.update_ai_review()
 
-        ready = step("Your workspace is ready", "Open your dashboard or invite teammates.")
+        ready = step(
+            "Your workspace is ready", "Start a conversation or invite your team."
+        )
         self.ready_summary = label("", "title", wrap=True)
         ready.addWidget(self.ready_summary)
-        invite = button("Invite teammates", role="primary")
-        invite.clicked.connect(self.show_simple_invite)
-        ready.addWidget(invite)
-        self.ready_continue = button("Go to dashboard", role="primary")
+        self.ready_continue = button("Open workspace", role="primary")
+        self.ready_continue.setMinimumHeight(48)
         self.ready_continue.clicked.connect(self.open_dashboard)
         ready.addWidget(self.ready_continue)
         ready.addStretch()
@@ -645,7 +697,7 @@ class AccountDialog(AppDialog):
                 wrap=True,
             )
         )
-        self.invite_dashboard = button("Go to dashboard", role="primary")
+        self.invite_dashboard = button("Open workspace", role="primary")
         self.invite_dashboard.setMinimumHeight(48)
         self.invite_dashboard.clicked.connect(self.open_dashboard)
         invitations.addWidget(self.invite_dashboard)
@@ -654,59 +706,19 @@ class AccountDialog(AppDialog):
 
 
 
-        self.ai_review_step = self.onboarding_steps.count()
-        review = step(
-            "How should your agent work?",
-            "Choose how builds run on this computer. You can change it later.",
-        )
-
-
-        review.parentWidget().setMinimumHeight(560)
-        review.addWidget(label("Model", "section"))
-        self.onboarding_model = label("", "muted", wrap=True)
-        review.addWidget(self.onboarding_model)
-        review.addWidget(label("Build workflow · this computer", "section"))
-        self.onboarding_workflow = ChoiceBox()
-        self.onboarding_workflow.setAccessibleName("AI build workflow")
-        self.onboarding_workflow.addItem("Plan and execute in the background", True)
-        self.onboarding_workflow.addItem("Review the plan before building", False)
-        review.addWidget(self.onboarding_workflow)
-        self.onboarding_permission = label("", "muted", wrap=True)
-        self.onboarding_permission.setSizePolicy(
-            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Minimum
-        )
-        review.addWidget(self.onboarding_permission)
-        review.addWidget(
-            label(
-                "Applying to original files and publishing still need approval. "
-                "Connect a project before building.",
-                "muted",
-                wrap=True,
-            )
-        )
-        self.onboarding_ack = QCheckBox("I’ve reviewed and allow this AI setup")
-        review.addWidget(self.onboarding_ack)
-        self.finish_onboarding = button("Create workspace", role="primary")
-        self.finish_onboarding.setMinimumHeight(48)
-        self.finish_onboarding.setEnabled(False)
-        self.finish_onboarding.clicked.connect(self.complete_onboarding)
-        review.addWidget(self.finish_onboarding)
-        back_ai = button("Back", role="outline")
-        back_ai.clicked.connect(lambda: self.onboarding_steps.setCurrentIndex(1))
-        review.addWidget(back_ai)
-        review.addStretch()
-        self.onboarding_ack.toggled.connect(self.finish_onboarding.setEnabled)
-        self.onboarding_workflow.currentIndexChanged.connect(self.update_ai_review)
-        self.onboarding_provider.currentIndexChanged.connect(self.update_ai_review)
-        self.update_ai_review()
         self.add_page(page)
 
         join_page = QWidget()
         join_layout = QVBoxLayout(join_page)
         join_layout.setSpacing(20)
-        join_layout.addStretch()
+        join_layout.setContentsMargins(24, 24, 24, 24)
         join_layout.addWidget(label("Join your team", "heading"))
-        join_layout.addWidget(label("Use the code shared with your email address.", "muted"))
+        join_layout.addWidget(label("Use the code your teammate shared with you.", "muted"))
+        join_layout.addWidget(
+            label(
+                "For A2 codes, keep the dashes. Capitalization doesn’t matter.", "muted", wrap=True
+            )
+        )
         self.onboarding_invite = self.field("Paste invitation code", password=True)
         join_layout.addWidget(self.onboarding_invite)
         join_button = button("Join workspace", role="primary")
@@ -763,7 +775,7 @@ class AccountDialog(AppDialog):
         self.home_invite.clicked.connect(self.show_simple_invite)
         actions.addWidget(self.home_invite)
         self.home_settings = self.workspace_icon("settings", "Workspace settings")
-        self.home_settings.clicked.connect(lambda: self.pages.setCurrentIndex(1))
+        self.home_settings.clicked.connect(lambda: self.show_workspace_intent("manage"))
         actions.addWidget(self.home_settings)
         actions.addStretch()
         self.archive_workspace = self.workspace_icon("archive", "Archive workspace for me")
@@ -793,9 +805,8 @@ class AccountDialog(AppDialog):
         centered.addStretch()
         centered.addWidget(content, 1)
         centered.addStretch()
-        layout.addStretch(1)
         layout.addLayout(centered)
-        layout.addStretch(2)
+        layout.addStretch()
         self.add_page(page)
 
     def confirm_archive(self):
@@ -884,9 +895,8 @@ class AccountDialog(AppDialog):
             self.status.setText("Give your workspace a name to continue.")
             self.onboarding_workspace.setFocus()
             return
-        self.onboarding_steps.setCurrentIndex(1)
-        self.onboarding_nickname.setFocus()
-        self.status.setText("Choose your team’s AI provider.")
+        self.review_ai_setup()
+        self.onboarding_provider.setFocus()
 
     def update_ai_review(self, *_):
         from aedrova.agents.managed import ai_access_mode
@@ -910,12 +920,9 @@ class AccountDialog(AppDialog):
         self.onboarding_permission.setMinimumHeight(self.onboarding_permission.sizeHint().height())
 
     def review_ai_setup(self):
-        if not self.onboarding_nickname.text().strip():
-            self.status.setText("Give your agent a name first.")
-            return
         self.update_ai_review()
         self.onboarding_steps.setCurrentIndex(self.ai_review_step)
-        self.status.setText("Review your AI setup before creating the workspace.")
+        self.status.clear()
 
     def show_simple_invite(self):
         if not self.workspace_id():
@@ -926,7 +933,7 @@ class AccountDialog(AppDialog):
         self.onboarding_steps.setCurrentIndex(3)
         self.setup_email.setFocus()
 
-    def open_dashboard(self):
+    def open_dashboard(self, *, require_profile=True):
         if self.busy:
             return
         if self.service and self.service.user and not self.workspace_id():
@@ -960,10 +967,43 @@ class AccountDialog(AppDialog):
                 self.finish_onboarding.setText("Finish AI setup")
                 self.status.setText("This workspace exists. Finish its AI setup to continue.")
                 return
+        profile = self.snapshot.get("user_profile")
+        window = self.parentWidget()
+        if (
+            require_profile
+            and window is not None
+            and isinstance(profile, dict)
+            and not profile.get("setup_required")
+            and not profile.get("profile_completed")
+        ):
+            if getattr(window, "enable_guided_onboarding", False):
+                flow = getattr(window, "setup_dialog", None)
+                if flow is None or flow.closed:
+                    from aedrova.desktop.zen_setup import ACCOUNT
+
+                    self.accept()
+                    window.show_setup(stage=ACCOUNT)
+                    return
+            from aedrova.desktop.profile import open_profile_editor
+
+            open_profile_editor(window, onboarding=True, continued=self.open_dashboard)
+            return
+        workspace = self.workspace_id()
+        show_join_code = self.pending_team_invite_workspace == workspace and bool(workspace)
+        service = self.service
+        self.pending_team_invite_workspace = None
         self.pending_intent = None
         self.generated_code.clear()
         self.accept()
         self.dashboard_requested.emit()
+        if show_join_code and window is not None:
+            from aedrova.desktop.team_invite import open_workspace_join_code
+
+            def invite():
+                if self.service is service:
+                    open_workspace_join_code(window, workspace)
+
+            QTimer.singleShot(0, invite)
 
     def finish_setup(self):
         self.pending_intent = None
@@ -982,16 +1022,19 @@ class AccountDialog(AppDialog):
             self.status.setText("Review and allow your AI setup before creating the workspace.")
             return
         name = self.onboarding_workspace.text().strip()
-        nickname = self.onboarding_nickname.text().strip()
-        if (
-            not name
-            or not nickname
-            or not nickname[0].isalnum()
-            or any(not (character.isalnum() or character in " _-") for character in nickname)
+        nickname = self.onboarding_nickname.text().strip() or "Aedrova"
+        if not name and not self.creation_workspace:
+            self.onboarding_steps.setCurrentIndex(0)
+            self.status.setText("Give your workspace a name to continue.")
+            self.onboarding_workspace.setFocus()
+            return
+        if not nickname[0].isalnum() or any(
+            not (character.isalnum() or character in " _-") for character in nickname
         ):
             self.status.setText(
-                "Add a workspace name. Nicknames can use letters, numbers, spaces, - or _."
+                "Use letters, numbers, spaces, hyphens or underscores in the nickname."
             )
+            self.onboarding_nickname.setFocus()
             return
         from aedrova.agents.managed import ai_access_mode
 
@@ -1032,15 +1075,29 @@ class AccountDialog(AppDialog):
             configuration=configuration,
         )
 
+    def last_workspace_key(self):
+        service = self.service
+        user = getattr(service, "user", None)
+        connection = getattr(service, "connection", None)
+        host = urlsplit(connection.url).netloc if connection else ""
+        return f"lastWorkspace/{host}/{user.id}" if user and host else None
+
+    def remember_workspace(self, workspace_id):
+        key = self.last_workspace_key()
+        if key and workspace_id and self.settings.value(key) != workspace_id:
+            self.settings.setValue(key, workspace_id)
+
     def workspace_id(self):
         return self.workspaces.currentData()
 
-    def run(self, operation, success, *, background=False):
+    def run(self, operation, success, *, background=False, kind=None):
         if self.busy:
             return
         self.busy = True
+        self.job_kind = kind
         self.background_job = background
         if not background:
+            self.recover_workspace.hide()
             self.pages.setEnabled(False)
             self.set_loading(self.pages, True)
         self.success = success
@@ -1059,18 +1116,58 @@ class AccountDialog(AppDialog):
         if ok:
             self.success(result)
         else:
-            self.last_error_retryable = bool(result and result.get("retryable"))
-            self.status.setText(
-                "Request unsuccessful. Check your connection or permissions.\n"
-                "Refresh before retrying a timed-out action."
-            )
-            if cancelled:
-                self.status.setText("Sign-in cancelled. You can try again whenever you’re ready.")
-            self.clear_connected()
+            self.show_request_failure(result or {}, cancelled)
             self.operation_failed.emit()
             if self.service is None or self.service.user is None:
                 self.pages.setCurrentIndex(0)
+        if (
+            ok
+            and self.pending_intent
+            and self.service
+            and self.service.user
+            and self.snapshot["workspaces"]
+        ):
+            self.show_workspace_intent(self.pending_intent, self.pending_workspace)
         self.operation_finished.emit()
+
+    def show_request_failure(self, result, cancelled):
+        self.last_error_retryable = bool(result.get("retryable"))
+        reason = result.get("reason")
+        signed_in = bool(self.service and self.service.user)
+        if getattr(self, "background_job", False) and signed_in:
+            return
+        write = self.job_kind == "workspace_write"
+        if cancelled:
+            message = "Sign-in cancelled. You can try again whenever you’re ready."
+        elif not signed_in:
+            message = "Sign-in didn’t finish. Check your connection and try again."
+        elif reason == "session":
+            message = "Your session expired. Sign out and sign in again to continue."
+        elif reason == "denied":
+            message = "You don’t have access to complete this action. Check with a workspace admin."
+        elif write and self.last_error_retryable:
+            self.workspace_write_unconfirmed = True
+            message = (
+                "We couldn’t confirm that your change saved. Your input is still here. "
+                "Reload and check the workspace before trying again."
+            )
+        elif write:
+            message = "Your change couldn’t be saved. Review your input and try again."
+        elif reason == "offline":
+            message = "Couldn’t connect to your workspaces. Check your connection and reload."
+        elif reason == "timeout":
+            message = "Loading your workspaces took too long. Reload to try again."
+        else:
+            message = "Couldn’t load your workspaces. Reload to try again."
+        if (
+            not signed_in
+            or reason == "session"
+            or (not write and not self.last_error_retryable)
+        ):
+            self.clear_connected()
+        self.status.setText(message)
+        if signed_in and self.job_kind in ("workspace_read", "workspace_write"):
+            self.recover_workspace.setVisible(reason != "session")
 
     def authenticated(self, user):
         if user is None:
@@ -1085,12 +1182,61 @@ class AccountDialog(AppDialog):
         self.refresh()
 
     def refresh(self):
+        if not self.service or not self.service.user:
+            return
         self.generated_code.clear()
-        self.run(self.service.snapshot, self.loaded)
+        page = self.pages.currentIndex()
+        checking_write = self.workspace_write_unconfirmed
+
+        def refreshed(snapshot):
+            if checking_write:
+                self.pending_workspace = None
+                self.populate_workspaces(snapshot, self.workspace_id())
+                self.pages.setCurrentIndex(page)
+                self.status.setText(
+                    "Workspaces reloaded. Check whether your change is there before trying again."
+                )
+                self.workspace_write_unconfirmed = False
+                self.snapshot_loaded.emit()
+            else:
+                self.loaded(snapshot)
+
+        self.run(self.service.snapshot, refreshed, kind="workspace_read")
 
     def loaded(self, snapshot):
-        previous = getattr(self, "pending_workspace", None) or self.workspace_id()
+        self.recover_workspace.hide()
+        previous = self.pending_workspace or self.workspace_id()
+        restore = None
+        if (
+            self.awaiting_sign_in_snapshot
+            and not self.pending_intent
+            and not self.pending_workspace
+        ):
+            key = self.last_workspace_key()
+            remembered = self.settings.value(key) if key else None
+            if remembered:
+                if any(workspace["id"] == remembered for workspace in snapshot["workspaces"]):
+                    restore = remembered
+                    previous = restore
+                else:
+                    self.settings.remove(key)
         self.pending_workspace = None
+        self.populate_workspaces(snapshot, previous)
+        self.pages.setCurrentIndex(
+            4 if snapshot["workspaces"] or snapshot.get("archived_workspaces") else 2
+        )
+        if not snapshot["workspaces"]:
+            self.onboarding_steps.setCurrentIndex(0)
+        self.status.setText("Connected")
+        self.apply_intent()
+        self.snapshot_loaded.emit()
+        if self.awaiting_sign_in_snapshot and self.service and self.service.user:
+            self.awaiting_sign_in_snapshot = False
+            self.sign_in_ready.emit()
+            if restore and self.isVisible() and self.pages.currentIndex() == 4:
+                self.open_dashboard()
+
+    def populate_workspaces(self, snapshot, previous):
         self.snapshot = snapshot
         self.space_parent.clear()
         self.space_parent.addItem("Independent Space · separate plan and AI", None)
@@ -1126,19 +1272,14 @@ class AccountDialog(AppDialog):
         self.home_invite.setEnabled(bool(snapshot["workspaces"]))
         self.home_settings.setEnabled(bool(snapshot["workspaces"]))
         self.render_workspace()
-        self.pages.setCurrentIndex(
-            4 if snapshot["workspaces"] or snapshot.get("archived_workspaces") else 2
-        )
-        if not snapshot["workspaces"]:
-            self.onboarding_steps.setCurrentIndex(0)
-        self.status.setText("Connected")
+
+    def show_workspace_intent(self, intent, workspace=None):
+        self.pending_intent = intent
+        self.pending_workspace = None
+        self.populate_workspaces(self.snapshot, workspace or self.workspace_id())
+        if intent not in ("manage", "channel") or not self.workspace_id():
+            self.pages.setCurrentIndex(4)
         self.apply_intent()
-        self.snapshot_loaded.emit()
-        if self.awaiting_sign_in_snapshot and self.service and self.service.user:
-            self.awaiting_sign_in_snapshot = False
-            self.sign_in_ready.emit()
-
-
 
     def apply_intent(self):
         intent, self.pending_intent = self.pending_intent, None
@@ -1248,6 +1389,10 @@ class AccountDialog(AppDialog):
         self.revoke_invitation_button.setVisible(self.invitations.count() > 0)
 
     def mutate(self, name, parameters, *, configuration=None, created_workspace=None):
+        if self.workspace_write_unconfirmed:
+            self.status.setText("Reload and check the workspace before trying this change again.")
+            self.recover_workspace.show()
+            return
         if self.busy:
             if getattr(self, "queued_settings_save", False):
                 return
@@ -1319,6 +1464,8 @@ class AccountDialog(AppDialog):
 
         def completed(result):
             value, snapshot = result
+            if name in ("onboard_workspace", "create_subspace") and value:
+                self.pending_team_invite_workspace = value
             if configuration:
                 from aedrova.desktop.projects import binding_key
 
@@ -1373,7 +1520,7 @@ class AccountDialog(AppDialog):
                     )
                     self.pages.setCurrentIndex(2)
                     self.onboarding_steps.setCurrentIndex(2)
-                    self.status.setText("Workspace created. Invite your team now or do it later.")
+                    self.status.clear()
                 elif name == "set_workspace_archived":
                     self.pages.setCurrentIndex(4)
                     self.status.setText(
@@ -1398,7 +1545,7 @@ class AccountDialog(AppDialog):
                     "this will not create another workspace."
                 )
 
-        self.run(operation, completed)
+        self.run(operation, completed, kind="workspace_write")
 
     def member_action(self, action):
         member = self.members.currentItem()
@@ -1431,6 +1578,8 @@ class AccountDialog(AppDialog):
             self.mutate("revoke_invitation", {"p_invitation": item.data(Qt.ItemDataRole.UserRole)})
 
     def clear_connected(self):
+        self.workspace_write_unconfirmed = False
+        self.recover_workspace.hide()
         self.snapshot = {
             "workspaces": [],
             "channels": [],
@@ -1455,10 +1604,17 @@ class AccountDialog(AppDialog):
         self.setup_email.clear()
 
     def sign_out(self):
-        if self.busy:
+        connected = getattr(self.parent(), "connected", None)
+        saving_replies = (
+            connected and connected.active
+            and any(action[0][0] == "agent-reply" for action in connected.queue)
+        )
+        if self.busy or saving_replies:
             if not getattr(self, "logout_pending", False):
                 self.logout_pending = True
                 self.operation_finished.connect(self.finish_pending_logout)
+            if saving_replies and not self.busy:
+                connected.refresh()
             return
         service = self.service
         self.service = None
@@ -1469,6 +1625,8 @@ class AccountDialog(AppDialog):
         self.onboarding_nickname.setText("Aedrova")
         self.onboarding_steps.setCurrentIndex(0)
         self.pending_intent = None
+        self.pending_workspace = None
+        self.pending_team_invite_workspace = None
 
         def completed(_):
             self.pages.setCurrentIndex(0)

@@ -10,10 +10,22 @@ CSP = (
 )
 
 
-@lru_cache(maxsize=2)
-def render_callback(success=True):
+@lru_cache(maxsize=6)
+def render_callback(success=True, *, appearance="system"):
+    if appearance not in ("light", "dark"):
+        appearance = "system"
+    color_scheme = "light dark" if appearance == "system" else appearance
+    dark_palette = """--bg:#000;--ink:#f5f5f7;--muted:#a1a1a6;
+--glass:rgba(28,28,30,.78);--line:rgba(255,255,255,.08);--shadow:rgba(0,0,0,.35);
+--shine:rgba(255,255,255,.06)"""
+    dark_styles = f":root {{{dark_palette}}}"
+    if appearance == "system":
+        dark_styles = f"@media(prefers-color-scheme:dark) {{{dark_styles}}}"
+    elif appearance == "light":
+        dark_styles = ""
     logo = Path(__file__).parents[1] / "desktop" / "assets" / "aedrova.png"
     image = base64.b64encode(logo.read_bytes()).decode("ascii")
+    wordmark = logo.with_name("aedrova-wordmark.svg").read_text(encoding="utf-8")
     heading = "Your space is waiting." if success else "Let’s try that again."
     description = (
         "Return to Aedrova to finish signing in. You can close this tab."
@@ -25,11 +37,12 @@ def render_callback(success=True):
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light dark">
+<meta name="color-scheme" content="{color_scheme}">
 <title>Aedrova · Your space to build</title>
 <style>
-:root {{color-scheme: light dark; --bg:#f5f5f7; --ink:#1d1d1f; --muted:#6e6e73;
---glass:rgba(255,255,255,.72); --line:rgba(0,0,0,.06); --shadow:rgba(34,45,80,.08)}}
+:root {{color-scheme:{color_scheme}; --bg:#f5f5f7; --ink:#1d1d1f; --muted:#6e6e73;
+--glass:rgba(255,255,255,.72); --line:rgba(0,0,0,.06); --shadow:rgba(34,45,80,.08);
+--shine:rgba(255,255,255,.35)}}
 * {{box-sizing:border-box}} body {{margin:0; min-height:100svh; display:grid; place-items:center;
 background:var(--bg);
  color:var(--ink);
@@ -48,15 +61,17 @@ radial-gradient(ellipse at 52% 77%,rgba(124,171,241,.2),transparent 55%);
 filter:blur(48px)}}
 main {{position:relative; width:min(100%,560px); text-align:center; border-radius:24px;
 padding:34px 48px 44px; background:var(--glass); border:1px solid var(--line);
-box-shadow:0 24px 90px var(--shadow),inset 0 1px 0 rgba(255,255,255,.35);
+box-shadow:0 24px 90px var(--shadow),inset 0 1px 0 var(--shine);
 backdrop-filter:blur(24px);
  -webkit-backdrop-filter:blur(24px);
  animation:arrive .65s ease-out both}}
-.brand {{font-size:18px; font-weight:600; letter-spacing:-.5px; margin:0}}
-.mark {{width:160px;height:160px; position:relative; margin:24px auto 20px}}
+.brand {{display:flex;align-items:center;justify-content:center;gap:12px;
+color:var(--ink);margin:0 auto 26px}}
+.brand svg {{display:block;width:148px;height:auto}}
+.mark {{width:64px;height:64px;position:relative;flex:none;overflow:hidden}}
 .mark img {{position:absolute;
-width:400px;
-height:400px;
+width:160px;
+height:160px;
  max-width:none;
 left:50%;
 top:50%;
@@ -85,15 +100,14 @@ text-align:center}}
 @keyframes arrive {{from {{opacity:0;
 transform:translateY(10px)}} to {{opacity:1;
 transform:translateY(0)}}}}
-@media(prefers-color-scheme:dark) {{:root {{--bg:#000;--ink:#f5f5f7;--muted:#a1a1a6;
---glass:rgba(28,28,30,.78);--line:rgba(255,255,255,.08);--shadow:rgba(0,0,0,.35)}}
-main {{box-shadow:0 24px 90px var(--shadow),inset 0 1px 0 rgba(255,255,255,.06)}}}}
+{dark_styles}
 @media(max-width:420px) {{main {{padding:28px 24px 32px}} .mark {{margin-top:16px}}}}
 @media(prefers-reduced-motion:reduce) {{main {{animation:none}}}}
 @media(prefers-reduced-transparency:reduce) {{main {{background:var(--bg);backdrop-filter:none}}}}
 </style></head><body><div class="aura" aria-hidden="true"></div>
-<div class="wrap"><main aria-labelledby="title"><p class="brand">Aedrova</p>
+<div class="wrap"><main aria-labelledby="title"><div class="brand" role="img" aria-label="Aedrova">
 <div class="mark"><img src="data:image/png;base64,{image}" alt="" aria-hidden="true"></div>
+{wordmark}</div>
 <p class="kicker">{status}</p><h1 id="title">{heading}</h1>
 <p class="description">{description}</p>
 <p class="hint">Switch to the <strong>Aedrova app</strong>

@@ -1,344 +1,240 @@
-"""Real, optional setup pages for the animated introduction; grants are never implicit."""
+"""Account and project forms for the desktop first-run flow."""
 
 from pathlib import Path
 
-from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QSize, Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import (
-    QButtonGroup,
-    QCheckBox,
-    QFrame,
-    QHBoxLayout,
-    QLayout,
-    QLineEdit,
-    QPushButton,
-    QScrollArea,
-    QVBoxLayout,
-)
+from PySide6.QtWidgets import QCheckBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QVBoxLayout
 
-from aedrova.delivery.github import repository_name
 from aedrova.desktop.brand import ASSETS
-from aedrova.desktop.controls import ChoiceBox, CodingProviderChoice, choose_project
-from aedrova.desktop.dialogs import button, label
+from aedrova.desktop.controls import CodingProviderChoice, choose_project
+from aedrova.desktop.dialogs import apple_sign_in_button, button, label
+from aedrova.desktop.getting_started import GOALS
+from aedrova.desktop.icons import assign, icon
 from aedrova.desktop.projects import binding, save_binding
-from aedrova.desktop.zen_visuals import ProjectPicker, SetupVisual, ThemePhoto
-from aedrova.localization import choice_source
+from aedrova.identity.oauth import apple_login_enabled
 
-SETUP_STEPS = (
-    ("Choose your style", "Make the workspace feel like yours.", "Continue"),
-    (
-        "Your account",
-        "Your teammates should know who is behind the good ones.",
-        "Continue",
-    ),
-    (
-        "Connect your workspace",
-        "Connect a specific folder. Your original files stay under your control.",
-        "Continue",
-    ),
-    (
-        "Choose your agent’s workflow",
-        "Choose how much your agent may do after an explicit mention.",
-        "Continue",
-    ),
-    (
-        "Connect with GitHub",
-        "Connect GitHub when you are ready to publish reviewed work.",
-        "Continue",
-    ),
-    (
-        "Meet face to face",
-        "Check devices deliberately. Nothing records in the background.",
-        "Continue",
-    ),
-    (
-        "You’re good to go",
-        "Real settings. Clear permissions. No surprise builds.",
-        "Save & enter workspace",
-    ),
-)
-LAST_STAGE = 4 + len(SETUP_STEPS)
+WELCOME, ACCOUNT, PRIVACY, GOAL, PROJECT = range(5)
 
 
-class SetupPages(QScrollArea):
+class SetupPages(QFrame):
     def __init__(self, flow):
         super().__init__(flow)
-        self.flow, self.window = flow, flow.window
-        self.workspace = self.window.workspace_id
-        self.original = binding(self.window, self.workspace)
-        self.draft = dict(self.original)
-        self.preferences = {
-            "theme": self.window.theme_mode,
-            "motion": self.window.reduced_motion,
-            "transparency": self.window.reduced_transparency,
-            "editor": self.window.settings.value("editor", "Visual Studio Code"),
-        }
-        self.setWidgetResizable(True)
-        self.setFrameShape(QScrollArea.Shape.NoFrame)
-        self.setObjectName("ZenSettings")
-        self.viewport().setAutoFillBackground(False)
-        self.body = QFrame()
-        self.body.setFrameShape(QFrame.Shape.NoFrame)
-        self.body.setObjectName("ZenSettingsBody")
-        self.setWidget(self.body)
-        self.column = QVBoxLayout(self.body)
-        self.column.setSizeConstraint(QLayout.SizeConstraint.SetMinimumSize)
-        self.column.setContentsMargins(20, 18, 20, 18)
-        self.column.setSpacing(16)
+        self.flow = flow
+        self.window = flow.window
+        self.workspace = None
+        self.draft = {}
         self.page = None
-        self.status = None
         self.login_dialog = None
-        self.login_active = False
-        self.login_completed = False
+        self.workspace_dialog = None
+        self.profile_form = None
+        self.first_action = None
+        self.select_workspace()
+        self.body = self
+        self.column = QVBoxLayout(self)
+        self.column.setContentsMargins(0, 0, 0, 0)
+        self.column.setSpacing(10)
+
+    def select_workspace(self):
+        account = getattr(self.window, "account_dialog", None)
+        if not account or not self.window.current_user():
+            return
+        allowed = {item["id"] for item in account.snapshot.get("workspaces", [])}
+        selected = account.workspace_id()
+        workspace = selected if selected in allowed else self.window.workspace_id
+        if workspace not in allowed:
+            self.workspace = None
+            self.draft = {}
+            return
+        if workspace != self.workspace:
+            self.workspace = workspace
+            self.draft = dict(binding(self.window, workspace))
+
+    def has_workspace(self):
+        account = getattr(self.window, "account_dialog", None)
+        return bool(
+            account
+            and self.workspace
+            and any(item["id"] == self.workspace for item in account.snapshot.get("workspaces", []))
+        )
 
     def note(self, text):
         self.column.addWidget(label(text, "muted", wrap=True))
 
-    def capture(self):
-        if self.page == 4:
-            self.preferences.update(
-                theme=self.appearance.currentData(),
-                motion=self.motion.isChecked(),
-                transparency=self.transparency.isChecked(),
-                editor=choice_source(self.editor),
-            )
-        elif self.page == 6:
-            self.draft.update(
-                folder=self.folder.text().strip(), provider=self.provider.currentData()
-            )
-        elif self.page == 7:
-            self.draft.update(
-                background_build=self.automatic.isChecked(), auto_plan=self.automatic.isChecked()
-            )
-        elif self.page == 8:
-            self.draft["repository"] = self.repository.text().strip()
-
     def render(self, stage):
-        self.capture()
-        self.page = stage
-        if hasattr(self, "appearance"):
-            self.appearance.deleteLater()
-            del self.appearance
-        self.column.setSpacing(12 if stage == 4 else 16)
         while self.column.count():
             item = self.column.takeAt(0)
             if item.widget():
                 item.widget().hide()
                 item.widget().deleteLater()
-        self.status = label("", "muted", wrap=True)
-        self.status.setAccessibleName("Onboarding setup status")
-        if stage == 4:
-            self.column.addWidget(label("Appearance", "title"))
-            self.appearance = ChoiceBox(self.body)
-            for title, value in (("Light", "light"), ("Dark", "dark"), ("Match macOS", "system")):
-                self.appearance.addItem(title, value)
-            self.appearance.setCurrentIndex(self.appearance.findData(self.preferences["theme"]))
-            self.appearance.setAccessibleName("Dashboard appearance")
-            self.appearance.hide()
-            self.photo_group = QButtonGroup(self)
-            photo_row = QHBoxLayout()
-            photo_row.setSpacing(12)
-            photo_row.setContentsMargins(0, 0, 0, 0)
-            self.theme_photos = {}
-            for mode in ("light", "dark", "system"):
-                card = ThemePhoto(mode)
-                self.photo_group.addButton(card)
-                card.setChecked(mode == self.preferences["theme"])
-                card.toggled.connect(
-                    lambda checked, value=mode: (
-                        self.appearance.setCurrentIndex(self.appearance.findData(value))
-                        if checked
-                        else None
-                    )
-                )
-                photo_row.addWidget(card, 1)
-                self.theme_photos[mode] = card
-            photo_container = QFrame()
-            photo_container.setLayout(photo_row)
-            self.column.addWidget(photo_container)
-            self.appearance.currentIndexChanged.connect(self.sync_theme_photos)
-            self.editor = ChoiceBox()
-            self.editor.addItems(["Visual Studio Code", "Cursor", "Xcode", "Finder"])
-            self.editor.setCurrentText(self.preferences["editor"])
-            self.editor.setAccessibleName("Preferred editor")
-            self.column.addWidget(label("Your editor", "title"))
-            self.column.addWidget(self.editor)
-            self.motion = QCheckBox("Reduce motion")
-            self.motion.setChecked(self.preferences["motion"])
-            self.column.addWidget(self.motion)
-            self.transparency = QCheckBox("Reduce transparency")
-            self.transparency.setChecked(self.preferences["transparency"])
-            self.column.addWidget(self.transparency)
-            self.motion.toggled.connect(self.preview_motion)
-            self.note(
-                "Your introduction and dashboard follow this look. "
-                "System matches macOS automatically."
-            )
-        elif stage == 5:
-            if self.window.current_user():
-                from aedrova.desktop.profile import ProfileDialog
-
-                self.profile_form = ProfileDialog(
-                    self.window,
-                    self.window.account_dialog,
-                    onboarding=True,
-                    continued=self.profile_saved,
-                    embedded=True,
-                )
-                self.profile_form.setParent(self.body, Qt.WindowType.Widget)
-                self.profile_form.setMinimumSize(0, 400)
-                identity = self.profile_form.steps[0].layout()
-                identity.itemAt(0).widget().hide()
-                identity.itemAt(1).widget().hide()
-                self.profile_form.avatar.setFixedSize(64, 64)
-                self.profile_form.layout().setContentsMargins(12, 8, 12, 8)
-                self.profile_form.next.hide()
-                self.profile_form.back.hide()
-                self.profile_form.state_changed.connect(self.sync_profile_controls)
-                for control in self.profile_form.findChildren(QPushButton):
-                    if (control.property("i18n_text") or [control.text()])[0] == "Finish later":
-                        control.hide()
-                self.column.addWidget(self.profile_form)
-                self.note(
-                    "Confirm your name and username to continue. "
-                    "Photo and other details are optional."
-                )
-            else:
-                self.column.addWidget(SetupVisual(self.flow, "profile"))
-                self.note("Sign in with Google, then confirm how your team will see you.")
-                signin = button("Continue with Google", role="primary")
-                signin.setIcon(QIcon(str(ASSETS / "google-g.png")))
-                signin.setIconSize(QSize(20, 20))
-                signin.clicked.connect(self.signin)
-                self.column.addWidget(signin)
-        elif stage == 6:
-            user = self.window.current_user()
-            if user:
-                self.note("Signed in · " + (getattr(user, "email", None) or "Google account"))
-                if self.workspace is None:
-                    self.note("Create or join your team's workspace before connecting a project.")
-                    workspace = button("Create or join a workspace", role="primary")
-                    workspace.clicked.connect(self.workspace_settings)
-                    self.column.addWidget(workspace)
-            self.folder = QLineEdit(self.draft.get("folder", ""))
-            self.folder.setPlaceholderText("Choose a specific project folder")
-            self.folder.setAccessibleName("Onboarding project folder")
-            self.project_picker = ProjectPicker(self.flow, self.folder)
-            self.project_picker.clicked.connect(self.choose)
-            self.column.addWidget(self.project_picker)
-            self.new_project = button("＋ Start a new project", role="outline")
-            self.new_project.setAccessibleName("Start a new project")
-            self.new_project.clicked.connect(self.start_new_project)
-            self.column.addWidget(self.new_project)
-            self.column.addWidget(self.folder)
-            self.provider = CodingProviderChoice()
-            self.provider.setCurrentIndex(
-                self.provider.findData(self.draft.get("provider", "auto"))
-            )
-            self.provider.setAccessibleName("Coding provider")
-            self.column.addWidget(self.provider)
-            self.note(
-                "A folder connection is private to your account on this Mac. Builds "
-                "use a separate copy. "
-                "Provider login and usage allowance are required separately; choosing "
-                "a provider does not sign in."
-            )
-        elif stage == 7:
-            self.automatic = QCheckBox("Plan and execute automatically")
-            self.automatic.setToolTip("Let my agent plan and execute automatically")
-            self.automatic.setChecked(
-                self.draft.get("background_build", self.draft.get("auto_plan", True))
-            )
-            self.column.addWidget(
-                SetupVisual(self.flow, "workflow", enabled=self.automatic.isChecked)
-            )
-            self.column.addWidget(self.automatic)
-            self.automatic.toggled.connect(lambda *_: self.body.update())
-            self.note(
-                "After an explicit @mention, this permits sharing accessible workspace "
-                "conversations "
-                "with your chosen provider, creating a plan, editing a build copy and "
-                "running sandboxed tests "
-                "without further prompts. Provider usage may be billed."
-            )
-            self.note(
-                "Applying changes to the original project and pushing to GitHub still "
-                "require approval. "
-                "Private channel access follows membership. You can revoke this in "
-                "Project settings."
-            )
-        elif stage == 8:
-            self.column.addWidget(SetupVisual(self.flow, "repository"))
-            self.repository = QLineEdit(self.draft.get("repository", ""))
-            self.repository.setPlaceholderText("owner/repository · optional")
-            self.repository.setAccessibleName("GitHub repository")
-            self.column.addWidget(self.repository)
-            setup = button("Set up GitHub CLI & sign in", role="outline")
-            setup.clicked.connect(self.github)
-            self.column.addWidget(setup)
-            self.note(
-                "The helper installer and GitHub authorization run only when you choose them. "
-                "Saving a repository name does not prove access or authorize a push."
-            )
-        elif stage == 9:
-            self.column.addWidget(SetupVisual(self.flow, "meeting"))
-            devices = button("Check microphone, camera & screen", role="outline")
-            devices.clicked.connect(self.devices)
-            self.column.addWidget(devices)
-            self.note(
-                "macOS may ask for device permissions only when you start a specific check. "
-                "A check never starts a call. You can skip and configure this when needed."
-            )
-            self.note(
-                "No recording, transcription or AI meeting access is enabled here. "
-                "Shared meeting hosting and transcription still follow their release requirements."
-            )
-        elif stage == 10:
-            self.column.addWidget(SetupVisual(self.flow, "review"))
-            name = (
-                Path(self.draft["folder"]).name
-                if self.draft.get("folder")
-                else "Not connected · configure later"
-            )
-            self.column.addWidget(label("Project · " + name, "title", wrap=True))
-            self.note("Provider · " + self.draft.get("provider", "codex"))
-            self.note(
-                "Agent workflow · "
-                + (
-                    "Automatic after your mention"
-                    if self.draft.get("background_build")
-                    else "Review plans before execution"
-                )
-            )
-            self.note(
-                "Repository · "
-                + (self.draft.get("repository") or "Not connected · configure later")
-            )
-            self.note(
-                "Provider sign-in, repository access and device permission are not "
-                "claimed as ready by this summary."
-            )
-            self.note(
-                "Save applies the local preferences and project permissions shown "
-                "above. No build, call or push starts."
-            )
+        self.profile_form = None
+        self.first_action = None
+        self.page = stage
+        self.status = label("", "error", wrap=True)
+        self.status.hide()
+        if stage == ACCOUNT:
+            self.render_account()
+        elif stage == PRIVACY:
+            self.render_privacy()
+        elif stage == GOAL:
+            self.render_goal()
+        else:
+            self.render_project()
         self.column.addWidget(self.status)
-        self.column.addStretch()
-        self.column.invalidate()
-        self.column.activate()
-        self.body.updateGeometry()
-        self.verticalScrollBar().setValue(0)
+        self.updateGeometry()
 
-    def sync_theme_photos(self):
-        mode = self.appearance.currentData()
-        self.preferences["theme"] = mode
-        self.flow.apply_appearance(mode)
-        for mode, card in self.theme_photos.items():
-            card.setChecked(mode == self.appearance.currentData())
+    def render_account(self):
+        self.column.addWidget(label("Your account", "title"))
+        if self.window.current_user():
+            from aedrova.desktop.profile import ProfileDialog
 
-    def preview_motion(self, checked):
-        self.flow.reduced = checked
-        self.flow.canvas.update()
+            self.profile_form = ProfileDialog(
+                self.window,
+                self.window.account_dialog,
+                onboarding=True,
+                continued=self.profile_saved,
+                embedded=True,
+            )
+            self.profile_form.setParent(self.body, Qt.WindowType.Widget)
+            self.profile_form.setMinimumSize(0, 0)
+            self.profile_form.layout().setContentsMargins(0, 0, 0, 0)
+            self.profile_form.steps[0].layout().itemAt(0).widget().hide()
+            for index in range(self.profile_form.controls.count()):
+                widget = self.profile_form.controls.itemAt(index).widget()
+                if widget:
+                    widget.hide()
+            self.profile_form.state_changed.connect(self.sync_profile_controls)
+            self.column.addWidget(self.profile_form)
+            self.sync_profile_controls()
+            return
+        self.note("Sign in to create a workspace or join your team.")
+        providers = QFrame()
+        provider_buttons = QVBoxLayout(providers)
+        provider_buttons.setContentsMargins(0, 0, 0, 0)
+        provider_buttons.setSpacing(8)
+        google = button("Continue with Google", role="primary")
+        google.setIcon(QIcon(str(ASSETS / "google-g.png")))
+        google.setIconSize(QSize(18, 18))
+        google.setMinimumHeight(44)
+        google.clicked.connect(lambda: self.signin("google"))
+        provider_buttons.addWidget(google)
+        self.first_action = google
+        if apple_login_enabled():
+            apple = apple_sign_in_button()
+            apple.clicked.connect(lambda: self.signin("apple"))
+            provider_buttons.addWidget(apple)
+        self.column.addWidget(providers)
+
+    def render_privacy(self):
+        self.column.addWidget(label("Your account and access", "title"))
+        email = getattr(self.window.current_user(), "email", None)
+        if email:
+            self.column.addWidget(label("Signed in as " + email, wrap=True))
+        account = self.window.account_dialog
+        workspace_name = next(
+            (
+                item["name"]
+                for item in account.snapshot.get("workspaces", [])
+                if item["id"] == self.workspace
+            ),
+            None,
+        )
+        if workspace_name:
+            self.note("Workspace: " + workspace_name)
+        self.note("Only channel members can access private conversations.")
+        self.note(
+            "You choose which project folder to connect. Applying edits to your original "
+            "files and publishing changes require your approval."
+        )
+
+    def render_goal(self):
+        from aedrova.desktop.iphone_companion import companion_section
+
+        self.column.addWidget(label("What are you here to do?", "title"))
+        self.note("Choose a starting point. You can change course in your workspace.")
+        for key, title, description, symbol in GOALS:
+            choice = button(title, role="outline")
+            assign(choice, symbol)
+            choice.setMinimumHeight(42)
+            choice.setToolTip(description)
+            choice.setAccessibleDescription(description)
+            choice.clicked.connect(lambda checked=False, goal=key: self.flow.choose_goal(goal))
+            self.column.addWidget(choice)
+            if self.first_action is None:
+                self.first_action = choice
+        self.column.addWidget(companion_section())
+
+    def render_project(self):
+        self.column.addWidget(label("Connect a project", "title"))
+        if not self.has_workspace():
+            self.note("Create or join a workspace to continue.")
+            workspace = button("Create or join a workspace", role="primary")
+            workspace.clicked.connect(self.workspace_settings)
+            self.column.addWidget(workspace)
+            self.first_action = workspace
+            self.flow.primary.hide()
+            self.flow.skip.hide()
+            return
+        self.note("Choose a local folder for builds.")
+        self.folder = QLineEdit(self.draft.get("folder", ""))
+        self.folder.setPlaceholderText("Project folder")
+        self.folder.setAccessibleName("Project folder")
+        self.column.addWidget(self.folder)
+        actions = QFrame()
+        row = QHBoxLayout(actions)
+        row.setContentsMargins(0, 0, 0, 0)
+        browse = button("Choose folder…", role="outline")
+        assign(browse, "folder")
+        browse.clicked.connect(self.choose)
+        new = button("Start a new project", role="outline")
+        assign(new, "plus")
+        new.clicked.connect(self.start_new_project)
+        row.addWidget(browse)
+        row.addWidget(new)
+        row.addStretch()
+        self.column.addWidget(actions)
+        self.provider = CodingProviderChoice()
+        self.provider.setCurrentIndex(self.provider.findData(self.draft.get("provider", "auto")))
+        self.provider.setAccessibleName("Coding provider")
+        self.column.addWidget(label("Coding provider"))
+        self.column.addWidget(self.provider)
+        self.automatic = QCheckBox("Plan and execute automatically")
+        self.automatic.setChecked(
+            bool(self.draft.get("background_build", self.draft.get("auto_plan", True)))
+        )
+        self.column.addWidget(self.automatic)
+        warning = label(
+            "Automatic execution is off. Start builds manually when you’re ready.",
+            "error",
+            wrap=True,
+        )
+        warning.setHidden(self.automatic.isChecked())
+        self.automatic.toggled.connect(warning.setHidden)
+        self.column.addWidget(warning)
+        disclosure = QFrame()
+        details = QVBoxLayout(disclosure)
+        details.setContentsMargins(0, 3, 0, 0)
+        details.setSpacing(5)
+        for symbol, text in (
+            ("mention", "A mention can share accessible chat with your provider."),
+            ("terminal", "Builds edit a copy, run sandboxed tests, and may use credits."),
+            ("permission_auto", "You approve changes to original files and publishing."),
+        ):
+            item = QHBoxLayout()
+            item.setSpacing(8)
+            glyph = QLabel()
+            glyph.setFixedSize(16, 16)
+            glyph.setPixmap(icon(symbol, self.flow.theme.secondary).pixmap(16, 16))
+            item.addWidget(glyph, alignment=Qt.AlignmentFlag.AlignTop)
+            item.addWidget(label(text, "muted", wrap=True), 1)
+            details.addLayout(item)
+        self.column.addWidget(disclosure)
+        self.folder.textChanged.connect(self.status.hide)
+        self.automatic.toggled.connect(self.status.hide)
+
+    def show_error(self, text):
+        self.status.setText(text)
+        self.status.show()
 
     def choose(self):
         folder = choose_project(self.flow, self.folder.text())
@@ -352,234 +248,133 @@ class SetupPages(QScrollArea):
         if dialog.exec() and dialog.project_path:
             self.folder.setText(dialog.project_path)
 
-    def valid(self):
-        self.capture()
-        if self.window.current_user() and self.workspace is None:
-            self.status.setText("Create or join a workspace before continuing.")
-            return False
-        try:
-            folder = self.draft.get("folder", "")
-            if folder:
-                root = Path(folder).expanduser().resolve(strict=True)
-                if not root.is_dir() or root in (Path.home(), Path(root.anchor)):
-                    raise ValueError("Choose a specific, accessible project folder.")
-                self.draft["folder"] = str(root)
-                if not self.same_account():
-                    raise ValueError(
-                        "Sign in to your original account and workspace to connect a project."
-                    )
-            if self.page != 6 and self.draft.get("background_build") and not folder:
-                raise ValueError("Choose a project folder first, or turn automatic builds off.")
-            if self.draft.get("repository"):
-                self.draft["repository"] = repository_name(self.draft["repository"])
-        except (ValueError, OSError):
-            self.status.setText(
-                "Choose an accessible project folder, sign in, and use "
-                "owner/repository for GitHub. "
-                "Automatic builds need a connected project."
-            )
-            return False
-        return True
-
-    def same_account(self):
-        user = self.window.current_user()
-        return bool(
-            user
-            and bool(self.workspace)
-            and str(user.id) == self.flow.owner
-            and self.window.workspace_id == self.workspace
-        )
-
     def save(self):
-        if not self.valid():
+        if not self.has_workspace() or self.window.workspace_id != self.workspace:
+            self.show_error("Open your workspace before connecting a project.")
             return False
-        if self.draft.get("folder"):
-            if not self.same_account():
+        folder = self.folder.text().strip()
+        automatic = self.automatic.isChecked()
+        if not folder:
+            if automatic:
+                self.show_error("Choose a project folder to enable automatic builds.")
                 return False
-            save_binding(self.window, self.draft, self.workspace)
-            build = getattr(self.window, "build_dialog", None)
-            if build and build.background_run and not build.background_authorized():
-                build.cancel()
-            self.window._render_pages()
-        self.window.set_theme(self.preferences["theme"])
-        self.window.reduce_motion_action.setChecked(self.preferences["motion"])
-        self.window.reduce_transparency_action.setChecked(self.preferences["transparency"])
-        self.window.settings.setValue("editor", self.preferences["editor"])
+            return True
+        try:
+            root = Path(folder).expanduser().resolve(strict=True)
+            if not root.is_dir() or root in (Path.home(), Path(root.anchor)):
+                raise ValueError("Choose a specific project folder.")
+        except (ValueError, OSError, RuntimeError):
+            self.show_error("Choose a specific, accessible project folder.")
+            return False
+        self.draft.update(
+            folder=str(root),
+            provider=self.provider.currentData(),
+            background_build=automatic,
+            auto_plan=automatic,
+        )
+        save_binding(self.window, self.draft, self.workspace)
+        build = getattr(self.window, "build_dialog", None)
+        if build and build.background_run and not build.background_authorized():
+            build.cancel()
+        self.window._render_pages()
         return True
 
-    def show_child(self, dialog):
-        if dialog is None:
+    def advance_profile(self):
+        if self.profile_form is not None:
+            self.profile_form.advance()
+
+    def profile_saved(self):
+        if self.flow.closed:
             return
-        from aedrova.desktop.theme import palette
+        self.select_workspace()
+        account = self.window.account_dialog
+        if self.has_workspace() and (
+            not self.window.connected or self.window.workspace_id != self.workspace
+        ):
+            account.open_dashboard(require_profile=False)
+        self.flow.show_stage(PRIVACY)
+        self.flow.raise_()
+        self.flow.activateWindow()
 
-        old_style, old_palette = dialog.styleSheet(), dialog.palette()
+    def sync_profile_controls(self):
+        if self.profile_form is not None and self.page == ACCOUNT:
+            self.flow.primary.setEnabled(not self.profile_form.saving)
+            self.flow.back.setEnabled(not self.profile_form.saving)
+            text = "Saving…" if self.profile_form.saving else "Continue"
+            self.flow.primary.setText(text)
+            self.flow.primary.setAccessibleName(text)
+
+    def signin(self, provider):
+        self.window.show_account()
+        account = self.window.account_dialog
+        self.login_dialog = account
+        account.sign_in_ready.connect(self.signed_in)
+        account.finished.connect(self.login_closed)
         self.flow.hide()
-        dialog.setPalette(palette(self.flow.theme))
-        dialog.setStyleSheet(self.flow.styleSheet())
-        dialog.finished.connect(
-            lambda *_: (dialog.setStyleSheet(old_style), dialog.setPalette(old_palette))
-        )
-        dialog.show()
-        if not self.flow.reduced:
-            from PySide6.QtWidgets import QApplication
+        if provider == "apple":
+            account.start_apple()
+        else:
+            account.start_google()
 
-            if QApplication.platformName() != "offscreen":
-                dialog.zen_transition = QPropertyAnimation(dialog, b"windowOpacity", dialog)
-                dialog.zen_transition.setDuration(220)
-                dialog.zen_transition.setStartValue(0.0)
-                dialog.zen_transition.setEndValue(1.0)
-                dialog.zen_transition.setEasingCurve(QEasingCurve.Type.OutCubic)
-                dialog.zen_transition.start()
-        dialog.raise_()
-        dialog.activateWindow()
-        dialog.finished.connect(self.resume)
+    def disconnect_login(self):
+        if self.login_dialog is not None:
+            account, self.login_dialog = self.login_dialog, None
+            account.sign_in_ready.disconnect(self.signed_in)
+            account.finished.disconnect(self.login_closed)
 
-    def resume(self, *_):
+    def signed_in(self):
+        from aedrova.desktop.onboarding import account_key
+
+        user = self.window.current_user()
+        if self.flow.closed or not user:
+            return
+        if self.flow.owner is not None and str(user.id) != self.flow.owner:
+            self.flow.reject()
+            return
+        self.flow.owner = str(user.id)
+        self.flow.prefix = account_key(self.window)
+        self.select_workspace()
+        account = self.login_dialog
+        if self.has_workspace() and self.flow.profile_complete():
+            account.open_dashboard(require_profile=False)
+        else:
+            account.accept()
+
+    def login_closed(self, *_):
+        self.disconnect_login()
+        if self.flow.closed:
+            return
+        self.flow.show_stage(PRIVACY if self.flow.profile_complete() else ACCOUNT)
+        self.flow.show()
+        self.flow.raise_()
+        self.flow.activateWindow()
+
+    def workspace_settings(self):
+        self.window.show_account()
+        account = self.window.account_dialog
+        self.workspace_dialog = account
+        account.finished.connect(self.workspace_closed)
+        self.flow.hide()
+
+    def stop_workspace_wait(self):
+        if self.workspace_dialog is not None:
+            account, self.workspace_dialog = self.workspace_dialog, None
+            account.finished.disconnect(self.workspace_closed)
+
+    def workspace_closed(self, *_):
+        self.stop_workspace_wait()
         from aedrova.desktop.onboarding import account_key
 
         if self.flow.closed:
             return
-        user = self.window.current_user()
-        newly_signed_in = self.flow.owner is None and user
-        if newly_signed_in:
-            self.flow.owner = str(user.id)
-            self.flow.prefix = account_key(self.window)
-        elif account_key(self.window) != self.flow.prefix:
+        if account_key(self.window) != self.flow.prefix:
             self.flow.reject()
             return
-        if newly_signed_in or (user and self.workspace is None):
-            account = self.window.account_dialog
-            allowed = {item["id"] for item in account.snapshot.get("workspaces", [])}
-            self.workspace = (
-                self.window.workspace_id
-                if self.window.workspace_id in allowed
-                else account.workspace_id()
-                if account.workspace_id() in allowed
-                else None
-            )
-            self.original = binding(self.window, self.workspace) if self.workspace else {}
-            self.draft = dict(self.original)
-        advance = self.login_active and self.login_completed and bool(user)
-        self.login_active = self.login_completed = False
-        if advance:
-            self.flow.show_stage(5)
+        self.select_workspace()
+        if self.has_workspace() and self.workspace == self.window.workspace_id:
+            self.flow.show_stage(GOAL)
         else:
-            self.render(self.page)
-        self.flow.entered = self.flow.now()
+            self.flow.show_stage(PROJECT)
         self.flow.show()
         self.flow.raise_()
         self.flow.activateWindow()
-        self.flow.primary.setFocus()
-
-    def signin(self):
-        self.window.show_account()
-        account = self.window.account_dialog
-        if self.login_dialog is not account:
-            if self.login_dialog is not None:
-                self.login_dialog.sign_in_ready.disconnect(self.signed_in)
-            self.login_dialog = account
-            account.sign_in_ready.connect(self.signed_in)
-        self.login_active = True
-        self.login_completed = False
-        self.show_child(account)
-
-    def signed_in(self):
-        if self.flow.closed or not self.login_active or self.page != 5:
-            return
-        account = self.login_dialog
-        user = self.window.current_user()
-        if user is None:
-            return
-        if self.flow.owner is not None and str(user.id) != self.flow.owner:
-            account.accept()
-            self.flow.reject()
-            return
-        self.login_completed = True
-        if account.snapshot.get("workspaces"):
-
-            account.open_dashboard()
-        else:
-            self.window.update_profile_button()
-            account.accept()
-
-    def go_back(self):
-        if self.page == 5 and hasattr(self, "profile_form"):
-            form = self.profile_form
-            if form.saving:
-                return
-            if form.stack.currentIndex() > 0:
-                form.go(form.stack.currentIndex() - 1)
-                return
-        self.flow.show_stage(self.flow.stage - 1)
-
-    def advance_profile(self):
-        if self.window.current_user() is None:
-            self.status.setText("Sign in with Google to continue.")
-            return
-        if self.profile_form.saving:
-            return
-        self.profile_form.advance()
-        if self.page == 5:
-            self.sync_profile_controls()
-
-    def sync_profile_controls(self):
-        if self.page != 5 or self.flow.closed:
-            return
-        self.profile_form.back.hide()
-        self.flow.primary.setText(self.profile_form.next.text())
-        self.flow.primary.setAccessibleName(self.flow.primary.text())
-        self.flow.primary.setEnabled(not self.profile_form.saving)
-        self.flow.back.setEnabled(not self.profile_form.saving)
-        self.flow.skip.setEnabled(not self.profile_form.saving and self.flow.profile_complete())
-
-    def profile_saved(self):
-        if self.flow.closed or not self.same_user():
-            return
-        self.flow.show_stage(6)
-
-    def same_user(self):
-        user = self.window.current_user()
-        return bool(user and str(user.id) == self.flow.owner)
-
-    def profile(self):
-        from aedrova.desktop.profile import open_profile_editor
-
-        self.show_child(open_profile_editor(self.window))
-
-    def workspace_settings(self):
-        self.window.show_account("manage")
-        account = self.window.account_dialog
-        if self.workspace is None:
-            self.workspace_dialog = account
-            self.workspace_waiting = True
-            account.snapshot_loaded.connect(self.workspace_ready)
-            account.finished.connect(self.stop_workspace_wait)
-        self.show_child(account)
-
-    def stop_workspace_wait(self, *_):
-        if getattr(self, "workspace_waiting", False):
-            self.workspace_waiting = False
-            self.workspace_dialog.snapshot_loaded.disconnect(self.workspace_ready)
-            self.workspace_dialog.finished.disconnect(self.stop_workspace_wait)
-
-    def workspace_ready(self):
-        account = self.workspace_dialog
-        user = self.window.current_user()
-        if self.flow.closed or user is None or str(user.id) != self.flow.owner:
-            return
-        if not account.snapshot.get("workspaces"):
-            return
-        self.stop_workspace_wait()
-        account.open_dashboard()
-
-    def github(self):
-        from aedrova.desktop.github_setup import open_github_setup
-
-        open_github_setup(self.window)
-        self.show_child(self.window.github_setup)
-
-    def devices(self):
-        from aedrova.desktop.meeting_setup import open_meeting_setup
-
-        open_meeting_setup(self.window)
-        self.show_child(self.window.meeting_setup)

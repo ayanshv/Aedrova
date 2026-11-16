@@ -57,6 +57,8 @@ class AppDialog(QDialog):
 
 
 class ChoiceBox(QComboBox):
+    fit_popup_labels = False
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._choice_style = QStyleFactory.create("Fusion")
@@ -110,7 +112,14 @@ class ChoiceBox(QComboBox):
             popup.setContentsMargins(left, top, right, bottom)
         geometry.adjust(-left, -top, right, bottom)
         available = popup.screen().availableGeometry()
-        geometry.setWidth(min(geometry.width(), available.width()))
+        width = geometry.width()
+        if self.fit_popup_labels:
+            view = self.view()
+            content_width = view.sizeHintForColumn(0) + 2 * (view.spacing() + view.frameWidth())
+            if self.count() > self.maxVisibleItems():
+                content_width += view.verticalScrollBar().sizeHint().width()
+            width = max(width, content_width + left + right)
+        geometry.setWidth(min(width, available.width()))
         geometry.setHeight(min(geometry.height(), available.height()))
         geometry.moveLeft(
             max(available.left(), min(geometry.left(), available.right() - geometry.width() + 1))
@@ -138,8 +147,36 @@ class ChoiceBox(QComboBox):
 
 
 class PermissionChoice(ChoiceBox):
+    fit_popup_labels = True
+
+    def __init__(self):
+        super().__init__()
+        from aedrova.agents.permissions import MODES
+        from aedrova.desktop.icons import icon
+
+        self.setObjectName("AgentPermissions")
+        self.setAccessibleName("Aedrova agent permissions")
+        self.setSizeAdjustPolicy(self.SizeAdjustPolicy.AdjustToContents)
+        self.setProperty("permissionMode", "ask")
+        names = ["permission_ask", "permission_auto", "permission_full"]
+        self.setProperty("itemIconNames", names)
+        self.setIconSize(QSize(16, 16))
+        color = self.palette().windowText().color().name()
+        for name, (value, (title, description)) in zip(names, MODES.items(), strict=True):
+            self.addItem(icon(name, color), title, value)
+            self.setItemData(self.count() - 1, description, Qt.ItemDataRole.ToolTipRole)
+        self.setToolTip(MODES["ask"][1])
+
     def sizeHint(self):  # noqa: N802
-        return super().sizeHint() + QSize(4, 0)
+        size = super().sizeHint()
+        label_width = max(
+            self.fontMetrics().horizontalAdvance(self.itemText(i)) for i in range(self.count())
+        )
+        size.setWidth(max(size.width(), label_width + self.iconSize().width() + 58))
+        return size
+
+    def minimumSizeHint(self):  # noqa: N802
+        return self.sizeHint()
 
 
 class CodingProviderChoice(ChoiceBox):

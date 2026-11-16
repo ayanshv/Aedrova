@@ -4423,3 +4423,62 @@ The approved bounded local audio test captured both sources, transcribed locally
 November 6 notarization update: Apple accepted the app; stapler validation and Gatekeeper assessment passed. The signed DMG was created but its separate submission failed because the Aedrova-Notary Keychain profile became unavailable. Restore the existing credential privately using the prepared command, then resume the DMG submission; no duplicate app submission or public download. Final focused native 46 tests and website 38 tests passed. Apple biometric sign-in, production readiness and clean-machine acceptance remain open.
 
 November 6 final Apple acceptance: owner restored the credential and completed Sign in with Apple. Existing staging workspace and history loaded; approved production Apple provider enabled. DMG submission 605ba7a3-9780-47f7-ace9-f50285ef9e8b Accepted; stapler and Gatekeeper passed. Artifact remains staging-only with public_release false and requires a final production rebuild. No outstanding personal Apple setup action from this round. Windows/Linux release CI and font sizing corrections remain under verification; public launch gates remain in effect.
+
+### November 7: Production operations resumed
+
+The owner resumed Stage 4 and requested hosted recovery. The production service
+was live on website commit 0510f37. The private operations probe confirmed database
+access and readiness, both spending pools below 90%, and zero expired pending
+requests. Production has an encryption key configured. Checkout, managed AI,
+hosted meetings and release switches are disabled. Public support, security and
+data controls returned 200. Anonymous workspace and balance reads returned 403.
+Render probes /health/ready and inherits email notifications for failures.
+Recipient delivery and a recurring spending probe remain open. Full staging
+account-deletion rehearsal also remains open.
+
+Supabase production has no scheduled backups on Free. Managed restore to a new
+project requires Pro and physical backups. Current egress is 21% of its allowance,
+and the prior-cycle warning still shows November 24. The new local recovery drill
+restored 32 migrations and passed all five restored access suites. The backend
+operations, recovery, trust and connector tests passed (91). Hosted recovery
+still requires an approved separate target, a database recovery point, matched
+Storage objects and independent key custody. Neither active database was used as
+a restore target. No paid resources or production settings were changed.
+
+The owner moved Supabase Pro to the [final purchase gate](final-paid-launch-gates.md).
+The isolated hosted restore and Storage recovery checks remain prerequisites for
+public launch after funding. Stage 4 can continue with alert delivery, recurring
+spending monitoring and the disposable staging account-deletion rehearsal.
+
+### November 7: Production operations follow-up
+
+Hosted Supabase staging passed a rollback-only Auth and workspace deletion
+rehearsal using two synthetic accounts. Deleting the Auth row first failed on
+authored content. Scoped cleanup removed the departing fixture, its owned
+workspace and membership in a second workspace. The surviving owner and
+message were preserved. No fixture data was committed. Actual session
+revocation, Storage object deletion and private backend/provider cleanup
+remain open for full deletion acceptance.
+
+Website PR #61 adds a read-only spending probe to the existing production
+PostgreSQL service every five minutes. It writes a content-free log event for
+both spending pools, expired pending requests and database failure. The local
+website suite passed all 712 tests and both candidate CI checks passed. PR #61
+merged to main as ea95d59. Render had not yet shown that revision as Live when
+the owner requested wrap-up. Verify the first live event after automatic rollout.
+External alert delivery and support mailbox receipt remain open.
+
+### November 7: Desktop reply history and Google Meet notes
+
+Aedrova Staging now has account-scoped agent reply history from migration
+`202611070001_agent_reply_history.sql`. The hosted rollback-only fixture verified
+root and thread reply reads, idempotent saves and isolation from another workspace
+member. The embedded PostgreSQL suite also verified source-channel revocation.
+Production migration and a real desktop sign-out/sign-in check remain open.
+Earlier replies can reappear only if their shared-work records were saved.
+
+The Mac meeting helper now checks for a recognizable foreground Meet title or
+browser microphone activity. The suggestion stays visible when switching to the
+browser, and capture still starts only after consent. The native helper compiled
+and the synthetic detection and dismissal checks passed. A live Google Meet
+check on a signed-in Mac remains open.

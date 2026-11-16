@@ -110,6 +110,54 @@ def codex_permissions(project, *, plan):
     ]
 
 
+CLARIFICATION = "AEDROVA_CLARIFICATION"
+
+
+def clarification_question(result):
+    marker, _, payload = result.strip().partition("\n")
+    if marker.strip() != CLARIFICATION:
+        return None
+    try:
+        question = json.loads(payload)
+    except ValueError:
+        question = None
+    def valid_text(value, limit):
+        return isinstance(value, str) and 1 <= len(value.strip()) <= limit
+
+    if valid_text(question, 1000):
+        return {
+            "title": question.strip(),
+            "fields": [{"label": "Your answer", "type": "text", "required": True}],
+        }
+    if isinstance(question, dict):
+        title, fields = question.get("title"), question.get("fields")
+        if valid_text(title, 250) and isinstance(fields, list) and 1 <= len(fields) <= 4:
+            normalized = []
+            for field in fields:
+                if not isinstance(field, dict):
+                    break
+                name, kind = field.get("label"), field.get("type")
+                required = field.get("required", True)
+                if not valid_text(name, 140) or type(required) is not bool:
+                    break
+                row = {"label": name.strip(), "type": kind, "required": required}
+                if kind in ("single", "multiple"):
+                    options = field.get("options")
+                    if not isinstance(options, list) or not 2 <= len(options) <= 5:
+                        break
+                    if not all(valid_text(option, 120) for option in options):
+                        break
+                    row["options"] = [option.strip() for option in options]
+                    if len(set(row["options"])) != len(options):
+                        break
+                elif kind != "text":
+                    break
+                normalized.append(row)
+            if len(normalized) == len(fields):
+                return {"title": title.strip(), "fields": normalized}
+    raise ValueError("The agent returned an incomplete question. Retry this build.")
+
+
 def instructions(task, context_file, *, plan, approved_plan=""):
     return (
         "You are the coding agent inside Aedrova. Work only in this local checkout. "
@@ -141,6 +189,8 @@ def instructions(task, context_file, *, plan, approved_plan=""):
         "A member confirmation is not proof of unanimous agreement. Ask about conflicting or "
         "underspecified requirements rather than silently choosing the newest message. "
         "Never claim tests passed unless you actually ran them.\n"
+        "If the request includes a clarification exchange, use the user's answer as "
+        "a requirement and treat the agent's earlier question as context.\n"
         + (
             "PLAN ONLY: perform read-only inspection of the repository and evidence NOW, "
             "then return a concrete plan, acceptance criteria and proposed test commands. "
@@ -149,9 +199,28 @@ def instructions(task, context_file, *, plan, approved_plan=""):
             "requests below describe the future approved build, not a conflict with planning. "
             "A plan that postpones inspecting evidence is incomplete. Include actual exact "
             "source identifiers you inspected, never message:<id> placeholders.\n"
+            "Resolve routine implementation choices from the repository and evidence. "
+            "Ask only if a missing answer would materially change the result or its safety. "
+            "If blocked, return exactly two lines and no markdown. The first line is "
+            f"{CLARIFICATION}. The second is one JSON string with a short question or "
+            'one JSON object such as {"title":"A short question","fields":'
+            '[{"label":"Details","type":"text","required":true},'
+            '{"label":"Choose options","type":"multiple","options":["A","B"]}]}. '
+            "Use single for one choice, multiple for checkboxes, and text for open answers. "
+            "Use at most four fields and two to five options per choice. "
+            "Ask in the user's language. Otherwise return the plan as Markdown. "
+            "Open with one sentence describing the intended outcome. Use level-two headings for "
+            "the implementation steps, acceptance criteria and planned checks. "
+            "Use numbered steps and concise bullets. Put paths and commands in backticks. "
+            "Keep source IDs beside the relevant requirement.\n"
             if plan
-            else "IMPLEMENT the approved plan, run relevant tests, and report modified "
-            "files, actual test results, failures and remaining setup.\nApproved plan:\n"
+            else "IMPLEMENT the approved plan. Run the smallest relevant checks first. "
+            "For UI work, use existing project interaction tests or offscreen previews "
+            "where available in the sandbox. Return a short Markdown report. Open with the "
+            "result in one sentence, then use level-two headings for changes and verification. "
+            "Use bullets for changed files and check results. Put paths and commands in backticks. "
+            "State whether checks passed, failed or were skipped. Add a next step only when "
+            "something remains. Keep raw command output out of the report.\nApproved plan:\n"
             + approved_plan
             + "\n"
         )

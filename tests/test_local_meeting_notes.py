@@ -10,6 +10,27 @@ from aedrova.meetings.local_capture import LocalCapture, validate_chunk
 from aedrova.meetings.local_speech import draft_notes, render_transcript
 
 
+def test_meet_suggestion_survives_background_focus_and_respects_dismissal(qtbot, tmp_path):
+    from PySide6.QtCore import QSettings, Qt
+
+    from aedrova.desktop.window import AedrovaWindow
+
+    window = AedrovaWindow(
+        settings=QSettings(str(tmp_path / "meet.ini"), QSettings.Format.IniFormat)
+    )
+    qtbot.addWidget(window)
+    window.show()
+    detector = window.meeting_detection
+    result = {"value": {"active": True, "names": ["Google Meet"]}}
+    detector.detected(result)
+    assert detector.capsule.isVisible()
+    assert detector.capsule.testAttribute(Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow)
+    assert getattr(window, "local_meeting_notes", None) is None
+    detector.dismiss()
+    detector.detected(result)
+    assert not detector.capsule.isVisible()
+
+
 def test_capture_requires_consent_before_any_native_process(qtbot):
     capture = LocalCapture()
     with pytest.raises(PermissionError):

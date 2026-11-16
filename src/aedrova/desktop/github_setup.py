@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 
 from aedrova.delivery.github import GitHub, gh_path, github_environment
 from aedrova.delivery.installer import VERSION, install
-from aedrova.desktop.brand import BrandMark
+from aedrova.desktop.brand import BrandLockup
 from aedrova.desktop.controls import AppDialog
 from aedrova.desktop.dialogs import button, label
 from aedrova.desktop.projects import Job
@@ -49,7 +49,7 @@ class GitHubSetup(AppDialog):
         layout = self.content_layout = QVBoxLayout(content)
         layout.setContentsMargins(32, 30, 32, 30)
         layout.setSpacing(18)
-        self.brand = BrandMark(58)
+        self.brand = BrandLockup(48, 24)
         layout.addWidget(self.brand)
         self.heading = label("Connect GitHub", "heading")
         layout.addWidget(self.heading)

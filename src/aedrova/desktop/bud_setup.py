@@ -164,7 +164,7 @@ def build_setup(d, window):
         "Your team, plus Agents.\nA few thoughtful choices. A teammate that feels yours.",
         centered=True,
     )
-    welcome.addStretch(1)
+    welcome.addSpacing(12)
     welcome.addWidget(BudLineup(panel, reduced_motion=window.reduced_motion))
     welcome.addWidget(d.summary)
     welcome.addStretch(2)
@@ -257,7 +257,7 @@ def build_setup(d, window):
     custom_color.clicked.connect(d.custom_color)
     d.custom_color_button = custom_color
     fields.addWidget(custom_color)
-    identity.addStretch(1)
+    identity.addSpacing(12)
     identity.addLayout(custom)
     identity.addWidget(label("Use its name with @ in your conversation.", "muted", wrap=True))
     identity.addStretch(2)
@@ -331,7 +331,7 @@ def build_setup(d, window):
     ready = page(
         "Meet your Bud", "A familiar face. Your tools. Right in your conversation.", centered=True
     )
-    ready.addStretch(1)
+    ready.addSpacing(12)
     final_art = QVBoxLayout()
     ready.addLayout(final_art)
     d.character_layouts[6] = final_art

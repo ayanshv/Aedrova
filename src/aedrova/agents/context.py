@@ -229,12 +229,12 @@ def gather(
             for row in rows:
                 add({"meeting_text": row})
         cursor = 0
+        progress(f"Reading #{channel['name']}…")
         while True:
             if cancelled():
                 raise InterruptedError("Cancelled")
             if time.monotonic() - started > 180:
                 raise TimeoutError("Context retrieval timed out. Check your connection and retry.")
-            progress(f"Reading #{channel['name']} · {count} messages gathered…")
             rows = (
                 sorted(
                     (row for row in candidates.values() if row["channel_id"] == channel["id"]),
@@ -304,6 +304,10 @@ def gather(
         fresh_memory = snapshot_record(read_memory(workspace), workspace, current)
         if fresh_memory != memory_snapshot:
             raise ValueError("Product memory changed during retrieval. Refresh and retry.")
+    if count:
+        progress(f"Gathered {count} {'message' if count == 1 else 'messages'} for context")
+    else:
+        progress("No chat messages found in the selected context")
     return WorkspaceContext(
         workspace,
         user,

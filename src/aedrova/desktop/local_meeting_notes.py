@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 )
 from shiboken6 import isValid
 
-from aedrova.desktop.brand import BrandMark
+from aedrova.desktop.brand import BrandLockup
 from aedrova.desktop.controls import AppDialog
 from aedrova.desktop.dialogs import button, label
 from aedrova.desktop.meeting_listening import ListeningCapsule
@@ -50,9 +50,10 @@ class LocalMeetingNotes(AppDialog):
         layout.setContentsMargins(28, 28, 28, 28)
         layout.setSpacing(16)
         header = QHBoxLayout()
-        header.addWidget(BrandMark(32))
-        header.addWidget(label("Notes for your meeting", "title"), 1)
+        header.addWidget(BrandLockup(32))
+        header.addStretch()
         layout.addLayout(header)
+        layout.addWidget(label("Notes for your meeting", "title"))
         layout.addWidget(
             label(
                 "Keep your call in Zoom, Meet or Teams. Transcription runs on this Mac.",

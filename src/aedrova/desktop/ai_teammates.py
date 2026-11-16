@@ -33,6 +33,15 @@ from aedrova.teammates.model import (
 )
 
 
+def paint_character(painter, rect, config, *, phase=0, blink=False):
+    from aedrova.desktop.teammate_habitat import paint_orb
+
+    inset = min(10, min(rect.width(), rect.height()) * 0.075)
+    paint_orb(
+        painter, rect.adjusted(inset, inset, -inset, -inset), config, phase=phase, blink=blink
+    )
+
+
 class Character(QWidget):
     def __init__(self, config=None, parent=None, *, reduced_motion=False):
         super().__init__(parent)
@@ -77,15 +86,12 @@ class Character(QWidget):
         self.update()
 
     def paintEvent(self, event):
-        from aedrova.desktop.teammate_habitat import paint_orb
-
-        p = QPainter(self)
-        inset = min(10, min(self.width(), self.height()) * 0.075)
-        paint_orb(
-            p,
-            QRectF(self.rect()).adjusted(inset, inset, -inset, -inset),
+        painter = QPainter(self)
+        paint_character(
+            painter,
+            QRectF(self.rect()),
             self.config,
-            phase=self.phase if not self.reduced_motion else 1,
+            phase=self.phase if not self.reduced_motion else 0,
             blink=self.blink,
         )
 

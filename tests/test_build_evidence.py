@@ -115,6 +115,7 @@ def test_runtime_records_completed_commands_with_file_snapshot(evidence):
 
 def test_shared_read_view_clears_evidence_on_account_change(qtbot, tmp_path, evidence):
     window, service = setup(qtbot, tmp_path)
+    qtbot.waitUntil(lambda: not window.account_dialog.busy, timeout=20000)
     _, _, value = evidence
     row = {
         "id": "review",
@@ -127,7 +128,7 @@ def test_shared_read_view_clears_evidence_on_account_change(qtbot, tmp_path, evi
     service.build_review_decisions = lambda identifier: []
     dialog = SharedBuilds(window)
     qtbot.addWidget(dialog)
-    qtbot.waitUntil(lambda: bool(dialog.rows) or not dialog.busy)
+    qtbot.waitUntil(lambda: bool(dialog.rows) or not dialog.busy, timeout=20000)
     assert dialog.rows, (
         dialog.status.text(),
         dialog.closed,

@@ -45,10 +45,13 @@ def test_settings_open_from_cache_during_background_sync(qtbot, tmp_path, monkey
     window, _ = setup(qtbot, tmp_path)
     account = window.account_dialog
     monkeypatch.setattr(account, "refresh", lambda: pytest.fail("No blocking refresh on open"))
+    account.workspaces.clear()
+    account.home_workspaces.clear()
     account.busy, account.background_job = True, True
     try:
-        window.show_account("manage")
+        window.workspace_settings_button.click()
         assert account.isVisible() and account.pages.currentIndex() == 1
+        assert account.workspace_id() == window.workspace_id
         assert account.pages.isEnabled()
         view = account.workspace_settings
         assert view.sections.count() == 10
@@ -179,6 +182,36 @@ def test_pending_channel_form_is_cleared_on_signout(qtbot, tmp_path):
     dialog.name.setText("private draft")
     window.account_dialog.session_closed.emit()
     assert not dialog.isVisible() and dialog.name.text() == ""
+
+
+def test_uncertain_workspace_save_requires_read_only_recovery(qtbot, tmp_path):
+    window, service = setup(qtbot, tmp_path)
+    account = window.account_dialog
+    window.connected.timer.stop()
+    account.show()
+    account.pages.setCurrentIndex(2)
+    account.onboarding_workspace.setText("Orbit")
+    calls = []
+
+    def timed_out(name, _):
+        calls.append(name)
+        raise TimeoutError()
+
+    service.rpc = timed_out
+    parameters = {"p_name": "Orbit", "p_nickname": "Aedrova", "p_provider": "auto"}
+    account.mutate("onboard_workspace", parameters)
+    qtbot.waitUntil(lambda: not account.busy)
+    assert account.recover_workspace.isVisible()
+    assert "couldn’t confirm" in account.status.text()
+    account.mutate("onboard_workspace", parameters)
+    assert calls == ["onboard_workspace"]
+
+    account.recover_workspace.click()
+    qtbot.waitUntil(lambda: not account.busy)
+    assert calls == ["onboard_workspace"]
+    assert not account.workspace_write_unconfirmed
+    assert account.onboarding_workspace.text() == "Orbit"
+    assert account.pages.currentIndex() == 2
 
 
 def test_queued_settings_save_is_cancelled_when_signout_requested(qtbot, tmp_path):

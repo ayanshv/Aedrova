@@ -141,21 +141,26 @@ class ProfileDialog(AppDialog):
         super().__init__(account if onboarding else window)
         self.window, self.account = window, account
         self.onboarding, self.continued = onboarding, continued
+        self.compact = onboarding
         self.user_id = str(account.service.user.id)
         self.avatar_data = None
         self.remove_photo = False
         self.saving = False
         profile = account.snapshot.get("user_profile", {})
         metadata = getattr(account.service.user, "user_metadata", None) or {}
-        self.setWindowTitle("Make Aedrova yours" if onboarding else "Your profile")
+        self.setWindowTitle("Your profile")
         self.setWindowModality(Qt.WindowModality.WindowModal)
         self.resize(680, 740)
-        self.setMinimumSize(540, 540)
+        self.setMinimumSize(540, 400 if self.compact else 540)
+        if self.compact:
+            self.resize(560, 460)
+
         outer = QVBoxLayout(self)
         outer.setContentsMargins(28, 28, 28, 28)
         outer.setSpacing(20)
         self.progress = label("", "section")
         outer.addWidget(self.progress)
+        self.progress.setVisible(not self.compact)
         self.stack = QStackedWidget()
         outer.addWidget(self.stack, 1)
         self.steps = []
@@ -202,13 +207,17 @@ class ProfileDialog(AppDialog):
         photo_row.addWidget(remove)
         photo_row.addStretch()
         identity.addLayout(photo_row)
-        identity.addWidget(
-            label(
-                "Photos are cropped to a square. Visible only to your teammates.",
-                "muted",
-                wrap=True,
+        if self.compact and not embedded:
+            photo.hide()
+            remove.hide()
+        else:
+            identity.addWidget(
+                label(
+                    "Photos are cropped to a square. Visible only to your teammates.",
+                    "muted",
+                    wrap=True,
+                )
             )
-        )
         self.name = QLineEdit(profile.get("display_name") or metadata.get("full_name", ""))
         self.name.setMaxLength(80)
         self.name.setAccessibleName("Display name")
@@ -228,6 +237,7 @@ class ProfileDialog(AppDialog):
         language = button("Language & translation…", role="outline")
         language.clicked.connect(lambda: show_language_settings(self.window))
         identity.addWidget(language)
+        language.setVisible(not self.compact)
         identity.addStretch()
         about = step(
             "Your status",
@@ -305,12 +315,16 @@ class ProfileDialog(AppDialog):
         self.back = button("Back", role="outline")
         self.back.clicked.connect(lambda: self.go(self.stack.currentIndex() - 1))
         self.controls.addWidget(self.back)
-        cancel = button("Finish later" if onboarding else "Cancel")
+        cancel = button("Back" if self.compact else "Finish later" if onboarding else "Cancel")
         cancel.clicked.connect(self.reject)
         self.controls.addWidget(cancel)
         self.controls.addStretch()
         self.next = button("Continue", role="primary")
         self.next.clicked.connect(self.advance)
+        if self.compact:
+            self.next.setProperty("onboardingAction", True)
+            cancel.setProperty("onboardingAction", True)
+            self.next.setMinimumHeight(46)
         self.controls.addWidget(self.next)
         outer.addLayout(self.controls)
         self.fade = QGraphicsOpacityEffect(self.progress)
@@ -378,12 +392,14 @@ class ProfileDialog(AppDialog):
     def go(self, index):
         if self.saving:
             return
-        index = max(0, min(2, index))
+        index = 0 if self.compact else max(0, min(2, index))
         self.stack.setCurrentIndex(index)
         self.progress.setText(f"YOUR PROFILE   ·   {index + 1} / 3")
         self.back.setVisible(index > 0)
         self.next.setText(
-            "Continue"
+            "Open workspace"
+            if self.compact
+            else "Continue"
             if index == 2 and self.onboarding
             else "Save profile"
             if index == 2
@@ -428,13 +444,14 @@ class ProfileDialog(AppDialog):
             self.show_error(str(error))
             return
         index = self.stack.currentIndex()
-        if index < 2:
+        if index < 2 and not self.compact:
             self.go(index + 1)
             return
         service = self.account.service
         if not service or not service.user or str(service.user.id) != self.user_id:
             self.show_error("Sign in again to save your profile.")
             return
+        self.error.hide()
         self.saving = True
         self.next.setEnabled(False)
         self.back.setEnabled(False)
@@ -449,15 +466,22 @@ class ProfileDialog(AppDialog):
                 return {
                     "error": "That username is already taken. Try another."
                     if "username is already taken" in message
-                    else "Could not save. Check your connection and profile SQL setup, then retry."
+                    else "Could not save your profile. Try again."
                 }
 
-        def saved(result):
+        action = "Open workspace" if self.compact else (
+            "Continue" if self.onboarding else "Save profile"
+        )
+
+        def restore_controls():
             self.saving = False
             self.next.setEnabled(True)
             self.back.setEnabled(True)
-            self.next.setText("Continue" if self.onboarding else "Save profile")
+            self.next.setText(action)
             self.state_changed.emit()
+
+        def saved(result):
+            restore_controls()
             if (
                 not self.account.service
                 or not self.account.service.user
@@ -484,18 +508,10 @@ class ProfileDialog(AppDialog):
         connected = getattr(self.window, "connected", None)
         if connected and connected.active:
             if not connected.enqueue(("save-full-profile", self.user_id), operation, saved):
-                self.saving = False
-                self.next.setEnabled(True)
-                self.back.setEnabled(True)
-                self.next.setText("Continue" if self.onboarding else "Save profile")
-                self.state_changed.emit()
+                restore_controls()
                 self.show_error("Connection busy. Try again shortly.")
         elif self.account.busy:
-            self.saving = False
-            self.next.setEnabled(True)
-            self.back.setEnabled(True)
-            self.next.setText("Continue" if self.onboarding else "Save profile")
-            self.state_changed.emit()
+            restore_controls()
             self.show_error("Connection busy. Try again shortly.")
         else:
             self.account.run(operation, saved)

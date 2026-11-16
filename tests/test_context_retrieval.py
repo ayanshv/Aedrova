@@ -325,7 +325,11 @@ def bounded_service():
 
 def test_indexed_context_preserves_query_threads_and_marks_coverage():
     source = bounded_service()
-    context = gather(source, "w", query="export invoices")
+    progress = []
+    context = gather(source, "w", progress=progress.append, query="export invoices")
+    assert "Reading #general…" in progress
+    assert all("0 messages" not in status for status in progress)
+    assert progress[-1] == "Gathered 5 messages for context"
     records = [json.loads(line) for line in context.text.splitlines()]
     assert records[0]["coverage"]["mode"] == "indexed search and bounded recent evidence"
     assert context.count == 5
@@ -355,3 +359,16 @@ def test_indexed_context_enforces_recent_message_ceiling():
     source.recent_context = lambda channel: [{}] * 21
     with pytest.raises(PermissionError, match="invalid"):
         gather(source, "w", query="invoice")
+
+
+def test_context_reports_no_messages_only_after_reading():
+    source = bounded_service()
+    source.search_context = lambda *_: []
+    source.recent_context = lambda _: []
+    progress = []
+
+    context = gather(source, "w", progress=progress.append, preferred_channel="c")
+
+    assert context.count == 0
+    assert progress[-1] == "No chat messages found in the selected context"
+    assert "Reading #general…" in progress[:-1]

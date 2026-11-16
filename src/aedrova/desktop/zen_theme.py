@@ -66,16 +66,13 @@ def onboarding_styles(theme):
         + f"""
         QDialog {{background:{theme.bg};}}
         QScrollArea#ZenSettings {{background:transparent;border:0;}}
-        QFrame#ZenSettingsBody {{background:{theme.bg};border:1px solid {theme.border};
-            border-radius:18px;}}
-        QFrame#ZenSettingsBody QLabel[role="muted"] {{font-size:12px;}}
-        QFrame#ZenSettingsBody QLabel[role="title"] {{font-size:15px;font-weight:600;}}
+        QWidget#ZenSettingsBody {{background:{theme.bg};border:0;}}
         QPushButton {{border-radius:10px;padding:9px 16px;}}
         QPushButton#OnboardingContinue {{background:{theme.accent};color:{theme.primary_text};
             border-radius:10px;text-align:center;font-weight:600;padding:8px 16px;}}
+        QPushButton#OnboardingContinue:focus {{border:2px solid {theme.text};}}
         QPushButton#OnboardingContinue:hover {{background:{theme.accent_text};}}
         QPushButton#OnboardingContinue:disabled {{background:{theme.surface};color:{theme.muted};}}
-        QPushButton#ZenSkip {{border:0;background:transparent;color:{theme.muted};padding:8px;}}
         QLineEdit {{background:{theme.bg};border:1px solid {theme.border};border-radius:10px;
             padding:11px;}}
         QLineEdit:focus {{border-color:{theme.accent};}}

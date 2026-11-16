@@ -17,16 +17,31 @@ def greeting_reply(question):
     return None
 
 
+def workspace_recap(question):
+    """Recognize conversational requests about the team's own recent work."""
+    return bool(
+        re.search(
+            r"\b(?:what (?:are|were|did|have) (?:we|our team) "
+            r"(?:(?:just|been)\s+)?(?:build(?:ing)?|built|work(?:ing)? on|ship(?:ping)?|shipped|"
+            r"finish(?:ing)?|finished|implement(?:ing)?|implemented|decide|decided|"
+            r"plan(?:ning)?|planned|do(?:ing)?|done)|"
+            r"where (?:did|have) we (?:leave|left) off|"
+            r"what (?:were|are) we (?:trying|going|supposed|planning) to (?:build|ship|do|fix)|"
+            r"what was the last thing we (?:built|shipped|worked on|were building)|"
+            r"what (?:was|is) (?:our|the team's) (?:last|current) (?:build|task|plan)|"
+            r"catch (?:me|us) up)\b",
+            " ".join(question.split()),
+            re.IGNORECASE,
+        )
+    )
+
+
 def needs_sources(question):
     """Keep general conversation out of workspace/connector retrieval.
 
     Explicit source questions and ambiguous follow-ups retain the evidence path.
     This only selects read-only retrieval, never authorizes a build or tool action.
     """
-    import re
-
-
-
     greetings = {
         "नमस्ते",
         "हैलो",
@@ -41,9 +56,9 @@ def needs_sources(question):
         "안녕하세요",
         "สวัสดี",
     }
-    if any(ord(c) > 0x024F for c in question):
+    if any(c.isalpha() and ord(c) > 0x024F for c in question):
         return question.strip().strip("!।。?？ ") not in greetings
-    return bool(
+    return workspace_recap(question) or bool(
         re.search(
             r"\b(workspace|chatspace|channels?|messages?|chats?|files?|meetings?|transcripts?|"
             r"project|codebase|folder|repositories|repository|repos?|commits?|deployments?|"
@@ -106,6 +121,9 @@ async def _reply(access, prompt, cancelled, emit, timeout):
 
     async def consume():
         text, complete, size, stopped = "", False, 0, False
+        next_update = 0.0
+        last_update_length = 0
+        clock = asyncio.get_running_loop().time
         async with (
             httpx.AsyncClient(
                 timeout=httpx.Timeout(timeout, connect=timeout),
@@ -200,10 +218,14 @@ async def _reply(access, prompt, cancelled, emit, timeout):
                     raise ValueError(
                         "Ask for a shorter reply; this answer exceeded the chat limit."
                     )
-                if delta:
+                if delta and clock() >= next_update:
                     emit(text)
+                    last_update_length = len(text)
+                    next_update = clock() + 0.05
         if not complete or not text.strip():
             raise RuntimeError("AI stopped before completing the reply. Please retry.")
+        if len(text) != last_update_length and not cancelled.is_set():
+            emit(text)
         return text
 
     task = asyncio.create_task(consume())

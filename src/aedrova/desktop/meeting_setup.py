@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from aedrova.desktop.brand import BrandMark
+from aedrova.desktop.brand import BrandLockup
 from aedrova.desktop.controls import AppDialog, ChoiceBox
 from aedrova.desktop.dialogs import button, label
 from aedrova.desktop.theme import palette
@@ -81,9 +81,10 @@ class MeetingSetup(AppDialog):
         layout.setContentsMargins(28, 24, 28, 24)
         layout.setSpacing(18)
         heading = QHBoxLayout()
-        heading.addWidget(BrandMark(46))
-        heading.addWidget(label('Check your meeting devices', 'title'), 1)
+        heading.addWidget(BrandLockup(46))
+        heading.addStretch()
         layout.addLayout(heading)
+        layout.addWidget(label('Check your meeting devices', 'title'))
         layout.addWidget(label('Check your devices before your next conversation.', 'muted'))
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
