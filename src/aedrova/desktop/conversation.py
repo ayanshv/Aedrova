@@ -68,6 +68,7 @@ from aedrova.desktop.response_actions import (
     append_response_actions,
     citations,
     compact_citations,
+    reply_anchor_at,
     response_parts,
 )
 from aedrova.desktop.theme import LIGHT, Theme
@@ -823,7 +824,8 @@ class MessageView(QListView):
             if hit:
                 index, document, _ = hit
                 rect = self.visualRect(index)
-                link = document.documentLayout().anchorAt(
+                link = reply_anchor_at(
+                    document,
                     QPointF(
                         event.position().x() - rect.x() - 74,
                         event.position().y() - rect.y() - self.delegate.body_offset(index),
@@ -852,7 +854,7 @@ class MessageView(QListView):
                 self.react(message.id, reaction["emoji"])
                 return
         body_top = rect.top() + self.delegate.body_offset(index)
-        link = document.documentLayout().anchorAt(QPointF(point.x() - 74, point.y() - body_top))
+        link = reply_anchor_at(document, QPointF(point.x() - rect.x() - 74, point.y() - body_top))
         if self.activate_message_link(message, link):
             return
         if (
@@ -1016,7 +1018,7 @@ class MessageView(QListView):
                     event.pos().x() - rect.x() - 74,
                     event.pos().y() - rect.top() - self.delegate.body_offset(index),
                 )
-                title = REPLY_ACTION_LABELS.get(document.documentLayout().anchorAt(point))
+                title = REPLY_ACTION_LABELS.get(reply_anchor_at(document, point))
                 if title:
                     QToolTip.showText(event.globalPos(), title, self.viewport())
                     return True

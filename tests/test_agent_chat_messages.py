@@ -4,7 +4,7 @@ from PySide6.QtCore import QEvent, QPointF, QSettings
 from PySide6.QtWidgets import QApplication
 from test_connected import setup
 
-from aedrova.desktop.response_actions import ACTION_PREFIX
+from aedrova.desktop.response_actions import ACTION_PREFIX, reply_anchor_at
 from aedrova.desktop.state import Message
 from aedrova.desktop.window import AedrovaWindow
 
@@ -100,14 +100,13 @@ def test_reply_choices_and_feedback_work_after_archiving(qtbot, tmp_path):
     document = view.delegate.document(message, 500)
     assert 'alt="Good response (selected)"' in document.toHtml()
     assert "Good response" not in document.toPlainText()
-    for action in ("copy", "good", "bad", "more"):
-        assert any(
-            document.documentLayout().anchorAt(QPointF(x, y)) == ACTION_PREFIX + action
-            for y in range(
-                max(0, int(document.size().height()) - 40), int(document.size().height())
-            )
-            for x in range(180)
-        )
+    bounds = document.documentLayout().blockBoundingRect(document.lastBlock())
+    reachable = {
+        reply_anchor_at(document, QPointF(x, y))
+        for y in range(int(bounds.top()), int(bounds.bottom()) + 1)
+        for x in range(int(bounds.left()), int(bounds.right()) + 1)
+    }
+    assert {ACTION_PREFIX + action for action in ("copy", "good", "bad", "more")} <= reachable
     assert "AEDROVA_CHOICES" not in document.toPlainText()
     assert 'href="https://example.com"' in document.toHtml()
     view.activate_message_link(message, ACTION_PREFIX + "choice-1")

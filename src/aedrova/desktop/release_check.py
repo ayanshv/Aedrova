@@ -1,5 +1,7 @@
 """A themed, asynchronous release check with an explicit website handoff."""
 
+import sys
+
 from PySide6.QtCore import QThreadPool, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QVBoxLayout
@@ -17,6 +19,7 @@ class ReleaseDialog(AppDialog):
         self.setWindowTitle("Aedrova · Updates")
         self.resize(520, 340)
         self.origin = application_origin()
+        self.windows = sys.platform == "win32"
         layout = QVBoxLayout(self)
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(16)
@@ -37,9 +40,13 @@ class ReleaseDialog(AppDialog):
         layout.addWidget(self.download)
         layout.addWidget(
             label(
-                "To update: quit Aedrova, replace it in Applications, then reopen. "
-                "Your account and local project files stay in place. "
-                "Keep the previous app until the replacement works.",
+                (
+                    "To update: quit Aedrova, run the installer, then reopen. "
+                    if self.windows
+                    else "To update: quit Aedrova, replace it in Applications, then reopen. "
+                )
+                + "Your account and local project files stay in place. "
+                "Keep the previous installer until the replacement works.",
                 "muted",
                 wrap=True,
             )
@@ -54,7 +61,7 @@ class ReleaseDialog(AppDialog):
         self.check.setEnabled(False)
         self.download.setEnabled(False)
         self.status.setText("Checking the verified release…")
-        self.job = Job(lambda: check_release(self.origin))
+        self.job = Job(lambda: check_release(self.origin, windows=self.windows))
         self.job.signals.finished.connect(self.completed)
         QThreadPool.globalInstance().start(self.job)
 
@@ -65,9 +72,13 @@ class ReleaseDialog(AppDialog):
             return
         release = result["value"]
         newer = version_tuple(release["version"]) > version_tuple(VERSION)
+        details = (
+            " The download is signed for Windows."
+            if self.windows
+            else f" Requires macOS {release['minimum_macos']} or later. The download is notarized."
+        )
         self.status.setText(
             (f"Aedrova {release['version']} is available." if newer else "You’re up to date.")
-            + f" Requires macOS {release['minimum_macos']} or later. "
-            "The download is signed and notarized."
+            + details
         )
         self.download.setEnabled(newer)

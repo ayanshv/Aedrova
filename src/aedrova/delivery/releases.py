@@ -20,7 +20,7 @@ def version_tuple(value):
     return tuple(map(int, value.split(".")))
 
 
-def validate_release(data, machine=None, macos=None):
+def validate_release(data, machine=None, macos=None, *, windows=False):
     if not isinstance(data, dict):
         raise ValueError("Release information is invalid.")
     version_tuple(data.get("version"))
@@ -31,10 +31,16 @@ def validate_release(data, machine=None, macos=None):
     digest = data.get("sha256")
     if not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest):
         raise ValueError("Release information is missing its verification digest.")
+    current = machine or platform.machine()
+    if windows:
+        if data.get("platform") != "windows" or data["architecture"] != "x86_64":
+            raise ValueError("Release information is missing the Windows installer.")
+        if current.lower() not in {"amd64", "x86_64"}:
+            raise ValueError("This installer is for a different Windows processor.")
+        return data
     minimum = data.get("minimum_macos")
     if not isinstance(minimum, str) or not re.fullmatch(r"\d{1,2}\.\d{1,2}", minimum):
         raise ValueError("Release information is missing macOS requirements.")
-    current = machine or platform.machine()
     if data["architecture"] not in {current, "universal2"}:
         raise ValueError("This installer is for a different Mac processor. Keep your current app.")
     operating_system = platform.mac_ver()[0] if macos is None else macos
@@ -46,7 +52,7 @@ def validate_release(data, machine=None, macos=None):
     return data
 
 
-def check_release(origin):
+def check_release(origin, *, windows=False):
     parsed = urlsplit(origin)
     if (
         not parsed.hostname
@@ -70,12 +76,13 @@ def check_release(origin):
 
     try:
         with urllib.request.build_opener(SameOrigin()).open(
-            origin.rstrip("/") + "/api/release", timeout=10
+            origin.rstrip("/") + ("/api/release?platform=windows" if windows else "/api/release"),
+            timeout=10,
         ) as response:
             body = response.read(16385)
         if len(body) > 16384:
             raise ValueError("Release information is larger than expected.")
-        return validate_release(json.loads(body))
+        return validate_release(json.loads(body), windows=windows)
     except urllib.error.HTTPError as exc:
         if exc.code == 503:
             raise ValueError(

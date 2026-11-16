@@ -140,7 +140,9 @@ def test_retry_receipt_keeps_restored_text_if_user_edits_it(qtbot, tmp_path):
     window, service = setup(qtbot, tmp_path)
     calls = []
 
-    def rpc(*args):
+    def rpc(name, params):
+        if name != "send_message":
+            return None
         calls.append(True)
         if len(calls) == 1:
             raise httpx.ConnectError("offline")

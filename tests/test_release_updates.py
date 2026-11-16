@@ -43,6 +43,16 @@ def test_version_comparison_and_mac_compatibility():
         validate_release(release(), machine="arm64", macos="13.6")
 
 
+def test_windows_releases_require_platform_and_matching_processor():
+    windows = release(platform="windows", architecture="x86_64")
+    windows.pop("minimum_macos")
+    assert validate_release(windows, machine="AMD64", windows=True) == windows
+    with pytest.raises(ValueError, match="different Windows processor"):
+        validate_release(windows, machine="ARM64", windows=True)
+    with pytest.raises(ValueError, match="missing the Windows installer"):
+        validate_release(release(), machine="AMD64", windows=True)
+
+
 def test_untrusted_update_origins_do_not_make_network_requests():
     with pytest.raises(ValueError, match="verified"):
         check_release("http://untrusted.example")

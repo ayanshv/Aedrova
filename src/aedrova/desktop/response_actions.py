@@ -6,7 +6,7 @@ from base64 import b64encode
 from functools import lru_cache
 from html import escape
 
-from PySide6.QtCore import QBuffer, QIODevice, QUrl
+from PySide6.QtCore import QBuffer, QIODevice, QRectF, QUrl
 from PySide6.QtGui import QColor, QTextBlockFormat, QTextCharFormat, QTextCursor, QTextDocument
 
 from aedrova.desktop.icons import icon
@@ -28,6 +28,37 @@ REPLY_ACTIONS = (
     ("more", "More options", "more_chat"),
 )
 REPLY_ACTION_LABELS = {ACTION_PREFIX + action: title for action, title, _ in REPLY_ACTIONS}
+
+
+def reply_anchor_at(document, point):
+    layout = document.documentLayout()
+    anchor = layout.anchorAt(point)
+    if anchor:
+        return anchor
+    block = document.lastBlock()
+    bounds = layout.blockBoundingRect(block)
+    if not bounds.contains(point):
+        return ""
+    fragments = block.begin()
+    while not fragments.atEnd():
+        fragment = fragments.fragment()
+        style = fragment.charFormat()
+        action = style.anchorHref()
+        if style.isImageFormat() and action in REPLY_ACTION_LABELS:
+            offset = fragment.position() - block.position()
+            line = block.layout().lineForTextPosition(offset)
+            if line.isValid():
+                left = line.cursorToX(offset)[0]
+                right = line.cursorToX(offset + fragment.length())[0]
+                if QRectF(
+                    bounds.x() + min(left, right),
+                    bounds.y() + line.y(),
+                    abs(right - left),
+                    line.height(),
+                ).contains(point):
+                    return action
+        fragments += 1
+    return ""
 
 
 def citations(text):
