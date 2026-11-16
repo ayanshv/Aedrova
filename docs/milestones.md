@@ -3529,18 +3529,6 @@ website work/team-entity-discovery-oct27/live-verification.json and indexing scr
 Stage1 remains OPEN for provider public review and audio clarity; Claude funding
 and reliable meetings remain deferred final launch gates.
 
-### October 27 — faceless default portrait
-
-Owner requested a default faceless person image for Joash Thomas. Replaced his
-monogram with an inline neutral head/shoulders silhouette in the existing portrait
-card; theme colors adapt in light/dark. Decorative SVG is hidden from assistive
-technology and is not added as a real Person photograph in structured data.
-12 focused product/discovery checks and Ruff passed; light/dark screenshots checked.
-PR31 merged as 4c4c65e, branch/main CI passed, live public /team placeholder verified.
-Name, role, biography and founder hierarchy retained. No owner action is required.
-Stage 1 remains OPEN with existing provider-review/audio acceptance gates; funded
-Claude and reliable meetings remain deferred final launch gates.
-
 ### October 27 — borderless login and pebble dark surfaces
 
 Removed the account login's inset panel appearance: matching dialog/page backgrounds,

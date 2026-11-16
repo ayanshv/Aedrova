@@ -207,6 +207,18 @@ class ConnectedDashboard(QObject):
     def reset_notice(self):
         self.window._reset_notice()
 
+    def update_feed_loading(self):
+        from aedrova.desktop.loading import set_loading
+
+        w = self.window
+        loading = (
+            self.active
+            and bool(w.channel_id)
+            and w.channel_id not in self.cache
+            and not w.messages.model().rowCount()
+        )
+        set_loading(self, w.message_stack, loading, "feed")
+
     def stop_realtime(self):
         from aedrova.desktop.loading import set_loading
 
@@ -443,10 +455,7 @@ class ConnectedDashboard(QObject):
         w, service = self.window, self.account.service
         workspace_id, channel_id, parent = w.workspace_id, w.channel_id, w.thread_id or None
         cached = dict(self.cache.get(channel_id, {}))
-        from aedrova.desktop.loading import set_loading
-
-        if channel_id and channel_id not in self.cache:
-            set_loading(self, w.message_stack, True, "feed")
+        self.update_feed_loading()
         reload_metadata = self.last_view is None
         self.sync_interrupt.clear()
 
@@ -512,7 +521,6 @@ class ConnectedDashboard(QObject):
                 return None
 
         def loaded(result):
-            set_loading(self, w.message_stack, False)
             if not self.active or result is None:
                 return
             snapshot, incoming, files, credentials, interactions, reply_history = result
@@ -757,6 +765,7 @@ class ConnectedDashboard(QObject):
         w.message_stack.setCurrentIndex(
             0 if w.messages.model().rowCount() or w.messages.agent_visible else 1
         )
+        self.update_feed_loading()
         if w.thread_id:
             parent = next((m for m in w.channel.messages if m.id == w.thread_id), None)
             if parent:

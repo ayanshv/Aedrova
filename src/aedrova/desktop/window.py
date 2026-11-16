@@ -703,6 +703,8 @@ class AedrovaWindow(QMainWindow):
         if self.connected and self.connected.active:
             self.connected.account.remember_workspace(workspace_id)
             self.workspace_usage.sync_scope()
+            if self.channel_id in self.connected.cache:
+                self.connected.render_local_messages()
             self.connected.refresh()
 
     def switch_channel(self, channel_id):
@@ -718,6 +720,8 @@ class AedrovaWindow(QMainWindow):
         self._load_channel()
         self.select_tab(0)
         if self.connected and self.connected.active:
+            if channel_id in self.connected.cache:
+                self.connected.render_local_messages()
             self.connected.refresh()
 
     def _load_channel(self):
@@ -791,6 +795,7 @@ class AedrovaWindow(QMainWindow):
         if self.composer.editor.toPlainText() != draft:
             self.composer.editor.setPlainText(draft)
         if self.connected and self.connected.active:
+            self.connected.update_feed_loading()
             self.setWindowTitle(f"Aedrova · {self.workspace.name}")
             self.connection_badge.setText("Connected")
             self.conversation_date.setText("Shared conversation")

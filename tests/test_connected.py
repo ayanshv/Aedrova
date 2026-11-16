@@ -62,6 +62,31 @@ def test_dashboard_uses_real_workspaces_and_messages(qtbot, tmp_path):
     assert window.isVisible()
 
 
+def test_channel_switch_loads_unknown_history_and_opens_cached_history_immediately(qtbot, tmp_path):
+    window, service = setup(qtbot, tmp_path)
+    qtbot.waitUntil(lambda: not window.account_dialog.busy, timeout=20000)
+    data = snapshot()
+    data["channels"].append(
+        {"id": "d", "workspace_id": "w", "name": "design", "private": False}
+    )
+    service.snapshot = lambda: data
+    service.message_page = lambda channel, **kw: [] if channel == "d" else [row()]
+    connected = window.connected
+    connected.cache["c"] = {"m": row()}
+    connected.apply(data, [row()], "w", "c")
+    window.account_dialog.busy = True
+    window.switch_channel("d")
+    assert connected._loading_skeleton.isVisible()
+    window.switch_channel("c")
+    assert window.channel.messages[0].body == "Hello"
+    assert not connected._loading_skeleton.isVisible()
+    window.switch_channel("d")
+    window.account_dialog.busy = False
+    connected.refresh()
+    qtbot.waitUntil(lambda: "d" in connected.cache and not connected._loading_skeleton.isVisible())
+    assert window.message_stack.currentIndex() == 1
+
+
 def test_new_member_can_retry_profile_and_open_chat_without_a_setup_tour(qtbot, tmp_path):
     window = AedrovaWindow(
         settings=QSettings(str(tmp_path / "new.ini"), QSettings.Format.IniFormat)

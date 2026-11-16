@@ -66,8 +66,8 @@ backdrop-filter:blur(24px);
  -webkit-backdrop-filter:blur(24px);
  animation:arrive .65s ease-out both}}
 .brand {{display:flex;align-items:center;justify-content:center;gap:12px;
-color:var(--ink);margin:0 auto 26px}}
-.brand svg {{display:block;width:148px;height:auto}}
+color:var(--ink);margin:0 auto 26px;max-width:100%;padding:2px 4px}}
+.brand svg {{display:block;width:148px;min-width:0;height:auto;overflow:visible}}
 .mark {{width:64px;height:64px;position:relative;flex:none;overflow:hidden}}
 .mark img {{position:absolute;
 width:160px;
@@ -101,7 +101,7 @@ text-align:center}}
 transform:translateY(10px)}} to {{opacity:1;
 transform:translateY(0)}}}}
 {dark_styles}
-@media(max-width:420px) {{main {{padding:28px 24px 32px}} .mark {{margin-top:16px}}}}
+@media(max-width:420px) {{main {{padding:28px 24px 32px}}}}
 @media(prefers-reduced-motion:reduce) {{main {{animation:none}}}}
 @media(prefers-reduced-transparency:reduce) {{main {{background:var(--bg);backdrop-filter:none}}}}
 </style></head><body><div class="aura" aria-hidden="true"></div>
