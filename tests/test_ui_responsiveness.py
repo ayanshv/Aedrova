@@ -22,23 +22,24 @@ def setup(qtbot, tmp_path):
 
 def test_dm_picker_opens_from_session_cache_even_while_transport_busy(qtbot, tmp_path, monkeypatch):
     window, service = setup(qtbot, tmp_path)
+    qtbot.waitUntil(lambda: not window.account_dialog.busy, timeout=20000)
     window.account_dialog.snapshot["directory"] = [
         {"workspace_id": "w", "user_id": "peer", "display_name": "Morgan"},
         {"workspace_id": "foreign", "user_id": "stranger", "display_name": "Hidden"},
     ]
-    service.snapshot = lambda: pytest.fail("Opening a picker must not fetch a snapshot")
     chosen = []
     monkeypatch.setattr(
         "aedrova.desktop.connected.choose_conversation",
         lambda _, people, buds: chosen.append(people) or None,
     )
-    monkeypatch.setattr(window.connected, "enqueue", lambda *a, **k: pytest.fail("No queue wait"))
-    window.account_dialog.busy = True
-    try:
+    with monkeypatch.context() as transport:
+        transport.setattr(
+            service, "snapshot", lambda: pytest.fail("Opening a picker must not fetch a snapshot")
+        )
+        transport.setattr(window.connected, "enqueue", lambda *a, **k: pytest.fail("No queue wait"))
+        transport.setattr(window.account_dialog, "busy", True)
         window.start_dm_button.click()
         assert [p["user_id"] for p in chosen[0]] == ["peer"]
-    finally:
-        window.account_dialog.busy = False
 
 
 def test_settings_open_from_cache_during_background_sync(qtbot, tmp_path, monkeypatch):
