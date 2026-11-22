@@ -19,7 +19,7 @@ from PySide6.QtCore import (
 from aedrova.agents.context import WorkspaceContext, authorize, gather
 from aedrova.agents.managed import ManagedClient, application_ai_origin
 from aedrova.agents.replies import needs_sources, workspace_recap
-from aedrova.agents.runtime import LocalRunner
+from aedrova.agents.runtime import RESPONSE_STYLE, LocalRunner
 from aedrova.desktop.builds import Signals
 from aedrova.dots.client import client, recheck, retrieve
 
@@ -44,7 +44,7 @@ class QueryJob(QRunnable):
             workspace,
             channel,
             task,
-            provider,
+            "codex",
         )
         self.bud = dict(bud) if bud else None
         source_question = task
@@ -68,7 +68,7 @@ class QueryJob(QRunnable):
         )
         self.local_only = bool(self.project_folder) and not self.recap and not re.search(
             r"\b(workspace|team|chat|messages?|meetings?|github|notion|figma|stripe|"
-            r"instagram|tiktok|vercel|supabase)\b",
+            r"instagram|tiktok|vercel|supabase|slack|archive)\b",
             task,
             re.I,
         )
@@ -143,6 +143,7 @@ class QueryJob(QRunnable):
                         self.signals.progress.emit,
                         query=self.task,
                         preferred_channel=self.channel,
+                        include_slack=True,
                     )
 
 
@@ -283,8 +284,7 @@ class QueryJob(QRunnable):
                         prompt += "\nCurrent channel ID: " + json.dumps(self.channel)
                 if not private:
                     prompt += (
-                        "\nLead with the answer. Use short paragraphs and Markdown headings "
-                        "when they help. Use bullets for steps and backticks for commands. "
+                        "\n" + RESPONSE_STYLE + " "
                         "When you need the user to choose, ask one concise question and end "
                         "with a single line of JSON choices, for example "
                         'AEDROVA_CHOICES ["First option","Second option"]. '
@@ -330,9 +330,15 @@ class QueryJob(QRunnable):
             from aedrova.agents.shared_work import recheck as recheck_shared
 
             recheck_shared(self.service, context)
+            from aedrova.agents.context import recheck_slack
+
+            uses_slack = recheck_slack(self.service, context)
             outcome = {"text": result}
             if not private:
                 outcome["source_channels"] = sorted(context.channel_ids or {self.channel})
+                outcome["shareable"] = not uses_slack and not self.project_folder and not any(
+                    line.startswith('{"dot_evidence":') for line in context.text.splitlines()
+                )
         except Exception as error:
             from aedrova.agents.runtime import BuildCancelled
 
@@ -373,9 +379,7 @@ def start_analysis(window, task, *, bud=None):
         return start_local_greeting(window, greeting)
     from aedrova.desktop.projects import binding
 
-    provider = binding(window).get("provider", "codex")
-    if provider == "auto":
-        provider = "codex"
+    provider = "codex"
     workspace, channel, user = window.workspace_id, window.channel_id, str(window.current_user().id)
 
     cancelled = threading.Event()
@@ -420,6 +424,7 @@ def start_analysis(window, task, *, bud=None):
                     bud["name"] if bud else "Aedrova",
                     prompt_id,
                     bud_avatar=bud_avatar,
+                    successful=False,
                 )
             return
         if (
@@ -451,20 +456,33 @@ def start_analysis(window, task, *, bud=None):
         origin = getattr(window, "agent_request_origin", None)
         parent = origin[2] if origin and origin[:2] == (workspace, channel) else None
         prompt_id = origin[3] if origin and origin[:2] == (workspace, channel) else None
+        phase = "context" if job.sources else "thinking"
+        window.connected.report_agent_progress(prompt_id, phase)
+        progress_timer = QTimer(window)
+        progress_timer.setInterval(15_000)
+        progress_timer.timeout.connect(
+            lambda: window.connected.report_agent_progress(prompt_id, phase)
+        )
+        if prompt_id:
+            progress_timer.start()
+        streamed = False
+
+        def reply_received(text):
+            nonlocal phase, streamed
+            if (not window.current_user() or str(window.current_user().id) != user
+                or window.dot_query is not job or job.runner.cancelled.is_set()):
+                return
+            if not streamed:
+                streamed = True
+                phase = "responding"
+                window.connected.report_agent_progress(prompt_id, phase)
+            if window.workspace_id == workspace:
+                window.agent_feed.set_reply(text)
+
         window.agent_activity(
             workspace, "Finding relevant context…" if job.sources else "Thinking…"
         )
-        job.signals.reply.connect(
-            lambda text: (
-                window.agent_feed.set_reply(text)
-                if window.current_user()
-                and str(window.current_user().id) == user
-                and window.workspace_id == workspace
-                and window.dot_query is job
-                and not job.runner.cancelled.is_set()
-                else None
-            )
-        )
+        job.signals.reply.connect(reply_received)
         job.signals.progress.connect(
             lambda text: (
                 window.agent_event(workspace, text, update_activity=True)
@@ -477,6 +495,8 @@ def start_analysis(window, task, *, bud=None):
         )
 
         def finished(result):
+            progress_timer.stop()
+            progress_timer.deleteLater()
             window.account_dialog.session_closed.disconnect(job.runner.cancel)
             window.dot_query = None
             if (
@@ -489,7 +509,8 @@ def start_analysis(window, task, *, bud=None):
                 elif project and binding(window, workspace).get("folder", "") != project:
                     result = {
                         "text": "Your project connection changed. "
-                        "Ask again to use the current folder."
+                        "Ask again to use the current folder.",
+                        "error": True,
                     }
                 window.finish_conversation_response(
                     workspace,
@@ -502,7 +523,10 @@ def start_analysis(window, task, *, bud=None):
                     if not result.get("error")
                     else None,
                     bud_avatar=bud_avatar,
+                    successful=not result.get("error"),
+                    share=result.get("shareable", not (job.project_folder or bud)),
                 )
+                window.connected.report_agent_progress(prompt_id, "finished")
 
         job.signals.finished.connect(finished)
         QThreadPool.globalInstance().start(job)

@@ -130,7 +130,7 @@ verification/external testing and Phase2 acceptance remain open; no billing enab
 ### October 11 — public policies/support update authorized
 
 Owner authorized replacing website Privacy/Terms, adding Customer support with
-(408) 634-5254, pushing/merging the website update as needed, and entering/saving
+[former number removed], pushing/merging the website update as needed, and entering/saving
 https://aedrova.com/privacy, /terms and /support in Stripe. Isolated website PR4
 uses codex/legal-support-refresh from main to avoid publishing unfinished connector
 changes. Local website suite392 passed. Documents describe conditional Beta features
@@ -144,7 +144,7 @@ Website PR4 https://github.com/ayanshv/Aedrova-website/pull/4 merged after green
 CI38120908946; main commit8bb942d, mainCI38121001131 also green. Render website
 srv-db0a8o7avr4c73eqcj4g auto-deploymentdep-db5jhsmk1f9s73eeecdg succeeded.
 Live browser verification confirms new Privacy/Terms effectiveOctober11 and Support
-with authorized phone(408)634-5254. Waitlist retained; release/billing gates untouched.
+with the contact details authorized at the time. Waitlist retained; release/billing gates untouched.
 Current website development branch integrates the same pages:431 tests passed,
 tracked secret check passed.
 

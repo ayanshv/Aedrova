@@ -21,6 +21,7 @@ def main():
     parser.add_argument("--thread", action="store_true")
     parser.add_argument("--demo", action="store_true", help="Open the local sample chat preview")
     parser.add_argument("--onboarding", action="store_true", help="Open the guided introduction")
+    parser.add_argument("--review-profile", action="store_true", help="Review saved profile in guided setup")
     parser.add_argument("--account", action="store_true", help="Open account and workspace setup")
     parser.add_argument("--width", type=int, default=1440)
     parser.add_argument("--height", type=int, default=940)
@@ -40,6 +41,8 @@ def main():
         else None
     )
     window = AedrovaWindow(settings=settings)
+    window.enable_guided_onboarding = not args.smoke_report
+    window.review_onboarding_profile = args.onboarding and args.review_profile
 
     class Links(QObject):
         def eventFilter(self, watched, event):
@@ -64,6 +67,8 @@ def main():
         window.open_pinned()
     if account_first:
         window.show_account()
+        if not args.smoke_report and not args.settings_file:
+            window.account_dialog.enable_session_restore()
     if args.smoke_report:
 
         def capture():

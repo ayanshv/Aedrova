@@ -242,7 +242,7 @@ def test_native_dot_profile_and_picker_states_in_both_themes(qtbot, tmp_path, mo
     dialog.new_dot()
     assert dialog.resource.isEnabled() and not dialog.connect.isEnabled()
     dialog.provider.setCurrentIndex(dialog.provider.findData("posthog"))
-    assert not dialog.save.isEnabled()
+    assert dialog.save.isEnabled()  # connecting a tool is optional
     for mode in ("light", "dark"):
         window.set_theme(mode)
         dialog.resize(620, 720)
@@ -332,7 +332,13 @@ def test_cross_source_query_job_selects_fetches_and_answers_with_citations(
     job.signals.finished.connect(results.append)
     job.run()
     assert len(calls) == 2 and paths[1] == "/api/dots/tools"
-    assert results == [{"text": "Sign in changed. [" + citation + "]", "source_channels": ["c"]}]
+    assert results == [
+        {
+            "text": "Sign in changed. [" + citation + "]",
+            "source_channels": ["c"],
+            "shareable": False,
+        }
+    ]
     assert closed == [True]
 
 

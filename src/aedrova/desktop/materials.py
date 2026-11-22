@@ -140,15 +140,21 @@ class SpringMotion(QObject):
         self.animation = QPropertyAnimation(self.effect, b"scale", self)
         self.enabled = True
         widget.installEventFilter(self)
-        widget.pressed.connect(lambda: self.animate(0.99, False))
+        widget.pressed.connect(self.press)
         widget.released.connect(lambda: self.animate(1.0, True))
+
+    def press(self):
+        self.animate(0.98 if self.widget.property("onboardingAction") else 0.99)
 
     def animate(self, target, spring=False):
         self.animation.stop()
         if not self.enabled:
             self.effect.set_scale(1.0)
             return
-        self.animation.setDuration(120 if spring else 90)
+        if self.widget.property("onboardingAction"):
+            self.animation.setDuration(145 if spring else 55)
+        else:
+            self.animation.setDuration(120 if spring else 90)
         self.animation.setStartValue(self.effect.get_scale())
         self.animation.setEndValue(target)
         self.animation.setEasingCurve(QEasingCurve.Type.OutCubic)

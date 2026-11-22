@@ -2,13 +2,72 @@
 
 import sys
 from functools import lru_cache
+from math import ceil
 from pathlib import Path
 
-from PySide6.QtCore import Property, QEasingCurve, QPropertyAnimation, QRectF, Qt
-from PySide6.QtGui import QIcon, QImage, QPainter
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtCore import Property, QByteArray, QEasingCurve, QPropertyAnimation, QRectF, Qt
+from PySide6.QtGui import QIcon, QImage, QPainter, QPalette
+from PySide6.QtSvg import QSvgRenderer
+from PySide6.QtWidgets import QApplication, QHBoxLayout, QWidget
 
 ASSETS = Path(__file__).parent / "assets"
+
+
+WORDMARK = ASSETS / "aedrova-wordmark.svg"
+WORDMARK_ASPECT = 380.5 / 74.48
+WORDMARK_CANVAS_SCALE = 80.48 / 74.48
+
+
+@lru_cache(maxsize=16)
+def wordmark_artwork(ink):
+    svg = WORDMARK.read_text(encoding="utf-8").replace("currentColor", ink)
+    return QSvgRenderer(QByteArray(svg.encode("utf-8")))
+
+
+def paint_brand_wordmark(painter, bounds, color):
+    wordmark_artwork(color.name()).render(painter, bounds)
+
+
+def paint_brand_lockup(painter, center, mark_size, text_height, color):
+    text_width = text_height * WORDMARK_ASPECT
+    canvas_height = text_height * WORDMARK_CANVAS_SCALE
+    gap = mark_size * 0.2
+    left = center.x() - (mark_size + gap + text_width) / 2
+    paint_brand_mark(
+        painter, QRectF(left, center.y() - mark_size / 2, mark_size, mark_size)
+    )
+    paint_brand_wordmark(
+        painter,
+        QRectF(left + mark_size + gap, center.y() - canvas_height / 2, text_width, canvas_height),
+        color,
+    )
+
+
+class BrandWordmark(QWidget):
+    def __init__(self, height):
+        super().__init__()
+        self.canvas_height = height * WORDMARK_CANVAS_SCALE
+        self.setFixedSize(round(height * WORDMARK_ASPECT), ceil(self.canvas_height))
+        self.setAccessibleName("Aedrova")
+
+    def paintEvent(self, event):  # noqa: N802
+        painter = QPainter(self)
+        color = self.palette().color(QPalette.ColorRole.WindowText)
+        top = (self.height() - self.canvas_height) / 2
+        paint_brand_wordmark(painter, QRectF(0, top, self.width(), self.canvas_height), color)
+
+
+class BrandLockup(QWidget):
+    def __init__(self, mark_size=32, text_height=18):
+        super().__init__()
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(round(mark_size * 0.2))
+        mark = BrandMark(mark_size)
+        mark.setAccessibleName("")
+        layout.addWidget(mark, alignment=Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(BrandWordmark(text_height), alignment=Qt.AlignmentFlag.AlignCenter)
+        self.setFixedSize(layout.sizeHint())
 
 
 @lru_cache(maxsize=1)
@@ -39,7 +98,7 @@ def app_icon():
         and (resources / "Assets.car").is_file()
     ):
         return QIcon()
-    return QIcon(str(ASSETS / "aedrova.icns"))
+    return QIcon(str(ASSETS / ("aedrova.ico" if sys.platform == "win32" else "aedrova.icns")))
 
 
 def paint_brand_mark(painter, rect, *, lift=0.0):

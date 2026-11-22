@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QPushButton,
     QSizePolicy,
     QVBoxLayout,
 )
@@ -49,6 +50,27 @@ def button(text, accessible="", role=""):
     return widget
 
 
+def apple_sign_in_button():
+    from PySide6.QtCore import QSize
+    from PySide6.QtGui import QIcon
+
+    from aedrova.desktop.brand import ASSETS
+
+    control = button("Sign in with Apple")
+    control.setIcon(QIcon(str(ASSETS / "apple.svg")))
+    control.setIconSize(QSize(18, 18))
+    control.setMinimumHeight(44)
+    control.setStyleSheet(
+        "QPushButton {background:white;color:black;border:1px solid #d0d0d0;"
+        "border-radius:10px;font-weight:500;text-align:center;} "
+        "QPushButton:hover {background:#f5f5f5;} "
+        "QPushButton:pressed {background:#e5e5e5;} "
+        "QPushButton:focus {border-color:#246bfd;} "
+        "QPushButton:disabled {background:#ededed;color:#676767;}"
+    )
+    return control
+
+
 def icon_button(name, title, *, primary=False):
     """Compact action with a visible glyph, tooltip and full accessible label."""
     from PySide6.QtCore import QSize
@@ -60,6 +82,22 @@ def icon_button(name, title, *, primary=False):
     control.setFixedSize(44, 44)
     assign(control, name)
     control.setIconSize(QSize(20, 20))
+    control.setToolTip(title)
+    return control
+
+
+def row_button(name, title):
+    """A labeled sidebar row: glyph, plain words, the full row is the target."""
+    from PySide6.QtCore import QSize
+
+    from aedrova.desktop.icons import assign
+
+    control = button(title, accessible=title)
+    control.setObjectName("SidebarRow")
+    control.setMinimumHeight(34)
+    control.setCursor(Qt.CursorShape.PointingHandCursor)
+    assign(control, name)
+    control.setIconSize(QSize(16, 16))
     control.setToolTip(title)
     return control
 
@@ -104,7 +142,7 @@ class CreateDialog(AppDialog):
             self.topic.hide()
         layout.addWidget(
             label(
-                "Local preview only. This space resets when you close the app.", "muted", wrap=True
+                "Demo workspace. It resets when you close the app.", "muted", wrap=True
             )
         )
         self.error = label("", "error", wrap=True)
@@ -191,3 +229,101 @@ class SwitcherDialog(AppDialog):
                 self.results.setCurrentRow(row)
                 return True
         return super().eventFilter(watched, event)
+
+
+def trailing_chevron(control):
+    """A drawn disclosure chevron after the text, in place of a typed glyph."""
+    from PySide6.QtCore import QSize
+
+    from aedrova.desktop.icons import assign
+
+    assign(control, "chevron")
+    control.setIconSize(QSize(14, 14))
+    control.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+    # Right-to-left layout mirrors alignment, so this keeps the words at the left edge.
+    control.setStyleSheet(control.styleSheet() + " text-align: right;")
+    return control
+
+
+class InsetRow(QPushButton):
+    """One row of an inset group: glyph, title with a line of detail, and a chevron."""
+
+    def __init__(self, symbol, title, detail=""):
+        super().__init__()
+        from PySide6.QtCore import QSize
+        from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout
+
+        from aedrova.desktop.icons import icon
+
+        self.setObjectName("InsetRow")
+        self.symbol = symbol
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setAccessibleName(title)
+        self.setAccessibleDescription(detail)
+        self.setMinimumHeight(56 if detail else 46)
+        row = QHBoxLayout(self)
+        row.setContentsMargins(14, 8, 14, 8)
+        row.setSpacing(12)
+        self.glyph = QLabel()
+        self.glyph.setFixedSize(QSize(20, 20))
+        color = self.palette().windowText().color().name()
+        self.glyph.setPixmap(icon(symbol, color).pixmap(20, 20))
+        self.glyph.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        row.addWidget(self.glyph)
+        text = QVBoxLayout()
+        text.setSpacing(1)
+        self.title = QLabel(title)
+        self.title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        text.addWidget(self.title)
+        self.detail = QLabel(detail)
+        self.detail.setProperty("role", "muted")
+        self.detail.setWordWrap(True)
+        self.detail.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.detail.setVisible(bool(detail))
+        text.addWidget(self.detail)
+        row.addLayout(text, 1)
+        self.chevron = QLabel()
+        self.chevron.setFixedSize(QSize(16, 16))
+        self.chevron.setPixmap(icon("chevron_right", self.muted_color()).pixmap(16, 16))
+        self.chevron.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        row.addWidget(self.chevron)
+
+    def changeEvent(self, event):  # noqa: N802
+        from PySide6.QtCore import QEvent
+
+        if event.type() == QEvent.Type.PaletteChange and hasattr(self, "symbol"):
+            from aedrova.desktop.icons import icon
+
+            color = self.palette().windowText().color().name()
+            self.glyph.setPixmap(icon(self.symbol, color).pixmap(20, 20))
+            self.chevron.setPixmap(icon("chevron_right", self.muted_color()).pixmap(16, 16))
+        super().changeEvent(event)
+
+    def muted_color(self):
+        from PySide6.QtGui import QPalette
+
+        return self.palette().color(QPalette.ColorRole.PlaceholderText).name()
+
+    def set_detail(self, text):
+        self.detail.setText(text)
+        self.detail.setVisible(bool(text))
+        self.setAccessibleDescription(text)
+
+
+def inset_group(rows):
+    """Rows in one rounded group with hairline separators, like Apple's grouped lists."""
+    from PySide6.QtWidgets import QFrame, QVBoxLayout
+
+    group = QFrame()
+    group.setObjectName("InsetGroup")
+    column = QVBoxLayout(group)
+    column.setContentsMargins(0, 0, 0, 0)
+    column.setSpacing(0)
+    for index, row in enumerate(rows):
+        if index:
+            line = QFrame()
+            line.setObjectName("InsetSeparator")
+            line.setFixedHeight(1)
+            column.addWidget(line)
+        column.addWidget(row)
+    return group

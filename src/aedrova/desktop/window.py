@@ -21,11 +21,19 @@ from PySide6.QtWidgets import (
 
 from aedrova.desktop.agent_activity import AgentActivity, AgentClock
 from aedrova.desktop.agent_stream import AgentStream
-from aedrova.desktop.brand import BrandMark, app_icon
+from aedrova.desktop.brand import BrandLockup, BrandMark, app_icon
 from aedrova.desktop.controls import AppDialog, AppMenu
 from aedrova.desktop.conversation import Composer, MessageView
 from aedrova.desktop.design_system import FlowActions
-from aedrova.desktop.dialogs import CreateDialog, button, icon_button, label
+from aedrova.desktop.dialogs import (
+    CreateDialog,
+    InsetRow,
+    button,
+    inset_group,
+    label,
+    row_button,
+    trailing_chevron,
+)
 from aedrova.desktop.materials import (
     AdaptiveBento,
     Backdrop,
@@ -59,7 +67,7 @@ class AedrovaWindow(QMainWindow):
         icon = app_icon()
         if not icon.isNull():
             self.setWindowIcon(icon)
-        self.setWindowTitle("Aedrova · Northstar Labs · Local preview")
+        self.setWindowTitle("Aedrova · Northstar Labs · Demo")
         self.resize(1440, 940)
         self.setMinimumSize(900, 650)
         from aedrova.desktop.tooltips import install_tooltips
@@ -113,10 +121,7 @@ class AedrovaWindow(QMainWindow):
         identity_layout = QHBoxLayout(identity)
         identity_layout.setContentsMargins(0, 0, 0, 0)
         identity_layout.setSpacing(9)
-        identity_layout.addWidget(BrandMark(26))
-        brand = label("Aedrova")
-        brand.setStyleSheet("font-size: 14px; font-weight: 600;")
-        identity_layout.addWidget(brand)
+        identity_layout.addWidget(BrandLockup(28, 16))
         identity_layout.addStretch()
         top_layout.addWidget(identity)
         self.sidebar_toggle = button("☷", "Toggle channel sidebar", "icon")
@@ -132,7 +137,7 @@ class AedrovaWindow(QMainWindow):
         self.search_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         top_layout.addWidget(self.search_button, 1)
         top_layout.addStretch()
-        self.connection_badge = label("Local preview", "badge")
+        self.connection_badge = label("Demo", "badge")
         top_layout.addWidget(self.connection_badge, 0, Qt.AlignmentFlag.AlignVCenter)
         self.theme_button = button("◐", "Toggle light and dark appearance", "icon")
         self.theme_button.setFixedSize(34, 34)
@@ -188,42 +193,41 @@ class AedrovaWindow(QMainWindow):
         self.sidebar.setObjectName("Sidebar")
         self.sidebar.setFixedWidth(236)
         side = QVBoxLayout(self.sidebar)
-        side.setContentsMargins(16, 20, 16, 16)
-        side.setSpacing(8)
-        self.workspace_title = button("Northstar Labs  ⌄", "Select workspace")
-        self.workspace_title.setStyleSheet("font-size: 16px; font-weight: 600; padding-left: 6px;")
+        side.setContentsMargins(12, 18, 12, 14)
+        side.setSpacing(2)
+        self.workspace_title = trailing_chevron(button("Northstar Labs", "Select workspace"))
+        self.workspace_title.setStyleSheet(
+            "font-size: 16px; font-weight: 600; padding-left: 6px; text-align: right;"
+        )
         self.workspace_title.clicked.connect(self.workspace_menu)
         side.addWidget(self.workspace_title)
+        side.addSpacing(10)
         self.workspace_quick_actions = QWidget()
         self.workspace_quick_actions.setObjectName("WorkspaceQuickActions")
         self.workspace_quick_actions.setAccessibleName("Workspace actions")
-        quick_actions = QHBoxLayout(self.workspace_quick_actions)
+        quick_actions = QVBoxLayout(self.workspace_quick_actions)
         quick_actions.setContentsMargins(0, 0, 0, 0)
-        quick_actions.setSpacing(0)
-        quick_actions.addStretch(1)
-        self.invite_teammates_button = icon_button("invite", "Invite teammates")
+        quick_actions.setSpacing(1)
+        self.invite_teammates_button = row_button("invite", "Invite teammates")
         self.invite_teammates_button.clicked.connect(lambda: self.show_account("invite"))
-        self.workspace_settings_button = icon_button("settings", "Workspace settings")
+        self.workspace_settings_button = row_button("settings", "Workspace settings")
         self.workspace_settings_button.clicked.connect(lambda: self.show_account("manage"))
-        self.workspace_connectors_button = icon_button("link", "Connectors")
+        self.workspace_connectors_button = row_button("link", "Connectors")
         self.workspace_connectors_button.clicked.connect(lambda: self.open_connectors())
-        self.workspace_people_button = icon_button("people", "People and status")
+        self.workspace_people_button = row_button("people", "People and status")
         self.workspace_people_button.clicked.connect(lambda: self.collaboration.panel("people"))
-        for control in (
-            self.invite_teammates_button,
-            self.workspace_settings_button,
-            self.workspace_connectors_button,
-            self.workspace_people_button,
-        ):
+        for control in (self.invite_teammates_button, self.workspace_settings_button):
             quick_actions.addWidget(control)
-            quick_actions.addStretch(1)
         side.addWidget(self.workspace_quick_actions)
+        side.addSpacing(18)
         from aedrova.desktop.dots import DotSection
 
         self.ai_team_section = DotSection(self)
         side.addWidget(self.ai_team_section)
-        side.addSpacing(8)
-        self.workspace_tools_toggle = button("Workspace tools  ⌄", "Show workspace tools")
+        side.addSpacing(18)
+        self.workspace_tools_toggle = trailing_chevron(
+            button("Workspace tools", "Show workspace tools")
+        )
         self.workspace_tools_toggle.setObjectName("WorkspaceToolsToggle")
         self.workspace_tools_toggle.setCheckable(True)
         self.workspace_tools_toggle.setToolTip(
@@ -232,9 +236,12 @@ class AedrovaWindow(QMainWindow):
         self.workspace_tools = QWidget()
         self.workspace_tools.setObjectName("WorkspaceTools")
         self.workspace_tools_layout = FlowActions(self.workspace_tools)
+        for control in (self.workspace_connectors_button, self.workspace_people_button):
+            self.workspace_tools_layout.addWidget(control)
         self.workspace_tools.hide()
         self.workspace_tools_toggle.toggled.connect(self.workspace_tools.setVisible)
         channels_header = QHBoxLayout()
+        channels_header.setContentsMargins(10, 0, 0, 0)
         channels_header.addWidget(label("Channels", "section"))
         channels_header.addStretch()
         self.create_channel_button = button("+", "Create channel", "icon")
@@ -242,13 +249,16 @@ class AedrovaWindow(QMainWindow):
         self.create_channel_button.clicked.connect(self.create_channel)
         channels_header.addWidget(self.create_channel_button)
         side.addLayout(channels_header)
+        side.addSpacing(4)
         self.channel_list = QListWidget()
         self.channel_list.setObjectName("Navigation")
         self.channel_list.setAccessibleName("Workspace channels")
         self.channel_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.channel_list.currentItemChanged.connect(self._channel_selected)
         side.addWidget(self.channel_list, 3)
+        side.addSpacing(16)
         dm_header = QHBoxLayout()
+        dm_header.setContentsMargins(10, 0, 0, 0)
         dm_header.addWidget(label("Direct messages", "section"))
         dm_header.addStretch()
         self.start_dm_button = button("+", "New direct message", "icon")
@@ -268,6 +278,10 @@ class AedrovaWindow(QMainWindow):
         self.dm_list.itemActivated.connect(lambda item: open_bud_dm(self, item))
         side.addWidget(self.dm_list, 2)
         side.addStretch(1)
+        from aedrova.desktop.workspace_usage import WorkspaceUsage
+
+        self.workspace_usage = WorkspaceUsage(self)
+        side.addWidget(self.workspace_usage)
         side.addWidget(self.workspace_tools_toggle)
         side.addWidget(self.workspace_tools)
         body.addWidget(self.sidebar)
@@ -356,7 +370,7 @@ class AedrovaWindow(QMainWindow):
             self.pages.addWidget(QWidget())
         self.select_tab(0)
         self.notice = label(
-            "Local preview · messages and new spaces reset when the app closes.", "muted"
+            "Demo workspace · messages and new spaces reset when the app closes.", "muted"
         )
         self.notice.setObjectName("ShortcutFooter")
         self.notice.setContentsMargins(16, 5, 16, 5)
@@ -377,9 +391,12 @@ class AedrovaWindow(QMainWindow):
         chat.setContentsMargins(0, 0, 0, 0)
         chat.setSpacing(0)
         self.pinned = button(
-            "↗   Pinned decision     ·     Three steps. Less friction.",
+            "Pinned decision  ·  Three steps. Less friction.",
             "Open pinned onboarding decision",
         )
+        from aedrova.desktop.icons import assign
+
+        assign(self.pinned, "pin")
         self.pinned.setObjectName("Pinned")
         self.pinned.clicked.connect(self.open_pinned)
         pinned_area = QHBoxLayout()
@@ -396,6 +413,13 @@ class AedrovaWindow(QMainWindow):
         self.conversation_header_layout.addWidget(date)
         self.conversation_header_layout.addStretch()
         chat.addWidget(conversation_header)
+        from aedrova.desktop.getting_started import GettingStarted
+
+        self.getting_started = GettingStarted(self)
+        guide_row = QHBoxLayout()
+        guide_row.setContentsMargins(28, 0, 28, 8)
+        guide_row.addWidget(self.getting_started)
+        chat.addLayout(guide_row)
         self.meeting_announcements = QWidget()
         self.meeting_announcements_layout = QVBoxLayout(self.meeting_announcements)
         self.meeting_announcements_layout.setContentsMargins(28, 0, 28, 10)
@@ -409,7 +433,7 @@ class AedrovaWindow(QMainWindow):
         empty_layout = QVBoxLayout(empty)
         empty_layout.setContentsMargins(32, 32, 32, 32)
         empty_layout.addStretch()
-        empty_layout.addWidget(BrandMark(76))
+        empty_layout.addWidget(BrandLockup(46, 23))
         empty_layout.addSpacing(12)
         empty_heading = label("Start a conversation", "heading")
         empty_heading.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
@@ -460,6 +484,8 @@ class AedrovaWindow(QMainWindow):
         self.agent_feed.install_status_controls(status_controls)
         self.last_agent_event = ""
         self.messages.attach_agent_feed(self.agent_feed)
+        self.agent_feed.choice_requested.connect(self.send_agent_choice)
+        self.messages.agent_choice_submitted.connect(self.send_agent_choice)
         composition.addWidget(self.composer)
         footer = label("Aedrova stays quiet until you mention it.", "muted")
         footer.hide()
@@ -499,6 +525,7 @@ class AedrovaWindow(QMainWindow):
         self.thread_composer.editor.setPlaceholderText("Reply to this thread…")
         self.thread_composer.submitted.connect(self.send_reply)
         thread_composition.addWidget(self.thread_composer)
+        self.thread_composition = thread_composition
         thread.addLayout(thread_composition)
         row.addWidget(self.thread_panel)
         row.setSpacing(12)
@@ -552,10 +579,12 @@ class AedrovaWindow(QMainWindow):
         settings.setShortcut(QKeySequence("Ctrl+,"))
         account_menu.addAction("Log out", self.log_out)
         help_menu = self.menuBar().addMenu("Help")
-        help_menu.addAction("Getting started…", self.show_setup)
+        help_menu.addAction("Workspace setup…", lambda: self.show_setup())
+        help_menu.addAction("Getting started…", self.getting_started.open)
         help_menu.addAction("Explore Aedrova…", self.show_tour)
+        help_menu.addAction("Aedrova for iPhone…", self.show_iphone_companion)
         help_menu.addAction("Check for updates…", self.show_updates)
-        help_menu.addAction("About this preview", self.show_about)
+        help_menu.addAction("About Aedrova", self.show_about)
         overflow = self.menuBar().findChild(QWidget, "qt_menubar_ext_button")
         if overflow:
             overflow.setAccessibleName("More menus")
@@ -608,9 +637,9 @@ class AedrovaWindow(QMainWindow):
     def _populate_channels(self):
         self.workspace_title.setText(
             self.workspace_title.fontMetrics().elidedText(
-                f"{self.workspace.name}  ⌄",
+                self.workspace.name,
                 Qt.TextElideMode.ElideRight,
-                177,
+                160,
             )
         )
         self.workspace_title.setToolTip(self.workspace.name)
@@ -690,6 +719,8 @@ class AedrovaWindow(QMainWindow):
         self._render_pages()
         self.select_tab(0)
         if self.connected and self.connected.active:
+            self.connected.account.remember_workspace(workspace_id)
+            self.workspace_usage.sync_scope()
             self.connected.refresh()
 
     def switch_channel(self, channel_id):
@@ -758,7 +789,9 @@ class AedrovaWindow(QMainWindow):
                 getattr(self, "activity_workspace", None) == self.workspace_id
             )
         channel = self.channel
-        self.setWindowTitle(f"Aedrova · {self.workspace.name} · Local preview")
+        self.setWindowTitle(f"Aedrova · {self.workspace.name} · Demo")
+        self.connection_badge.setText("Demo")
+        self.connection_badge.setVisible(True)
         self.channel_title.setText(channel.name if channel.direct else channel.name.capitalize())
         self.channel_topic.setText(channel.topic)
         self.conversation_date.setText(
@@ -779,10 +812,11 @@ class AedrovaWindow(QMainWindow):
             self.composer.editor.setPlainText(draft)
         if self.connected and self.connected.active:
             self.setWindowTitle(f"Aedrova · {self.workspace.name}")
-            self.connection_badge.setText("Connected")
+            self.connection_badge.setVisible(False)  # status shows only when something is wrong
             self.conversation_date.setText("Shared conversation")
             self.members_label.setText("Your team")
             self.composer.setEnabled(bool(self.channel_id))
+        self.getting_started.refresh()
         if hasattr(self, "account_dialog"):
             from aedrova.desktop.meeting_activity import update_meeting_ui
 
@@ -793,8 +827,8 @@ class AedrovaWindow(QMainWindow):
         count = sum(m.pinned and not m.unsent for root in messages for m in [root, *root.replies])
         self.pinned.setVisible(bool(count) or any(m.decision for m in messages))
         self.pinned.setText(
-            f"↗   {count} pinned " + ("message" if count == 1 else "messages")
-            if count else "↗   Pinned decision     ·     Three steps. Less friction."
+            f"{count} pinned " + ("message" if count == 1 else "messages")
+            if count else "Pinned decision  ·  Three steps. Less friction."
         )
 
     def open_pinned(self):
@@ -943,6 +977,13 @@ class AedrovaWindow(QMainWindow):
                 phase = summary
             self.agent_activity(workspace, phase)
 
+    def present_agent_card(self, workspace):
+        """Bring an approval or question card into view in the conversation."""
+        if workspace == self.workspace_id:
+            self.messages.refresh_agent()
+            self.messages.set_agent_visible(True)
+            self.message_stack.setCurrentIndex(0)
+
     def cancel_agent(self):
         query = getattr(self, "dot_query", None)
         if query and hasattr(query, "runner"):
@@ -1045,6 +1086,15 @@ class AedrovaWindow(QMainWindow):
             bud_avatar=bud_avatar, source_channels=sources, share=False,
         )
 
+    def send_agent_choice(self, author, text, free):
+        """A choice button or typed answer continues the work right away."""
+        if not self.current_user():
+            return
+        message = (
+            f"@{author} {text}" if free else f"@{author} Please continue with this option: {text}"
+        )
+        self.send_message(message)
+
     def draft_agent_choice(self, composer, author, option):
         if not self.current_user() or (composer.thread and not self.thread_id):
             return
@@ -1056,32 +1106,39 @@ class AedrovaWindow(QMainWindow):
         editor.setTextCursor(cursor)
         editor.setFocus()
 
-    def _record_agent_prompt(self, text, composer):
-
-
-        if text.lstrip().split(maxsplit=1)[0].casefold() == "/build":
-            (composer or self.composer).clear_submission(text)
-            self._save_drafts()
-            return
+    def _start_chat_agent(self, text, composer, launch):
+        workspace, channel = self.workspace_id, self.channel_id
         parent = self.thread_id if composer is self.thread_composer else None
+        if text.split(maxsplit=1)[0].casefold() == "/build":
+            if launch():
+                self.agent_request_origin = (workspace, channel, parent, None)
+                (composer or self.composer).clear_submission(text)
+                self._save_drafts()
+            return
+
         identifier = self.connected.send(text, parent, composer=composer)
-        self.agent_request_origin = (self.workspace_id, self.channel_id, parent, identifier)
-        if identifier and not parent:
+        if not identifier or not launch():
+            return
+        self.agent_request_origin = (workspace, channel, parent, identifier)
+        if not parent:
+            self.getting_started.prompt_sent(text, identifier)
             self.messages.agent_anchor = identifier
             self.messages.refresh_agent()
 
     def finish_conversation_response(
         self, workspace, channel, parent, text, author, prompt_id=None, *,
-        source_channels=None, bud_avatar=None,
+        source_channels=None, bud_avatar=None, successful=True, share=True,
     ):
         self.completed_agent_response = None
         self.connected.complete_agent_reply(
             workspace, channel, text, author, parent, prompt_id,
-            source_channels=source_channels, bud_avatar=bud_avatar,
+            source_channels=source_channels, bud_avatar=bud_avatar, share=share and successful,
         )
         self.agent_feed.clear()
         self.build_activity.hide()
         self.update_agent_cancel()
+        if successful and parent is None and not bud_avatar:
+            self.getting_started.reply_received(workspace, channel, prompt_id, text)
 
     def start_agent_request(self, text, *, composer=None):
         from aedrova.agents.context import agent_mention, build_command, without_mention
@@ -1114,63 +1171,43 @@ class AedrovaWindow(QMainWindow):
         bud_match = mention_match(text, dot) if dot else None
         main_match = agent_mention(text, nickname)
         addressed_bud = bud_match and (not main_match or bud_match.start() <= main_match.start())
-
-
-        if dot and (task is None or addressed_bud):
-            from aedrova.desktop.dot_analysis import start_analysis
-
-            request = without_mention(text, bud_match)
-            building = bool(
-                re.match(
-                    r"^(?:please\s+)?(?:/build|build|implement|fix|create|ship|add)\b",
-                    request,
-                    re.IGNORECASE,
-                )
-            )
-            building = building or localized_build(request)
-            if building:
-                from aedrova.desktop.builds import start_background_build
-                from aedrova.desktop.projects import binding
-
-                accepted = (
-                    open_build(self, request, bud=dot)
-                    if binding(self).get("background_build") is False
-                    else start_background_build(self, request, bud=dot)
-                )
-            else:
-                accepted = start_analysis(self, request, bud=dot)
-            if accepted:
-                self._record_agent_prompt(text, composer)
-            return True
-
-        candidate = without_mention(text, main_match) if main_match else text.strip()
-        building = candidate.startswith("/build") or bool(
-            re.match(
-                r"^(?:please\s+)?(?:build|implement|fix|create|ship|add)\b",
-                candidate,
-                re.IGNORECASE,
-            )
-        )
-        building = building or localized_build(candidate)
-        if (dot or task is not None) and not building:
-            from aedrova.desktop.dot_analysis import start_analysis
-
-            if start_analysis(self, task or text):
-                self._record_agent_prompt(text, composer)
-            return True
-        task = build_command(text, nickname) or (text if dot and building else None)
-        if task is None:
+        bud = dot if dot and (task is None or addressed_bud) else None
+        if task is None and bud is None:
             return False
+        recipient = bud_match if bud else main_match
+        candidate = without_mention(text, recipient) if recipient else text.strip()
+        explicit_build = text.split(maxsplit=1)[0].casefold() == "/build"
+        drafting = re.match(
+            r"^(?:please\s+)?(?:build|create|write|draft|make|prepare|generate)\s+"
+            r"(?:me\s+)?(?:(?:a|an|the)\s+)?(?:PRD|product requirements document)\b",
+            candidate,
+            re.IGNORECASE,
+        )
+        build_verb = re.match(
+            r"^(?:please\s+)?(?:/build|build|implement|fix|create|ship|add)\b",
+            candidate,
+            re.IGNORECASE,
+        )
+        building = explicit_build or (not drafting and (build_verb or localized_build(candidate)))
+        if not building:
+            from aedrova.desktop.dot_analysis import start_analysis
+
+            self._start_chat_agent(
+                text, composer, lambda: start_analysis(self, candidate, bud=bud)
+            )
+            return True
         from aedrova.desktop.projects import binding
 
-        if text.lstrip().startswith("/build") or binding(self).get("background_build") is False:
-            accepted = open_build(self, task)
+        request = candidate if bud else task
+        options = {"bud": bud} if bud else {}
+        if explicit_build or binding(self).get("background_build") is False:
+            self._start_chat_agent(text, composer, lambda: open_build(self, request, **options))
         else:
             from aedrova.desktop.builds import start_background_build
 
-            accepted = start_background_build(self, task)
-        if accepted:
-            self._record_agent_prompt(text, composer)
+            self._start_chat_agent(
+                text, composer, lambda: start_background_build(self, request, **options)
+            )
         return True
 
     def _local_message(self, identifier):
@@ -1237,9 +1274,9 @@ class AedrovaWindow(QMainWindow):
         self.store.drafts[(self.workspace_id, self.channel_id, "")] = ""
         QTimer.singleShot(0, self.messages.scrollToBottom)
         self.notify(
-            "Saved locally. Agent execution isn’t connected in this preview."
+            "Saved locally. Agent execution isn’t connected in demo mode."
             if "@aedrova" in text.lower()
-            else "Message added to this local preview."
+            else "Message added to this demo workspace."
         )
 
     def send_reply(self, text):
@@ -1264,7 +1301,7 @@ class AedrovaWindow(QMainWindow):
         self.thread_composer.clear()
         self.store.drafts[(self.workspace_id, self.channel_id, self.thread_id)] = ""
         QTimer.singleShot(0, self.thread_messages.scrollToBottom)
-        self.notify("Reply added to this local preview.")
+        self.notify("Reply added to this demo workspace.")
 
     def open_product_memory(self):
         from aedrova.desktop.product_memory import open_memory
@@ -1380,7 +1417,7 @@ class AedrovaWindow(QMainWindow):
         if self.connected and self.connected.active:
             self.notice.hide()
             return
-        self.notice.setText("Local preview · messages and new spaces reset when the app closes.")
+        self.notice.setText("Demo workspace · messages and new spaces reset when the app closes.")
         self.notice.show()
 
     def workspace_menu(self):
@@ -1447,7 +1484,7 @@ class AedrovaWindow(QMainWindow):
 
                 page, layout = self._page(
                     "From direction to delivery",
-                    "Turn an idea into working code with Codex or Claude, "
+                    "Turn an idea into working code with your Aedrova agent, "
                     "grounded in your accessible workspace conversations.",
                 )
                 layout.addWidget(
@@ -1462,12 +1499,13 @@ class AedrovaWindow(QMainWindow):
                 from aedrova.desktop.build_evidence import SharedBuilds
                 from aedrova.desktop.execution import execution_queue
 
-                queue = button("Queue & run history", role="outline")
+                queue = InsetRow("activity", "Queue & run history", "Past and running builds")
                 queue.clicked.connect(lambda: execution_queue(self).show_history())
-                reviews = button("Shared build evidence", role="outline")
+                reviews = InsetRow(
+                    "context", "Shared build evidence", "Reviews and receipts your team shared"
+                )
                 reviews.clicked.connect(lambda: SharedBuilds(self).show())
-                layout.addWidget(queue)
-                layout.addWidget(reviews)
+                layout.addWidget(inset_group([queue, reviews]))
                 layout.addStretch()
                 self.pages.insertWidget(index, page)
             elif self.connected and self.connected.active and index == 1:
@@ -1590,14 +1628,14 @@ class AedrovaWindow(QMainWindow):
             steps.addLayout(column)
         hero_layout.addLayout(steps)
         hero_layout.addStretch()
-        action = button("Explore the brief  ↗", role="primary")
+        action = button("Explore the brief", role="primary")
         action.clicked.connect(lambda: self.show_document("Product brief.md"))
         hero_layout.addWidget(action, alignment=Qt.AlignmentFlag.AlignLeft)
         tile = DocumentTile("Design principles", "A quieter way to work.", "02")
         tile.clicked.connect(lambda: self.show_document("Design principles.md"))
         connection = self._card(
             "Connect your project",
-            "Repository access is not connected in this local preview.",
+            "Repository access is not connected in demo mode.",
         )
         layout.addWidget(AdaptiveBento([hero, tile, connection], asymmetric=True))
         layout.addStretch()
@@ -1613,11 +1651,11 @@ class AedrovaWindow(QMainWindow):
                 "Ready when your team is.",
                 "No builds have run. In a connected workspace, mention @Aedrova in a conversation "
                 "to propose a plan. You stay in control of what gets pushed.",
-                "Go to the conversation  →",
+                "Go to the conversation",
                 lambda: self.select_tab(0),
             )
         )
-        layout.addWidget(label("Agent execution isn’t connected in this preview.", "muted"))
+        layout.addWidget(label("Agent execution isn’t connected in demo mode.", "muted"))
         layout.addStretch()
         return page
 
@@ -1886,16 +1924,15 @@ class AedrovaWindow(QMainWindow):
         self.dialog.resize(480, 430)
         layout = QVBoxLayout(self.dialog)
         layout.setContentsMargins(24, 24, 24, 24)
-        layout.addWidget(BrandMark(112), 0, Qt.AlignmentFlag.AlignHCenter)
-        layout.addWidget(label("Aedrova", "heading"))
+        layout.addWidget(BrandLockup(52, 26), 0, Qt.AlignmentFlag.AlignHCenter)
         layout.addWidget(label("Where teams and AI build together.", "muted"))
-        layout.addWidget(label("Internal preview", "muted"))
+        from aedrova import __version__
+
+        layout.addWidget(label("Version " + __version__, "muted"))
         layout.addWidget(
             label(
                 "Your team’s conversations, shared context and coding agent in one workspace. "
-                "Aedrova is being prepared for release. Service availability depends on setup. "
-                "Local sample workspaces use preview data; your appearance and accessibility "
-                "preferences are saved on this Mac.",
+                "Your appearance and accessibility preferences are saved on this Mac.",
                 wrap=True,
             )
         )
@@ -2000,7 +2037,8 @@ class AedrovaWindow(QMainWindow):
         account.sign_out()
         self.update_profile_button()
 
-    def show_account(self, intent=None):
+    def ensure_account_dialog(self):
+        """The account machinery, created but not shown, for flows that draw their own screens."""
         from aedrova.desktop.account import AccountDialog
 
         if not hasattr(self, "account_dialog"):
@@ -2008,6 +2046,10 @@ class AedrovaWindow(QMainWindow):
             if hasattr(self, "localizer"):
                 self.localizer.bind(self.account_dialog)
             self.account_dialog.dashboard_requested.connect(self.open_dashboard)
+        return self.account_dialog
+
+    def show_account(self, intent=None):
+        self.ensure_account_dialog()
         self.account_dialog.pending_intent = intent
         if self.connected and self.connected.active:
             self.account_dialog.pending_workspace = self.workspace_id
@@ -2026,7 +2068,7 @@ class AedrovaWindow(QMainWindow):
 
 
 
-                    if not self.account_dialog.busy and not (
+                    if intent != "create" and not self.account_dialog.busy and not (
                         self.connected and self.connected.active
                     ):
                         self.account_dialog.refresh()
@@ -2046,7 +2088,7 @@ class AedrovaWindow(QMainWindow):
                 self.connected = ConnectedDashboard(self, account)
             self.connected.activate()
             self.select_tab(0)
-            QTimer.singleShot(0, self.offer_setup)
+            self.composer.editor.setFocus()
             return
 
         self.select_tab(0)
@@ -2060,32 +2102,41 @@ class AedrovaWindow(QMainWindow):
 
             open_github_setup(self)
 
-    def offer_setup(self):
-        from aedrova.desktop.onboarding import account_key
+    def showEvent(self, event):  # noqa: N802
+        first = not getattr(self, "appeared", False)
+        self.appeared = True
+        super().showEvent(event)
+        if first:
+            from aedrova.desktop.motion import appear_window
 
-        key = account_key(self)
-        if not self.current_user() or getattr(self, "setup_offered", None) == key:
-            return
-        self.setup_offered = key
-        if not self.settings.value(key + "/setup", False, type=bool) and not self.settings.value(
-            key + "/deferred", False, type=bool
-        ):
-            self.show_setup()
+            appear_window(self, 560)
 
-    def show_setup(self):
+    def show_setup(self, *, stage=None):
         from aedrova.desktop.onboarding import SetupDialog
 
         if self.tour:
             self.tour.finish("paused")
         existing = getattr(self, "setup_dialog", None)
-        if existing and existing.timer.isActive():
+        if existing and not existing.closed:
             if existing.isVisible():
                 existing.raise_()
                 existing.activateWindow()
             return
         self.setup_dialog = SetupDialog(self)
+        if stage is not None:
+            self.setup_dialog.show_stage(stage)
+        self.setup_dialog.cover_screen()
         self.setup_dialog.show()
         self.setup_dialog.raise_()
+
+    def start_first_tour(self):
+        """Offer the short tour once, right after first-run setup. Never twice, never over work."""
+        from aedrova.desktop.onboarding import account_key
+
+        status = self.settings.value(account_key(self) + "/status")
+        if self.tour or status in {"completed", "skipped", "paused"}:
+            return
+        self.show_tour()
 
     def show_tour(self):
         from aedrova.desktop.onboarding import SpotlightTour
@@ -2094,6 +2145,11 @@ class AedrovaWindow(QMainWindow):
             self.tour.raise_()
             return
         self.tour = SpotlightTour(self)
+
+    def show_iphone_companion(self):
+        from aedrova.desktop.iphone_companion import show_iphone_companion
+
+        show_iphone_companion(self)
 
     def show_updates(self):
         from aedrova.desktop.release_check import ReleaseDialog

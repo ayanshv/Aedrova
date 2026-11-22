@@ -11,12 +11,14 @@ from PySide6.QtCore import (
     QAbstractListModel,
     QEasingCurve,
     QEvent,
+    QLocale,
     QPersistentModelIndex,
     QPoint,
     QPointF,
     QRectF,
     QSize,
     Qt,
+    QTime,
     QTimer,
     QVariantAnimation,
     Signal,
@@ -34,6 +36,7 @@ from PySide6.QtGui import (
     QPalette,
     QPixmap,
     QTextBlockFormat,
+    QTextCharFormat,
     QTextCursor,
     QTextDocument,
     QTextOption,
@@ -70,7 +73,7 @@ from aedrova.desktop.response_actions import (
     compact_citations,
     response_parts,
 )
-from aedrova.desktop.theme import LIGHT, Theme
+from aedrova.desktop.theme import LIGHT, Theme, link_color
 
 MESSAGE_ROLE = Qt.ItemDataRole.UserRole + 1
 
@@ -101,7 +104,7 @@ class ConversationModel(QAbstractListModel):
             view = self.parent()
             body = view.display_body(message) if hasattr(view, "display_body") else message.body
             return (
-                f"{message.author}, {message.time}. {decision}{body}. "
+                f"{message.author}, {human_time(message.time)}. {decision}{body}. "
                 f"{message.attachment} {len(message.replies)} replies."
             )
         if role == Qt.ItemDataRole.AccessibleDescriptionRole:
@@ -148,6 +151,34 @@ def message_urls(body):
     return list(dict.fromkeys(re.findall(r"https?://[^\s<>\)]+", body)))[:3]
 
 
+def human_time(raw, now=None, *, clock_only=False):
+    """'5:00 AM', 'Yesterday 5:00 AM', 'Mon 5:00 AM' or 'Sep 27, 5:00 AM' from a stored time."""
+    moment = None
+    for pattern in ("%Y-%m-%d %H:%M", "%H:%M", "%I:%M %p"):
+        try:
+            moment = datetime.strptime(raw, pattern)
+            break
+        except ValueError:
+            continue
+    if moment is None:
+        return raw
+    clock = QLocale.system().toString(
+        QTime(moment.hour, moment.minute), QLocale.FormatType.ShortFormat
+    )
+    if clock_only or "-" not in raw:
+        return clock
+    now = now or datetime.now()
+    days = (now.date() - moment.date()).days
+    if days == 0:
+        return clock
+    if days == 1:
+        return "Yesterday " + clock
+    if 1 < days < 7:
+        return moment.strftime("%a ") + clock
+    pattern = "%b %-d, " if moment.year == now.year else "%b %-d %Y, "
+    return moment.strftime(pattern) + clock
+
+
 class SafeDocument(QTextDocument):
     def loadResource(self, resource_type, url):
 
@@ -163,22 +194,47 @@ def markdown_document(text, *, base_font=None):
 
 
 def space_agent_response(document):
+    """Agent replies read as quiet, scannable text: headings become bold lead-ins."""
+    base = document.defaultFont().pointSizeF()
     block = document.begin()
     while block.isValid():
+        lists = block.textList()
+        if lists is not None:
+            shape = lists.format()
+            if shape.indent() > 1:
+                shape.setIndent(1)
+                lists.setFormat(shape)
         layout = block.blockFormat()
         list_item = block.textList() is not None
-        top_margin = 14 if layout.headingLevel() else 6
+        heading = bool(layout.headingLevel())
+        top_margin = 10 if heading else 6
         if block.blockNumber() == 0 or list_item:
             top_margin = 0
+        if heading:
+            layout.setHeadingLevel(0)
         layout.setTopMargin(top_margin)
-        layout.setBottomMargin(3 if list_item else 6)
+        layout.setBottomMargin(2 if heading else 4 if list_item else 8)
         layout.setLineHeight(130, QTextBlockFormat.LineHeightTypes.ProportionalHeight.value)
         layout.setNonBreakableLines(False)
-        QTextCursor(block).setBlockFormat(layout)
+        cursor = QTextCursor(block)
+        cursor.setBlockFormat(layout)
+        if heading:
+            cursor.movePosition(QTextCursor.MoveOperation.StartOfBlock)
+            cursor.movePosition(
+                QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor
+            )
+            quiet = QTextCharFormat()
+            quiet.setFontWeight(QFont.Weight.DemiBold)
+            if base > 0:
+                quiet.setFontPointSize(base)
+            cursor.mergeCharFormat(quiet)
         block = block.next()
 
 
-def markdown_html(text, *, base_font=None, agent=False, options=None, rating="", file_summary=None):
+def markdown_html(
+    text, *, base_font=None, agent=False, options=None, rating="", file_summary=None,
+    show_choices=True,
+):
     document = markdown_document(text, base_font=base_font)
     action_images = set()
     if options is not None:
@@ -186,10 +242,11 @@ def markdown_html(text, *, base_font=None, agent=False, options=None, rating="",
         dark = palette.color(QPalette.ColorRole.Window).lightness() < 128
         action_images = append_response_actions(
             document, options, rating,
-            choice_color="#8fbcff" if dark else "#1759bf",
+            choice_color=link_color(dark),
             action_color=palette.color(QPalette.ColorRole.PlaceholderText).name(),
             file_summary=file_summary,
             card_background=palette.color(QPalette.ColorRole.AlternateBase).name(),
+            show_choices=show_choices,
         )
     elif agent:
         compact_citations(document, color=QApplication.palette().link().color().name())
@@ -200,6 +257,10 @@ def markdown_html(text, *, base_font=None, agent=False, options=None, rating="",
         return match.group() if source and source[1] in action_images else ""
 
     return re.sub(r"<img\b[^>]*>", keep_action_image, document.toHtml(), flags=re.IGNORECASE)
+
+
+def choice_card_height(count):
+    return count * 45 + 52 + 8
 
 
 class MessageDelegate(QStyledItemDelegate):
@@ -220,7 +281,7 @@ class MessageDelegate(QStyledItemDelegate):
             document = SafeDocument()
             document.setDefaultFont(font(14))
             document.setDefaultStyleSheet(
-                "a { color: " + self.theme.accent + "; } pre { white-space: pre-wrap; }"
+                "a { color: " + self.theme.link + "; } pre { white-space: pre-wrap; }"
             )
             document.setDocumentMargin(0)
             wrap = document.defaultTextOption()
@@ -259,10 +320,11 @@ class MessageDelegate(QStyledItemDelegate):
             if message.agent:
                 append_response_actions(
                     document, response_parts(message.body)[1], rating,
-                    choice_color="#8fbcff" if self.theme.name == "dark" else "#1759bf",
+                    choice_color=link_color(self.theme.name == "dark"),
                     action_color=self.theme.secondary,
                     file_summary=summary,
                     card_background=self.theme.surface,
+                    show_choices=False,  # the newest reply offers buttons instead
                 )
                 space_agent_response(document)
             block = document.begin()
@@ -282,12 +344,12 @@ class MessageDelegate(QStyledItemDelegate):
                     fragment = fragments.fragment()
                     if fragment.isValid() and fragment.charFormat().isAnchor():
                         action = fragment.charFormat().anchorHref()
-                        color = self.theme.accent
+                        color = self.theme.link
                         if action.startswith(ACTION_PREFIX):
                             if not action.startswith(ACTION_PREFIX + "choice-"):
                                 color = self.theme.muted
                             elif self.theme.name == "dark":
-                                color = "#8fbcff"
+                                color = link_color(True)
                         anchor_ranges.append((fragment.position(), fragment.length(), color))
                     fragments += 1
                 block = block.next()
@@ -353,6 +415,9 @@ class MessageDelegate(QStyledItemDelegate):
         )
         chips = reaction_chips(message, width, 0)
         reaction_height = int(chips[-1][0].bottom()) + 8 if chips else 0
+        options = self.view.interactive_choices(message)
+        if options:
+            extra += choice_card_height(len(options))
         return QSize(
             width,
             self.body_offset(index) + ceil(document.size().height()) + extra + 10 + reaction_height,
@@ -398,19 +463,23 @@ class MessageDelegate(QStyledItemDelegate):
             painter.setPen(QColor(t.secondary))
             painter.setFont(font(9))
             painter.drawText(
-                QRectF(rect.x() + 10, rect.y() + 5, 54, 18),
+                QRectF(rect.x() + 6, rect.y() + 5, 62, 18),
                 Qt.AlignmentFlag.AlignCenter,
-                message.time[-5:],
+                human_time(message.time, clock_only=True),
             )
         if not grouped:
             x, y = rect.x() + 28, rect.y() + 14
+            photo = getattr(self.view, "avatar_images", {}).get(
+                getattr(self.view, "avatar_paths", {}).get(message.sender_id)
+            )
+            has_photo = photo is not None and not photo.isNull()
             painter.setPen(Qt.PenStyle.NoPen)
             if not message.agent:
                 painter.setBrush(QColor(t.avatars[message.tone % len(t.avatars)]))
                 painter.drawRoundedRect(QRectF(x, y, 34, 34), 12, 12)
             painter.setPen(QColor(t.text))
             painter.setFont(font(11, True))
-            if not message.agent:
+            if not message.agent and not has_photo:
                 painter.drawText(
                     QRectF(x, y, 34, 34), Qt.AlignmentFlag.AlignCenter, message.initials
                 )
@@ -422,10 +491,7 @@ class MessageDelegate(QStyledItemDelegate):
                     paint_character(painter, QRectF(x, rect.y() + 10, 34, 32), bud_avatar)
                 else:
                     paint_brand_mark(painter, QRectF(x, rect.y() + 10, 34, 34))
-            photo = getattr(self.view, "avatar_images", {}).get(
-                getattr(self.view, "avatar_paths", {}).get(message.sender_id)
-            )
-            if not message.agent and photo is not None and not photo.isNull():
+            if not message.agent and has_photo:
                 painter.save()
                 clip = QPainterPath()
                 clip.addRoundedRect(QRectF(x, y, 34, 34), 12, 12)
@@ -438,7 +504,7 @@ class MessageDelegate(QStyledItemDelegate):
             badge_width = 76 if message.decision else 0
             delivery = message.delivery
             timestamp = delivery or (
-                message.time
+                human_time(message.time)
                 + (" · edited" if message.edited else "")
                 + (" · pinned" if message.pinned else "")
                 + (" · saved" if message.saved else "")
@@ -619,6 +685,7 @@ class MessageView(QListView):
     files_dropped = Signal(list)
     link_requested = Signal(str)
     agent_choice_requested = Signal(str, str)
+    agent_choice_submitted = Signal(str, str, bool)
 
     def __init__(self, parent=None, *, allow_threads=True):
         super().__init__(parent)
@@ -637,6 +704,7 @@ class MessageView(QListView):
         self.agent_anchor = None
         self.bud_avatars = {}
         self.reply_feedback = {}
+        self.answered_choices = set()
         self.build_summaries = OrderedDict()
         self.source_messages = []
         self.text_selection = None
@@ -1397,6 +1465,48 @@ class MessageView(QListView):
                 localizer.originals.add(identifier)
             self.show_messages(self.source_messages, force=True)
 
+    def interactive_choices(self, message):
+        """Options to offer as buttons: only under the newest, still-unanswered agent reply."""
+        rows = self.conversation_model.messages
+        if (
+            not self.allow_threads
+            or not rows
+            or rows[-1].id != message.id
+            or not message.agent
+            or message.id == self.agent_message_id
+            or message.id in self.answered_choices
+        ):
+            return ()
+        return response_parts(message.body)[1]
+
+    def sync_choice_card(self):
+        rows = self.conversation_model.messages
+        if not rows:
+            return
+        message = rows[-1]
+        options = self.interactive_choices(message)
+        if not options:
+            return
+        from aedrova.desktop.agent_components import ChoiceCard
+
+        holder = QWidget()
+        holder.setAutoFillBackground(False)
+        layout = QVBoxLayout(holder)
+        layout.setContentsMargins(74, 0, 20, 4)
+        layout.addStretch()
+        card = ChoiceCard(options)
+        card.setFixedHeight(choice_card_height(len(options)) - 8)
+        layout.addWidget(card)
+        author = message.author
+
+        def chosen(value, free, identifier=message.id):
+            self.answered_choices.add(identifier)
+            self.agent_choice_submitted.emit(author, value, free)
+            self.show_messages(self.source_messages, force=True)
+
+        card.chosen.connect(chosen)
+        self.setIndexWidget(self.model().index(len(rows) - 1), holder)
+
     def show_messages(self, messages, *, force=False):
         from aedrova.desktop.state import Message
 
@@ -1455,8 +1565,7 @@ class MessageView(QListView):
                     self.setIndexWidget(self.model().index(row), holder)
                     self.agent_feed.show()
                     break
-
-
+        self.sync_choice_card()
         self.doItemsLayout()
         if at_bottom:
             self.scrollToBottom()

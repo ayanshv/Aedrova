@@ -54,7 +54,7 @@ def test_settings_open_from_cache_during_background_sync(qtbot, tmp_path, monkey
         assert account.workspace_id() == window.workspace_id
         assert account.pages.isEnabled()
         view = account.workspace_settings
-        assert view.sections.count() == 10
+        assert view.sections.count() == 11  # includes Slack history
         assert view.sections.currentIndex() == view.pages["overview"]
         assert not account.invite_email.isVisible()
         view.buttons["invitations"].click()

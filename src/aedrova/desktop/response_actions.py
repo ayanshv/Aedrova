@@ -127,7 +127,7 @@ def response_parts(text):
 
 def append_response_actions(
     document, options, rating, *, choice_color="#1759bf", action_color="#525d6b",
-    file_summary=None, card_background="",
+    file_summary=None, card_background="", show_choices=True,
 ):
     block = document.begin()
     while block.isValid():
@@ -153,7 +153,7 @@ def append_response_actions(
     compact_citations(document, color=choice_color)
     cursor = QTextCursor(document)
     cursor.movePosition(QTextCursor.MoveOperation.End)
-    for index, option in enumerate(options):
+    for index, option in enumerate(options if show_choices else ()):
         cursor.insertBlock(QTextBlockFormat(), QTextCharFormat())
         cursor.insertHtml(
             f'<a href="{ACTION_PREFIX}choice-{index}" '

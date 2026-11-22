@@ -112,6 +112,11 @@ class WorkspaceSettingsView(QWidget):
         super().changeEvent(event)
 
     def show_section(self, key):
+        changed = self.sections.currentIndex() != self.pages[key]
         self.sections.setCurrentIndex(self.pages[key])
+        if changed and self.isVisible():
+            from aedrova.desktop.motion import FAST, fade_in
+
+            fade_in(self.sections.currentWidget(), FAST)
         self.buttons[key].setChecked(True)
         self.refresh_icons()

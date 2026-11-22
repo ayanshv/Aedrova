@@ -288,7 +288,7 @@ def test_build_dialog_uses_nickname_and_requires_consent(qtbot, tmp_path):
     ]
     dialog = BuildDialog(window, "Build something")
     qtbot.addWidget(dialog)
-    assert dialog.provider.currentData() == "claude_code"
+    assert dialog.provider.currentData() == "codex"
     assert not dialog.consent.isChecked()
     dialog.start(True)
     assert not dialog.pending

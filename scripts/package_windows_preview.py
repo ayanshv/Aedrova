@@ -30,6 +30,8 @@ def main():
         "--windowed",
         "--name",
         "Aedrova",
+        "--icon",
+        str(source / "desktop/assets/aedrova.ico"),
         "--copy-metadata",
         "aedrova",
         "--paths",

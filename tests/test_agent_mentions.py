@@ -110,7 +110,7 @@ def test_bud_with_preceding_text_keeps_identity_and_full_request(qtbot, tmp_path
     assert any(m.body == text for m in window.channel.messages)
 
 
-def test_rejected_agent_request_retains_draft_without_false_sent_message(
+def test_rejected_agent_request_still_posts_the_prompt_as_a_normal_message(
     qtbot, tmp_path, monkeypatch
 ):
     window, _ = setup(qtbot, tmp_path)
@@ -120,8 +120,9 @@ def test_rejected_agent_request_retains_draft_without_false_sent_message(
     text = "hey @Aedrova hello"
     window.composer.editor.setPlainText(text)
     window.send_message(text)
-    assert window.composer.editor.toPlainText() == text
-    assert not window.connected.outbox
+    # Prompts post before the agent starts; a declined start never swallows the message.
+    assert window.composer.editor.toPlainText() == ""
+    assert any(item for item in window.connected.outbox)
 
 
 def test_accepted_slash_command_remains_private(qtbot, tmp_path, monkeypatch):

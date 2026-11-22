@@ -259,14 +259,18 @@ class Localizer(QObject):
                     from aedrova.desktop.conversation import markdown_html
 
                     translated = self.text(source)
-                    rendered = markdown_html(
-                        translated,
-                        base_font=widget.font(),
-                        agent=True,
-                        options=widget.property("aedrovaReplyOptions"),
-                        rating=widget.property("aedrovaReplyRating") or "",
-                        file_summary=widget.property("aedrovaFileSummary"),
-                    )
+                    if widget.property("aedrovaPlainReply"):
+                        # Choices and actions live in their own widgets under the answer.
+                        rendered = markdown_html(translated, base_font=widget.font(), agent=True)
+                    else:
+                        rendered = markdown_html(
+                            translated,
+                            base_font=widget.font(),
+                            agent=True,
+                            options=widget.property("aedrovaReplyOptions"),
+                            rating=widget.property("aedrovaReplyRating") or "",
+                            file_summary=widget.property("aedrovaFileSummary"),
+                        )
                     if widget.text() != rendered:
                         widget.setText(rendered)
                     continue

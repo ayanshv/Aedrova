@@ -27,7 +27,8 @@ def test_agent_token_send_clears_only_accepted_originating_composer(
     other.editor.setPlainText("@Orbit hello")
     monkeypatch.setattr("aedrova.desktop.dot_analysis.start_analysis", lambda *a, **k: accepted)
     composer._submit()
-    assert composer.editor.toPlainText() == ("" if accepted else "@Orbit hello")
+    # The prompt posts first, so the originating composer clears whether or not the agent starts.
+    assert composer.editor.toPlainText() == ""
     assert other.editor.toPlainText() == "@Orbit hello"
 
 
@@ -140,17 +141,22 @@ def test_retry_receipt_keeps_restored_text_if_user_edits_it(qtbot, tmp_path):
     window, service = setup(qtbot, tmp_path)
     calls = []
 
-    def rpc(*args):
-        calls.append(True)
+    def rpc(name, params):
+        if name != "send_message":
+            return None
+        calls.append(params)
         if len(calls) == 1:
             raise httpx.ConnectError("offline")
 
     service.rpc = rpc
     window.composer.editor.setPlainText("First message")
     window.send_message("First message")
-    qtbot.waitUntil(lambda: len(calls) == 1 and not window.account_dialog.busy)
+    qtbot.waitUntil(
+        lambda: len(calls) == 1 and window.composer.editor.toPlainText() == "First message"
+    )
     window.composer.editor.setPlainText("My next thought")
     window.connected.retry_at = 0
     window.connected.refresh()
     qtbot.waitUntil(lambda: len(calls) == 2 and not window.account_dialog.busy)
+    assert calls[0] == calls[1]
     assert window.composer.editor.toPlainText() == "My next thought"

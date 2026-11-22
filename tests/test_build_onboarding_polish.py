@@ -101,7 +101,11 @@ def test_finished_build_keeps_results_and_removes_live_activity(qtbot, tmp_path)
     assert "Running:" not in dialog.response.toPlainText()
     assert "Running: python3 -m pytest" in dialog.output.toPlainText()
     actions = window.agent_feed.reply_row.findChildren(QPushButton)
-    assert [action.text() for action in actions] == ["Review changes"]
+    from aedrova.desktop.agent_components import DeliveryCard
+
+    cards = window.agent_feed.reply_row.findChildren(DeliveryCard)
+    assert len(cards) == 1  # delivery actions appear once the changes finish loading
+    assert {a.text() for a in actions} >= {"Review changes", "Apply to project"}
     assert not window.agent_feed.running and window.agent_feed.status_row is None
     dialog.pending = True
     window.agent_activity("w", "Trying again…")

@@ -57,6 +57,11 @@ def main():
         action="store_true",
         help="Enable consented meeting history in the internal staging source.",
     )
+    parser.add_argument(
+        "--onboarding",
+        action="store_true",
+        help="Open the first-run setup flow even for an account that already finished it.",
+    )
     args = parser.parse_args()
     config = validate(json.loads(args.config.read_text()))
     if args.check_only:
@@ -85,7 +90,7 @@ def main():
             interpreter,
             "-m",
             "aedrova.desktop.app",
-            "--account",
+            *(["--onboarding"] if args.onboarding else ["--account"]),
             "--settings-file",
             str(args.settings_file.resolve()),
         ],

@@ -1,13 +1,14 @@
 """Themed, keyboard-accessible choices, including macOS popup menus."""
 
-from PySide6.QtCore import QSize, Qt
-from PySide6.QtGui import QIcon, QPainter, QPainterPath, QPalette, QPen, QPixmap
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtGui import QPainter, QPainterPath, QPalette, QPen, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QFileDialog,
     QFrame,
     QHBoxLayout,
+    QLabel,
     QListView,
     QMenu,
     QProxyStyle,
@@ -49,6 +50,17 @@ class AppDialog(QDialog):
         self.setAttribute(Qt.WidgetAttribute.WA_WindowPropagation, True)
         if parent is not None:
             self.setFont(parent.font())
+
+    def showEvent(self, event):  # noqa: N802
+        first = not getattr(self, "shown_once", False)
+        self.shown_once = True
+        super().showEvent(event)
+        if first:
+            from aedrova.desktop.motion import BASE, appear_window
+
+            appear_window(
+                self, getattr(self, "appear_ms", BASE + 80), rise=getattr(self, "appear_rise", 10)
+            )
 
     def set_loading(self, target, active, kind="form"):
         from aedrova.desktop.loading import set_loading
@@ -179,19 +191,43 @@ class PermissionChoice(ChoiceBox):
         return self.sizeHint()
 
 
-class CodingProviderChoice(ChoiceBox):
-    """The same provider identities in onboarding, settings and build controls."""
+class CodingProviderChoice(QFrame):
+    """Aedrova identity with the existing provider-setting interface."""
+
+    currentIndexChanged = Signal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         from aedrova.desktop.brand import brand_image
-        from aedrova.desktop.connector_icons import connector_pixmap
 
-        self.setIconSize(QSize(28, 28))
-        for key, name in (("codex", "Codex"), ("claude_code", "Claude Code")):
-            self.addItem(QIcon(connector_pixmap(key, 28)), name, key)
-        self.addItem(QIcon(QPixmap.fromImage(brand_image())), "Auto · Aedrova chooses", "auto")
-        self.setCurrentIndex(self.findData("auto"))
+        self.setAccessibleName("Aedrova agent")
+        self.setMinimumHeight(44)
+        row = QHBoxLayout(self)
+        row.setContentsMargins(0, 8, 0, 8)
+        row.setSpacing(10)
+        mark = QLabel(self)
+        mark.setPixmap(QPixmap.fromImage(brand_image()).scaled(
+            28, 28, Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        ))
+        row.addWidget(mark)
+        row.addWidget(QLabel("Aedrova", self))
+        row.addStretch(1)
+
+    def currentIndex(self):
+        return 0
+
+    def currentData(self):
+        return "codex"
+
+    def currentText(self):
+        return "Aedrova"
+
+    def findData(self, value):
+        return 0 if value in {"codex", "claude_code", "auto"} else -1
+
+    def setCurrentIndex(self, index):
+        pass
 
 
 def choose_project(parent, initial=""):

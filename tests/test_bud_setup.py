@@ -120,7 +120,7 @@ def test_seven_stages_save_without_oauth_and_never_fake_ready(editor, qtbot):
     assert dialog.pages.currentIndex() == 0
     dialog.next.click()
     assert dialog.pages.currentIndex() == 1
-    assert dialog.next.accessibleName() == "Continue →"
+    assert dialog.next.accessibleName() == "Continue"
     dialog.name.setText("Orbit")
     dialog.role.setText("Engineering updates")
     dialog.instructions.setPlainText("Focus on open pull requests.")
@@ -132,24 +132,40 @@ def test_seven_stages_save_without_oauth_and_never_fake_ready(editor, qtbot):
         assert dialog.pages.currentIndex() == stage
     dialog.resource.setText("team/project")
     assert dialog.save.isEnabled() and not dialog.connect.isEnabled()
+    assert dialog.next.text() == "Skip tools for now"
     dialog.next.click()
     assert saved[0]["p_role"] == "Builder · Engineering updates"
     assert saved[0]["p_shape"] == "cloud"
+    assert saved[0]["p_resource"] == "team/project"
     assert dialog.current()["id"] == "bud-1"
-    assert dialog.pages.currentIndex() == 5
+    assert dialog.pages.currentIndex() == 6
+    assert dialog.ready_copy.text() == "Orbit"
     dialog.next.click()
     assert len(saved) == 1
-    assert "connector card" in dialog.status.text()
-    assert dialog.pages.currentIndex() == 5
-    rows[0]["status"] = "Connected"
-    dialog.refresh()
-    dialog.show_step(5)
-    dialog.next.click()
-    assert dialog.pages.currentIndex() == 6
-    dialog.next.click()
     assert window.composer.editor.toPlainText().endswith("@Orbit ")
     assert window.composer.mention_tokens["Orbit"] == "<@dot:bud-1|Orbit>"
     assert not dialog.isVisible()
+
+
+def test_bud_saves_without_any_tool_and_never_blocks_on_connectors(editor):
+    dialog, rows, saved, _ = editor
+    dialog.name.setText("Scout")
+    dialog.show_step(5)
+    assert dialog.next.text() == "Skip tools for now"
+    dialog.next.click()
+    assert saved[0]["p_provider"] == "search"
+    assert saved[0]["p_resource"] == "General research"
+    assert dialog.pages.currentIndex() == 6
+    assert rows[0]["name"] == "Scout"
+
+
+def test_every_look_and_color_control_is_enabled_before_membership_syncs(editor):
+    dialog, _, _, window = editor
+    window.account_dialog.snapshot["members"] = []
+    dialog.preview()
+    assert all(tile.isEnabled() for tile, _ in dialog.appearance_buttons)
+    assert all(swatch.isEnabled() for swatch, _ in dialog.swatch_buttons)
+    assert dialog.new.isEnabled() or dialog.capacity is not None
 
 
 def test_validation_and_member_cannot_save(editor):
@@ -483,12 +499,12 @@ def test_look_selection_sets_specialty_and_recommendations(editor):
     assert not any("Match" in tile.text() for tile, _ in dialog.appearance_buttons)
 
 
-def test_required_bud_setup_cannot_be_accepted_without_verified_connection(editor):
+def test_required_bud_setup_cannot_be_accepted_before_a_bud_is_saved(editor):
     dialog, rows, saved, window = editor
     dialog.required = True
     dialog.accept()
     assert dialog.isVisible()
-    assert "connect one tool" in dialog.status.text()
+    assert "Finish configuring" in dialog.status.text()
     assert not rows
 
 
@@ -502,7 +518,7 @@ def test_finish_later_closes_required_setup_without_completing_it(editor):
     assert not rows and not saved
 
 
-def test_required_setup_finishes_only_after_verified_tool_and_final_stage(editor):
+def test_required_setup_finishes_at_the_final_stage_with_or_without_a_tool(editor):
     dialog, rows, _, _ = editor
     dialog.required = True
     dialog.show_step(5)
@@ -516,15 +532,11 @@ def test_required_setup_finishes_only_after_verified_tool_and_final_stage(editor
     assert dialog.isVisible()
     dialog.next.click()
     assert dialog.pages.currentIndex() == 6
-    for status in ("Needs authorization", "Disconnected", "Permission issue", "Error"):
-        dialog.current()["status"] = status
-        dialog.accept()
-        assert dialog.isVisible()
-    dialog.current()["status"] = "Connected"
     dialog.name.setText("Changed after authorization")
     dialog.accept()
     assert dialog.isVisible()
     dialog.name.setText(rows[0]["name"])
+    dialog.current()["status"] = "Needs authorization"
     dialog.accept()
     assert not dialog.isVisible()
     assert dialog.result() == dialog.DialogCode.Accepted
@@ -599,7 +611,7 @@ def test_capacity_is_loaded_from_authenticated_service(editor):
     window.account_dialog.service.bud_capacity = capacity
     dialog.refresh()
     assert calls == [window.workspace_id]
-    assert dialog.capacity_note.text() == "2 / 15 Buds · Team · shared by your team"
+    assert dialog.capacity_note.text() == "2 / 15 Buds · Teams · shared by your team"
 
 
 def test_wizard_visits_personality_and_back_keeps_custom_settings(editor):

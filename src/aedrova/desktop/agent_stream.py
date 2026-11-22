@@ -24,8 +24,17 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from aedrova.desktop.agent_activity import WorkNotes, activity_icon
+from aedrova.desktop.agent_activity import activity_icon
+from aedrova.desktop.agent_components import (
+    ApprovalCard,
+    ChoiceCard,
+    FourDots,
+    PromptCard,
+    StepChecklist,
+    StepSummary,
+)
 from aedrova.desktop.brand import BrandMark
+from aedrova.desktop.conversation import human_time
 from aedrova.desktop.icons import assign
 from aedrova.desktop.materials import system_font
 
@@ -53,6 +62,8 @@ class ActivityRow(QFrame):
         self.rating = ""
         self.file_summary = None
         self.streaming = streaming
+        self.choice_card = None
+        self.actions_label = None
         self.pending = pending
         self.status = "running" if pending else "done"
         if not pending and details.startswith("$ "):
@@ -112,13 +123,14 @@ class ActivityRow(QFrame):
             self.column = column
             column.setSpacing(6)
             header = QHBoxLayout()
+            self.header = header
             header.setSpacing(12)
             self.author = QLabel(author)
             self.author.setTextFormat(Qt.TextFormat.PlainText)
             self.author.setFont(system_font(14))
             self.author.setStyleSheet("font-weight: 600;")
             self.author.setAccessibleName("Agent sender: " + author)
-            self.timestamp = QLabel(self.sent_at.strftime("%I:%M %p · %b %d"))
+            self.timestamp = QLabel(human_time(self.sent_at.strftime("%Y-%m-%d %H:%M")))
             self.timestamp.setProperty("role", "muted")
             self.timestamp.setObjectName("MessageTimestamp")
             self.timestamp.setFont(system_font(11))
@@ -170,12 +182,41 @@ class ActivityRow(QFrame):
         self.message.setProperty("aedrovaReplyRating", self.rating)
         self.message.setProperty("aedrovaFileSummary", self.file_summary)
         self.message.setProperty("aedrovaTranslatingStream", self.streaming or self.pending)
+        self.message.setProperty("aedrovaPlainReply", self.choice_card is not None)
+        if self.choice_card is not None:
+            # Choices are buttons below the answer, so the text carries no links.
+            self.message.setText(markdown_html(body, base_font=self.message.font(), agent=True))
+            self.actions_label.setText(
+                markdown_html(
+                    "", base_font=self.message.font(), agent=True, options=(),
+                    rating=self.rating, file_summary=self.file_summary,
+                )
+            )
+            return
         self.message.setText(
             markdown_html(
                 body, base_font=self.message.font(), agent=True, options=options,
                 rating=self.rating, file_summary=self.file_summary,
             )
         )
+
+    def install_choices(self, options):
+        """Replace the choice links with buttons and a text box under the answer."""
+        if self.choice_card is not None or not options:
+            return None
+        self.choice_card = ChoiceCard(options)
+        self.actions_label = QLabel()
+        self.actions_label.setTextFormat(Qt.TextFormat.RichText)
+        self.actions_label.setFont(system_font(14))
+        self.actions_label.linkActivated.connect(self.open_source)
+        self.actions_label.linkHovered.connect(self.show_action_tooltip)
+        self.actions_label.setAccessibleName("Response actions")
+        self.actions_label.setFixedHeight(32)
+        self.actions_label.setAlignment(Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft)
+        index = self.column.indexOf(self.message) + 1
+        self.column.insertWidget(index, self.choice_card)
+        self.column.insertWidget(index + 1, self.actions_label)
+        return self.choice_card
 
     def show_action_tooltip(self, link):
         from aedrova.desktop.response_actions import REPLY_ACTION_LABELS
@@ -211,7 +252,7 @@ class ActivityRow(QFrame):
     def expand(self, expanded):
         marker = {"running": "◦", "done": "✓", "failed": "!", "stopped": "□"}[self.status]
         assign(self.toggle, activity_icon(self.summary))
-        self.toggle.setText(f"{'▾' if expanded else '▸'}  {marker}  {self.summary}")
+        self.toggle.setText(f"{marker}  {self.summary}")
         self.toggle.setToolTip(self.summary)
         self.details.setVisible(expanded)
         self.toggle.setAccessibleDescription("Expanded" if expanded else "Collapsed")
@@ -226,6 +267,7 @@ class ActivityRow(QFrame):
 class AgentStream(QScrollArea):
     changed = Signal()
     reply_action = Signal(object, str)
+    choice_requested = Signal(str, str, bool)
 
     def __init__(self):
         super().__init__()
@@ -262,6 +304,7 @@ class AgentStream(QScrollArea):
         return QSize(100, self.height() if self.inline else 70)
 
     def clear(self):
+        self.resolve_cards()
         self.scroll_timer.stop()
         if self.status_controls:
             self.status_controls.hide()
@@ -321,7 +364,10 @@ class AgentStream(QScrollArea):
         self.running.clear()
 
     def add_event(self, text):
-        self.record_work(text)
+        checklist = getattr(self.status_row, "checklist", None)
+        if checklist is not None:
+            checklist.observe(text)  # steps and commands live in the task list, once
+            return
         if text.startswith("Running:"):
             command = text.removeprefix("Running:").strip()
             row = ActivityRow("Running " + command[:180], command, tool=True, pending=True)
@@ -377,6 +423,36 @@ class AgentStream(QScrollArea):
             self.setFixedHeight(height)
         return height
 
+    def add_approval(self, tool, data):
+        """An inline Allow once / Deny card. The caller waits for `decided`."""
+        card = ApprovalCard(tool, data)
+        self.add_row(card)
+        return card
+
+    def add_prompt(self, question):
+        """The agent's clarifying question as buttons and a text box."""
+        card = PromptCard(question)
+        self.add_row(card)
+        card.focus_first()
+        return card
+
+    def remove_row(self, row):
+        if row in self.rows:
+            self.rows.remove(row)
+        self.layout.removeWidget(row)
+        row.hide()
+        row.deleteLater()
+        self.changed.emit()
+
+    def cards(self):
+        return [row for row in self.rows if isinstance(row, (ApprovalCard, PromptCard))]
+
+    def resolve_cards(self):
+        """Deny anything still waiting, so no run is left blocked on a hidden card."""
+        for card in self.cards():
+            if isinstance(card, ApprovalCard) and not card.resolved:
+                card.resolve(False)
+
     def install_status_controls(self, controls):
         self.status_controls = controls
         controls.setParent(self)
@@ -392,66 +468,107 @@ class AgentStream(QScrollArea):
             if self.status_controls is not None:
                 self.status_row.column.addWidget(self.status_controls)
                 self.status_controls.show()
-            self.status_row.work_notes = WorkNotes()
-            self.status_row.column.addWidget(self.status_row.work_notes)
-            self.status_row.work_notes.record(text)
+            self.status_row.dots = FourDots()
+            header = self.status_row.header
+            header.insertWidget(header.count() - 1, self.status_row.dots)
+            self.status_row.checklist = StepChecklist()
+            self.status_row.checklist.changed.connect(self.changed)
+            self.status_row.column.addWidget(self.status_row.checklist)
+            self.status_row.checklist.observe(text)
             self.add_row(self.status_row)
         else:
             self.status_row.summary = text
-            self.record_work(text)
+            self.status_row.checklist.observe(text)
 
     def record_work(self, text):
-        if (
-            self.status_row
-            and getattr(self, "reply_row", None) not in self.rows
-            and self.status_row.work_notes.record(text)
-        ):
-            self.changed.emit()
+        """The task list is the single record of progress; no repeated sentences."""
+        return False
+
+    def retire_status(self):
+        """Fold the live status row into the answer so nothing jumps when it arrives."""
+        steps = []
+        row = self.status_row
+        if row is None:
+            return steps
+        if getattr(row, "checklist", None):
+            row.checklist.finish()
+            steps = [dict(s) for s in row.checklist.steps]
+        self.layout.removeWidget(row)
+        if row in self.rows:
+            self.rows.remove(row)
+        if self.status_controls:
+            self.status_controls.hide()
+            self.status_controls.setParent(self)
+        row.hide()
+        row.deleteLater()
+        self.status_row = None
+        return steps
+
+    def attach_summary(self, steps):
+        reply = getattr(self, "reply_row", None)
+        if reply is None or len(steps) < 2 or getattr(reply, "step_summary", None):
+            return
+        summary = StepSummary(steps)
+        summary.changed.connect(self.changed)
+        reply.step_summary = summary
+        reply.column.insertWidget(1, summary)
 
     def finish_with_result(self, text, *, file_summary=None):
-        for transient in list(self.rows):
-            if transient is self.status_row or getattr(transient, "is_reply", False):
-                continue
-            self.layout.removeWidget(transient)
-            self.rows.remove(transient)
-            transient.hide()
-            transient.deleteLater()
-        if self.status_row is not None:
-            row = self.status_row
-            self.layout.removeWidget(row)
-            if row in self.rows:
-                self.rows.remove(row)
-            if self.status_controls:
-                self.status_controls.hide()
-                self.status_controls.setParent(self)
-            row.hide()
-            row.deleteLater()
-            self.status_row = None
-        self.set_reply(text)
-        if self.reply_row:
-            self.reply_row.response_id = "agent-" + str(uuid4())
-            self.reply_row.rating = ""
-            self.reply_row.file_summary = file_summary
-            self.reply_row.streaming = False
-            self.reply_row.set_message(text)
-            self.reply_row.message.setProperty("aedrovaTranslatingStream", False)
+        self.resolve_cards()
+        content = self.widget()
+        content.setUpdatesEnabled(False)  # one clean repaint, never a half-built answer
+        try:
+            for transient in list(self.rows):
+                if transient is self.status_row or getattr(transient, "is_reply", False):
+                    continue
+                self.layout.removeWidget(transient)
+                self.rows.remove(transient)
+                transient.hide()
+                transient.deleteLater()
+            steps = self.retire_status()
+            self.set_reply(text)
+            reply = self.reply_row
+            if reply:
+                self.attach_summary(steps)
+                reply.response_id = "agent-" + str(uuid4())
+                reply.rating = ""
+                reply.file_summary = file_summary
+                reply.streaming = False
+                from aedrova.desktop.response_actions import response_parts
+
+                options = response_parts(text)[1]
+                card = reply.install_choices(options)
+                author = reply.author.text()
+                if card is not None:
+                    card.chosen.connect(
+                        lambda value, free: self.choice_requested.emit(author, value, free)
+                    )
+                reply.set_message(text)
+                reply.message.setProperty("aedrovaTranslatingStream", False)
+        finally:
+            content.setUpdatesEnabled(True)
             self.changed.emit()
 
     def set_reply(self, text):
         """Update a single streaming response without adding activity-log rows."""
-        if self.status_row and self.status_row.work_notes.notes:
-            self.status_row.work_notes.clear()
         if not getattr(self, "reply_row", None) or self.reply_row not in self.rows:
-            self.reply_row = ActivityRow(
-                text,
-                author=self.author_name,
-                character_config=self.character_config,
-                streaming=True,
-            )
-            self.reply_row.is_reply = True
-            self.reply_row.reply_action.connect(self.reply_action)
-            self.reply_row.message.setProperty("aedrovaTranslatingStream", True)
-            self.add_row(self.reply_row)
+            content = self.widget()
+            content.setUpdatesEnabled(False)
+            try:
+                steps = self.retire_status()
+                self.reply_row = ActivityRow(
+                    text,
+                    author=self.author_name,
+                    character_config=self.character_config,
+                    streaming=True,
+                )
+                self.reply_row.is_reply = True
+                self.reply_row.reply_action.connect(self.reply_action)
+                self.reply_row.message.setProperty("aedrovaTranslatingStream", True)
+                self.add_row(self.reply_row)
+                self.attach_summary(steps)
+            finally:
+                content.setUpdatesEnabled(True)
         elif self.reply_row.summary != text:
             self.reply_row.summary = text
             self.reply_row.set_message(text)

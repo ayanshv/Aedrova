@@ -87,13 +87,6 @@ def test_actual_build_gate(qtbot, tmp_path, monkeypatch, selected, answer, expec
     dialog.pending = True
     dialog.project = tmp_path
     dialog.job = SimpleNamespace(runner=LocalRunner(lambda _: None), permission_mode=selected)
-    asked = []
-
-    def decide(box):
-        asked.append(box.windowTitle())
-        return QMessageBox.StandardButton.Yes if answer else QMessageBox.StandardButton.No
-
-    monkeypatch.setattr(QMessageBox, "exec", decide)
     request = {
         "tool": "Write",
         "data": {"file_path": "hello.py"},
@@ -101,8 +94,12 @@ def test_actual_build_gate(qtbot, tmp_path, monkeypatch, selected, answer, expec
         "allow": False,
     }
     dialog.permission(request)
+    cards = window.agent_feed.cards()
+    assert len(cards) == prompts
+    if prompts:
+        assert not request["event"].is_set()  # the agent waits on the card
+        (cards[0].allow if answer else cards[0].deny).click()
     assert request["allow"] is expected and request["event"].is_set()
-    assert len(asked) == prompts
     dialog.pending = False
     dialog.job = None
 
@@ -118,19 +115,22 @@ def test_permission_change_cancels_old_run(qtbot, tmp_path):
     del window.build_dialog
 
 
-def fake_server(tmp_path, monkeypatch, *, decision="decline", wrong_scope=False):
+def fake_server(
+    tmp_path, monkeypatch, *, decision="decline", wrong_scope=False, policy="untrusted"
+):
     binary = tmp_path / "fake-server"
     body = """
 import sys,json
 assert 'app-server' in sys.argv
 assert 'permissions.aedrova.network.enabled=false' in sys.argv
+assert 'web_search="live"' in sys.argv
 assert 'shell_environment_policy.inherit="none"' in sys.argv
 assert any(x.startswith('permissions.aedrova.filesystem=') for x in sys.argv)
 def read(): return json.loads(sys.stdin.readline())
 def send(v): print(json.dumps(v),flush=True)
 x=read();assert x['method']=='initialize';send({'id':x['id'],'result':{}})
 assert read()['method']=='initialized'
-x=read(); assert x['method']=='thread/start';assert x['params']['ephemeral']
+x=read(); assert x['method']=='thread/start';assert x['params']['ephemeral'];assert x['params']['approvalPolicy']==POLICY
 send({'id':x['id'],'result':{'thread':{'id':'thread'}}})
 x=read();assert x['method']=='turn/start';send({'id':x['id'],'result':{'turn':{'id':'turn'}}})
 send({'method':'item/started','params':{'threadId':'thread','turnId':'turn',
@@ -144,7 +144,7 @@ assert read()['result']['permissions']=={}
 send({'method':'item/completed','params':{'threadId':'thread','turnId':'turn','item':{'id':'message','type':'agentMessage','text':'Finished'}}})
 send({'method':'turn/completed','params':{'threadId':'thread','turn':{'id':'turn','status':'completed'}}})
 sys.stdin.read()
-""".replace("THREAD", repr("other" if wrong_scope else "thread")).replace(
+""".replace("POLICY", repr(policy)).replace("THREAD", repr("other" if wrong_scope else "thread")).replace(
         "DECISION", repr(decision)
     )
     binary.write_text(f"#!{sys.executable}\n" + body)
@@ -193,13 +193,6 @@ def test_auto_requests_human_for_unreviewed_command(qtbot, tmp_path, monkeypatch
     dialog.pending = True
     dialog.project = tmp_path
     dialog.job = SimpleNamespace(runner=LocalRunner(lambda _: None), permission_mode="auto")
-    prompts = []
-
-    def refuse(box):
-        prompts.append(box)
-        return QMessageBox.StandardButton.No
-
-    monkeypatch.setattr(QMessageBox, "exec", refuse)
     request = {
         "tool": "Bash",
         "data": {"command": "python custom_script.py"},
@@ -207,7 +200,10 @@ def test_auto_requests_human_for_unreviewed_command(qtbot, tmp_path, monkeypatch
         "allow": False,
     }
     dialog.permission(request)
-    assert len(prompts) == 1 and not request["allow"] and request["event"].is_set()
+    cards = window.agent_feed.cards()
+    assert len(cards) == 1 and not request["event"].is_set()
+    cards[0].deny.click()
+    assert not request["allow"] and request["event"].is_set()
     dialog.job = None
     dialog.pending = False
 
@@ -220,11 +216,6 @@ def test_changed_permission_during_prompt_cannot_approve(qtbot, tmp_path, monkey
     dialog.project = tmp_path
     dialog.job = SimpleNamespace(runner=LocalRunner(lambda _: None), permission_mode="ask")
 
-    def changed(box):
-        window.settings.setValue("agent-permissions/u/w", "auto")
-        return QMessageBox.StandardButton.Yes
-
-    monkeypatch.setattr(QMessageBox, "exec", changed)
     request = {
         "tool": "Write",
         "data": {"file_path": "x.py"},
@@ -232,6 +223,8 @@ def test_changed_permission_during_prompt_cannot_approve(qtbot, tmp_path, monkey
         "allow": False,
     }
     dialog.permission(request)
+    window.settings.setValue("agent-permissions/u/w", "auto")
+    window.agent_feed.cards()[0].allow.click()
     assert not request["allow"] and request["event"].is_set()
     dialog.job = None
     dialog.pending = False
@@ -369,3 +362,16 @@ def test_full_confirmation_and_permission_label_fit_the_theme(qtbot, tmp_path, t
     assert dialog.cancel.isDefault() and not dialog.confirm.isDefault()
     assert dialog.confirm.geometry().right() < dialog.width()
     dialog.reject()
+
+
+@pytest.mark.parametrize(
+    ("mode", "policy"), [("ask", "untrusted"), ("auto", "untrusted"), ("full", "never")]
+)
+def test_each_permission_mode_sets_the_agents_real_approval_policy(
+    tmp_path, monkeypatch, mode, policy
+):
+    fake_server(tmp_path, monkeypatch, decision="accept", policy=policy)
+    asked = []
+    runner = LocalRunner(lambda _: None, lambda *a: asked.append(a) or True, timeout=5)
+    runner.permission_mode = mode
+    assert runner.run("codex", tmp_path, "test", plan=False) == "Finished"

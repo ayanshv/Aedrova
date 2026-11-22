@@ -1,6 +1,5 @@
 """Working account and desktop preferences; no placeholder account actions."""
 
-from datetime import UTC, datetime
 from urllib.parse import quote
 
 from PySide6.QtCore import QUrl
@@ -167,15 +166,14 @@ class SettingsDialog(AppDialog):
             layout = section(
                 "billing",
                 "Billing & credits",
-                "One workspace subscription covers your team.",
+                "Manage your subscription and see available AI capacity.",
                 "activity",
                 "Plan & governance",
             )
             if ai_access_mode() == "local":
                 layout.addWidget(
                     label(
-                        "AI builds use your local provider login in this internal "
-                        "alpha. Included plan access is being prepared.",
+                        "AI builds use your own provider login on this Mac.",
                         "muted",
                         wrap=True,
                     )
@@ -184,8 +182,8 @@ class SettingsDialog(AppDialog):
                 "Checking your workspace’s plan…"
                 if self.billing_origin
                 else (
-                    "Included AI is being prepared. This internal alpha uses "
-                    "separate provider access."
+                    "Included AI isn’t available in this build. Builds use your own "
+                    "provider access."
                 ),
                 "muted",
                 wrap=True,
@@ -193,7 +191,7 @@ class SettingsDialog(AppDialog):
             layout.addWidget(self.billing_status)
             if self.billing_origin:
                 row = QHBoxLayout()
-                manage = button("Team plan & billing", role="outline")
+                manage = button("Plan & billing", role="outline")
                 manage.clicked.connect(
                     lambda: QDesktopServices.openUrl(
                         QUrl(
@@ -312,19 +310,34 @@ class SettingsDialog(AppDialog):
             if result.get("error"):
                 self.billing_status.setText(result["error"])
             elif result.get("status") == "active":
-                names = {"free": "Free", "monthly": "Pro", "annual": "Team"}
+                names = {
+                    "free": "Free",
+                    "monthly": "Pro",
+                    "annual": "Teams",
+                    "pro_monthly": "Pro",
+                    "pro_annual": "Pro",
+                    "power_monthly": "Teams",
+                    "power_annual": "Teams",
+                }
                 plan = names.get(result["plan"], result["plan"].title())
-                spent = result.get("monthly_spent", result["spent"])
-                budget = max(1, result.get("monthly_budget", result["allowance"]))
-                remaining = max(0, min(100, round(100 * (1 - spent / budget))))
-                reset = ""
-                if result.get("reset_at"):
-                    date = datetime.fromtimestamp(result["reset_at"], UTC).strftime("%b %d")
-                    reset = f"Resets {date} (UTC). "
+                weekly, five = result.get("weekly_budget"), result.get("five_hour_budget")
+                if type(weekly) is int and weekly > 0:
+                    week_left = max(0, min(100, round(100 * (1 - result["weekly_spent"] / weekly))))
+                    five_left = 100
+                    if type(five) is int and five > 0:
+                        used = result.get("five_hour_spent", 0)
+                        five_left = max(0, min(100, round(100 * (1 - used / five))))
+                    capacity = (
+                        f"{week_left}% of this week and {five_left}% of the next 5 hours remain. "
+                    )
+                else:
+                    spent = result.get("monthly_spent", result["spent"])
+                    budget = max(1, result.get("monthly_budget", result["allowance"]))
+                    left = max(0, min(100, round(100 * (1 - spent / budget))))
+                    capacity = f"{left}% monthly AI capacity remaining. "
+                holder = "Your" if result.get("personal") else "This workspace’s"
                 self.billing_status.setText(
-                    f"Your team’s {plan} plan · {remaining}% shared monthly AI capacity remaining. "
-                    + reset
-                    + "One subscription covers your team. No automatic overage charges."
+                    f"{holder} {plan} plan · " + capacity + "No automatic overage charges."
                 )
             else:
                 self.billing_status.setText(
@@ -369,6 +382,7 @@ class SettingsDialog(AppDialog):
                 self.activate_ai.setEnabled(True)
             else:
                 self.activate_ai.hide()
+                self.window.workspace_usage.refresh(workspace)
                 self.load_balance()
 
         if not self.window.connected.enqueue(

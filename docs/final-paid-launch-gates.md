@@ -53,8 +53,8 @@ funded operating budget before metered features are enabled.
 1. Finish payment-free preparation and tests; record paid-dependent checks as open.
 2. Consolidate the necessary paid actions for owner review and personal submission.
 3. Once funded/configured, run the dependent isolated staging/live-account/device
-   checks, including the hosted restore, actual Claude coding and reliable
-   meetings. Do not substitute mock tests or provider metadata for these results.
+   checks, including the hosted restore, and reliable
+   meetings. Claude coding is post-launch and no longer a gate. Do not substitute mock tests or provider metadata for these results.
 4. Close the remaining release-candidate, signing and clean-machine gates and
    obtain the required approval for Step 10 production promotion.
 5. Promote the verified candidate, pass production smoke checks, then separately
@@ -76,5 +76,5 @@ October 25 replacement accepted: OpenAI Responses live web search now uses the
 existing included-AI credential and ledger; no Brave activation/card is required.
 One actual staged search passed with citations and $0.019123 recorded. This removes
 the separate Search-account gate; it does not remove normal OpenAI usage costs or
-the company/Free/workspace caps. Claude funding and meeting hosting/guard payments
-remain final owner-paid gates, followed by real inference and device acceptance.
+the company/Free/workspace caps. Meeting hosting/guard payments remain final owner-paid
+gates (Claude funding moved to post-launch), followed by real inference and device acceptance.

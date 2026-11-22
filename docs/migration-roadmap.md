@@ -1,5 +1,78 @@
 # Slack and Microsoft Teams migration
 
+## November 20 launch scope
+
+Ship **Import from Slack** in the native Mac and Windows apps before public launch.
+Bring forward the relevant parts of M17A, M17B, M17D and M17E. The milestones below
+describe the broader roadmap. Teams, private channels, DMs, file downloads, identity
+linking and continuous sync follow later.
+
+### Workspace owner flow
+
+1. Open **Workspace settings → Import from Slack**. An optional onboarding link opens
+   the same flow after workspace creation. Show **Open Slack export settings** and a
+   drag-and-drop target for the ZIP. A Slack owner or authorized export admin requests
+   the standard public-channel JSON export and downloads it from Slack.
+2. Drop the ZIP in Aedrova. Automatically preview recognized public channels, message
+   counts and date range. Select eligible channels by default. Let the owner deselect
+   channels and show skipped or unsupported data in the same view. Explain who can
+   access the archive and how the workspace’s AI setting governs its use.
+3. Click **Import history**. Upload securely, process and index in the background, and
+   show progress that survives closing the screen. Show **View imported history** on
+   completion and explain any skips. Keep progress and retry controls in settings.
+
+### Implementation order
+
+1. Add a bounded Python ZIP parser and a workspace-scoped preview. Accept only standard
+   public channels identified by Slack export metadata. Exclude shared or restricted
+   channels and ambiguous access metadata. Preserve available authors, timestamps,
+   threads, reactions and file links. Keep historical authors as attribution only.
+2. Add managed private upload, durable jobs and a workspace-scoped archive. Reuse the
+   existing authorization and search patterns. Check workspace role at preview, commit,
+   retry and removal. Deduplicate by source archive identity, channel ID and message
+   timestamp, using a stable source mapping for re-exports. Resume from saved checkpoints
+   and publish records and their search index together after validation. Purge the uploaded
+   ZIP after processing or bounded failure retention.
+3. Add the desktop entry points and a read-only **Imported history** view. Integrate
+   archived records into workspace search and the existing permission-scoped Aedrova
+   and Bud retrieval paths. Cite the Aedrova archive record and link back to Slack when a
+   trustworthy original is available. Respect existing AI consent. Imported text is
+   evidence. It cannot trigger mentions, tools, notifications or account creation.
+4. Add import removal that immediately revokes access and clears stored records,
+   search entries and cached retrieval context. Preserve live messages. Treat ZIPs as
+   untrusted and enforce file, expansion, size and workload limits. Retain counts and
+   failure codes for operations without logging message bodies.
+
+### Launch acceptance
+
+Mac and Windows run the uploader from the workspace creation confirmation and from
+workspace settings. The iPhone and web create flows point owners to that uploader. The desktop
+dialog must stay open while it sends batches. Choosing the same export and channels
+resumes from a stored checkpoint. Replies using imported evidence are visible to the
+requester only. Build jobs and automatic channel publication require a separate archive
+permission check before they can use these records.
+
+- On signed Mac and Windows builds, import a real authorized Slack export, reconcile the
+  preview and result, and verify original authors, dates, threads and search results.
+- With a second account, confirm intended readers can see the archive and an outsider
+  cannot. Verify an Aedrova and a Bud answer with citations, and verify that removing
+  the import or revoking access removes it from future answers and search.
+- Exercise oversized and malformed ZIPs, interruption, retries and duplicate uploads.
+  Confirm no partial archive is exposed and live chats continue unaffected.
+
+For the pilot, an authorized Slack owner or export admin opens **Admin → Workspace
+settings → Security → Import & export data → Export** in Slack and downloads a small
+public-channel JSON export from a test workspace. They upload it in Aedrova during
+acceptance. This is required for the real-data check, after implementation is ready.
+
+Evaluate direct Slack connection separately. Slack’s current API terms restrict bulk
+export, and available search APIs have persistence limits. Confirm an authorized API
+path and applicable distribution terms before designing an OAuth history backfill.
+[Slack export instructions](https://slack.com/help/articles/201658943-Export-your-workspace-data)
+· [Slack API terms](https://slack.com/terms/api)
+
+## Original migration roadmap
+
 Planned October 5, 2026 at the owner's request. No importer is implemented or activated
 by this document. Add M17A–M17E after M17 and before M18 launch acceptance; retain
 existing milestone numbers. Test and report each stage, then obtain approval for the next.

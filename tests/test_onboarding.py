@@ -1,11 +1,11 @@
-"""Tour navigation cannot perform product actions or share state across accounts."""
+"""The tour is short, tags real controls, and cannot perform product actions."""
 
 from types import SimpleNamespace
 
 import pytest
 from PySide6.QtCore import QSettings, Qt
 
-from aedrova.desktop.onboarding import FEATURES, STEPS, account_key
+from aedrova.desktop.onboarding import STEPS, account_key, resolve
 from aedrova.desktop.window import AedrovaWindow
 
 
@@ -20,70 +20,34 @@ def window(qtbot, tmp_path):
     return widget
 
 
-def test_implemented_function_coverage():
-    expected = {
-        "workspaces",
-        "channels",
-        "invitations",
-        "roles",
-        "nickname",
-        "unread",
-        "direct_messages",
-        "messages",
-        "threads",
-        "history",
-        "search",
-        "decisions",
-        "sources",
-        "attachments",
-        "save_files",
-        "project",
-        "provider",
-        "workflow",
-        "permissions",
-        "ide",
-        "repository",
-        "mentions",
-        "builds",
-        "context",
-        "progress",
-        "queue",
-        "recovery",
-        "usage",
-        "cancel",
-        "approvals",
-        "review",
-        "apply",
-        "preview",
-        "github",
-        "devices",
-        "screen_preview",
-        "calls",
-        "camera",
-        "microphone",
-        "sharing",
-        "participants",
-        "leave_call",
-        "account",
-        "settings",
-        "appearance",
-        "accessibility",
-        "profile",
-        "billing",
-        "allowance",
-        "logout",
-        "help",
-        "updates",
-    }
-    assert expected <= FEATURES
-    assert {"reactions", "editing", "deletion", "pins", "bookmarks", "activity"} <= FEATURES
-    assert all(len(step.text.split()) <= 40 for step in STEPS)
+def test_the_tour_is_short_and_every_tag_is_one_line():
+    assert 6 <= len(STEPS) <= 10
     assert len({step.title for step in STEPS}) == len(STEPS)
+    for step in STEPS:
+        assert len(step.title.split()) <= 4, step.title
+        assert len(step.text.split()) <= 14, step.text
+
+
+def test_the_tour_covers_the_parts_people_use_first():
+    targets = {step.target for step in STEPS}
+    assert {
+        "workspace_title",
+        "invite_teammates_button",
+        "ai_team_section",
+        "channel_list",
+        "composer",
+        "composer.permissions",
+        "primary_navigation",
+        "workspace_usage",
+        "profile_button",
+    } <= targets
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
 @pytest.mark.parametrize("size", [(900, 650), (1440, 940)])
-def test_all_steps_fit_and_do_not_send_or_build(window, qtbot, monkeypatch, theme, size):
+def test_every_visible_tag_fits_and_nothing_is_sent_or_built(
+    window, qtbot, monkeypatch, theme, size
+):
     def forbidden(*args):
         pytest.fail("Tour must not trigger a build, message, invitation or external action")
 
@@ -94,33 +58,57 @@ def test_all_steps_fit_and_do_not_send_or_build(window, qtbot, monkeypatch, them
     window.set_reduced_motion(True)
     window.show_tour()
     tour = window.tour
+    seen = []
     for index in range(len(STEPS)):
         tour.show_step(index)
         qtbot.wait(5)
+        step = STEPS[tour.index]
+        if not resolve(window, step.target):
+            continue
+        seen.append(step.title)
         assert tour.rect().contains(tour.card.geometry())
-        assert tour.card.graphicsEffect() is None
-        assert tour.next.isVisible()
-        assert tour.heading.text() == STEPS[index].title
-        if not tour.target_rect.isEmpty():
-            assert tour.parentWidget().rect().contains(tour.target_rect)
+        assert not tour.target_rect.isEmpty()
+        assert tour.parentWidget().rect().contains(tour.target_rect)
+        assert not tour.card.geometry().intersects(tour.target_rect), step.title
+        assert tour.heading.text() == step.title
         assert not tour.grab().isNull()
+    assert len(seen) >= 6
     tour.advance()
-    assert window.tour is None
+    while window.tour is not None:
+        tour.advance()
     assert window.settings.value(account_key(window) + "/status") == "completed"
 
 
-def test_pause_resume_chapters_and_account_isolation(window, qtbot):
+def test_steps_with_nothing_to_show_are_skipped_not_faked(window, qtbot):
+    window.set_reduced_motion(True)
+    window.workspace_usage.hide()  # no AI allowance in a local preview
+    window.show_tour()
+    tour = window.tour
+    titles = []
+    tour.show_step(0)
+    for _ in range(len(STEPS)):
+        titles.append(tour.heading.text())
+        previous = tour.index
+        tour.advance()
+        if window.tour is None:
+            break
+        assert tour.index != previous
+    assert "Your AI allowance" not in titles
+    assert tour.progress.text().endswith(str(len(titles))) or window.tour is None
+
+
+def test_pause_resume_and_account_isolation(window, qtbot):
+    window.set_reduced_motion(True)
     window.current_user = lambda: SimpleNamespace(id="one")
     window.show_tour()
-    window.tour.show_step(8)
+    window.tour.show_step(3)
+    stopped_at = window.tour.index
     window.activateWindow()
     qtbot.wait(10)
     qtbot.keyClick(window.tour.next, Qt.Key.Key_Escape)
     assert window.tour is None
     window.show_tour()
-    assert window.tour.index == 8
-    window.tour.chapters.setCurrentText("Meet")
-    assert STEPS[window.tour.index].chapter == "Meet"
+    assert window.tour.index == stopped_at
     window.tour.finish("paused")
     window.current_user = lambda: SimpleNamespace(id="two")
     window.show_tour()
@@ -128,41 +116,37 @@ def test_pause_resume_chapters_and_account_isolation(window, qtbot):
     window.tour.finish("skipped")
     window.current_user = lambda: SimpleNamespace(id="one")
     window.show_tour()
-    assert STEPS[window.tour.index].chapter == "Meet"
+    assert window.tour.index == stopped_at
     window.tour.finish("paused")
 
 
-def test_hidden_target_does_not_get_spotlight(window, qtbot):
-    window.sidebar.hide()
+def test_completed_tour_can_be_replayed_from_the_start(window):
+    window.set_reduced_motion(True)
     window.show_tour()
-    window.tour.show_step(0)
-    assert window.tour.target_rect.isEmpty()
-    window.tour.finish("paused")
-
-
-def test_completed_tour_can_be_replayed_from_start(window):
-    window.show_tour()
-    window.tour.show_step(len(STEPS) - 1)
-    window.tour.advance()
+    while window.tour is not None:
+        window.tour.advance()
     window.show_tour()
     assert window.tour.index == 0
     window.tour.finish("skipped")
 
 
-def test_tour_highlights_component_without_a_surrounding_overlay(window, qtbot):
+def test_first_run_offers_the_tour_once_and_never_after_it_was_answered(window):
+    window.set_reduced_motion(True)
+    window.start_first_tour()
+    assert window.tour is not None
+    window.tour.finish("skipped")
+    window.start_first_tour()
+    assert window.tour is None  # skipped means skipped
+    window.settings.setValue(account_key(window) + "/status", "paused")
+    window.start_first_tour()
+    assert window.tour is None  # a paused tour waits for the person, not for us
+
+
+def test_clicking_the_dimmed_window_does_nothing(window, qtbot):
     window.set_reduced_motion(True)
     window.show_tour()
     tour = window.tour
-    qtbot.wait(10)
-    for index in range(len(STEPS)):
-        tour.show_step(index)
-        if tour.highlighted_target is not None:
-            break
-    target = tour.highlighted_target
-    assert target is not None
-    assert target.graphicsEffect() is tour.component_effect
-    assert tour.mask().isEmpty()
-    assert tour.size() == tour.card.size()
-    assert tour.parentWidget().rect().contains(tour.geometry())
+    before = tour.index
+    qtbot.mouseClick(tour, Qt.MouseButton.LeftButton, pos=tour.rect().center())
+    assert window.tour is tour and tour.index == before
     tour.finish("paused")
-    assert target.graphicsEffect() is None

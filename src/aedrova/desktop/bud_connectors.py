@@ -540,7 +540,7 @@ class ConnectorsDialog(AppDialog):
             self.status.setText(
                 "Choose a tool to connect."
                 if self.rows
-                else "Choose a tool. Your Bud will be saved when you connect."
+                else "Tools are optional. Connect one now, or skip and add it later."
                 if self.embedded_owner
                 else "Create a Bud first, then connect its tools here."
             )
@@ -711,7 +711,7 @@ class ConnectorsDialog(AppDialog):
                 )
                 column.addWidget(
                     label(
-                        "Service setup required"
+                        "Unavailable right now"
                         if not login_ready and not connected
                         else "Connected to this Bud"
                         if connected

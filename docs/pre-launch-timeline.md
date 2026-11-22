@@ -2,19 +2,40 @@
 
 Planning baseline: October 30, 2026, Asia/Bangkok. Apple Developer membership is active, as reported by the owner. Account/team access, certificates and Apple login have not been verified by this planning task.
 
-Target: 15–20 focused working days of execution, excluding external provider review, owner setup and funding delays. This is an estimate, not a promised launch date. Preparation may overlap; milestone completion remains gated. This timeline does not itself authorize another stage. Stage 1 acceptance was subsequently resumed by the owner; each later stage still requires approval.
+Desktop baseline: 15–20 focused working days, excluding external provider review, owner setup and funding delays. The iPhone gate added November 9 needs its own estimate after scoping. The public launch date depends on both tracks. Preparation may overlap. This timeline does not itself authorize another stage. Stage 1 acceptance was subsequently resumed by the owner. Each later stage still requires approval.
 
 Current execution: Apple signing/notarization and Sign in with Apple, prioritized November 5. Stage 4 was approved and then paused for Apple setup. Stage 3 payment-free checks passed and PR #16 merged after Mac/Windows/Linux and PostgreSQL CI. Owner-directed Stage 2 UI fixes are signed off; remaining combined visual/shared-context checks and funded gates are not waived. Historical Stage 1 status follows. Previously passed: fresh onboarding, bounded OpenAI build/review/apply, Stripe test access, TikTok staging access and new-workspace Free activation. Offline English/Hindi desktop translation and simultaneous-reader prompt-display acceptance have now passed with two real staging accounts. Public-site localization remains partial and separate. The earlier bounded API test allowance was restored; offline acceptance needed no entitlement change.
 
-## 1. Finish staging acceptance — Days 1–3
+## Launch priority 1. iPhone companion and App Store acceptance
+
+The owner moved the iPhone companion to the first launch priority on November 10. Development is underway in [Aedrova_mobile](https://github.com/ayanshv/Aedrova_mobile). The first release covers channels and direct messages, mentions, and agent and Bud updates. Teammates can reply to agent questions and check completed work from their phones. Local project setup and builds stay on desktop.
+
+Add iOS to the existing Aedrova App Store Connect record and upload a signed build. Test on real iPhones through TestFlight, including workspace access, message sync, mention notifications, and agent replies across mobile and desktop. Prepare App Store screenshots, privacy disclosures, and reviewer access, then submit for App Review and verify the public listing at release.
+
+Exit: real-device acceptance passes, Apple approves the iOS build, and the App Store release is ready to go live. Include a live listing and install check in the public rollout.
+
+## Android companion and Google Play
+
+Run Android as a separate release track so iPhone submission can proceed while the Android companion is built and tested.
+
+1. Confirm the Play Console account type and complete developer verification. Reserve the Android package name and set up Play App Signing under the intended publisher. The owner handles identity checks and any fee.
+2. Build the Kotlin/Compose companion for Android 16 (API 36) or later. Reuse the existing workspace, invite, chat, realtime, moderation and account deletion APIs. Add Android sign-in and deep links, then test on at least two physical devices and across Android, iPhone and desktop.
+3. Upload a signed Android App Bundle to internal testing. Prepare reviewer access, screenshots, content rating, privacy policy and Data safety disclosures. Provide an in-app account deletion entry and a direct web deletion page.
+4. If the publisher uses a personal account created after November 13, 2023, run the required closed track with at least 12 testers opted in continuously for at least 14 days. Apply for production access after satisfying that gate.
+5. Submit for Play review, roll out to an initial cohort, and add the verified Google Play listing link to desktop onboarding and the website.
+
+Sources: [Target API](https://support.google.com/googleplay/android-developer/answer/11926878), [Developer verification](https://support.google.com/googleplay/android-developer/answer/10788890), [Account deletion](https://support.google.com/googleplay/android-developer/answer/13327111), [Closed testing](https://support.google.com/googleplay/android-developer/answer/14151465).
+
+## 1. Finish desktop staging acceptance — Days 1–3
 
 Passed: live Bud-cap/downgrade checks, uploads/voice transport, human audio clarity, Research three-turn conversation/follow-up/correction, and simultaneous English/Hindi reader/prompt display with offline models. Connector lifecycle acceptance also passed; see connector-lifecycle-acceptance-2026-10-30.md. The owner subsequently selected Buffer as the primary social publishing path.
 Real Instagram scheduling, approval, duplicate prevention, refresh and revocation
 acceptance passed on October 31; see buffer-staging-acceptance-2026-10-31.md.
 Direct Meta/TikTok public approvals remain unverified for legacy read connectors
 and no longer block this new path. Remaining candidate status-fix CI/deployment
-must pass before the non-funded Stage 1 scope exits. Funded Claude and reliable
-two-device meetings remain deferred final launch gates.
+must pass before the non-funded Stage 1 scope exits. Reliable two-device
+meetings remain a deferred final launch gate. Claude funding moved to post-launch on
+November 21; launch depends on Codex only.
 
 Exit: evidence for each advertised flow; unresolved features held back from launch.
 
@@ -78,7 +99,7 @@ Exit: signing identities and Apple login configured; Windows signing method sele
 
 ## 7. Final paid and commercial gates — Days 13–15 · owner controlled
 
-Owner completes required production hosting/meeting guard, provider funding and any signing purchases. Finalize Stripe prices/entitlements; verify retries, renewals, failures, upgrades, cancellations and refunds. Complete funded Claude and real two-device meeting acceptance.
+Owner completes required production hosting/meeting guard, provider funding and any signing purchases. Finalize Stripe prices/entitlements; verify retries, renewals, failures, upgrades, cancellations and refunds. Complete real two-device meeting acceptance. Claude funding is post-launch.
 
 The owner deferred Supabase Pro to this gate on November 7. After the owner
 upgrades the Aedrova organization and a physical backup exists, restore it to an
@@ -92,7 +113,11 @@ Exit: funded services operate and billing matches approved plans. No payments su
 
 Freeze candidate, sign/notarize Mac and sign Windows, validate clean installs/update/uninstall. Apply reviewed production migrations, verify backups, downloads, support, legal/operator disclosures and rollback. Invite a small cohort before wider launch.
 
-Exit: explicit go/no-go approval, working download links and monitored production. Blockers delay release.
+Exit: explicit go/no-go approval, working Mac and Windows download links, a verified iPhone App Store listing and install, and monitored production. Blockers delay release.
+
+### Deferred Mac App Store Connect gate
+
+The owner deferred the Mac upload for the Sign in with Apple icon. Revisit the private macOS draft later in release preparation, after core functionality acceptance. At that point, confirm access to App Store Connect and authorize the Mac App Distribution and Mac Installer Distribution certificates. Prepare a Store-signed build with the existing icon, upload it to the draft, and check whether Apple displays the icon on a fresh sign-in. The iPhone App Review and desktop installer acceptance gates still apply independently.
 
 ## Owner actions and external dependencies
 
@@ -105,3 +130,14 @@ No personal action is required to approve or read this plan. When execution resu
 - Before public commercial release: confirm the actual legal operator and required disclosures. C-Corp formation remains deferred; do not represent Aedrova as incorporated. If the 60-day offer is still advertised, reconcile its actual deadline/eligibility before launch; do not silently restart it.
 
 Feature freeze: after step 5, only launch blockers, security fixes and release corrections. New feature requests go to a post-launch backlog unless explicitly replacing scheduled work. Security and release acceptance apply to every added feature; the feature slot does not waive launch gates.
+
+### November 18 launch scope update
+
+Launch uses the OpenAI-backed Aedrova agent. Cross-provider model routing, provider selection and Anthropic funding are deferred to docs/post-launch-plans.md. Validate the single-agent production experience before wider launch.
+
+### November 20 launch scope update
+
+Slack public-channel history import is a public launch gate for Mac and Windows.
+Ship the native ZIP flow and verify a real export, permission-scoped search and cited
+agent retrieval. Teams and expanded Slack coverage follow after launch. See the
+[Slack launch scope and acceptance checks](migration-roadmap.md#november-20-launch-scope).

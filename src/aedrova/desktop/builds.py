@@ -16,7 +16,6 @@ from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
     QLineEdit,
-    QMessageBox,
     QPlainTextEdit,
     QTabWidget,
     QTextEdit,
@@ -161,7 +160,7 @@ class BuildJob(QRunnable):
         self.signals = Signals()
         self.baseline = baseline
         self.context, self.repository, self.task = context, repository, task
-        self.provider, self.plan, self.project, self.approved = provider, plan, project, approved
+        self.provider, self.plan, self.project, self.approved = "codex", plan, project, approved
         self.teammate = None
         self.bud = None
         self.ledger = None
@@ -189,57 +188,6 @@ class BuildJob(QRunnable):
         try:
             if self.runner.cancelled.is_set():
                 raise BuildCancelled()
-            if self.provider == "auto":
-                from aedrova.agents.routing import choose, runtime_candidates
-
-                candidates = runtime_candidates(managed=self.managed_client is not None)
-                if self.managed_client:
-                    balance = self.managed_client.balance(self.context.workspace_id)
-                    if (
-                        type(balance.get("available")) not in {int, float}
-                        or balance["available"] <= 0
-                    ):
-                        raise ValueError(
-                            "Your Space has no available AI credit. Check team billing."
-                        )
-                    configured = {row["provider"] for row in balance.get("coding_providers", [])}
-                    if not configured:
-                        raise ValueError(
-                            "Routing preflight unavailable. Update the server or select a provider."
-                        )
-                    from dataclasses import replace as candidate_replace
-
-                    candidates = [
-                        candidate_replace(
-                            row, available=row.available and row.provider in configured
-                        )
-                        for row in candidates
-                    ]
-                import os
-                import sys
-
-                from aedrova.agents.routing import category, reviewed_candidates
-
-                evaluation = (
-                    ""
-                    if getattr(sys, "frozen", False)
-                    else os.getenv("AEDROVA_ROUTING_EVALUATION_FILE", "")
-                )
-                if evaluation:
-                    candidates = reviewed_candidates(
-                        evaluation,
-                        candidates,
-                        task_category=category(self.task),
-                        configuration="aedrova-local-harness-v1",
-                    )
-                decision = choose(self.task, candidates)
-                if decision.provider is None:
-                    raise ValueError("This is a conversation request. Ask Aedrova in chat.")
-                self.provider = decision.provider
-                self.routing_decision = decision.record()
-                self.signals.progress.emit(
-                    "Aedrova selected " + self.provider + ": " + decision.reason
-                )
             if self.teammate:
                 from aedrova.connectors.service import evidence
 
@@ -466,6 +414,8 @@ class BuildDialog(AppDialog):
         self.context_callbacks = {}
         self.invalidated = False
         self.permission_box = None
+        self.prompt_card = None
+        self.card_answers = None
         self.context_browser = None
         self.review_dialog = None
         self.successful_build = False
@@ -709,8 +659,16 @@ class BuildDialog(AppDialog):
             self.window, self.request.toPlainText(), bud=getattr(self, "bud", None)
         )
 
+    def answer_from_card(self, answers):
+        self.card_answers = answers
+        self.resume_with_answer()
+
     def clear_question(self):
         self.clarification = None
+        self.card_answers = None
+        card, self.prompt_card = getattr(self, "prompt_card", None), None
+        if card is not None and card in self.window.agent_feed.rows:
+            self.window.agent_feed.remove_row(card)
         if self.question_form:
             self.question_slot.removeWidget(self.question_form)
             self.question_form.hide()
@@ -741,7 +699,7 @@ class BuildDialog(AppDialog):
             self.cancel()
             self.status.setText("Project permissions changed. Start a new build after setup.")
             return
-        answers = self.question_form.answers()
+        answers, self.card_answers = self.card_answers or self.question_form.answers(), None
         if answers is None:
             self.status.setText("Complete the required fields to continue.")
             return
@@ -789,6 +747,14 @@ class BuildDialog(AppDialog):
             self.stop_before_run("Project permissions changed. Send a new request after setup.")
             return
         self.start(False)
+
+    def delivery_review(self):
+        """The guarded review flow, created without showing its window."""
+        from aedrova.desktop.review import ReviewDialog
+
+        if self.review_dialog is None or self.review_dialog.cancelled.is_set():
+            self.review_dialog = ReviewDialog(self)
+        return self.review_dialog
 
     def open_review(self):
         from aedrova.desktop.review import ReviewDialog
@@ -1135,6 +1101,7 @@ class BuildDialog(AppDialog):
 
     @Slot(object)
     def permission(self, request):
+        deferred = False
         try:
             job = self.job
             user = self.window.current_user()
@@ -1164,39 +1131,40 @@ class BuildDialog(AppDialog):
             ):
                 request["allow"] = True
                 return
-            box = QMessageBox(self)
-            self.permission_box = box
+            feed = self.window.agent_feed
             self.window.agent_activity(self.workspace, "Action needs your approval")
-            box.setWindowTitle("Aedrova · Approve agent action")
-            box.setTextFormat(Qt.TextFormat.PlainText)
-            box.setText(f"Allow {request['tool']} in this build?")
-            detail = request["data"].get("command") or request["data"].get("file_path")
-            if isinstance(detail, str):
-                box.setInformativeText(detail[:320] + ("…" if len(detail) > 320 else ""))
-            box.setDetailedText(json.dumps(request["data"], indent=2))
-            box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-            box.setDefaultButton(QMessageBox.StandardButton.No)
-            box.button(QMessageBox.StandardButton.Yes).setText("Allow once")
-            box.button(QMessageBox.StandardButton.No).setText("Deny")
-            approved = box.exec() == QMessageBox.StandardButton.Yes
-            current = self.window.current_user()
-            request["allow"] = (
-                approved
-                and not self.invalidated
-                and self.pending
-                and self.job is job
-                and not job.runner.cancelled.is_set()
-                and current
-                and str(current.id) == self.user
-                and self.window.workspace_id == self.workspace
-                and mode(self.window, self.workspace) == selected
-                and (not self.background_run or self.background_authorized())
-            )
+            card = feed.add_approval(request["tool"], request["data"])
+            self.permission_box = card
+            deferred = True
+            self.window.present_agent_card(self.workspace)
+
+            def decide(approved):
+                try:
+                    current = self.window.current_user()
+                    request["allow"] = bool(
+                        approved
+                        and not self.invalidated
+                        and self.pending
+                        and self.job is job
+                        and not job.runner.cancelled.is_set()
+                        and current
+                        and str(current.id) == self.user
+                        and self.window.workspace_id == self.workspace
+                        and mode(self.window, self.workspace) == selected
+                        and (not self.background_run or self.background_authorized())
+                    )
+                finally:
+                    if self.permission_box is card:
+                        self.permission_box = None
+                    request["event"].set()
+
+            card.decided.connect(decide)
         finally:
-            self.permission_box = None
-            request["event"].set()
+            if not deferred:
+                request["event"].set()
 
     def finished(self, result, plan):
+        self.window.workspace_usage.refresh(self.workspace)
         if result.get("provider") in {"codex", "claude_code"}:
             self.provider.blockSignals(True)
             self.provider.setCurrentIndex(self.provider.findData(result["provider"]))
@@ -1228,9 +1196,13 @@ class BuildDialog(AppDialog):
             self.status.setText("Waiting for your answer")
             self.start_button.setText("Send answer")
             self.window.agent_activity(self.workspace, "Build paused · answer a question")
-            self.show()
-            self.raise_()
-            self.question_form.focus_first()
+            self.prompt_card = self.window.agent_feed.add_prompt(self.clarification)
+            self.prompt_card.submitted.connect(self.answer_from_card)
+            self.window.present_agent_card(self.workspace)
+            if not self.background_run:
+                self.show()
+                self.raise_()
+                self.question_form.focus_first()
             return
         if result["ok"]:
             self.response.setHtml(markdown_html(result["text"], base_font=self.response.font()))
@@ -1315,6 +1287,21 @@ class BuildDialog(AppDialog):
                 open_changes=review_current_build if summary else None,
             )
             if (
+                result["ok"]
+                and self.successful_build
+                and not plan
+                and self.window.workspace_id == self.workspace
+                and self.project
+                and not getattr(self, "bud", None)
+                and not getattr(self, "teammate", None)
+            ):
+                from aedrova.desktop.agent_components import DeliveryCard
+
+                feed = self.window.agent_feed
+                card = DeliveryCard(self.delivery_review())
+                feed.reply_row.column.addWidget(card)
+                feed.changed.emit()
+            elif (
                 result["ok"]
                 and self.successful_build
                 and not plan
@@ -1471,7 +1458,7 @@ class BuildDialog(AppDialog):
         else:
             self.set_busy(False)
         if self.permission_box:
-            self.permission_box.reject()
+            self.permission_box.resolve(False)
         self.status.setText("Cancellation requested. Waiting for the provider to stop…")
         if not self.invalidated:
             self.window.agent_activity(

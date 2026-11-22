@@ -1,4 +1,4 @@
-"""User-token-only access. Sessions live in memory, never QSettings or project files."""
+"""User-token-only access. The desktop can opt in to secure refresh-token storage."""
 
 import base64
 import hashlib
@@ -13,7 +13,7 @@ from threading import local
 from urllib.parse import urlparse
 
 import httpx
-from supabase_auth.errors import AuthRetryableError
+from supabase_auth.errors import AuthApiError, AuthRetryableError, AuthSessionMissingError
 
 from supabase import ClientOptions, create_client
 
@@ -110,6 +110,48 @@ class IdentityService:
             ),
         )
         self.user = None
+        self._session_subscription = None
+
+    def remember_session(self, vault, slot):
+        session = self.client.auth.get_session()
+        if session is None or not session.refresh_token:
+            return False
+        if not vault.save(slot, session.refresh_token):
+            return False
+
+        def rotated(event, updated):
+            if event == "TOKEN_REFRESHED" and updated and updated.refresh_token:
+                vault.save(slot, updated.refresh_token)
+
+        self._session_subscription = self.client.auth.on_auth_state_change(rotated)
+        return True
+
+    def restore_session(self, vault, slot):
+        token = vault.read(slot)
+        if not token:
+            return None, False
+        try:
+            result = self.client.auth.refresh_session(token)
+        except AuthSessionMissingError:
+            vault.discard(slot)
+            return None, False
+        except AuthApiError as error:
+            if error.code not in {
+                "refresh_token_not_found",
+                "refresh_token_already_used",
+                "session_not_found",
+                "session_expired",
+                "user_not_found",
+                "user_banned",
+            }:
+                raise
+            vault.discard(slot)
+            return None, False
+        if not result.session or not result.user:
+            vault.discard(slot)
+            return None, False
+        self.user = result.user
+        return self.user, self.remember_session(vault, slot)
 
     def fork_for_context(self):
         """Called in the serialized transport worker; never expose tokens to UI/logs."""
@@ -125,7 +167,7 @@ class IdentityService:
         )
         fork.is_context_clone = True
         try:
-            result = fork.client.auth.set_session(session.access_token, session.refresh_token)
+            result = fork.client.auth.set_session(session.access_token, "")
             fork.user = result.user
             if fork.user is None or str(fork.user.id) != str(self.user.id):
                 raise PermissionError("Session changed. Sign in again.")
@@ -199,6 +241,9 @@ class IdentityService:
             self.rpc("save_chat_profile", {"p_data": {"display_name": name}})
 
     def sign_out(self):
+        if self._session_subscription is not None:
+            self._session_subscription.unsubscribe()
+            self._session_subscription = None
         try:
             self.client.auth.sign_out({"scope": "local"})
         finally:
@@ -450,17 +495,34 @@ class IdentityService:
             "set_agent_preferences",
             "create_channel",
             "create_invitation",
+            "create_workspace_join_code",
             "accept_invitation",
             "revoke_invitation",
             "set_member_role",
             "remove_member",
             "set_channel_member",
             "set_workspace_archived",
+            "write_slack_history",
+            "slack_history",
+            "list_slack_imports",
+            "remove_slack_import",
         }
         if name not in allowed:
             raise ValueError("Unsupported account operation")
         self._authenticated()
         return self.client.rpc(name, parameters).execute().data
+
+    def slack_history(self, workspace, query, limit=20):
+        from postgrest.exceptions import APIError
+
+        try:
+            return self.rpc("slack_history", {
+                "p_workspace": workspace, "p_query": query[:1400], "p_limit": limit,
+            })
+        except APIError as error:
+            if error.code == "PGRST202":
+                return []
+            raise
 
     def message_interactions(self, identifiers):
         self._authenticated()
@@ -655,6 +717,26 @@ class IdentityService:
             .data
         )
 
+    def channel_history(self, channel, limit=400):
+        """The newest `limit` messages of one channel, newest page first, paged by sequence."""
+        self._authenticated()
+        rows, before = [], None
+        while len(rows) < limit:
+            size = min(200, limit - len(rows))
+            page = (
+                self.client.rpc(
+                    "message_page",
+                    {"p_channel": channel, "p_threads": True, "p_before": before, "p_limit": size},
+                )
+                .execute()
+                .data
+            )
+            rows.extend(page)
+            if len(page) < size:
+                break
+            before = min(row["sequence"] for row in page)
+        return rows[:limit]
+
     def thread_context(self, channel, parent):
         self._authenticated()
         root = (
@@ -843,6 +925,28 @@ class IdentityService:
         if credential_rules(parameters["p_body"].encode()):
             raise ValueError("Remove credentials before saving an agent reply.")
         return self.client.rpc("save_agent_reply", parameters).execute().data
+
+    def publish_chat_agent_reply(self, reply):
+        self._authenticated()
+        self.client.rpc("publish_chat_agent_reply", {"p_reply": reply}).execute()
+
+    def report_chat_agent_progress(self, prompt, phase):
+        self._authenticated()
+        self.client.rpc(
+            "report_chat_agent_progress", {"p_prompt": prompt, "p_phase": phase}
+        ).execute()
+
+    def chat_agent_progress(self, channel):
+        self._authenticated()
+        try:
+            return (
+                self.client.table("chat_agent_progress").select("author_id,parent_id,phase")
+                .eq("channel_id", channel).order("expires_at", desc=True).limit(12).execute().data
+            )
+        except Exception as error:
+            if getattr(error, "code", None) == "PGRST205":
+                return []
+            raise
 
     def shared_agent_work(self, workspace, *, identifiers=None):
         """Fresh RLS read; no private Bud history or cached connector grants."""

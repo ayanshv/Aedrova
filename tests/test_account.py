@@ -24,7 +24,7 @@ def test_missing_configuration_never_starts_network(qtbot, tmp_path, monkeypatch
     widget = dialog(qtbot, tmp_path)
     widget.start_google()
     assert not widget.busy
-    assert "not available" in widget.status.text()
+    assert "isn’t available" in widget.status.text()
 
 
 def test_worker_does_not_block_event_loop_or_close_during_request(qtbot, tmp_path):
@@ -83,6 +83,58 @@ def test_new_google_user_gets_onboarding(qtbot, tmp_path):
     assert "Aedrova" in widget.windowTitle()
 
 
+def test_sign_in_reopens_last_accessible_workspace(qtbot, tmp_path):
+    widget = dialog(qtbot, tmp_path)
+    widget.service = SimpleNamespace(
+        user=SimpleNamespace(id="returning-user"),
+        connection=SimpleNamespace(url="https://staging.example.test"),
+    )
+    widget.remember_workspace("recent")
+    widget.awaiting_sign_in_snapshot = True
+    snapshot = {
+        **widget.snapshot,
+        "workspaces": [{"id": "first", "name": "First"}, {"id": "recent", "name": "Recent"}],
+    }
+    opened = []
+    widget.dashboard_requested.connect(lambda: opened.append(widget.workspace_id()))
+    widget.loaded(snapshot)
+    assert opened == ["recent"]
+
+    widget.show()
+    widget.loaded(snapshot)
+    assert opened == ["recent"]
+
+
+def test_sign_in_ignores_archived_or_other_accounts_last_workspace(qtbot, tmp_path):
+    widget = dialog(qtbot, tmp_path)
+    widget.service = SimpleNamespace(
+        user=SimpleNamespace(id="returning-user"),
+        connection=SimpleNamespace(url="https://staging.example.test"),
+    )
+    widget.remember_workspace("archived")
+    remembered_key = widget.last_workspace_key()
+    snapshot = {
+        **widget.snapshot,
+        "workspaces": [{"id": "available", "name": "Available"}],
+        "archived_workspaces": [{"id": "archived", "name": "Archived"}],
+    }
+    opened = []
+    widget.dashboard_requested.connect(lambda: opened.append(widget.workspace_id()))
+
+    widget.service.user.id = "different-user"
+    widget.awaiting_sign_in_snapshot = True
+    widget.loaded(snapshot)
+    assert widget.settings.value(remembered_key) == "archived"
+    assert not opened
+
+    widget.service.user.id = "returning-user"
+    widget.awaiting_sign_in_snapshot = True
+    widget.loaded(snapshot)
+    assert not widget.settings.contains(remembered_key)
+    assert widget.pages.currentIndex() == 4
+    assert not opened
+
+
 def test_onboarding_sends_shared_nickname_and_provider(qtbot, tmp_path):
     widget = dialog(qtbot, tmp_path)
     calls = []
@@ -96,7 +148,7 @@ def test_onboarding_sends_shared_nickname_and_provider(qtbot, tmp_path):
     assert calls == [
         (
             "onboard_workspace",
-            {"p_name": "Our team", "p_nickname": "Sparky", "p_provider": "claude_code"},
+            {"p_name": "Our team", "p_nickname": "Sparky", "p_provider": "codex"},
         )
     ]
     widget.onboarding_nickname.setText("<admin>")
@@ -192,7 +244,7 @@ def setup_service(widget, *, fail_refresh=False):
     return calls
 
 
-def test_wizard_finishes_once_without_returning_to_create(qtbot, tmp_path):
+def test_wizard_finishes_once_without_returning_to_create(qtbot, tmp_path, monkeypatch):
     widget = dialog(qtbot, tmp_path)
     calls = setup_service(widget)
     widget.begin_onboarding()
@@ -201,7 +253,6 @@ def test_wizard_finishes_once_without_returning_to_create(qtbot, tmp_path):
     widget.onboarding_workspace.setText("Our team")
     widget.name_continue.click()
     assert widget.onboarding_steps.currentIndex() == 1
-    widget.provider_continue.click()
     widget.onboarding_ack.setChecked(True)
     widget.finish_onboarding.click()
     widget.finish_onboarding.click()
@@ -210,11 +261,47 @@ def test_wizard_finishes_once_without_returning_to_create(qtbot, tmp_path):
     assert widget.workspace_id() == "new"
     assert widget.onboarding_steps.currentIndex() == 2
     assert widget.ready_summary.text() == "Our team"
+    opened = []
+    monkeypatch.setattr(
+        "aedrova.desktop.slack_history.open_slack_history",
+        lambda parent, service, workspace, mode: opened.append((workspace, mode)),
+    )
+    widget.ready_slack.click()
+    assert opened == [("new", "import")]
     widget.finish_setup()
     assert widget.pages.currentIndex() == 4
     assert widget.home_workspaces.currentData() == "new"
     assert len(calls) == 1
 
+
+
+def test_new_workspace_opens_join_code_after_entering_chat(qtbot, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QWidget
+
+    parent = QWidget()
+    qtbot.addWidget(parent)
+    widget = AccountDialog(parent, settings=QSettings(
+        str(tmp_path / "account.ini"), QSettings.Format.IniFormat
+    ))
+    qtbot.addWidget(widget)
+    setup_service(widget)
+    opened = []
+    monkeypatch.setattr(
+        "aedrova.desktop.team_invite.open_workspace_join_code",
+        lambda window, workspace: opened.append((window, workspace)),
+    )
+    widget.begin_onboarding()
+    widget.onboarding_workspace.setText("Our team")
+    widget.name_continue.click()
+    widget.onboarding_ack.setChecked(True)
+    widget.finish_onboarding.click()
+    qtbot.waitUntil(lambda: not widget.busy)
+    assert not opened
+
+    widget.open_dashboard()
+    qtbot.waitUntil(lambda: opened == [(parent, "new")])
+    widget.open_dashboard()
+    assert widget.pending_team_invite_workspace is None
 
 def test_successful_create_with_failed_refresh_is_not_reported_as_failed(qtbot, tmp_path):
     widget = dialog(qtbot, tmp_path)

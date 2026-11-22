@@ -130,6 +130,43 @@ def test_main_agent_greeting_never_builds_without_buds(qtbot, tmp_path, monkeypa
     assert not window.start_agent_request("ordinary human chat")
 
 
+def test_prd_mention_posts_before_requesting_a_chat_draft(qtbot, tmp_path, monkeypatch):
+    window, _ = setup(qtbot, tmp_path)
+    events = []
+    task = "build me a prd for a mobile app which gives automatic descriptions for images"
+    prompt = "@Aedrova " + task
+
+    def send(text, parent, *, composer):
+        events.append(("chat", text, parent))
+        return "posted-prompt"
+
+    monkeypatch.setattr(window.connected, "send", send)
+    monkeypatch.setattr(
+        "aedrova.desktop.dot_analysis.start_analysis",
+        lambda _, request, **kw: events.append(("draft", request)) or True,
+    )
+    window.send_message(prompt)
+    assert events == [("chat", prompt, None), ("draft", task)]
+    assert window.agent_request_origin[-1] == "posted-prompt"
+
+
+def test_declined_agent_work_does_not_swallow_thread_message(qtbot, tmp_path, monkeypatch):
+    window, _ = setup(qtbot, tmp_path)
+    window.thread_id = "thread-root"
+    prior = window.agent_request_origin = ("w", "c", "thread-root", "running-prompt")
+    sent = []
+
+    def send(text, parent, *, composer):
+        sent.append((text, parent, composer))
+        return "new-prompt"
+
+    monkeypatch.setattr(window.connected, "send", send)
+    monkeypatch.setattr("aedrova.desktop.builds.start_background_build", lambda *_: False)
+    window.send_reply("@Aedrova build a status page")
+    assert sent == [("@Aedrova build a status page", "thread-root", window.thread_composer)]
+    assert window.agent_request_origin == prior
+
+
 def access(provider="codex"):
     return BuildAccess(
         "run",
@@ -280,7 +317,7 @@ def test_greeting_skips_evidence_and_tools_but_rechecks_identity(monkeypatch, ad
     job.signals.finished.connect(result.append)
     job.run()
     assert result == (
-        [{"text": "Hello!", "source_channels": ["c"]}]
+        [{"text": "Hello!", "source_channels": ["c"], "shareable": True}]
         if addressed_bud
         else [{"text": "Hello! How can I help?"}]
     )
@@ -507,8 +544,11 @@ def test_thinking_stays_mounted_through_auth_handoff_and_slow_reply(qtbot, tmp_p
     jobs[0].signals.progress.emit("Reading shared work…")
     assert window.agent_feed.rows == [before]
     assert window.build_activity.text() == "Reading shared work…"
-    assert "checking which workspace sources" in before.work_notes.text()
-    assert "other Buds" in before.work_notes.text()
+    assert before.checklist.states() == [
+        ("access", "done"),
+        ("context", "running"),
+        ("respond", "pending"),
+    ]
 
     window._load_channel()
     qtbot.wait(5200)

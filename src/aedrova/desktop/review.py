@@ -3,7 +3,7 @@
 import threading
 from uuid import uuid4
 
-from PySide6.QtCore import QThreadPool, QUrl, Slot
+from PySide6.QtCore import QThreadPool, QUrl, Signal, Slot
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -20,10 +20,12 @@ from aedrova.delivery.preview import StaticPreview
 from aedrova.desktop.controls import AppDialog
 from aedrova.desktop.design_system import FlowActions
 from aedrova.desktop.dialogs import button, label
-from aedrova.desktop.projects import Job, binding, open_editor
+from aedrova.desktop.projects import Job, binding, open_editor, open_project
 
 
 class ReviewDialog(AppDialog):
+    state = Signal(str, object)
+
     def __init__(self, studio):
         super().__init__(studio)
         self.studio, self.window = studio, studio.window
@@ -74,6 +76,10 @@ class ReviewDialog(AppDialog):
         remote.addWidget(self.prepare_button)
         remote.addWidget(self.publish_button)
         layout.addLayout(remote)
+        self.connect_repository = button("Connect a GitHub repository…", role="outline")
+        self.connect_repository.clicked.connect(self.open_project_connection)
+        self.connect_repository.hide()
+        layout.addWidget(self.connect_repository)
         self.evidence_button = button("Requirements & shared evidence…", role="outline")
         self.evidence_button.clicked.connect(self.open_evidence)
         layout.addWidget(self.evidence_button)
@@ -176,6 +182,7 @@ class ReviewDialog(AppDialog):
             self.publication = None
             self.publish_button.setEnabled(False)
             self.status.setText(result["error"])
+            self.state.emit("error", result["error"])
         else:
             self.callback(result["value"])
 
@@ -199,6 +206,7 @@ class ReviewDialog(AppDialog):
         self.scope.setText("Review fingerprint: " + review.digest)
         self.apply_button.setEnabled(bool(review.changes))
         self.prepare_button.setEnabled(bool(review.changes))
+        self.state.emit("loaded", review)
 
     def open_evidence(self):
         if not self.review or self.job or self.cancelled.is_set():
@@ -237,10 +245,11 @@ class ReviewDialog(AppDialog):
         )
         QDesktopServices.openUrl(QUrl(preview.url))
 
-    def apply(self):
+    def apply(self, checked=False, *, confirmed=False):
+        """`confirmed` means the caller already showed this exact scope and got a yes."""
         if not self.review or not self.review.changes:
             return
-        if (
+        if not confirmed and (
             QMessageBox.question(
                 self,
                 "Apply reviewed changes?",
@@ -260,6 +269,7 @@ class ReviewDialog(AppDialog):
         self.status.setText("Applied. Recovery copy: " + str(receipt))
         self.apply_button.setEnabled(False)
         self.record_delivery("local_apply", "Reviewed changes applied locally")
+        self.state.emit("applied", str(receipt))
         self.studio.repository.setText(str(self.review.source))
 
     def prepare(self):
@@ -267,8 +277,12 @@ class ReviewDialog(AppDialog):
             return
         repo = binding(self.window, self.studio.workspace).get("repository")
         if not repo:
-            self.status.setText("Connect a GitHub repository in Projects first.")
+            self.status.setText("Connect a repository to publish this review.")
+            self.state.emit("needs_repository", None)
+            self.connect_repository.show()
+            self.connect_repository.setFocus()
             return
+        self.connect_repository.hide()
         self.run(
             lambda guard: prepare_publication(
                 GitHub(), repo, self.review, self.studio.request.toPlainText()
@@ -276,6 +290,12 @@ class ReviewDialog(AppDialog):
             self.prepared,
             publishing=True,
         )
+
+    def open_project_connection(self):
+        if self.window.workspace_id != self.studio.workspace:
+            self.status.setText("Switch back to this review’s workspace to connect a repository.")
+            return
+        open_project(self.window)
 
     def prepared(self, publication):
         self.publication = publication
@@ -289,11 +309,12 @@ class ReviewDialog(AppDialog):
         )
         self.status.setText("Ready for approval. This scope expires in ten minutes.")
         self.publish_button.setEnabled(True)
+        self.state.emit("prepared", publication)
 
-    def publish(self):
+    def publish(self, checked=False, *, confirmed=False):
         if not self.publication or not self.review:
             return
-        if (
+        if not confirmed and (
             QMessageBox.question(
                 self,
                 "Publish this exact review?",
@@ -317,6 +338,7 @@ class ReviewDialog(AppDialog):
         self.scope.setText(result["url"])
         self.record_delivery("draft_pr" if "/pull/" in result["url"] else "branch", result["url"])
         self.publish_button.setEnabled(False)
+        self.state.emit("published", result)
 
     def record_delivery(self, kind, reference):
         identifier = getattr(self.studio, "evidence_id", None)

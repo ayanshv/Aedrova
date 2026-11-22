@@ -4,6 +4,7 @@ from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QRectF, QSize, Qt, 
 from PySide6.QtGui import QIcon, QPainter
 from PySide6.QtWidgets import (
     QApplication,
+    QButtonGroup,
     QFrame,
     QGraphicsOpacityEffect,
     QGridLayout,
@@ -87,10 +88,11 @@ class BudLineup(QWidget):
 def build_setup(d, window):
     d.setWindowTitle("Aedrova · Configure your Buds")
     d.setObjectName("BudSetup")
-    d.setMinimumSize(600, 650)
-    d.resize(820, 800)
+    d.setMinimumSize(640, 680)
+    d.resize(840, 820)
     outer = QVBoxLayout(d)
-    outer.setContentsMargins(32, 22, 32, 22)
+    outer.setContentsMargins(32, 24, 32, 24)
+    outer.setSpacing(14)
     toolbar = QHBoxLayout()
     toolbar.addWidget(label("Aedrova / Buds", "muted"))
     toolbar.addStretch()
@@ -101,32 +103,36 @@ def build_setup(d, window):
     d.list = QListWidget(d)
     d.list.setProperty("accountList", True)
     d.list.setAccessibleName("Your workspace Buds")
-    d.list.setMaximumHeight(54)
+    d.list.setMaximumHeight(60)
     d.list.currentRowChanged.connect(d.select)
     outer.addWidget(d.list)
     panel = QFrame(d)
     panel.setObjectName("BudSetupPanel")
     d.setup_panel = panel
-    panel.setMinimumWidth(500)
-    panel.setMaximumWidth(560)
+    panel.setMinimumWidth(540)
+    panel.setMaximumWidth(640)
     outer.addWidget(panel, 1, Qt.AlignmentFlag.AlignHCenter)
     column = QVBoxLayout(panel)
-    column.setContentsMargins(34, 24, 34, 24)
-    column.setSpacing(10)
+    column.setContentsMargins(36, 24, 36, 28)
+    column.setSpacing(12)
     navigation = QHBoxLayout()
+    navigation.setSpacing(12)
+    d.back = button("Back")
+    from aedrova.desktop.icons import assign
+
+    assign(d.back, "back")
+    d.back.clicked.connect(lambda: d.show_step(max(0, d.pages.currentIndex() - 1)))
+    navigation.addWidget(d.back)
+    navigation.addStretch()
     d.progress = label("1 / 7", "muted")
     navigation.addWidget(d.progress)
-    navigation.addStretch()
     d.exit_button = button("Finish later")
     d.exit_button.clicked.connect(d.finish_later)
     navigation.addWidget(d.exit_button)
     column.addLayout(navigation)
-    d.capacity_note = label("Bud capacity is checked when you connect.", "muted")
+    d.capacity_note = label("Bud capacity is checked when you save.", "muted")
     d.capacity_note.setAccessibleName("Workspace Bud capacity")
     column.addWidget(d.capacity_note)
-    d.back = button("‹  Back")
-    d.back.clicked.connect(lambda: d.show_step(max(0, d.pages.currentIndex() - 1)))
-    column.addWidget(d.back, alignment=Qt.AlignmentFlag.AlignLeft)
     d.pages = QStackedWidget(panel)
     column.addWidget(d.pages, 1)
     d.character = Character(parent=panel, reduced_motion=window.reduced_motion)
@@ -146,8 +152,8 @@ def build_setup(d, window):
         body = QWidget(area)
         body.setObjectName("BudSetupPage")
         layout = QVBoxLayout(body)
-        layout.setContentsMargins(2, 16, 2, 8)
-        layout.setSpacing(14)
+        layout.setContentsMargins(4, 12, 8, 8)
+        layout.setSpacing(12)
         heading = label(title, "heading", wrap=True)
         note = label(subtitle, "muted", wrap=True)
         if centered:
@@ -184,7 +190,9 @@ def build_setup(d, window):
     for title, value in zip(LABELS, LOOKS, strict=True):
         d.appearance.addItem(title, value)
     grid = QGridLayout()
-    grid.setSpacing(8)
+    grid.setSpacing(10)
+    d.appearance_group = QButtonGroup(d)
+    d.appearance_group.setExclusive(True)
     d.appearance_buttons, d.planet_buttons = [], []
     for index, (title, value) in enumerate(zip(LABELS, LOOKS, strict=True)):
         tile = QToolButton(panel)
@@ -197,12 +205,12 @@ def build_setup(d, window):
         tile.setProperty("budAppearance", True)
         tile.setIcon(QIcon(sprite(value)))
         tile.setIconSize(QSize(52, 52))
-        tile.setMinimumHeight(86)
+        tile.setMinimumHeight(92)
         tile.setAccessibleName("Choose " + title + " appearance")
 
 
-
         tile.toggled.connect(lambda checked, v=value: choose_look(d, v) if checked else None)
+        d.appearance_group.addButton(tile)
         grid.addWidget(tile, index // 3, index % 3)
         d.appearance_buttons.append((tile, value))
     if not window.reduced_motion:
@@ -226,7 +234,7 @@ def build_setup(d, window):
 
     identity = page("Make it yours", "Give your Bud a name and choose its color.")
     custom = QHBoxLayout()
-    custom.setSpacing(22)
+    custom.setSpacing(28)
     artwork = QVBoxLayout()
     custom.addLayout(artwork, 1)
     d.character_layouts[2] = artwork
@@ -237,10 +245,10 @@ def build_setup(d, window):
     d.name.setAccessibleName("Bud name")
     fields.addWidget(label("Bud name", "muted"))
     fields.addWidget(d.name)
-    fields.addSpacing(10)
+    fields.addSpacing(14)
     fields.addWidget(label("Color", "muted"))
     swatches = QGridLayout()
-    swatches.setSpacing(8)
+    swatches.setSpacing(10)
     d.swatch_buttons = []
     for index, (title, value) in enumerate(COLORS):
         swatch = button("")
@@ -294,7 +302,6 @@ def build_setup(d, window):
     build_personality(d, personality)
 
 
-
     tools = QWidget(panel)
     d.tools_layout = QVBoxLayout(tools)
     d.tools_layout.setContentsMargins(0, 12, 0, 0)
@@ -309,7 +316,7 @@ def build_setup(d, window):
     d.connection_hint = label("", "muted", wrap=True)
     d.connect = button("Connect GitHub", role="primary")
     d.connect.clicked.connect(d.authorize)
-    d.connector_gallery = button("Browse connectors →")
+    d.connector_gallery = button("Browse connectors")
     d.connector_gallery.clicked.connect(d.open_connectors)
     d.save = button("Save changes")
     d.save.clicked.connect(d.save_dot)
@@ -349,7 +356,7 @@ def build_setup(d, window):
     d.dots.setObjectName("BudStepDots")
     d.dots.setAlignment(Qt.AlignmentFlag.AlignCenter)
     column.addWidget(d.dots)
-    d.next = button("Let’s set up your Bud →", role="primary")
+    d.next = button("Let’s set up your Bud", role="primary")
     d.next.setObjectName("BudContinue")
     d.next.setMinimumWidth(260)
     d.next.clicked.connect(d.continue_setup)
@@ -367,7 +374,7 @@ def build_setup(d, window):
     d.opacity = QGraphicsOpacityEffect(d.character)
     d.character.setGraphicsEffect(d.opacity)
     d.transition = QPropertyAnimation(d.opacity, b"opacity", d)
-    d.transition.setDuration(160)
+    d.transition.setDuration(180)
     d.transition.setEasingCurve(QEasingCurve.Type.OutCubic)
     d.after_refresh = None
     d.show_step(0)

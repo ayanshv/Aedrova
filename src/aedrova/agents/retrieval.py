@@ -48,6 +48,14 @@ class ContextIndex:
             (r["product_memory_snapshot"] for r in records if "product_memory_snapshot" in r), {}
         )
         for record in records:
+            slack = record.get("imported_slack_message")
+            if slack is not None:
+                citation = slack["citation"]
+                if not re.fullmatch(r"slack:[A-Z][A-Z0-9]{1,39}:[0-9]{1,10}\.[0-9]{6}", citation):
+                    raise PermissionError("Invalid Slack evidence citation.")
+                self._add(Source(citation, citation, "Slack · #" + slack["channel"],
+                                 slack["text"], None, slack["timestamp"],
+                                 "external_untrusted", "", hashlib.sha256(slack["text"].encode()).hexdigest()))
             local = record.get("project_file")
             if local is None:
                 continue
@@ -342,7 +350,8 @@ def validate_citations(context, plan):
                 r"(?:build-review|agent-work|message|attachment|meeting|memory):[A-Za-z0-9_-]+"
                 r"|connector:(?:github|figma|notion):[A-Za-z0-9_./-]+"
                 r"|bud:[a-f0-9-]{36}:[a-f0-9-]{36}:[a-z_]+"
-                r"|dot:[a-f0-9-]{36}:[a-z_]+|project:[a-f0-9]{24}",
+                r"|dot:[a-f0-9-]{36}:[a-z_]+|project:[a-f0-9]{24}"
+                r"|slack:[A-Z][A-Z0-9]{1,39}:[0-9]{1,10}\.[0-9]{6}",
                 plan,
             )
         )

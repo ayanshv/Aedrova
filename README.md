@@ -10,13 +10,13 @@ The project is in pre-launch development. Feature implementation, staging accept
 
 - Team workspaces, channels, threads, private conversations, file previews, and voice messages.
 - Buds with configurable roles, appearance, personality, reporting preferences, and authorized tool connections.
-- Coding workflows through Codex and Claude Code, with Auto routing, workspace defaults, and manual provider selection.
+- Coding workflows through the Aedrova agent on Codex, with web search and read-only access to local files. Claude and provider routing follow after launch.
 - Workspace context and product memory backed by source references, confirmed decisions, and permission checks.
 - Builds in a separate project copy, observed check results, reviewable changes, and approval gates for applying or publishing work.
 - Per-reader language preferences, multilingual prompts, and supported offline translation models.
 - Meeting controls, local device checks, and consent-based transcript review where the required services are configured.
 
-Staging checks have covered core collaboration, bounded OpenAI builds, Research follow-up, connector lifecycle behavior, and offline English/Hindi reader flows. Funded Claude builds, reliable two-device meeting acceptance, and final installer validation remain release gates. Provider availability depends on configuration and approval.
+Staging checks have covered core collaboration, bounded OpenAI builds, Research follow-up, connector lifecycle behavior, and offline English/Hindi reader flows. Reliable two-device meeting acceptance and final installer validation remain release gates. Claude funding is post-launch. Provider availability depends on configuration and approval.
 
 ## Run locally
 

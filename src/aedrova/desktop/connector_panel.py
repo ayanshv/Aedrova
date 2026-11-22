@@ -39,7 +39,7 @@ class ConnectorPanel(QWidget):
         layout.addWidget(self.resource)
         layout.addWidget(self.token)
         actions = FlowActions()
-        self.help = button("Get token ↗", role="outline")
+        self.help = button("Get token", role="outline")
         self.connect = button("Verify & connect", role="primary")
         self.disconnect = button("Disconnect selected tool", role="outline")
         for control in (self.help, self.connect, self.disconnect):

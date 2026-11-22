@@ -355,6 +355,14 @@ class Collaboration(QObject):
         window.primary_tabs_layout.addWidget(self.more_button)
         self.typing_label = TypingBubble()
         window.composition.insertWidget(0, self.typing_label, alignment=Qt.AlignmentFlag.AlignLeft)
+        self.peer_agent_activity = TypingBubble()
+        window.composition.insertWidget(
+            0, self.peer_agent_activity, alignment=Qt.AlignmentFlag.AlignLeft
+        )
+        self.thread_agent_activity = TypingBubble()
+        window.thread_composition.insertWidget(
+            0, self.thread_agent_activity, alignment=Qt.AlignmentFlag.AlignLeft
+        )
         self.typing_expiry = QTimer(self)
         self.typing_expiry.setSingleShot(True)
         self.typing_expiry.setInterval(8000)
@@ -627,7 +635,9 @@ class Collaboration(QObject):
         paths = {p["user_id"]: p["avatar_path"] for p in people if p.get("avatar_path")}
         for view in (window.messages, window.thread_messages):
             view.avatar_paths = paths
-        for path in list(paths.values())[:12]:
+        unloaded = [p for p in dict.fromkeys(paths.values()) if p not in self.avatar_images
+                    and p not in self.avatar_pending and p not in self.avatar_failed]
+        for path in unloaded[:12]:
             self.load_avatar(
                 path,
                 lambda image: (
@@ -641,10 +651,24 @@ class Collaboration(QObject):
             "Activity" + (f" · {data['unseen']}" if data.get("unseen") else "")
         )
         window.workspace_tools_toggle.setText(
-            "Workspace tools" + (f" · {data['unseen']}" if data.get("unseen") else "") + "  ⌄"
+            "Workspace tools" + (f" · {data['unseen']}" if data.get("unseen") else "")
         )
         self.typing_expiry.start()
         self.render_typing()
+        user = window.current_user()
+        progress_labels = {
+            "thinking": "Agent is thinking…",
+            "context": "Agent is finding context…",
+            "responding": "Agent is preparing a reply…",
+        }
+        peer_progress = {
+            row["parent_id"]: progress_labels.get(row["phase"], "")
+            for row in reversed(data.get("agent_progress", []))
+            if user and row["author_id"] != str(user.id)
+        }
+        self.peer_agent_activity.setText(peer_progress.get(None, ""))
+        thread_progress = peer_progress.get(window.thread_id, "") if window.thread_id else ""
+        self.thread_agent_activity.setText(thread_progress)
         if self.channel_seen != window.channel_id:
             self.manual_unread.clear()
             self.channel_seen = window.channel_id
@@ -706,10 +730,12 @@ class Collaboration(QObject):
         self.scope_workspace = None
         self.allowed_channels.clear()
         self.activity_button.setText("Activity")
-        self.window.workspace_tools_toggle.setText("Workspace tools  ⌄")
+        self.window.workspace_tools_toggle.setText("Workspace tools")
         self.typing_expiry.stop()
         self.typing_channel = None
         self.typing_label.setText("")
+        self.peer_agent_activity.setText("")
+        self.thread_agent_activity.setText("")
         for composer in (self.window.composer, self.window.thread_composer):
             composer.people = []
             composer.mention_tokens.clear()
@@ -1512,7 +1538,7 @@ class Collaboration(QObject):
         layout.addWidget(description)
         metadata = button("Load page preview", role="outline")
         layout.addWidget(metadata)
-        open_button = button("Open in browser ↗", role="primary")
+        open_button = button("Open in browser", role="primary")
         layout.addWidget(open_button)
         open_button.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(url)))
 

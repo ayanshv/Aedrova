@@ -1,28 +1,21 @@
-"""Optional, versioned setup and safe, task-based dashboard spotlights."""
+"""Versioned setup and a short tour that tags the parts of the workspace you will use."""
 
 from dataclasses import dataclass
 
 from PySide6.QtCore import (
-    QEasingCurve,
     QEvent,
     QPoint,
     QPropertyAnimation,
     QRect,
+    QRectF,
     Qt,
     QTimer,
     QVariantAnimation,
 )
-from PySide6.QtGui import QColor, QKeySequence, QShortcut
-from PySide6.QtWidgets import (
-    QFrame,
-    QGraphicsDropShadowEffect,
-    QHBoxLayout,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtGui import QColor, QKeySequence, QPainter, QPainterPath, QPen, QShortcut
+from PySide6.QtWidgets import QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QVBoxLayout, QWidget
 
-from aedrova.desktop.controls import ChoiceBox
+from aedrova.desktop import motion
 from aedrova.desktop.dialogs import button, label
 
 VERSION = 2
@@ -30,230 +23,71 @@ VERSION = 2
 
 @dataclass(frozen=True)
 class Step:
-    chapter: str
     title: str
     text: str
-    target: str
-    features: tuple[str, ...]
+    target: str  # a window attribute, or "attribute.child"
     tab: int = 0
+    side: str = "auto"  # where the tag prefers to sit: right, above, below or left
 
 
+# Nine stops, one line each. Order follows how a first session actually goes.
 STEPS = (
     Step(
-        "Your team",
-        "A place for every team.",
-        "Switch teams here. Each workspace keeps its people, conversations and projects "
-        "separate. Use + to create another.",
+        "Your workspaces",
+        "Switch teams, or start a new one.",
         "workspace_title",
-        ("workspaces",),
-        0,
+        side="right",
     ),
     Step(
-        "Your team",
-        "Bring your people together.",
-        "Invite teammates here. Workspace settings manages members, owner/admin roles and "
-        "your agent’s nickname.",
+        "Invite your team",
+        "Add people by email or link.",
         "invite_teammates_button",
-        ("invitations", "roles", "nickname"),
-        0,
+        side="right",
     ),
     Step(
-        "Your team",
-        "Connect your Buds.",
-        "Use + to connect a source. Authorize one repository and inspect its capabilities. "
-        "Click a Bud for permissions and status; mention it in a question to your agent.",
+        "Buds",
+        "AI teammates with a role. Add your first.",
         "ai_team_section",
-        ("dots", "source_permissions", "tool_selection"),
-        0,
+        side="right",
     ),
     Step(
-        "Your team",
-        "Give conversations a home.",
-        "Pick a channel or use + to create one. Public and private channels have topics, "
-        "members and unread activity.",
+        "Channels",
+        "One place for each topic. Direct messages sit below.",
         "channel_list",
-        ("channels", "unread"),
-        0,
+        side="right",
     ),
     Step(
-        "Your team",
-        "A quieter conversation.",
-        "Start a private conversation with one teammate or a group. "
-        "Presence and typing indicators show who’s available and replying.",
-        "dm_list",
-        ("direct_messages",),
-        0,
-    ),
-    Step(
-        "Conversation",
-        "Pick up the thread.",
-        "Open a message’s replies to keep discussion in a thread. Scroll up for history; "
-        "Escape closes the thread.",
-        "messages",
-        ("messages", "threads", "history"),
-        0,
-    ),
-    Step(
-        "Conversation",
-        "Find the signal.",
-        "Find messages, people, channels and files. ⌘K jumps to a conversation; context "
-        "search finds decisions and sources.",
-        "search_button",
-        ("search", "decisions", "sources"),
-        0,
-    ),
-    Step(
-        "Conversation",
-        "Keep decisions current.",
-        "Product memory links goals and requirements to their sources. Review proposals, "
-        "approve agreed decisions and replace outdated ones. Source changes are flagged "
-        "before your agent relies on them.",
-        "memory_button",
-        ("product_memory", "revisions", "source_freshness"),
-        0,
-    ),
-    Step(
-        "Conversation",
-        "Keep the work close.",
-        "Format text or code, add emoji, and attach or drag files here. "
-        "Files keeps shared uploads together. ⌘⇧S saves a selected file.",
+        "Mention @Aedrova",
+        "Say what to build. It reads your chat, files and meetings first.",
         "composer",
-        ("attachments", "save_files", "rich_text", "drag_uploads"),
-        0,
+        side="above",
     ),
     Step(
-        "Conversation",
-        "Make messages work for you.",
-        "Hover or right-click a message to react, reply, quote, edit or unsend. The + "
-        "reaction button opens all emojis.",
-        "messages",
-        ("reactions", "emojis", "editing", "deletion", "quotes"),
-        0,
+        "You set the access",
+        "Ask first, approve safe steps, or allow everything.",
+        "composer.permissions",
+        side="above",
     ),
     Step(
-        "Conversation",
-        "Keep the important things.",
-        "Message actions pin, save, forward, share or copy a message link. Links show "
-        "previews when available.",
-        "messages",
-        ("pins", "bookmarks", "forwarding", "message_links", "sharing_messages", "link_previews"),
-        0,
+        "Project, Work, Files",
+        "Connect a folder, follow builds, find uploads.",
+        "primary_navigation",
+        side="below",
     ),
     Step(
-        "Conversation",
-        "Stay in the loop.",
-        "Activity collects mentions, direct messages and replies. Channel settings control "
-        "notifications; unread badges show where to catch up.",
-        "button:Activity",
-        ("notifications", "activity", "read_state", "typing", "presence"),
-        0,
+        "Your AI allowance",
+        "What's left for the next 5 hours. Click it for the week.",
+        "workspace_usage",
+        side="right",
     ),
     Step(
-        "Build",
-        "Your project, connected.",
-        "Connect a local project and choose Codex or Claude Code. Your settings control "
-        "planning and execution.",
-        "button:Project settings|Connect a project",
-        ("project", "provider", "workflow", "permissions"),
-        1,
-    ),
-    Step(
-        "Build",
-        "Your editor stays yours.",
-        "Open the connected project in your preferred editor. Choose VS Code, Cursor, Xcode "
-        "or Finder in Settings.",
-        "button:Open project in IDE",
-        ("ide", "repository"),
-        1,
-    ),
-    Step(
-        "Build",
-        "From a decision to a build.",
-        "Type @ to choose your agent, a Bud or a teammate. Your agent builds from accessible team "
-        "context after your request.",
-        "composer",
-        ("mentions", "builds", "context"),
-        0,
-    ),
-    Step(
-        "Build",
-        "Follow the work.",
-        "Follow build progress, tools, results and usage here. Stop cancels a run; failed "
-        "runs can be recovered.",
-        "build_history",
-        ("progress", "queue", "recovery", "usage", "cancel", "approvals"),
-        0,
-    ),
-    Step(
-        "Build",
-        "Review before publishing.",
-        "Inspect changes and tests before applying them. Publishing to GitHub always asks "
-        "for your approval.",
-        "build_history",
-        ("review", "apply", "preview", "github"),
-        0,
-    ),
-    Step(
-        "Meet",
-        "Arrive ready.",
-        "Use meeting options to check your microphone, camera, speaker and screen. Checks "
-        "stay local and never start a call.",
-        "call_bar",
-        ("devices", "screen_preview"),
-        0,
-    ),
-    Step(
-        "Meet",
-        "A familiar room.",
-        "The phone starts audio; the camera starts video. In a call, control microphone, "
-        "camera, sharing, participants and leaving.",
-        "call_bar",
-        ("calls", "camera", "microphone", "sharing", "participants", "leave_call"),
-        0,
-    ),
-    Step(
-        "Make it yours",
-        "Comfort comes first.",
-        "Your account menu opens profile and settings. Change appearance, accessibility, "
-        "editor preferences and status here.",
+        "Settings and help",
+        "Appearance, plan and this tour, any time.",
         "profile_button",
-        ("account", "settings", "appearance", "accessibility", "profile"),
-        0,
-    ),
-    Step(
-        "Make it yours",
-        "Know your allowance.",
-        "Settings shows included AI usage. Plan & billing opens subscription details and "
-        "usage allowances on the website.",
-        "profile_button",
-        ("billing", "allowance"),
-        0,
-    ),
-    Step(
-        "Make it yours",
-        "You can always come back.",
-        "Log out from Account. Help offers updates and these guides again. You can pause or "
-        "skip this tour anytime.",
-        "profile_button",
-        ("logout", "help", "updates"),
-        0,
+        side="right",
     ),
 )
-FEATURES = frozenset(feature for step in STEPS for feature in step.features)
-
-
-def fade(widget, reduced):
-
-    if reduced:
-        return
-    position = widget.pos()
-    animation = QPropertyAnimation(widget, b"pos", widget)
-    animation.setDuration(0 if reduced else 180)
-    animation.setStartValue(position + QPoint(0, 8))
-    animation.setEndValue(position)
-    animation.setEasingCurve(QEasingCurve.Type.OutCubic)
-    widget.transition = animation
-    animation.start()
+TITLES = tuple(step.title for step in STEPS)
 
 
 def account_key(window):
@@ -261,12 +95,22 @@ def account_key(window):
     return f"onboarding/v{VERSION}/" + (str(user.id) if user else "local-preview")
 
 
-
 from aedrova.desktop.zen_onboarding import ZenOnboarding as SetupDialog  # noqa: E402, F401
 
 
+def resolve(window, path):
+    """The widget a step points at, or None when it is not on screen."""
+    target = window
+    for part in path.split("."):
+        target = getattr(target, part, None)
+        if target is None:
+            return None
+    visible = getattr(target, "isVisible", None)
+    return target if visible and visible() and target.isEnabled() else None
+
+
 class SpotlightTour(QWidget):
-    """Tint the real component; only the guide card intercepts interaction."""
+    """Dim the window, light one real control, and tag it with a sentence."""
 
     def __init__(self, window):
         super().__init__(window.centralWidget())
@@ -276,170 +120,230 @@ class SpotlightTour(QWidget):
         self.index = max(0, min(len(STEPS) - 1, self.index))
         if window.settings.value(self.prefix + "/status") in {"completed", "skipped"}:
             self.index = 0
-        self.reveal = 1.0
-        self.highlight_animation = QVariantAnimation(self)
-        self.highlight_animation.setDuration(240)
-        self.highlight_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
-        self.highlight_animation.valueChanged.connect(self.animate_highlight)
-        self.highlighted_target = None
-        self.component_effect = None
         self.target_rect = QRect()
+        self.hole = QRectF()
         self.saved_tab = window.pages.currentIndex()
+        self.glide = QVariantAnimation(self)
+        self.glide.setDuration(motion.SLOW)
+        self.glide.setEasingCurve(motion.EASE)
+        self.glide.valueChanged.connect(self.move_hole)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.setAccessibleName("Explore Aedrova guided tour")
+        self.setAccessibleName("Aedrova tour")
+        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground)
+
         self.card = QFrame(self)
         self.card.setObjectName("TourCard")
+        shadow = QGraphicsDropShadowEffect(self.card)
+        shadow.setBlurRadius(36)
+        shadow.setOffset(0, 10)
+        shadow.setColor(QColor(0, 0, 0, 70))
+        self.card.setGraphicsEffect(shadow)
+        self.card_slide = None
+        self.pulse = 0.0
         layout = QVBoxLayout(self.card)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(14)
-        self.chapters = ChoiceBox()
-        self.chapters.setAccessibleName("Tour chapter")
-        for chapter in dict.fromkeys(step.chapter for step in STEPS):
-            self.chapters.addItem(chapter)
-        self.chapters.currentTextChanged.connect(self.chapter)
-        layout.addWidget(self.chapters)
+        layout.setContentsMargins(18, 16, 18, 14)
+        layout.setSpacing(6)
+        top = QHBoxLayout()
+        from aedrova.desktop.zen_onboarding import StepDots
+
+        self.dots = StepDots(len(STEPS))
+        top.addWidget(self.dots)
         self.progress = label("", "section")
+        self.progress.hide()  # the dots say it; the words stay for screen readers
+        top.addStretch()
+        self.skip = button("Skip")
+        self.skip.setObjectName("TourSkip")
+        self.skip.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.skip.clicked.connect(lambda: self.finish("skipped"))
+        top.addWidget(self.skip)
+        layout.addLayout(top)
         self.heading = label("", "title", wrap=True)
+        self.heading.setObjectName("TourHeading")
         self.description = label("", "muted", wrap=True)
-        for widget in (self.progress, self.heading, self.description):
-            layout.addWidget(widget)
+        layout.addWidget(self.heading)
+        layout.addWidget(self.description)
+        layout.addSpacing(6)
         row = QHBoxLayout()
-        self.back = button("Back", role="outline")
-        self.back.clicked.connect(lambda: self.show_step(self.index - 1))
+        self.back = button("Back")
+        self.back.setObjectName("TourBack")
+        self.back.clicked.connect(lambda: self.show_step(self.index - 1, direction=-1))
         self.next = button("Next", role="primary")
+        self.next.setObjectName("TourNext")
         self.next.clicked.connect(self.advance)
         row.addWidget(self.back)
         row.addStretch()
         row.addWidget(self.next)
         layout.addLayout(row)
-        row = QHBoxLayout()
-        pause = button("Pause tour", role="outline")
-        pause.clicked.connect(lambda: self.finish("paused"))
-        skip = button("Skip tour", role="outline")
-        skip.clicked.connect(lambda: self.finish("skipped"))
-        row.addWidget(pause)
-        row.addWidget(skip)
-        layout.addLayout(row)
         for key, action in (
             ("Alt+Right", self.advance),
-            ("Alt+Left", lambda: self.show_step(self.index - 1)),
+            ("Alt+Left", lambda: self.show_step(self.index - 1, direction=-1)),
+            ("Right", self.advance),
+            ("Left", lambda: self.show_step(self.index - 1, direction=-1)),
         ):
             shortcut = QShortcut(QKeySequence(key), self)
             shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
             shortcut.activated.connect(action)
         window.centralWidget().installEventFilter(self)
+        self.setGeometry(self.parentWidget().rect())
         self.show_step(self.index)
         self.show()
         self.raise_()
+        motion.fade_in(self, motion.SLOW)
 
-    def chapter(self, chapter):
-        self.show_step(next(i for i, step in enumerate(STEPS) if step.chapter == chapter))
+    # -- navigation ----------------------------------------------------------------
+    def visible_steps(self):
+        return [i for i, step in enumerate(STEPS) if resolve(self.window, step.target)]
 
-    def show_step(self, index):
-        self.index = max(0, min(len(STEPS) - 1, index))
-        step = STEPS[self.index]
-        self.chapters.blockSignals(True)
-        self.chapters.setCurrentText(step.chapter)
-        self.chapters.blockSignals(False)
-        self.progress.setText(f"{self.index + 1} OF {len(STEPS)} · ⌥→ NEXT · ESC PAUSE")
+    def show_step(self, index, *, direction=1):
+        index = max(0, min(len(STEPS) - 1, index))
+        # Steps whose control is not on screen (no AI allowance yet, a hidden sidebar) are skipped.
+        order = range(index, len(STEPS)) if direction > 0 else range(index, -1, -1)
+        chosen = None
+        for candidate in order:
+            self.window.select_tab(STEPS[candidate].tab)
+            if resolve(self.window, STEPS[candidate].target):
+                chosen = candidate
+                break
+        index = index if chosen is None else chosen
+        self.index = index
+        step = STEPS[index]
+        shown = self.visible_steps()
+        position = shown.index(index) + 1 if index in shown else index + 1
+        total = len(shown) or len(STEPS)
+        self.progress.setText(f"{position} OF {total}")
+        self.dots.count = total
+        self.dots.setFixedWidth(total * 14 + 14)
+        self.dots.set_current(position - 1)
         self.heading.setText(step.title)
         self.description.setText(step.text)
-        self.back.setEnabled(self.index > 0)
-        self.next.setText("Finish" if self.index == len(STEPS) - 1 else "Next")
-        self.window.select_tab(step.tab)
-        self.window.settings.setValue(self.prefix + "/step", self.index)
+        self.back.setEnabled(bool(shown) and index != shown[0])
+        last = bool(shown) and index == shown[-1]
+        self.next.setText("Done" if last else "Next")
+        self.window.settings.setValue(self.prefix + "/step", index)
         self.window.settings.setValue(self.prefix + "/status", "paused")
         self.next.setFocus()
-        self.reposition()
-        self.highlight_animation.stop()
-        if self.window.reduced_motion:
-            self.reveal = 1.0
-        else:
-            self.highlight_animation.setStartValue(0.0)
-            self.highlight_animation.setEndValue(1.0)
-            self.highlight_animation.start()
-        QTimer.singleShot(0, self.reposition)
-
-    def animate_highlight(self, value):
-        self.reveal = float(value)
-        if self.component_effect is not None:
-            self.component_effect.setBlurRadius(12 + 16 * self.reveal)
-        self.update()
-
-    def clear_component_highlight(self):
-        if self.highlighted_target is not None and self.component_effect is not None:
-            self.highlighted_target.setGraphicsEffect(None)
-        self.highlighted_target = self.component_effect = None
+        self.layout_for_step(animate=True)
+        QTimer.singleShot(0, self.layout_for_step)
 
     def advance(self):
-        if self.index == len(STEPS) - 1:
+        shown = self.visible_steps()
+        if not shown or self.index >= shown[-1]:
             self.finish("completed")
         else:
             self.show_step(self.index + 1)
 
-    def reposition(self):
+    # -- geometry ------------------------------------------------------------------
+    def layout_for_step(self, animate=False):
         available = self.parentWidget().rect()
-        dark = self.window.theme.name == "dark"
-        self.card.setStyleSheet(
-            "QFrame#TourCard {background:"
-            + ("#1C1C1E" if dark else "#FFFFFF")
-            + ";border:1px solid "
-            + ("#38383A" if dark else "#E5E5E7")
-            + ";border-radius:24px;}"
-        )
-        if STEPS[self.index].target in ("memory_button", "build_history", "button:Activity"):
-            self.window.workspace_tools_toggle.setChecked(True)
-        target = getattr(self.window, STEPS[self.index].target, None)
-        if STEPS[self.index].target.startswith("button:"):
-            names = STEPS[self.index].target.removeprefix("button:").split("|")
-            target = next(
-                (
-                    control
-                    for control in self.window.findChildren(QPushButton)
-                    if control.text().split(" · ")[0] in names and control.isVisible()
-                ),
-                None,
-            )
-        if target is not self.highlighted_target:
-            self.clear_component_highlight()
-            if target is not None and target.isVisible() and target.isEnabled():
-
-                if target.graphicsEffect() is None:
-                    self.component_effect = QGraphicsDropShadowEffect(target)
-                    self.component_effect.setColor(QColor("#0066FF"))
-                    self.component_effect.setOffset(0, 0)
-                    self.component_effect.setBlurRadius(28)
-                    target.setGraphicsEffect(self.component_effect)
-                    self.highlighted_target = target
-        if target is not None and target.isVisible() and target.isEnabled():
+        self.setGeometry(available)
+        step = STEPS[self.index]
+        target = resolve(self.window, step.target)
+        if target is None:
+            self.target_rect = QRect()
+        else:
             origin = self.parentWidget().mapFromGlobal(target.mapToGlobal(QPoint(0, 0)))
             self.target_rect = QRect(origin, target.size()).intersected(available)
-        else:
-            self.target_rect = QRect()
-        self.card.setFixedWidth(min(420, available.width() - 48))
+        goal = QRectF()
+        if not self.target_rect.isEmpty():
+            goal = QRectF(self.target_rect.adjusted(-6, -6, 6, 6))
+        self.card.setFixedWidth(min(340, available.width() - 48))
         self.card.adjustSize()
-        x = max(24, available.width() - self.card.width() - 28)
-        y = (
-            28
-            if self.target_rect.center().y() > available.height() // 2
-            else available.height() - self.card.height() - 28
+        before = self.card.pos()
+        spot = self.tag_position(available, step.side)
+        had_card = self.card.isVisible() and before != QPoint(0, 0)
+        self.card.raise_()
+        if self.card_slide is not None:
+            self.card_slide.stop()
+        if animate and had_card and not motion.reduced() and before != spot:
+            self.card_slide = QPropertyAnimation(self.card, b"pos", self)
+            self.card_slide.setDuration(motion.SLOW + 80)
+            self.card_slide.setEasingCurve(motion.EASE)
+            self.card_slide.setStartValue(before)
+            self.card_slide.setEndValue(spot)
+            self.card_slide.start()
+        else:
+            self.card.move(spot)
+        if animate and not motion.reduced() and not self.hole.isEmpty() and not goal.isEmpty():
+            self.glide.stop()
+            self.glide.setStartValue(self.hole)
+            self.glide.setEndValue(goal)
+            self.glide.start()
+        else:
+            self.glide.stop()
+            self.hole = goal
+        if animate:
+            motion.fade_in(self.heading, motion.SLOW)
+            motion.fade_in(self.description, motion.SLOW)
+        self.update()
+
+    def tag_position(self, available, preferred):
+        """Put the tag beside the lit control, on the side with room, inside the window."""
+        card, gap, margin = self.card.size(), 16, 16
+        rect = self.target_rect
+        if rect.isEmpty():
+            return QPoint(available.width() - card.width() - 28, 28)
+        options = {
+            "right": QPoint(rect.right() + gap, rect.center().y() - card.height() // 2),
+            "left": QPoint(
+                rect.left() - gap - card.width(), rect.center().y() - card.height() // 2
+            ),
+            "above": QPoint(
+                rect.center().x() - card.width() // 2, rect.top() - gap - card.height()
+            ),
+            "below": QPoint(rect.center().x() - card.width() // 2, rect.bottom() + gap),
+        }
+        order = [preferred] if preferred in options else []
+        order += [s for s in ("right", "below", "above", "left") if s not in order]
+        bounds = available.adjusted(margin, margin, -margin, -margin)
+        for side in order:
+            spot = options[side]
+            if bounds.contains(QRect(spot, card)):
+                return spot
+        spot = options[order[0]]
+        return QPoint(
+            max(bounds.left(), min(spot.x(), bounds.right() - card.width())),
+            max(bounds.top(), min(spot.y(), bounds.bottom() - card.height())),
         )
 
-
-
-        self.setGeometry(x, max(24, y), self.card.width(), self.card.height())
-        self.card.move(0, 0)
-        self.raise_()
+    def move_hole(self, value):
+        self.hole = QRectF(value)
         self.update()
+
+    # -- painting ------------------------------------------------------------------
+    def paintEvent(self, event):  # noqa: N802
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        dark = self.window.theme.name == "dark"
+        veil = QPainterPath()
+        veil.addRect(QRectF(self.rect()))
+        if not self.hole.isEmpty():
+            veil.addRoundedRect(self.hole, 12, 12)
+        veil.setFillRule(Qt.FillRule.OddEvenFill)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(0, 0, 0, 150 if dark else 105))
+        painter.drawPath(veil)
+        if not self.hole.isEmpty():
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            for spread, alpha in ((10, 14), (6, 26), (3, 46)):
+                glow = QColor("#7C9DFF")
+                glow.setAlpha(alpha)
+                painter.setPen(QPen(glow, spread))
+                painter.drawRoundedRect(self.hole.adjusted(-1, -1, 1, 1), 13, 13)
+            ring = QColor("#3D74FF")
+            ring.setAlpha(235)
+            painter.setPen(QPen(ring, 2))
+            painter.drawRoundedRect(self.hole, 12, 12)
+
+    def mousePressEvent(self, event):  # noqa: N802
+        event.accept()  # the lit control is for looking; the tag is the only thing to press
 
     def eventFilter(self, watched, event):  # noqa: N802
         if event.type() in (QEvent.Type.Resize, QEvent.Type.LayoutRequest):
-            QTimer.singleShot(0, self.reposition)
+            QTimer.singleShot(0, self.layout_for_step)
         return super().eventFilter(watched, event)
 
     def finish(self, status):
-        self.highlight_animation.stop()
-        self.clear_component_highlight()
+        self.glide.stop()
         self.window.settings.setValue(self.prefix + "/status", status)
         self.window.settings.sync()
         self.window.select_tab(self.saved_tab)

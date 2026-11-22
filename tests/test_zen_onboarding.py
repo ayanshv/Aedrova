@@ -1,371 +1,72 @@
-"""Exercise the real sequence, input scoping, account boundary and no-effect contract."""
+"""Exercise desktop setup navigation, account boundaries and project permissions."""
 
 from types import SimpleNamespace
 
 import pytest
 from PySide6.QtCore import QSettings, Qt
+from PySide6.QtWidgets import QApplication, QLabel, QPushButton
+from test_connected import setup, snapshot
 
+from aedrova.desktop.account import AccountDialog
 from aedrova.desktop.onboarding import SetupDialog, account_key
 from aedrova.desktop.projects import binding
 from aedrova.desktop.window import AedrovaWindow
-from aedrova.desktop.zen_onboarding import processing_progress, settled_spring
-from aedrova.desktop.zen_setup import LAST_STAGE
+from aedrova.desktop.zen_setup import ACCOUNT, GOAL, OPENING, PRIVACY, PROJECT, THEME, WELCOME
+
+
+@pytest.fixture(autouse=True)
+def nothing_to_allow(monkeypatch):
+    """Existing flows assume the devices are already allowed; permissions have their own tests."""
+    monkeypatch.setattr("aedrova.desktop.zen_onboarding.pending_kinds", lambda: [])
+
+
+def past_privacy(flow):
+    """Privacy, then the appearance choice, which a first run always shows."""
+    flow.primary.click()
+    assert flow.stage == THEME
+    flow.primary.click()
 
 
 @pytest.fixture
-def flow(qtbot, tmp_path, monkeypatch):
+def fresh_window(qtbot, tmp_path):
     window = AedrovaWindow(
-        settings=QSettings(str(tmp_path / "zen.ini"), QSettings.Format.IniFormat)
+        settings=QSettings(str(tmp_path / "onboarding.ini"), QSettings.IniFormat)
     )
     qtbot.addWidget(window)
     window.show()
-
-    def forbidden(*args, **kwargs):
-        pytest.fail("Preview must not run product actions")
-
-    for action in (
-        "send_message",
-        "start_agent_request",
-        "create_workspace",
-        "show_account",
-    ):
-        monkeypatch.setattr(window, action, forbidden)
-    dialog = SetupDialog(window)
-    qtbot.addWidget(dialog)
-    dialog.clock = 100.0
-    dialog.now = lambda: dialog.clock
-    dialog.entered = dialog.now()
-    dialog.show()
-    dialog.timer.stop()
-    return window, dialog
+    return window
 
 
-def advance_time(dialog, seconds):
-    dialog.clock += seconds
-    dialog.tick()
+def show_setup(window, qtbot):
+    flow = SetupDialog(window)
+    qtbot.addWidget(flow)
+    flow.show()
+    if flow.stage == OPENING:
+        flow.activate()  # most flows start after the opening screen
+    return flow
 
 
-def test_full_sequence_timing_keyboard_and_dashboard_handoff(flow, qtbot, monkeypatch):
-    window, dialog = flow
-    dialog.activate()
-    dialog.activate()
-    advance_time(dialog, 0.43)
-    assert dialog.stage == 1
-    qtbot.mouseClick(dialog.primary, Qt.MouseButton.LeftButton)
-    assert dialog.success and not binding(window)
-    advance_time(dialog, 1)
-    assert dialog.stage == 2
-    advance_time(dialog, 2.49)
-    assert dialog.stage == 2 and 0 < dialog.processing < 1
-    advance_time(dialog, 0.01)
-    assert dialog.stage == 3
-    qtbot.keyPress(dialog, Qt.Key.Key_Control)
-    assert dialog.command_down
-    qtbot.keyPress(dialog, Qt.Key.Key_K, Qt.KeyboardModifier.ControlModifier)
-    assert dialog.unlocked
-    advance_time(dialog, 0.7)
-    assert dialog.stage == 4
-    monkeypatch.setattr(dialog.setup, "advance_profile", lambda: dialog.show_stage(6))
-    for stage in range(4, LAST_STAGE):
-        assert dialog.stage == stage
-        if stage == 7:
-            dialog.setup.automatic.setChecked(False)
-        dialog.activate()
-    assert dialog.stage == LAST_STAGE
-    dialog.bud_setup_completed = True
-    advance_time(dialog, 1)
-    assert not dialog.isVisible() and not dialog.timer.isActive()
-    key = account_key(window)
-    assert window.settings.value(key + "/hasCompletedOnboarding", False, type=bool)
-    assert window.settings.value(key + "/setup", False, type=bool)
-    assert not binding(window)
-    qtbot.waitUntil(lambda: window.tour is not None)
-    assert window.tour.index == 0
-    assert window.tour.next.hasFocus()
-    window.tour.finish("completed")
-    qtbot.waitUntil(lambda: window.composer.editor.hasFocus())
-
-
-def test_click_alternative_and_account_change_cannot_mark_new_account(flow, qtbot):
-    window, dialog = flow
-    dialog.show_stage(3)
-    qtbot.mouseClick(dialog.primary, Qt.MouseButton.LeftButton)
-    assert dialog.unlocked
-    window.current_user = lambda: SimpleNamespace(id="another-account")
-    advance_time(dialog, 1)
-    advance_time(dialog, 1)
-    dialog.activate()
-    assert not window.settings.value(account_key(window) + "/setup", False, type=bool)
-    assert not dialog.timer.isActive()
-
-
-def test_escape_skip_and_reduced_motion_do_not_grant_setup(flow, qtbot):
-    window, dialog = flow
-    dialog.reduced = True
-    dialog.activate()
-    advance_time(dialog, 0.06)
-    assert dialog.stage == 1
-    dialog.defer()
-    assert dialog.stage == 4
-    dialog.defer()
-    assert dialog.isVisible() and dialog.stage == 5
-    assert not window.settings.value(account_key(window) + "/deferred", False, type=bool)
-    assert not window.settings.value(
-        account_key(window) + "/hasCompletedOnboarding", False, type=bool
-    )
-
-
-@pytest.mark.parametrize("size", [(640, 620), (960, 720), (1440, 940)])
-def test_all_scenes_render_and_controls_fit(flow, qtbot, size):
-    _, dialog = flow
-    dialog.resize(*size)
-    for stage in range(LAST_STAGE + 1):
-        dialog.show_stage(stage)
-        qtbot.wait(5)
-        assert not dialog.canvas.grab().isNull()
-        assert dialog.rect().contains(dialog.primary.geometry())
-        assert dialog.rect().contains(dialog.skip.geometry())
-
-
-def test_curves_are_monotonic_accelerating_and_bounded():
-    assert processing_progress(-1) == 0 and processing_progress(2.5) == 1
-    assert processing_progress(2.5) - processing_progress(2) > processing_progress(0.5)
-    values = [settled_spring(i / 60) for i in range(121)]
-    assert values == sorted(values) and all(0 <= value <= 1 for value in values)
-
-
-def test_boot_keyboard_and_escape_cleanup(flow, qtbot):
-    _, dialog = flow
-    qtbot.keyClick(dialog, Qt.Key.Key_Return)
-    assert dialog.action_started is not None
-    advance_time(dialog, 0.43)
-    assert dialog.stage == 1
-    qtbot.keyClick(dialog, Qt.Key.Key_Escape)
-    assert not dialog.isVisible() and not dialog.timer.isActive()
-
-
-def test_missing_logo_has_immediate_render_fallback(flow):
-    from PySide6.QtGui import QPixmap
-
-    _, dialog = flow
-    dialog.logo = QPixmap()
-    assert not dialog.canvas.grab().isNull()
-    dialog.activate()
-    advance_time(dialog, 0.43)
-    assert dialog.stage == 1
-
-
-def test_explicit_configuration_saves_account_scoped_project_not_a_build(
-    qtbot, tmp_path, monkeypatch
+def test_welcome_goes_directly_to_account_and_apple_returns_to_profile(
+    fresh_window, qtbot, monkeypatch
 ):
-    from test_connected import setup
-
-    window, _ = setup(qtbot, tmp_path)
+    window = fresh_window
+    monkeypatch.setenv("AEDROVA_APPLE_LOGIN_ENABLED", "true")
+    providers = []
     monkeypatch.setattr(
-        window, "start_agent_request", lambda *_: pytest.fail("No build during setup")
+        AccountDialog, "start_provider", lambda _, provider: providers.append(provider)
     )
-    dialog = SetupDialog(window)
-    qtbot.addWidget(dialog)
-    project = tmp_path / "specific-project"
-    project.mkdir()
-    dialog.show_stage(6)
-    dialog.setup.folder.setText(str(project))
-    dialog.setup.provider.setCurrentIndex(1)
-    dialog.activate()
-    assert dialog.stage == 7
-    assert dialog.setup.automatic.isChecked()
-    dialog.setup.automatic.setChecked(True)
-    dialog.activate()
-    dialog.setup.repository.setText("ayanshv/Aedrova")
-    dialog.activate()
-    dialog.activate()
-    assert dialog.stage == 10 and not binding(window)
-    dialog.activate()
-    saved = binding(window)
-    assert saved["folder"] == str(project)
-    assert saved["provider"] == "claude_code"
-    assert saved["background_build"] and saved["auto_plan"]
-    assert saved["repository"] == "ayanshv/Aedrova"
-    assert dialog.stage == LAST_STAGE
-
-
-def test_permissions_require_project_and_original_workspace(qtbot, tmp_path):
-    from test_connected import setup
-
-    window, _ = setup(qtbot, tmp_path)
-    dialog = SetupDialog(window)
-    qtbot.addWidget(dialog)
-    dialog.show_stage(7)
-    dialog.setup.automatic.setChecked(True)
-    dialog.activate()
-    assert dialog.stage == 7 and not binding(window)
-    project = tmp_path / "project"
-    project.mkdir()
-    dialog.show_stage(6)
-    dialog.setup.folder.setText(str(project))
-    window.workspace_id = "different-workspace"
-    dialog.activate()
-    assert dialog.stage == 6 and not binding(window)
-
-
-def test_preferences_are_drafts_until_review_and_back_keeps_choices(flow):
-    window, dialog = flow
-    old_mode = window.theme_mode
-    dialog.show_stage(4)
-    dialog.setup.appearance.setCurrentIndex(dialog.setup.appearance.findData("light"))
-    dialog.setup.editor.setCurrentText("Cursor")
-    dialog.activate()
-    assert window.theme_mode == old_mode
-    dialog.show_stage(4)
-    assert dialog.setup.editor.currentText() == "Cursor"
-    dialog.show_stage(10)
-    dialog.activate()
-    assert window.theme_mode == "light"
-    assert window.settings.value("editor") == "Cursor"
-
-
-def test_integration_dialog_keeps_window_parent_and_resumes_flow(flow, qtbot):
-    from PySide6.QtWidgets import QDialog
-
-    window, dialog = flow
-    child = QDialog(window)
-    qtbot.addWidget(child)
-    original = child.styleSheet()
-    dialog.setup.show_child(child)
-    assert child.parentWidget() is window
-    assert child.isVisible() and not dialog.isVisible()
-    child.accept()
-    assert dialog.isVisible() and child.styleSheet() == original
-    dialog.setup.show_child(child)
-    dialog.reject()
-    child.reject()
-    assert not dialog.isVisible()
-
-
-def test_theme_photos_choose_real_theme_and_persist_draft(flow, qtbot):
-    _, dialog = flow
-    dialog.show_stage(4)
-    for mode in ("dark", "system", "light"):
-        card = dialog.setup.theme_photos[mode]
-        assert not card.grab().isNull()
-        qtbot.mouseClick(card, Qt.MouseButton.LeftButton)
-        assert dialog.setup.appearance.currentData() == mode
-        assert card.isChecked()
-    dialog.show_stage(5)
-    assert dialog.setup.preferences["theme"] == "light"
-
-
-def test_accessible_theme_selection_updates_actual_appearance(flow):
-    _, dialog = flow
-    dialog.show_stage(4)
-    for mode in ("dark", "light", "system"):
-        dialog.setup.theme_photos[mode].setChecked(True)
-        assert dialog.setup.appearance.currentData() == mode
-        assert dialog.theme_mode == mode
-        assert dialog.setup.preferences["theme"] == mode
-
-
-def test_system_illustration_keeps_both_halves_without_screenshot_assets(qtbot):
-    from aedrova.desktop.zen_visuals import ThemePhoto
-
-    card = ThemePhoto("system")
-    qtbot.addWidget(card)
-    card.resize(300, 180)
-    image = card.grab().toImage()
-    scale = image.devicePixelRatio()
-    assert image.pixelColor(int(140 * scale), int(70 * scale)).lightness() > 200
-    assert image.pixelColor(int(190 * scale), int(70 * scale)).lightness() < 60
-
-
-def test_small_setup_illustrations_never_overlap_controls(flow, qtbot):
-    from aedrova.desktop.zen_visuals import SetupVisual
-
-    _, dialog = flow
-    dialog.resize(640, 620)
-    for stage in range(5, 11):
-        dialog.show_stage(stage)
-        qtbot.wait(10)
-        items = [dialog.setup.column.itemAt(i).widget() for i in range(dialog.setup.column.count())]
-        widgets = [widget for widget in items if widget is not None and widget.isVisible()]
-        for previous, following in zip(widgets, widgets[1:], strict=False):
-            assert previous.geometry().bottom() < following.geometry().top()
-        for visual in dialog.setup.body.findChildren(SetupVisual):
-            if visual.isVisible():
-                assert visual.height() >= 172
-
-
-def test_onboarding_theme_previews_all_scenes_without_saving(flow, qtbot):
-    from PySide6.QtGui import QPalette
-
-    from aedrova.desktop.theme import DARK, LIGHT
-
-    window, dialog = flow
-    original = window.theme_mode
-    dialog.show_stage(4)
-    qtbot.mouseClick(dialog.setup.theme_photos["dark"], Qt.MouseButton.LeftButton)
-    assert dialog.theme == DARK
-    assert dialog.palette().color(QPalette.ColorRole.WindowText).name() == DARK.text.lower()
-    assert window.theme_mode == original
-    for stage in range(LAST_STAGE + 1):
-        dialog.show_stage(stage)
-        qtbot.wait(5)
-        screenshot = dialog.canvas.grab().toImage()
-        assert screenshot.pixelColor(5, 5).lightness() < 60
-        assert (
-            sum(
-                screenshot.pixelColor(x, y).lightness() > 180
-                for x in range(32, screenshot.width() - 32, 3)
-                for y in range(146, 240, 3)
-            )
-            > 100
-        )
-    dialog.show_stage(4)
-    qtbot.mouseClick(dialog.setup.theme_photos["light"], Qt.MouseButton.LeftButton)
-    assert dialog.theme == LIGHT
-    assert dialog.canvas.grab().toImage().pixelColor(5, 5).lightness() > 240
-
-
-def test_system_appearance_follows_changes_but_explicit_modes_do_not(flow, monkeypatch):
-    from aedrova.desktop import zen_onboarding
-    from aedrova.desktop.theme import DARK, LIGHT
-    from aedrova.desktop.zen_theme import resolve_theme
-
-    _, dialog = flow
-    scheme = [Qt.ColorScheme.Light]
-    monkeypatch.setattr(
-        zen_onboarding, "resolve_theme", lambda mode: resolve_theme(mode, scheme[0])
+    flow = show_setup(window, qtbot)
+    assert flow.stage == WELCOME
+    flow.primary.click()
+    assert flow.stage == ACCOUNT and flow.primary.isHidden()
+    apple = next(
+        b for b in flow.setup.findChildren(QPushButton) if b.text() == "Sign in with Apple"
     )
-    dialog.apply_appearance("system")
-    assert dialog.theme == LIGHT
-    scheme[0] = Qt.ColorScheme.Dark
-    dialog.system_appearance_changed()
-    assert dialog.theme == DARK and dialog.theme_mode == "system"
-    dialog.apply_appearance("light")
-    dialog.system_appearance_changed()
-    assert dialog.theme == LIGHT
-    dialog.apply_appearance("dark")
-    scheme[0] = Qt.ColorScheme.Light
-    dialog.system_appearance_changed()
-    assert dialog.theme == DARK
+    assert not apple.icon().isNull()
+    apple.click()
+    assert providers == ["apple"] and flow.isVisible()  # setup waits in place for the browser
+    assert not flow.setup.wait_note.isHidden() and not window.account_dialog.isVisible()
 
-
-def test_google_returns_to_embedded_required_profile_then_project(qtbot, tmp_path):
-    from PySide6.QtWidgets import QPushButton
-    from test_connected import snapshot
-
-    window = AedrovaWindow(
-        settings=QSettings(str(tmp_path / "oauth-flow.ini"), QSettings.IniFormat)
-    )
-    qtbot.addWidget(window)
-    window.show()
-    dialog = SetupDialog(window)
-    window.setup_dialog = dialog
-    qtbot.addWidget(dialog)
-    dialog.show()
-    dialog.show_stage(5)
-    dialog.activate()
-    assert dialog.stage == 5 and "Sign in" in dialog.setup.status.text()
-    dialog.setup.signin()
     account = window.account_dialog
     user = SimpleNamespace(
         id="u", email="maya@example.com", user_metadata={"full_name": "Maya Chen"}
@@ -374,176 +75,456 @@ def test_google_returns_to_embedded_required_profile_then_project(qtbot, tmp_pat
 
     def save(values, photo):
         stored.update(values)
-        return dict(values)
+        return values
 
-    service = SimpleNamespace(
-        user=user,
-        snapshot=lambda: {**snapshot(), "user_profile": dict(stored)},
-        message_page=lambda *args, **kwargs: [],
-        attachments_for=lambda _: [],
-        realtime_credentials=lambda: None,
-        rpc=lambda *args: None,
-        save_full_profile=save,
-    )
-    account.service = service
+    account.service = SimpleNamespace(user=user, snapshot=snapshot, save_full_profile=save)
     account.authenticated(user)
-    qtbot.waitUntil(lambda: dialog.isVisible() and hasattr(dialog.setup, "profile_form"))
-    assert not account.isVisible() and dialog.stage == 5
-    assert dialog.owner == "u" and dialog.setup.workspace == "w"
-    form = dialog.setup.profile_form
-    from PySide6.QtWidgets import QScrollArea
-
-    assert not isinstance(form.stack.widget(0), QScrollArea)
+    qtbot.waitUntil(lambda: flow.isVisible() and flow.setup.profile_form is not None)
+    assert flow.stage == ACCOUNT and flow.setup.workspace == "w"
+    form = flow.setup.profile_form
     assert form.name.text() == "Maya Chen"
-    assert not any(
-        control.isVisible() and control.text() == "Personalize my profile"
-        for control in dialog.setup.body.findChildren(QPushButton)
+    flow.primary.click()
+    qtbot.waitUntil(lambda: flow.stage == PRIVACY)
+    assert any(
+        item.text() == "Signed in as maya@example.com" for item in flow.setup.findChildren(QLabel)
     )
-    dialog.activate()
-    assert dialog.stage == 5 and form.stack.currentIndex() == 1
-    dialog.setup.go_back()
-    assert dialog.stage == 5 and form.stack.currentIndex() == 0
-    dialog.activate()
-    dialog.activate()
-    assert dialog.stage == 5 and form.stack.currentIndex() == 2
-    assert dialog.primary.accessibleName() == "Continue"
-    dialog.activate()
-    qtbot.waitUntil(lambda: dialog.stage == 6)
-    assert stored["profile_completed"] and stored["display_name"] == "Maya Chen"
-    assert dialog.setup.workspace == "w" and not binding(window)
-    account.loaded(service.snapshot())
-    assert dialog.stage == 6
+    past_privacy(flow)
+    assert flow.stage == GOAL
+    flow.skip.click()
+    assert flow.closed and window.getting_started.isVisible()
+    assert stored["profile_completed"]
     window.connected.timer.stop()
 
 
-def test_cancelled_google_returns_to_same_required_step(qtbot, tmp_path):
-    window = AedrovaWindow(
-        settings=QSettings(str(tmp_path / "cancel-login.ini"), QSettings.IniFormat)
+def test_google_still_works_when_apple_is_disabled(fresh_window, qtbot, monkeypatch):
+    monkeypatch.setenv("AEDROVA_APPLE_LOGIN_ENABLED", "false")
+    providers = []
+    monkeypatch.setattr(
+        AccountDialog, "start_provider", lambda _, provider: providers.append(provider)
     )
-    qtbot.addWidget(window)
-    window.show()
-    dialog = SetupDialog(window)
-    window.setup_dialog = dialog
-    qtbot.addWidget(dialog)
-    dialog.show_stage(5)
-    dialog.show()
-    dialog.setup.signin()
-    window.account_dialog.reject()
-    assert dialog.isVisible() and dialog.stage == 5 and dialog.owner is None
-    dialog.activate()
-    assert dialog.stage == 5
+    flow = show_setup(fresh_window, qtbot)
+    flow.primary.click()
+    buttons = flow.setup.findChildren(QPushButton)
+    assert not any(b.text() == "Sign in with Apple" for b in buttons)
+    next(b for b in buttons if b.text() == "Continue with Google").click()
+    assert providers == ["google"]
+    fresh_window.account_dialog.reject()
+    assert flow.isVisible() and flow.stage == ACCOUNT
 
 
-def test_first_account_has_no_demo_workspace_binding(qtbot, tmp_path):
-    from test_connected import snapshot
+def test_signed_in_profile_completion_opens_workspace_with_no_tour(qtbot, tmp_path):
+    window, service = setup(qtbot, tmp_path)
+    sample_code = "A2-0123-4567-89AB-CDEF"
+    service.rpc = lambda name, _: sample_code if name == "create_workspace_join_code" else None
+    window.account_dialog.snapshot["user_profile"] = {"profile_completed": True}
+    flow = show_setup(window, qtbot)
+    flow.primary.click()
+    assert flow.stage == PRIVACY
+    past_privacy(flow)
+    assert flow.stage == GOAL
+    next(b for b in flow.setup.findChildren(QPushButton) if b.text() == "Build something").click()
+    assert flow.closed and window.tour is None
+    assert window.getting_started.examples.currentIndex() == 1
+    assert window.getting_started.isVisible()
+    assert window.settings.value(account_key(window) + "/setup", False, type=bool)
+    assert not binding(window)
+    invite = window.onboarding_team_invite
+    qtbot.waitUntil(invite.copy.isEnabled)
+    assert invite.isVisible() and invite.code.text() == sample_code
+    invite.copy.click()
+    assert QApplication.clipboard().text() == sample_code
+    invite.accept()
+    window.getting_started.dismiss()
+    window.getting_started.refresh()
+    assert not window.getting_started.isVisible()
 
-    window = AedrovaWindow(
-        settings=QSettings(str(tmp_path / "new-account.ini"), QSettings.IniFormat)
+
+def test_project_starts_with_review_and_saves_only_after_confirmation(qtbot, tmp_path):
+    window, _ = setup(qtbot, tmp_path)
+    flow = show_setup(window, qtbot)
+    flow.show_stage(PROJECT)
+    assert flow.setup.automatic.isChecked()
+    warning = next(
+        item
+        for item in flow.setup.findChildren(QLabel)
+        if item.text().startswith("Automatic builds are off.")
     )
-    qtbot.addWidget(window)
-    window.show()
-    dialog = SetupDialog(window)
-    window.setup_dialog = dialog
-    qtbot.addWidget(dialog)
-    dialog.show_stage(5)
-    dialog.show()
-    dialog.setup.signin()
-    account = window.account_dialog
-    user = SimpleNamespace(id="u", email="new@example.com", user_metadata={"name": "New Member"})
-    empty = {**snapshot(), "workspaces": [], "channels": [], "members": []}
-    account.service = SimpleNamespace(user=user, snapshot=lambda: empty)
-    account.authenticated(user)
-    qtbot.waitUntil(lambda: dialog.isVisible() and dialog.owner == "u")
-    assert dialog.setup.workspace is None
-    assert not dialog.setup.same_account()
-    dialog.show_stage(6)
+    assert warning.isHidden()
+    flow.setup.automatic.setChecked(False)
+    assert warning.isVisible()
+    flow.setup.automatic.setChecked(True)
+    assert warning.isHidden()
+    flow.primary.click()
+    assert "Choose a project folder" in flow.setup.status.text()
+    assert flow.isVisible() and not binding(window)
     folder = tmp_path / "project"
     folder.mkdir()
-    dialog.setup.folder.setText(str(folder))
-    assert not dialog.setup.valid()
-    assert not binding(window)
+    flow.setup.folder.setText(str(folder))
+    flow.primary.click()
+    assert flow.closed
+    saved = binding(window)
+    assert saved["folder"] == str(folder) and saved["background_build"]
 
 
-def test_required_profile_failure_keeps_step_and_retry_controls(qtbot, tmp_path):
-    from test_connected import setup
+def test_workspace_change_blocks_project_save(qtbot, tmp_path):
+    window, _ = setup(qtbot, tmp_path)
+    flow = show_setup(window, qtbot)
+    flow.show_stage(PROJECT)
+    flow.setup.folder.setText(str(tmp_path))
+    window.workspace_id = "different"
+    flow.primary.click()
+    assert flow.isVisible() and not binding(window, "w")
 
+
+def test_profile_errors_stay_inline(qtbot, tmp_path):
     window, service = setup(qtbot, tmp_path)
     service.save_full_profile = lambda *_: (_ for _ in ()).throw(
         ValueError("username is already taken")
     )
-    dialog = SetupDialog(window)
-    qtbot.addWidget(dialog)
-    dialog.show()
-    dialog.show_stage(5)
-    form = dialog.setup.profile_form
+    flow = show_setup(window, qtbot)
+    flow.show_stage(ACCOUNT)
+    form = flow.setup.profile_form
     form.name.setText("Maya")
     form.username.setText("maya_chen")
-    form.go(2)
-    dialog.activate()
+    flow.primary.click()
     qtbot.waitUntil(lambda: not form.saving)
-    assert dialog.stage == 5 and "taken" in form.error.text()
-    assert dialog.primary.isEnabled() and dialog.back.isEnabled()
-    assert form.name.text() == "Maya" and form.username.text() == "maya_chen"
-    assert not window.settings.value(account_key(window) + "/setup", False, type=bool)
+    assert "taken" in form.error.text()
+    assert flow.primary.isEnabled() and form.username.text() == "maya_chen"
 
 
-def test_handoff_cannot_complete_without_required_bud_setup(flow):
-    window, dialog = flow
-    dialog.show_stage(LAST_STAGE)
-    dialog.complete()
-    assert dialog.stage == 5
-    assert not window.settings.value(
-        account_key(window) + "/hasCompletedOnboarding", False, type=bool
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_compact_layout_fits_supported_minimum(fresh_window, qtbot, theme):
+    flow = show_setup(fresh_window, qtbot)
+    flow.apply_appearance(theme)
+    flow.resize(560, 580)
+    qtbot.keyClick(flow.primary, Qt.Key.Key_Return)
+    assert flow.stage == ACCOUNT
+    qtbot.waitUntil(lambda: flow.content.height() > 100)
+    assert flow.content.width() >= 300
+    left = flow.content.mapTo(flow, flow.content.rect().topLeft()).x()
+    right = flow.content.mapTo(flow, flow.content.rect().topRight()).x()
+    assert left >= 0 and right <= flow.surface.width()  # the form stays inside the left half
+    assert flow.art.width() > 200 and not flow.grab().isNull()
+
+
+def test_dashboard_first_run_keeps_profile_before_workspace(qtbot, tmp_path):
+    window, _ = setup(qtbot, tmp_path)
+    window.enable_guided_onboarding = True
+    window.account_dialog.snapshot["user_profile"] = {}
+    window.account_dialog.open_dashboard()
+    flow = window.setup_dialog
+    assert flow.isVisible() and flow.stage == ACCOUNT
+    assert flow.setup.profile_form is not None
+
+
+def test_profile_then_join_requires_a_real_workspace(fresh_window, qtbot, monkeypatch):
+    window = fresh_window
+    monkeypatch.setattr(AccountDialog, "start_provider", lambda *_: None)
+    flow = show_setup(window, qtbot)
+    flow.primary.click()
+    flow.setup.signin("google")
+    account = window.account_dialog
+    user = SimpleNamespace(
+        id="u", email="maya@example.com", user_metadata={"full_name": "Maya Chen"}
     )
-    assert not dialog.finished_once
+    empty = {**snapshot(), "workspaces": [], "channels": [], "members": []}
+    account.service = SimpleNamespace(
+        user=user, snapshot=lambda: empty, save_full_profile=lambda values, _: values
+    )
+    account.authenticated(user)
+    qtbot.waitUntil(lambda: flow.isVisible() and flow.setup.profile_form is not None)
+    flow.primary.click()
+    qtbot.waitUntil(lambda: flow.stage == PRIVACY)
+    past_privacy(flow)
+    assert flow.stage == PROJECT
+    assert flow.primary.isHidden() and flow.skip.isHidden()
+    assert flow.setup.first_action is flow.setup.workspace_name
+    assert not window.settings.value(flow.prefix + "/setup", False, type=bool)
 
 
-def test_required_bud_walkthrough_returns_on_cancel_and_hands_off_on_finish(flow, monkeypatch):
-    from PySide6.QtWidgets import QDialog
+def test_fresh_walkthrough_reviews_existing_profile_then_creates_and_invites(
+    fresh_window, qtbot, monkeypatch
+):
+    window = fresh_window
+    window.review_onboarding_profile = True
+    monkeypatch.setattr(AccountDialog, "start_provider", lambda *_: None)
+    flow = show_setup(window, qtbot)
+    window.setup_dialog = flow
+    flow.primary.click()
+    flow.setup.signin("google")
+    account = window.account_dialog
+    state = snapshot()
+    state["user_profile"] = {
+        "profile_completed": True,
+        "display_name": "Maya Chen",
+        "username": "maya_chen",
+    }
+    created = "buyer-workspace"
+    invites = []
 
-    window, dialog = flow
-    window.current_user = lambda: SimpleNamespace(id="bud-onboarding-account")
-    dialog.prefix = account_key(window)
+    def save_profile(data, _photo):
+        state["user_profile"] = data
+        return data
 
-    class BudWalkthrough(QDialog):
-        def __init__(self, parent, *, required):
-            super().__init__(parent)
-            assert required
+    def rpc(name, params):
+        if name == "onboard_workspace":
+            state["workspaces"].append({"id": created, "name": params["p_name"]})
+            state["channels"].append(
+                {
+                    "id": "buyers-general",
+                    "workspace_id": created,
+                    "name": "general",
+                    "private": False,
+                }
+            )
+            state["members"].append({"workspace_id": created, "user_id": "u", "role": "owner"})
+            return created
+        if name == "create_workspace_join_code":
+            invites.append(params["p_workspace"])
+            return "A2-0123-4567-89AB-CDEF"
 
-    monkeypatch.setattr("aedrova.desktop.dots.DotDialog", BudWalkthrough)
-    dialog.show_stage(LAST_STAGE)
-    dialog.complete()
-    first = dialog.buds_dialog
-    dialog.complete()
-    assert dialog.buds_dialog is first and not dialog.finished_once
-    first.reject()
-    assert dialog.isVisible() and dialog.stage == LAST_STAGE - 1
-    assert not window.settings.value(dialog.prefix + "/hasCompletedOnboarding", False, type=bool)
-    dialog.show_stage(LAST_STAGE)
-    dialog.complete()
-    dialog.buds_dialog.accept()
-    assert dialog.finished_once
-    assert window.settings.value(dialog.prefix + "/hasCompletedOnboarding", False, type=bool)
+    user = SimpleNamespace(id="u", email="maya@example.com")
+    account.service = SimpleNamespace(
+        user=user,
+        snapshot=lambda: state,
+        save_full_profile=save_profile,
+        rpc=rpc,
+        message_page=lambda *args, **kwargs: [],
+        attachments_for=lambda _: [],
+        realtime_credentials=lambda: None,
+    )
+    account.authenticated(user)
+    qtbot.waitUntil(lambda: flow.isVisible() and flow.setup.profile_form is not None)
+    assert flow.setup.profile_form.name.text() == "Maya Chen"
+    flow.primary.click()
+    qtbot.waitUntil(lambda: flow.stage == PRIVACY)
+    past_privacy(flow)
+    assert flow.setup.create_button.isEnabled() is False
+    flow.setup.workspace_name.setText("Buyer workspace")
+    flow.setup.workspace_ack.setChecked(True)
+    assert flow.setup.create_button.isEnabled() and not account.isVisible()
+    flow.setup.create_button.click()  # created inside setup; the account window stays hidden
+    qtbot.waitUntil(lambda: flow.isVisible() and hasattr(flow.setup, "folder"), timeout=8000)
+    assert not account.isVisible()
+    assert flow.stage == PROJECT and flow.created_workspace == created
+    assert not invites
+    flow.skip.click()
+    assert flow.stage == GOAL
+    flow.skip.click()
+    qtbot.waitUntil(lambda: invites == [created])
+    assert flow.closed and window.workspace_id == created
+    window.connected.timer.stop()
 
 
-def test_explicit_bud_finish_later_continues_controls_tour(flow, monkeypatch, qtbot):
-    from PySide6.QtWidgets import QDialog
+def test_starter_drafts_are_local_and_do_not_overwrite_or_send(qtbot, tmp_path, monkeypatch):
+    window, service = setup(qtbot, tmp_path)
+    guide = window.getting_started
+    monkeypatch.setattr(service, "rpc", lambda *_: pytest.fail("The guide must never send"))
+    guide.open()
+    editor = window.composer.editor
+    editor.setPlainText("Existing draft")
+    guide.draft.click()
+    assert editor.toPlainText() == "Existing draft"
+    assert guide.progress.text() == "0 of 3 tried"
 
-    window, dialog = flow
-    window.current_user = lambda: SimpleNamespace(id="bud-deferred-account")
-    dialog.prefix = account_key(window)
+    editor.clear()
+    guide.examples.setCurrentIndex(1)
+    guide.draft.click()
+    assert editor.toPlainText().startswith(f"@{window.composer.agent_name} Turn the latest")
+    assert guide.progress.text() == "1 of 3 tried"
+    guide.searched("onboarding")
+    assert guide.progress.text() == "2 of 3 tried"
+    guide.dismiss()
+    guide.refresh()
+    assert guide.isHidden()
+    guide.open()
+    assert guide.progress.text() == "2 of 3 tried"
+    window.connected.disconnect()
+    assert guide.isHidden()
 
-    class BudWalkthrough(QDialog):
-        def __init__(self, parent, *, required):
-            super().__init__(parent)
-            self.deferred_setup = True
 
-    monkeypatch.setattr("aedrova.desktop.dots.DotDialog", BudWalkthrough)
+def test_first_reply_guide_follows_only_the_selected_starter(qtbot, tmp_path, monkeypatch):
+    window, _ = setup(qtbot, tmp_path)
+    guide = window.getting_started
+    guide.open(goal="catch-up")
+    guide.draft.click()
+    guide.prompt_sent(window.composer.editor.toPlainText(), "starter")
+    guide.reply_received("w", "c", "unrelated", "Other reply")
+    assert guide.sample.isHidden()
+    source = "message:11111111-1111-4111-8111-111111111111"
+    guide.reply_received("w", "c", "starter", "See " + source)
+    assert guide.next_step.text() == "Open a cited source"
+    opened = []
+    monkeypatch.setattr(window.messages, "open_reply_source", opened.append)
+    guide.next_step.click()
+    assert opened == [source]
+
+
+def test_theme_step_applies_the_choice_and_the_scene_follows(fresh_window, qtbot):
+    window = fresh_window
+    window.set_reduced_motion(True)
+    flow = show_setup(window, qtbot)
+    flow.show_stage(THEME)
+    assert flow.art.scene == "theme"
+    from aedrova.desktop.zen_visuals import ThemePhoto
+
+    photos = {p.mode: p for p in flow.setup.findChildren(ThemePhoto)}
+    assert set(photos) == {"system", "light", "dark"}
+    photos["dark"].click()
+    assert window.theme_mode == "dark" and flow.theme.name == "dark"
+    assert flow.art.preview == "dark"
+    assert flow.art.grab().toImage().pixelColor(5, 5).lightness() < 128
+    photos["light"].click()
+    assert window.theme_mode == "light" and flow.theme.name == "light"
+
+
+def test_review_after_first_run_skips_the_theme_choice(fresh_window, qtbot):
+    window = fresh_window
+    flow = show_setup(window, qtbot)
+    assert flow.shows_theme()
+    window.settings.setValue(flow.prefix + "/setup", True)
+    assert not flow.shows_theme()
+    assert flow.next_after_privacy() != THEME
+
+
+def test_every_step_has_a_scene_and_reduced_motion_holds_it_still(fresh_window, qtbot):
+    from aedrova.desktop.onboarding_art import StageArt
+    from aedrova.desktop.zen_setup import PERMISSIONS
+
+    fresh_window.set_reduced_motion(True)
+    flow = show_setup(fresh_window, qtbot)
+    assert set(flow.SCENES.values()) == set(StageArt.SCENES)
+    for scene in StageArt.SCENES:
+        flow.art.show_scene(scene)
+        assert flow.art.enter == 1.0 and not flow.art.timer.isActive()
+        assert not flow.art.grab().isNull()
+    flow.art.set_granted(["camera"])
+    assert flow.art.levels["camera"] == 1.0 and flow.art.levels["screen"] == 0.0
+    assert PERMISSIONS in flow.SCENES
+
+
+def test_the_colour_wash_leans_a_new_way_on_each_step(fresh_window, qtbot):
+    fresh_window.set_reduced_motion(True)
+    flow = show_setup(fresh_window, qtbot)
+    flow.show_stage(THEME)
+    first = flow.surface.bias
+    flow.show_stage(GOAL)
+    assert flow.surface.bias != first
+
+
+def test_back_is_offered_on_every_step_after_the_first(fresh_window, qtbot):
+    fresh_window.set_reduced_motion(True)
+    flow = show_setup(fresh_window, qtbot)
+    assert flow.back.isHidden()
+    for stage in (ACCOUNT, THEME, GOAL):
+        flow.show_stage(stage)
+        assert not flow.back.isHidden(), stage
+    shown = []
+    flow.show_stage = shown.append
+    flow.stage = THEME
+    flow.back.click()
+    assert shown == [PRIVACY]
+
+
+def test_a_first_run_opens_on_the_motto_screen_alone(fresh_window, qtbot):
+    flow = SetupDialog(fresh_window)
+    qtbot.addWidget(flow)
+    flow.show()
+    assert flow.stage == OPENING
+    assert flow.opener_title.text() == "Your team, plus Agents."
+    assert flow.art.isHidden() and flow.top.isHidden()
+    assert flow.back.isHidden() and flow.primary.isHidden()
+    assert not flow.begin.isHidden() and flow.pages.currentIndex() == 2
+    flow.begin.click()
+    assert flow.stage == WELCOME and not flow.art.isHidden() and not flow.top.isHidden()
+
+
+def test_reviewing_setup_later_skips_the_motto_screen(fresh_window, qtbot):
+    fresh_window.settings.setValue(account_key(fresh_window) + "/setup", True)
+    flow = SetupDialog(fresh_window)
+    qtbot.addWidget(flow)
+    flow.show()
+    assert flow.stage == WELCOME
+
+
+def test_windows_arrive_instead_of_popping_in(fresh_window, qtbot, monkeypatch):
+    from aedrova.desktop import motion
+
     calls = []
-    monkeypatch.setattr(dialog, "start_controls_tour", lambda: calls.append("tour"))
-    dialog.show_stage(LAST_STAGE)
-    dialog.complete()
-    dialog.buds_dialog.reject()
-    qtbot.waitUntil(lambda: calls == ["tour"])
-    assert dialog.finished_once
-    assert window.settings.value(dialog.prefix + "/budsDeferred", False, type=bool)
+    monkeypatch.setattr(motion, "appear_window", lambda w, *a, **k: calls.append((w, a, k)))
+    flow = SetupDialog(fresh_window)
+    qtbot.addWidget(flow)
+    flow.show()
+    assert calls and calls[0][0] is flow and calls[0][1] == (700,)
+
+
+def test_appear_window_runs_and_is_skipped_for_reduced_motion(fresh_window, qtbot, monkeypatch):
+    from aedrova.desktop import motion
+
+    assert motion.appear_window(fresh_window, 40) is not None
+    qtbot.wait(150)
+    monkeypatch.setattr(motion, "reduced", lambda: True)
+    assert motion.appear_window(fresh_window, 40) is None
+
+
+def test_changing_screens_glides_the_old_one_out_and_blurs_scenes_through(fresh_window, qtbot):
+    from aedrova.desktop import motion
+
+    flow = show_setup(fresh_window, qtbot)
+    assert not motion.reduced()
+    flow.show_stage(THEME)
+    assert flow.ghost is not None and flow.art.previous is not None
+    assert flow.art.graphicsEffect() is not None
+    qtbot.waitUntil(lambda: flow.art.previous is None, timeout=3000)
+    flow.show_stage(WELCOME)
+    assert flow.art.direction == -1  # going back moves the other way
+    qtbot.waitUntil(lambda: flow.art.previous is None, timeout=3000)
+    assert flow.art.graphicsEffect() is None
+
+
+def test_reduced_motion_changes_screens_without_ghosts(fresh_window, qtbot):
+    fresh_window.set_reduced_motion(True)
+    flow = show_setup(fresh_window, qtbot)
+    flow.show_stage(THEME)
+    assert getattr(flow, "ghost", None) is None and flow.art.previous is None
+
+
+def test_signing_in_waits_inside_setup_and_can_be_cancelled(fresh_window, qtbot, monkeypatch):
+    fresh_window.set_reduced_motion(True)
+    monkeypatch.setattr(AccountDialog, "start_provider", lambda *_: None)
+    flow = show_setup(fresh_window, qtbot)
+    flow.show_stage(ACCOUNT)
+    flow.setup.signin("google")
+    account = fresh_window.account_dialog
+    assert account.quiet and flow.isVisible() and not account.isVisible()
+    assert not any(b.isEnabled() for b in flow.setup.sign_in_buttons)
+    flow.setup.cancel_signin.click()
+    assert not account.quiet and all(b.isEnabled() for b in flow.setup.sign_in_buttons)
+    assert flow.setup.wait_note.isHidden()
+
+
+def test_joining_with_a_code_is_done_in_setup(qtbot, tmp_path, monkeypatch):
+    window, _ = setup(qtbot, tmp_path)
+    window.account_dialog.snapshot.update(workspaces=[], channels=[], members=[])
+    flow = show_setup(window, qtbot)
+    flow.show_stage(PROJECT)
+    assert flow.setup.join_code.isHidden()
+    flow.setup.have_code.click()
+    sent = []
+    monkeypatch.setattr(
+        window.account_dialog, "mutate", lambda name, params, **_: sent.append((name, params))
+    )
+    flow.setup.join_code.setText(" CODE-1 ")
+    flow.setup.join_button.click()
+    qtbot.waitUntil(lambda: bool(sent), timeout=3000)
+    assert sent == [("accept_invitation", {"p_token": "CODE-1"})]
+    assert not window.account_dialog.isVisible()
+    flow.setup.release_job()
+
+
+def test_setup_covers_the_screen_and_takes_focus_back_after_pickers(fresh_window, qtbot):
+    flow = show_setup(fresh_window, qtbot)
+    flow.cover_screen()
+    assert flow.windowFlags() & Qt.WindowType.FramelessWindowHint
+    assert not flow.isFullScreen()  # no macOS Space for file pickers to wander off to
+    flow.setup.flow.regain_focus()

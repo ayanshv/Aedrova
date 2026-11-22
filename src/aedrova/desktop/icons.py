@@ -108,6 +108,18 @@ def icon(name, color):
     elif name == "chevron":
         p.drawLine(5, 8, 10, 13)
         p.drawLine(10, 13, 15, 8)
+    elif name == "microphone":
+        p.drawRoundedRect(QRectF(7.5, 2.5, 5, 9), 2.5, 2.5)
+        p.drawArc(QRectF(4.5, 6, 11, 8), 180 * 16, 180 * 16)
+        p.drawLine(10, 14, 10, 17)
+        p.drawLine(7, 17, 13, 17)
+    elif name == "screen":
+        p.drawRoundedRect(QRectF(2.5, 3.5, 15, 10), 2, 2)
+        p.drawLine(7, 17, 13, 17)
+        p.drawLine(10, 13.5, 10, 17)
+    elif name == "chevron_right":
+        p.drawLine(8, 5, 13, 10)
+        p.drawLine(13, 10, 8, 15)
     elif name == "more_chat":
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(QColor(color))

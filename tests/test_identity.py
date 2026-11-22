@@ -219,7 +219,7 @@ def test_context_fork_validates_once_on_isolated_client(monkeypatch):
     monkeypatch.setattr("aedrova.identity.service.IdentityService", lambda *a, **kw: clone)
     assert source.fork_for_context() is clone
     source_client.auth.get_user.assert_not_called()
-    clone.client.auth.set_session.assert_called_once_with("private-token", "private-refresh")
+    clone.client.auth.set_session.assert_called_once_with("private-token", "")
     assert clone.user.id == "user"
 
     clone.client.auth.set_session.return_value = SimpleNamespace(user=SimpleNamespace(id="other"))

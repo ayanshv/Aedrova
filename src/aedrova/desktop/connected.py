@@ -268,6 +268,8 @@ class ConnectedDashboard(QObject):
         if build:
             build.invalidate()
         self.active = False
+        self.window.getting_started.hide()
+        self.window.workspace_usage.sync_scope()
         self.sync_interrupt.set()
         self.last_view = None
         self.pages_ready = False
@@ -489,6 +491,8 @@ class ConnectedDashboard(QObject):
                     files.extend(service.attachments_for(ids[start : start + 100]))
             if hasattr(service, "chat_inventory") and workspace_id:
                 snapshot["chat"] = service.chat_inventory(workspace_id, section="recent")
+                if channel_id in allowed and hasattr(service, "chat_agent_progress"):
+                    snapshot["chat"]["agent_progress"] = service.chat_agent_progress(channel_id)
                 channel_details = {c["id"]: c for c in snapshot["chat"].get("channels", [])}
                 snapshot["channels"] = [
                     {**c, **channel_details.get(c["id"], {})} for c in snapshot["channels"]
@@ -662,6 +666,8 @@ class ConnectedDashboard(QObject):
         w._save_drafts()
         w.store.workspaces = spaces
         w.workspace_id = next((x.id for x in spaces if x.id == workspace_id), spaces[0].id)
+        self.account.remember_workspace(w.workspace_id)
+        w.workspace_usage.sync_scope()
         channels = w.workspace.channels
         w.channel_id = next((c.id for c in channels if c.id == channel_id), channels[0].id)
         allowed = {(space.id, c.id) for space in spaces for c in space.channels}
@@ -775,6 +781,19 @@ class ConnectedDashboard(QObject):
             ids.add(live[5])
         return list(rows) + list({r["id"]: r for r in replies if r["id"] not in ids}.values())
 
+    def report_agent_progress(self, prompt, phase):
+        service = self.account.service
+        if not prompt or not hasattr(service, "report_chat_agent_progress"):
+            return
+
+        def publish():
+            try:
+                service.report_chat_agent_progress(prompt, phase)
+            except Exception:
+                return
+
+        self.enqueue(("agent-progress", prompt, phase), publish, lambda _: None)
+
     def complete_agent_reply(
         self,
         workspace,
@@ -790,6 +809,7 @@ class ConnectedDashboard(QObject):
         bud_avatar=None,
         share=True,
     ):
+        self.window.workspace_usage.refresh(workspace)
         key = (workspace, channel)
         try:
             identifier = str(UUID((response_id or "").removeprefix("agent-")))
@@ -824,13 +844,22 @@ class ConnectedDashboard(QObject):
 
             def save_history(parameters=parameters):
                 try:
-                    return service.save_agent_reply(parameters) == identifier
+                    if service.save_agent_reply(parameters) != identifier:
+                        return False
+                    if share and prompt_id and hasattr(service, "publish_chat_agent_reply"):
+                        try:
+                            service.publish_chat_agent_reply(identifier)
+                        except Exception:
+                            return None
+                    return True
                 except Exception:
                     return False
 
             def history_saved(saved):
-                if not saved:
+                if saved is False:
                     self.window.notify("This reply could not be saved to history.")
+                elif saved is None:
+                    self.window.notify("Reply saved for you. It couldn’t sync to teammates.")
 
             if not self.enqueue(("agent-reply", identifier), save_history, history_saved):
                 history_saved(False)

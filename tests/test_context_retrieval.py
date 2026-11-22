@@ -325,7 +325,11 @@ def bounded_service():
 
 def test_indexed_context_preserves_query_threads_and_marks_coverage():
     source = bounded_service()
-    context = gather(source, "w", query="export invoices")
+    progress = []
+    context = gather(source, "w", progress=progress.append, query="export invoices")
+    assert "Reading #general…" in progress
+    assert all("0 messages" not in status for status in progress)
+    assert progress[-1] == "Gathered 5 messages for context"
     records = [json.loads(line) for line in context.text.splitlines()]
     assert records[0]["coverage"]["mode"] == "indexed search and bounded recent evidence"
     assert context.count == 5
@@ -355,3 +359,51 @@ def test_indexed_context_enforces_recent_message_ceiling():
     source.recent_context = lambda channel: [{}] * 21
     with pytest.raises(PermissionError, match="invalid"):
         gather(source, "w", query="invoice")
+
+
+def test_context_reports_no_messages_only_after_reading():
+    source = bounded_service()
+    source.search_context = lambda *_: []
+    source.recent_context = lambda _: []
+    progress = []
+
+    context = gather(source, "w", progress=progress.append, preferred_channel="c")
+
+    assert context.count == 0
+    assert progress[-1] == "No chat messages found in the selected context"
+    assert "Reading #general…" in progress[:-1]
+
+
+def test_the_channel_where_the_request_was_made_is_read_in_depth():
+    from aedrova.agents.context import CURRENT_CHANNEL_MESSAGES
+
+    source = bounded_service()
+    history = []
+
+    def deep(channel, limit):
+        history.append((channel, limit))
+        return [
+            {
+                "id": str(100 + n),
+                "channel_id": channel,
+                "body": f"plan step {n}",
+                "sequence": 100 + n,
+                "parent_id": None,
+            }
+            for n in range(150)
+        ]
+
+    source.channel_history = deep
+    context = gather(source, "w", query="build what we discussed", preferred_channel="c")
+    assert history == [("c", CURRENT_CHANNEL_MESSAGES)]
+    assert context.count >= 150
+    assert "plan step 149" in context.text
+    # Other channels keep the small recent window.
+    assert ("recent", "c") not in source.calls
+
+
+def test_deep_history_never_accepts_rows_from_another_channel():
+    source = bounded_service()
+    source.channel_history = lambda channel, limit: [{"id": "9", "channel_id": "other"}]
+    with pytest.raises(PermissionError, match="invalid"):
+        gather(source, "w", query="invoice", preferred_channel="c")

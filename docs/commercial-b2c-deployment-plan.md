@@ -41,7 +41,7 @@ with verified facts across Privacy, Terms, Support, Stripe and receipts.
   consumer rights or substitute for real technical controls.
 - Verify simple cancellation/refund contact and backend behavior; identify actual
   seller and authorized support/postal address. No unauthorized library or borrowed
-  establishment address. Maintain contact@aedrova.com and (408) 634-5254 if still valid.
+  establishment address. Use contact@aedrova.com for public support.
 - Finalize retention/deletion/export procedure, provider contracts/DPAs as applicable,
   cross-border handling and child/minor policy. Do not launch child-directed collection
   or regulated-data promises without the appropriate process.

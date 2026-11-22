@@ -8,7 +8,7 @@ from PySide6.QtCore import QObject, Qt, QThreadPool, QTimer
 from PySide6.QtWidgets import QHBoxLayout, QListWidget, QPlainTextEdit, QVBoxLayout
 from shiboken6 import isValid
 
-from aedrova.desktop.brand import BrandMark
+from aedrova.desktop.brand import BrandLockup
 from aedrova.desktop.controls import AppDialog
 from aedrova.desktop.dialogs import button, label
 from aedrova.desktop.meeting_transcript import ReviewJob
@@ -30,7 +30,7 @@ class MeetingWrapup(AppDialog):
         layout.setContentsMargins(32, 28, 32, 28)
         layout.setSpacing(16)
         brand = QHBoxLayout()
-        brand.addWidget(BrandMark(28))
+        brand.addWidget(BrandLockup(28, 14))
         brand.addWidget(label("Meeting complete", "muted"), 1)
         layout.addLayout(brand)
         layout.addWidget(label("Share with Aedrova?", "heading", wrap=True))

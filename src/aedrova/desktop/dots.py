@@ -13,7 +13,6 @@ from aedrova.desktop.projects import Job
 from aedrova.desktop.teammate_habitat import TeamSection
 from aedrova.dots.client import client
 from aedrova.dots.roles import NAMES, ROLES, purpose_from, role_for, stored_role
-from aedrova.localization import choice_source
 
 
 def shelf_rows(rows):
@@ -94,7 +93,7 @@ class DotDialog(AppDialog):
         self.rows = deepcopy(
             [
                 {
-                    "status": "Not checked",
+                    "status": "Checking…",
                     "last_sync": 0,
                     "tools": {},
                     "permissions": "Connection access is checked before use.",
@@ -334,9 +333,9 @@ class DotDialog(AppDialog):
                     + (
                         ""
                         if provider["available"]
-                        else " · Setup required"
+                        else " · Unavailable"
                         if provider["id"] == "github"
-                        else " · Coming next"
+                        else " · Unavailable"
                     ),
                     provider["id"],
                 )
@@ -383,12 +382,16 @@ class DotDialog(AppDialog):
         return self.rows[index] if 0 <= index < len(self.rows) else None
 
     def admin(self):
-        return any(
-            m["workspace_id"] == self.workspace
-            and m["user_id"] == self.user
-            and m["role"] in {"owner", "admin"}
+        """Known members follow their role; an unsynced snapshot must not lock the editor.
+
+        The database function still enforces owner/admin access on every save and removal.
+        """
+        mine = [
+            m
             for m in self.window.account_dialog.snapshot.get("members", [])
-        )
+            if m["workspace_id"] == self.workspace and m["user_id"] == self.user
+        ]
+        return not mine or any(m["role"] in {"owner", "admin"} for m in mine)
 
     def select(self, index):
         row = self.current()
@@ -574,9 +577,11 @@ class DotDialog(AppDialog):
                 "role": self.configured_role(),
             }
         )
+        self.appearance_group.setExclusive(False)
         for tile, value in self.appearance_buttons:
             tile.setChecked(self.appearance.currentData() == value)
             tile.setEnabled(self.admin())
+        self.appearance_group.setExclusive(True)
         for tile, value in self.planet_buttons:
             tile.setChecked(self.shape.currentData() == value)
             tile.setEnabled(self.admin())
@@ -587,7 +592,11 @@ class DotDialog(AppDialog):
                 "QPushButton {background:"
                 + display_color
                 + ";border-radius:14px;border:"
-                + ("3px solid #FFFFFF" if selected else "2px solid transparent")
+                + (
+                    "3px solid " + self.palette().windowText().color().name()
+                    if selected
+                    else "2px solid transparent"
+                )
                 + ";}"
             )
             tile.setEnabled(self.admin())
@@ -633,12 +642,14 @@ class DotDialog(AppDialog):
             layout.addWidget(self.character, alignment=Qt.AlignmentFlag.AlignHCenter)
         self.character.setVisible(layout is not None)
         self.next.setText(
-            "Start chatting →"
+            "Start chatting"
             if step == 6
-            else "Let’s set up your Bud →"
+            else "Let’s set up your Bud"
             if step == 0
-            else "Continue →"
+            else "Continue"
         )
+        if step == 6:
+            self.ready_copy.setText(self.ready_text())
         self.exit_button.setText("Close" if self.current() else "Finish later")
         self.next.setAccessibleName(self.next.text())
         self.update_controls()
@@ -655,9 +666,10 @@ class DotDialog(AppDialog):
             return
         capacity = self.capacity
         if capacity:
+            plan = "Teams" if capacity["plan"] == "team" else capacity["plan"].title()
             self.capacity_note.setText(
                 f"{capacity['used']} / {capacity['limit']} Buds · "
-                f"{capacity['plan'].title()} · shared by your team"
+                f"{plan} · shared by your team"
             )
         self.capacity_note.setAccessibleName("Workspace Bud capacity: " + self.capacity_note.text())
         gallery = getattr(self, "embedded_connectors", None)
@@ -682,17 +694,11 @@ class DotDialog(AppDialog):
             and (not busy or getattr(self, "_read_only_loading", False))
             and (not capacity or capacity["remaining"] > 0)
         )
-        self.save.setEnabled(
-            self.admin()
-            and not busy
-            and (
-                any(
-                    p.get("configurable") and p["id"] == self.provider.currentData()
-                    for p in self.providers
-                )
-                or self.current() is not None
-            )
-        )
+        self.save.setEnabled(self.admin() and not busy)
+        if self.pages.currentIndex() == 5:
+            connected = bool(self.current() and self.current().get("status") == "Connected")
+            self.next.setText("Continue" if connected else "Skip tools for now")
+            self.next.setAccessibleName(self.next.text())
         row = self.current()
         provider = next((p for p in self.providers if p["id"] == self.provider.currentData()), {})
         self.connector_gallery.setEnabled(bool(row) and not busy)
@@ -734,28 +740,11 @@ class DotDialog(AppDialog):
                 return
             self.show_step(step + 1)
         elif step == 5:
-            if (
-                self.current()
-                and self.current().get("status") == "Connected"
-                and not self.has_changes()
-            ):
-                sources = list(
-                    dict.fromkeys(
-                        c["provider"].title()
-                        for c in self.current().get("connections", [])
-                        if c["status"] == "Connected"
-                    )
-                )
-                self.ready_copy.setText(
-                    self.name.text()
-                    + " · "
-                    + (", ".join(sources) if sources else choice_source(self.provider))
-                )
+            row = self.current()
+            if row and not self.has_changes():
                 self.show_step(6)
-            elif self.current() and not self.has_changes():
-                self.status.setText("Choose a connector card and authorize a tool to finish setup.")
             else:
-                self.save_dot()
+                self.save_dot(next_step=6)
         else:
             row = self.current()
             if row:
@@ -766,6 +755,17 @@ class DotDialog(AppDialog):
                 self.window.composer.editor.setTextCursor(cursor)
                 self.window.composer.editor.setFocus()
             self.accept()
+
+    def ready_text(self):
+        row = self.current() or {}
+        sources = list(
+            dict.fromkeys(
+                c["provider"].title()
+                for c in row.get("connections", [])
+                if c.get("status") == "Connected"
+            )
+        )
+        return self.name.text().strip() + (" · " + ", ".join(sources) if sources else "")
 
     def has_changes(self):
         row = self.current()
@@ -780,7 +780,7 @@ class DotDialog(AppDialog):
             ]
         )
 
-    def save_dot(self, checked=False, *, on_saved=None):
+    def save_dot(self, checked=False, *, on_saved=None, next_step=5):
         row = self.current()
         if not self.admin():
             self.status.setText("Only workspace owners or admins can configure Buds.")
@@ -790,14 +790,18 @@ class DotDialog(AppDialog):
                 "Your workspace has reached its Bud limit. Remove a Bud or change your plan."
             )
             return
-        if not row and not any(
-            p.get("configurable") and p["id"] == self.provider.currentData() for p in self.providers
+        provider_id, resource = self.provider.currentData(), self.resource.text().strip()
+        if not row and not resource:
+            # Tools are optional. A Bud saved without one can connect tools later.
+            provider_id, resource = "search", "General research"
+        elif not row and not any(
+            p.get("configurable") and p["id"] == provider_id for p in self.providers
         ):
             self.status.setText("This tool is not available yet. Choose an available connector.")
             return
-        if not self.name.text().strip() or not self.resource.text().strip():
-            self.status.setText("Add a Bud name and a tool resource before saving.")
-            self.show_step(5 if self.name.text().strip() else 2)
+        if not self.name.text().strip():
+            self.status.setText("Give your Bud a name first.")
+            self.show_step(2)
             return
         if len(self.configured_role()) > 240:
             self.status.setText(
@@ -817,8 +821,8 @@ class DotDialog(AppDialog):
             )
             self.show_step(2)
             return
-        if self.provider.currentData() == "github" and not re.fullmatch(
-            r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", self.resource.text().strip()
+        if provider_id == "github" and not re.fullmatch(
+            r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", resource
         ):
             self.status.setText("Use a repository identifier like your-team/your-project.")
             return
@@ -826,8 +830,8 @@ class DotDialog(AppDialog):
             "p_id": row["id"] if row else None,
             "p_workspace": self.workspace,
             "p_version": row["version"] if row else 0,
-            "p_provider": self.provider.currentData(),
-            "p_resource": self.resource.text().strip(),
+            "p_provider": provider_id,
+            "p_resource": resource,
             "p_name": self.name.text().strip(),
             "p_color": self.color.currentData(),
             "p_shape": self.shape.currentData(),
@@ -838,7 +842,7 @@ class DotDialog(AppDialog):
 
         def saved(value):
             self.selected_id = value["id"]
-            self.after_refresh = 5
+            self.after_refresh = next_step
             self.after_save = on_saved
             self.refresh()
 
@@ -886,13 +890,8 @@ class DotDialog(AppDialog):
     def done(self, result):
         if self.required and result == self.DialogCode.Accepted:
             row = self.current()
-            if (
-                not row
-                or row.get("status") != "Connected"
-                or self.has_changes()
-                or self.pages.currentIndex() != 6
-            ):
-                self.status.setText("Finish configuring a Bud and connect one tool to continue.")
+            if not row or self.has_changes() or self.pages.currentIndex() != 6:
+                self.status.setText("Finish configuring your Bud to continue.")
                 return
         if self.embedded_connectors:
             self.embedded_connectors.stop_oauth()

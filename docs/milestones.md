@@ -1,3 +1,49 @@
+## November 22 — mention-to-build workflow, deeper context, quieter replies
+
+Owner vision recorded: discuss in chat, then mention `@Aedrova` and it builds, using the
+whole workspace as context, with minimal premium replies (see post-launch plans for the
+deferred agent-to-Bud collaboration).
+
+Source changes, not deployed and not yet verified live:
+- The channel a request is made in is now read in depth (up to 400 messages with threads,
+  paged by sequence) instead of the latest 20, so a long planning discussion reaches the
+  build. Other channels keep search plus a recent window. More text and code file types
+  (YAML, TOML, TSX, shell, Swift, Kotlin and others) are read from attachments.
+- Replies, plans and build reports share one style: lead with the answer, bullets with
+  bold lead-ins, no titles, about 120 words. Headings that still appear render as quiet
+  bold lines instead of large titles.
+- The task list shows how much was read ("Read 142 messages").
+
+Owner actions: build packaged apps with `AEDROVA_MEETING_CONTEXT_ENABLED=true` if meeting
+transcripts should reach the agent (consented, reviewed rows only; off by default).
+Applying changes to the original project and opening a pull request still use the
+existing review dialog with explicit approval. Not yet verified: a real GitHub pull
+request from a mention, and large-history retrieval against hosted staging.
+
+## November 21 — Codex-only launch, Bud setup repairs, automatic AI, web and file access
+
+Owner decision: Claude funding is post-launch; every launch gate depends on the Codex
+provider only. Docs updated: timeline, final paid gates, manual-actions rule, README.
+
+Repairs in source (not deployed, not yet verified in a signed build):
+- Bud setup no longer requires connecting a tool. Step 6 is optional ("Skip tools for
+  now"); a Bud saves with the built-in web-search provider and can add tools later.
+  Controls no longer lock when the member list has not synced; the database still
+  enforces owner/admin on save and removal. Look tiles are exclusive, the colour ring
+  follows the theme, and the setup panel header and spacing were tightened.
+- Included AI turns on by itself: a workspace that reports Inactive triggers one
+  automatic free activation (server still checks role, eligibility and budgets). The
+  Settings button remains as the manual fallback.
+- The agent can search the web (Codex hosted `web_search`, live) and read files under
+  the user's home folder. Writes stay in the isolated build copy; shell networking stays
+  off; credential stores, browser profiles, keychains and `.env*`/key files are denied.
+- Website gateway accepts only `web_search`, forces low context and at most 5 searches,
+  reserves and charges $0.01 per search on top of token cost.
+
+Owner actions: deploy the website gateway change (Render) before web search works for
+managed builds, confirm free activation is enabled in production config, and run the
+two-account and signed-build checks. Search spend is $0.01/search under existing caps.
+
 ## October 24 — signed-in native chat follow-up; step 2 not yet certified
 
 Owner completed Google sign-in. Dashboard dismissal, two native chronological greeting
@@ -1846,7 +1892,7 @@ verification/external testing and Phase2 acceptance remain open; no billing enab
 ### October 11 — public policies/support update authorized
 
 Owner authorized replacing website Privacy/Terms, adding Customer support with
-(408) 634-5254, pushing/merging the website update as needed, and entering/saving
+[former number removed], pushing/merging the website update as needed, and entering/saving
 https://aedrova.com/privacy, /terms and /support in Stripe. Isolated website PR4
 uses codex/legal-support-refresh from main to avoid publishing unfinished connector
 changes. Local website suite392 passed. Documents describe conditional Beta features
@@ -1860,7 +1906,7 @@ Website PR4 https://github.com/ayanshv/Aedrova-website/pull/4 merged after green
 CI38120908946; main commit8bb942d, mainCI38121001131 also green. Render website
 srv-db0a8o7avr4c73eqcj4g auto-deploymentdep-db5jhsmk1f9s73eeecdg succeeded.
 Live browser verification confirms new Privacy/Terms effectiveOctober11 and Support
-with authorized phone(408)634-5254. Waitlist retained; release/billing gates untouched.
+with the contact details authorized at the time. Waitlist retained; release/billing gates untouched.
 Current website development branch integrates the same pages:431 tests passed,
 tracked secret check passed.
 

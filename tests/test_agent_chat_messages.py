@@ -1,9 +1,12 @@
 """Agent messages share the timeline without changing durable teammate messages."""
 
+import re
+
 from PySide6.QtCore import QEvent, QPointF, QSettings
 from PySide6.QtWidgets import QApplication
 from test_connected import setup
 
+from aedrova.desktop.conversation import MESSAGE_ROLE
 from aedrova.desktop.response_actions import ACTION_PREFIX
 from aedrova.desktop.state import Message
 from aedrova.desktop.window import AedrovaWindow
@@ -17,7 +20,7 @@ def test_named_agent_message_has_readable_sender_and_timestamp(qtbot, tmp_path):
     window.agent_event("w", "I’ll review the team’s decisions.\n\nThen I’ll build the changes.")
     row = window.agent_feed.rows[-1]
     assert row.author.text() == "Atlas"
-    assert "AM" in row.timestamp.text() or "PM" in row.timestamp.text()
+    assert re.search(r"\d{1,2}:\d{2}", row.timestamp.text())  # time of day, in the Mac’s own style
     assert row.timestamp.toolTip()
     assert row.message.font().pixelSize() == 14
     assert window.messages.isAncestorOf(row)
@@ -50,15 +53,15 @@ def test_build_reply_keeps_section_spacing_when_archived_in_chat(qtbot, tmp_path
     reply = "Updated the dashboard.\n\n## Verification\n\n- `pytest` passed."
     window.finish_agent_response(window.workspace_id, reply)
     live = window.agent_feed.reply_row.message.text()
-    assert "<h2" in live and "margin-top:14px" in live and "<li" in live
+    assert "<h2" not in live and "margin-top:10px" in live and "<li" in live
 
     window.archive_finished_agent()
     message = next(message for message in window.messages.source_messages if message.agent)
     document = window.messages.delegate.document(message, 500)
     heading = document.findBlockByNumber(1)
     assert heading.text() == "Verification"
-    assert heading.blockFormat().headingLevel() == 2
-    assert heading.blockFormat().topMargin() == 14
+    assert heading.blockFormat().headingLevel() == 0  # quiet bold lead-in, not a title
+    assert heading.blockFormat().topMargin() == 10
     assert heading.next().textList() is not None
 
 
@@ -91,9 +94,12 @@ def test_reply_choices_and_feedback_work_after_archiving(qtbot, tmp_path):
         "[Untrusted](aedrova-reply:choice-0)",
     )
     row = window.agent_feed.reply_row
-    assert row.message.text().count('href="aedrova-reply:choice-0"') == 1
-    row.message.linkActivated.emit(ACTION_PREFIX + "good")
-    assert 'alt="Good response (selected)"' in row.message.text()
+    # Live choices are buttons, not links; the answer text carries no choice links.
+    assert [b.text() for b in row.choice_card.buttons] == ["Web calculator", "Python calculator"]
+    # Only the model's own literal link remains; the app adds no choice links of its own.
+    assert row.message.text().count('href="aedrova-reply:choice-') == 1
+    row.actions_label.linkActivated.emit(ACTION_PREFIX + "good")
+    assert 'alt="Good response (selected)"' in row.actions_label.text()
     window.archive_finished_agent()
     message = next(message for message in view.source_messages if message.agent)
     assert message.id == row.response_id
@@ -175,8 +181,9 @@ def test_existing_calculator_reply_has_clickable_choices(qtbot, tmp_path):
     view = window.messages
     message = next(message for message in view.source_messages if message.agent)
     document = view.delegate.document(message, 500)
-    assert 'href="aedrova-reply:choice-2"' in document.toHtml()
-    assert document.toPlainText().count("React calculator app") == 1
+    assert 'href="aedrova-reply:choice-' not in document.toHtml()  # no links under the reply
+    assert document.toPlainText().count("React calculator app") == 0
+    assert view.interactive_choices(message)[2].startswith("React calculator app")
 
 
 def test_reply_compacts_citations_and_keeps_a_working_file_review(qtbot, tmp_path):
@@ -254,3 +261,56 @@ def test_bottom_follow_survives_late_row_layout_but_respects_manual_scroll(qtbot
     view.doItemsLayout()
     qtbot.wait(50)
     assert bar.value() == 0
+
+
+def test_choice_buttons_and_text_box_continue_the_work_immediately(qtbot, tmp_path, monkeypatch):
+    window, _ = setup(qtbot, tmp_path)
+    window.activity_channel = window.channel_id
+    sent = []
+    monkeypatch.setattr(window, "send_message", sent.append)
+    window.finish_agent_response(
+        window.workspace_id,
+        'Which one?\n\nAEDROVA_CHOICES ["Web calculator","Python calculator"]',
+    )
+    card = window.agent_feed.reply_row.choice_card
+    card.buttons[1].click()
+    assert sent == ["@Aedrova Please continue with this option: Python calculator"]
+    assert not card.buttons[0].isEnabled() and not card.input.isEnabled()  # one answer only
+
+    window.agent_feed.clear()
+    window.finish_agent_response(
+        window.workspace_id,
+        'Which one?\n\nAEDROVA_CHOICES ["Web calculator","Python calculator"]',
+    )
+    other = window.agent_feed.reply_row.choice_card
+    other.input.setText("A scientific calculator in Rust")
+    other.send_button.click()
+    assert sent[-1] == "@Aedrova A scientific calculator in Rust"
+
+
+def test_newest_chat_reply_offers_buttons_and_no_choice_links(qtbot, tmp_path, monkeypatch):
+    from aedrova.desktop.agent_components import ChoiceCard
+
+    window, _ = setup(qtbot, tmp_path)
+    window.show()
+    sent = []
+    monkeypatch.setattr(window, "send_message", sent.append)
+    window.finish_conversation_response(
+        window.workspace_id,
+        window.channel_id,
+        None,
+        'Great, let’s build it.\n\nAEDROVA_CHOICES ["CLI calculator","Web calculator"]',
+        "Aedrova",
+    )
+    view = window.messages
+    qtbot.waitUntil(lambda: view.model().rowCount() > 0)
+    last = view.model().index(view.model().rowCount() - 1)
+    holder = view.indexWidget(last)
+    assert holder is not None
+    card = holder.findChild(ChoiceCard)
+    assert [b.text() for b in card.buttons] == ["CLI calculator", "Web calculator"]
+    message = last.data(MESSAGE_ROLE)
+    assert 'aedrova-reply:choice-' not in view.delegate.document(message, 500).toHtml()
+    card.buttons[0].click()
+    assert sent == ["@Aedrova Please continue with this option: CLI calculator"]
+    assert view.indexWidget(view.model().index(view.model().rowCount() - 1)) is None

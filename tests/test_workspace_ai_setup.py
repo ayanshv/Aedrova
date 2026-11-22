@@ -14,7 +14,6 @@ def review(widget, *, automatic=False):
     widget.begin_onboarding()
     widget.onboarding_workspace.setText("New team")
     widget.advance_onboarding()
-    widget.provider_continue.click()
     widget.onboarding_workflow.setCurrentIndex(widget.onboarding_workflow.findData(automatic))
     widget.onboarding_ack.setChecked(True)
 
@@ -28,8 +27,8 @@ def test_creation_is_blocked_until_ai_review_and_changes_revoke_consent(qtbot, t
     assert not widget.finish_onboarding.isEnabled()
     widget.onboarding_ack.setChecked(True)
     widget.onboarding_provider.setCurrentIndex(1)
-    assert not widget.onboarding_ack.isChecked() and not widget.finish_onboarding.isEnabled()
-    widget.onboarding_ack.setChecked(True)
+    assert widget.onboarding_provider.currentData() == "codex"
+    assert widget.onboarding_ack.isChecked()
     widget.onboarding_workflow.setCurrentIndex(1)
     assert not widget.onboarding_ack.isChecked()
 
@@ -42,7 +41,7 @@ def test_compact_review_scrolls_instead_of_compressing_controls(qtbot, tmp_path)
     widget.resize(600, 540)
     widget.show()
     qtbot.wait(50)
-    scroll = widget.pages.currentWidget()
+    scroll = widget.onboarding_steps.currentWidget()
     assert isinstance(scroll, QScrollArea)
     scroll.ensureWidgetVisible(widget.finish_onboarding)
     assert scroll.verticalScrollBar().maximum() > 0
@@ -61,7 +60,7 @@ def test_creation_saves_real_execution_preferences_per_account_workspace(
     qtbot.waitUntil(lambda: not widget.busy)
     data = json.loads(widget.settings.value(binding_key("user", "new")))
     assert data["background_build"] is data["auto_plan"] is automatic
-    assert data["provider"] == "auto" and data["ai_setup_version"] == 1
+    assert data["provider"] == "codex" and data["ai_setup_version"] == 1
     assert data["model_policy"] in {"managed", "provider_default"}
     assert not data["ai_setup_pending"] and "folder" not in data
     assert widget.settings.value(binding_key("another-user", "new")) is None
@@ -96,7 +95,7 @@ def test_subspace_gets_selected_identity_and_retries_setup_without_recreating(qt
     assert [n for n, _ in calls].count("create_subspace") == 1
     assert calls[-1] == (
         "set_agent_preferences",
-        {"p_workspace": "new", "p_nickname": "Atlas", "p_provider": "auto"},
+        {"p_workspace": "new", "p_nickname": "Atlas", "p_provider": "codex"},
     )
     complete = json.loads(widget.settings.value(binding_key("user", "new")))
     assert not complete["ai_setup_pending"] and complete["background_build"]
@@ -163,3 +162,25 @@ def test_manual_workflow_opens_review_without_background_execution(
     )
     assert window.start_agent_request("@" + (bud or "Aedrova") + " build a page")
     assert len(opened) == 1 and opened[0][1] == row
+
+
+@pytest.mark.parametrize("saved_provider", ["codex", "claude_code", "auto"])
+def test_existing_provider_preferences_use_the_single_aedrova_agent(qtbot, saved_provider):
+    from PySide6.QtWidgets import QComboBox
+
+    from aedrova.desktop.controls import CodingProviderChoice
+
+    identity = CodingProviderChoice()
+    qtbot.addWidget(identity)
+    identity.setCurrentIndex(identity.findData(saved_provider))
+    assert identity.currentData() == "codex"
+    assert identity.currentText() == "Aedrova"
+    assert not isinstance(identity, QComboBox)
+
+    from aedrova.desktop.builds import BuildJob
+    from aedrova.desktop.dot_analysis import QueryJob
+
+    build = BuildJob(None, "", "Test request", saved_provider, True)
+    query = QueryJob(None, "workspace", "channel", "Test question", saved_provider)
+    assert build.provider == "codex"
+    assert query.provider == "codex"

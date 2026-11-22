@@ -73,7 +73,7 @@ def test_legacy_planning_consent_does_not_authorize_coding(qtbot, tmp_path):
     assert not getattr(window, "build_dialog", None)
     assert window.agent_setup_needed
     assert "Project settings" in window.build_activity.text()
-    assert window.composer.editor.toPlainText()
+    assert not window.composer.editor.toPlainText()  # the prompt posted as chat
 
 
 def test_agent_question_pauses_build_until_answered(qtbot, tmp_path, monkeypatch):
@@ -104,23 +104,23 @@ def test_agent_question_pauses_build_until_answered(qtbot, tmp_path, monkeypatch
     assert start_background_build(window, "Build the requested greeting")
     dialog = window.build_dialog
     qtbot.waitUntil(lambda: bool(dialog.clarification), timeout=10000)
-    assert dialog.isVisible()
+    assert not dialog.isVisible()  # the question lives in the conversation, not a pop-up
+    card = dialog.prompt_card
+    assert card is not None and card in window.agent_feed.cards()
     assert dialog.start_button.text() == "Send answer"
     assert not dialog.approved_plan
     window.execution_queue.tick()
     assert window.execution_queue.active[1] is dialog
     assert runs == [True]
-    from PySide6.QtWidgets import QCheckBox
 
-    _, greeting = dialog.question_form.inputs[0]
-    _, audience = dialog.question_form.inputs[1]
-    _, choices = dialog.question_form.inputs[2]
+    greeting, _ = card.inputs[0][1], None
+    audience, choices = card.inputs[1][2], card.inputs[2][2]
     greeting.setText("Welcome aboard")
-    audience.setCurrentIndex(1)
-    dialog.start_button.click()
-    assert dialog.clarification and runs == [True]
-    choices.findChildren(QCheckBox)[0].setChecked(True)
-    dialog.start_button.click()
+    audience[0].click()
+    card.send_button.click()
+    assert dialog.clarification and runs == [True]  # a required answer is still missing
+    choices[0].click()
+    card.send_button.click()
     qtbot.waitUntil(lambda: dialog.successful_build, timeout=10000)
     assert runs == [True, True, False]
     assert not (root / "hello.py").exists()
@@ -243,11 +243,12 @@ def test_background_routine_approval_respects_scope(
     dialog.background_settings = (str(root), "codex", True)
     window.settings.setValue("agent-permissions/u/w", "auto")
     dialog.job = SimpleNamespace(runner=LocalRunner(lambda _: None), permission_mode="auto")
-    from PySide6.QtWidgets import QMessageBox
-
-    monkeypatch.setattr(QMessageBox, "exec", lambda self: QMessageBox.StandardButton.No)
     request = {"tool": tool, "data": data, "event": threading.Event(), "allow": False}
     dialog.permission(request)
+    if not allow:
+        (card,) = window.agent_feed.cards()
+        assert not request["event"].is_set()
+        card.deny.click()
     assert request["event"].is_set() and request["allow"] is allow
     assert not dialog.permission_box
     dialog.job = None

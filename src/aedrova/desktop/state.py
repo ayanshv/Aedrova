@@ -68,7 +68,7 @@ class DemoStore:
         if not 1 <= len(name) <= 32:
             raise ValueError("Use a workspace name between 1 and 32 characters.")
         if any(w.name.casefold() == name.casefold() for w in self.workspaces):
-            raise ValueError("A workspace with that name already exists in this preview.")
+            raise ValueError("A workspace with that name already exists in demo mode.")
         initials = "".join(word[0] for word in name.split())[:2].upper()
         workspace = Workspace(
             uuid4().hex,
@@ -95,7 +95,7 @@ class DemoStore:
         if not body:
             raise ValueError("Write a message first.")
         if len(body) > 10_000:
-            raise ValueError("Keep messages under 10,000 characters in this preview.")
+            raise ValueError("Keep messages under 10,000 characters in demo mode.")
         channel = self.channel(workspace_id, channel_id)
         message = Message(
             uuid4().hex, "You", "AV", datetime.now().strftime("%H:%M"), body, 3, mine=True

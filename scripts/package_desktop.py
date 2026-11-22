@@ -109,8 +109,10 @@ asset_args.extend(
 )
 for asset in (
     "aedrova.png",
+    "aedrova-wordmark.svg",
     "aedrova.icns",
     "google-g.png",
+    "google-play.svg",
     "apple.svg",
     "checkbox-checked.svg",
     "emoji.json",

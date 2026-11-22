@@ -394,6 +394,6 @@ class ProjectPicker(QAbstractButton):
 
     def refresh(self):
         self.visual.detail = (
-            Path(self.path.text()).name if self.path.text().strip() else "Choose your project →"
+            Path(self.path.text()).name if self.path.text().strip() else "Choose your project"
         )
         self.visual.update()

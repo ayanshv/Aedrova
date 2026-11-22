@@ -66,17 +66,27 @@ def onboarding_styles(theme):
         + f"""
         QDialog {{background:{theme.bg};}}
         QScrollArea#ZenSettings {{background:transparent;border:0;}}
-        QFrame#ZenSettingsBody {{background:{theme.bg};border:1px solid {theme.border};
-            border-radius:18px;}}
-        QFrame#ZenSettingsBody QLabel[role="muted"] {{font-size:12px;}}
-        QFrame#ZenSettingsBody QLabel[role="title"] {{font-size:15px;font-weight:600;}}
-        QPushButton {{border-radius:10px;padding:9px 16px;}}
+        QWidget#ZenSettingsBody {{background:{theme.bg};border:0;}}
+        QPushButton {{border-radius:10px;padding:8px 16px;}}
+        QPushButton#OnboardingBack {{background:transparent;border:0;color:{theme.muted};
+            padding:8px 10px;}}
+        QPushButton#OnboardingBack:hover {{color:{theme.text};}}
+        QFrame#FeatureRow {{background:{"rgba(255,255,255,0.80)" if theme.name == "light"
+            else theme.surface};border:1px solid {theme.border};border-radius:12px;}}
+        QFrame#FeatureRow[active="true"] {{border:1px solid #E58BC8;}}
+        QFrame#PermissionRow {{background:{"rgba(255,255,255,0.88)" if theme.name == "light"
+            else theme.surface};border:1px solid {theme.border};border-radius:12px;}}
+        QFrame#PermissionRow[asking="true"] {{border:1px solid {theme.accent};}}
+        QScrollArea#ZenSettings > QWidget > QWidget {{background:transparent;}}
         QPushButton#OnboardingContinue {{background:{theme.accent};color:{theme.primary_text};
-            border-radius:10px;text-align:center;font-weight:600;padding:8px 16px;}}
+            border-radius:10px;text-align:center;font-weight:600;padding:8px 18px;}}
+        QPushButton#OnboardingContinue:focus {{border:2px solid rgba(255,255,255,0.75);}}
+        QLabel#ZenHeading {{font-size:30px;font-weight:600;}}
+        QLabel#ZenOpening {{font-size:42px;font-weight:600;}}
+        QLabel[role='muted'] {{font-size:13px;}}
         QPushButton#OnboardingContinue:hover {{background:{theme.accent_text};}}
         QPushButton#OnboardingContinue:disabled {{background:{theme.surface};color:{theme.muted};}}
-        QPushButton#ZenSkip {{border:0;background:transparent;color:{theme.muted};padding:8px;}}
-        QLineEdit {{background:{theme.bg};border:1px solid {theme.border};border-radius:10px;
+        QLineEdit {{background:{theme.bg};border:1px solid {theme.border};border-radius:12px;
             padding:11px;}}
         QLineEdit:focus {{border-color:{theme.accent};}}
     """

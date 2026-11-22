@@ -1,560 +1,644 @@
-"""Animated introduction followed by explicit, optional real configuration."""
+"""First-run setup for the desktop workspace."""
 
-import math
-import time
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPixmap
+from PySide6.QtWidgets import (
+    QApplication,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QScrollArea,
+    QSizePolicy,
+    QSpacerItem,
+    QVBoxLayout,
+    QWidget,
+)
 
-from PySide6.QtCore import QEvent, QRectF, Qt, QTimer
-from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
-from PySide6.QtWidgets import QApplication, QPushButton, QWidget
-
-from aedrova.desktop.brand import brand_image
+from aedrova.desktop import motion
+from aedrova.desktop.agent_components import StepIcon
+from aedrova.desktop.brand import BrandLockup, BrandMark
 from aedrova.desktop.controls import AppDialog
-from aedrova.desktop.materials import system_font
+from aedrova.desktop.dialogs import button, label
+from aedrova.desktop.icons import icon
+from aedrova.desktop.onboarding_art import AuroraSurface, Confetti, StageArt
+from aedrova.desktop.onboarding_motion import OnboardingStack
+from aedrova.desktop.permission_cards import pending_kinds
 from aedrova.desktop.theme import palette
-from aedrova.desktop.zen_setup import LAST_STAGE, SETUP_STEPS, SetupPages
+from aedrova.desktop.zen_setup import (
+    ACCOUNT,
+    GOAL,
+    OPENING,
+    PERMISSIONS,
+    PRIVACY,
+    PROJECT,
+    THEME,
+    WELCOME,
+    SetupPages,
+    heading,
+)
 from aedrova.desktop.zen_theme import onboarding_styles, resolve_theme
 
-PROCESSING_SECONDS = 2.5
+
+class ReadinessChip(QFrame):
+    """What is finishing in the background. It informs; it never blocks the next step."""
+
+    def __init__(self, window, setup):
+        super().__init__()
+        self.window, self.setup = window, setup
+        self.setObjectName("ReadinessChip")
+        self.setAccessibleName("Setup in the background")
+        row = QHBoxLayout(self)
+        row.setContentsMargins(12, 8, 14, 8)
+        row.setSpacing(10)
+        self.icon = StepIcon("running")
+        row.addWidget(self.icon)
+        self.text = label("", "muted")
+        row.addWidget(self.text)
+        self.timer = QTimer(self)
+        self.timer.setInterval(700)
+        self.timer.timeout.connect(self.refresh)
+        self.hide()
+
+    def tasks(self):
+        tasks = [("Setting up your workspace", self.setup.has_workspace())]
+        usage = getattr(self.window, "workspace_usage", None)
+        if usage is not None and usage.scope is not None:
+            tasks.append(("Turning on AI", usage.data is not None))
+        return tasks
+
+    def refresh(self):
+        if not self.window.current_user():
+            self.hide()
+            return
+        tasks = self.tasks()
+        waiting = [name for name, done in tasks if not done]
+        self.show()
+        if waiting:
+            self.icon.state = "running"
+            self.text.setText(waiting[0] + "…  You can keep going.")
+            self.timer.start()
+        else:
+            self.icon.state = "done"
+            self.text.setText("You’re all set.")
+            self.timer.stop()
+            QTimer.singleShot(1600, self, self.hide)
+        self.icon.angle = (self.icon.angle + 40) % 360
+        self.icon.update()
+
+    def watch(self):
+        self.refresh()
+        self.timer.start()
 
 
-def settled_spring(seconds, frequency=11):
-    """Exact critically damped step response: heavy, smooth, and no overshoot."""
-    return 1 - (1 + frequency * seconds) * math.exp(-frequency * seconds)
+class StepDots(QWidget):
+    """Where you are in setup: small dots, the current one a short pill."""
+
+    def __init__(self, count):
+        super().__init__()
+        self.count, self.current = count, 0
+        self.setFixedHeight(14)
+        self.setFixedWidth(count * 14 + 14)
+        self.setAccessibleName("Setup progress")
+
+    def set_current(self, index):
+        self.current = index
+        self.setAccessibleDescription(f"Step {index + 1} of {self.count}")
+        self.update()
+
+    def paintEvent(self, event):  # noqa: N802
+        from PySide6.QtCore import QRectF
+        from PySide6.QtGui import QColor, QPainter, QPalette
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        ink = self.palette().color(QPalette.ColorRole.Text)
+        x = 7.0
+        for index in range(self.count):
+            active = index == self.current
+            width = 16.0 if active else 6.0
+            color = QColor("#3D74FF") if active else QColor(ink)
+            if not active:
+                color.setAlpha(70 if index > self.current else 140)
+            painter.setBrush(color)
+            painter.drawRoundedRect(QRectF(x, 4, width, 6), 3, 3)
+            x += width + 8
 
 
-def processing_progress(seconds):
-    return min(1.0, max(0.0, seconds / PROCESSING_SECONDS) ** 1.65)
+FEATURES = (
+    ("chat", "mention", "Chat with your team and your AI Buds.", "#8275E6", "#C9B6FF"),
+    ("build", "terminal", "Mention @Aedrova to plan and build.", "#3D74FF", "#7DB4FF"),
+    ("people", "people", "Bring your history over from Slack.", "#E5589F", "#FFB5DA"),
+    ("work", "folder", "Keep projects, files and meetings together.", "#E8923A", "#FFD3B3"),
+)
 
 
-class ZenCanvas(QWidget):
-    """Reference-led centered composition; the surrounding app remains real."""
+def feature_tile(symbol, start, end):
+    """A small gradient tile with a white glyph, drawn once."""
+    size = 26
+    pixmap = QPixmap(size * 2, size * 2)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    gradient = QLinearGradient(0, 0, size * 2, size * 2)
+    gradient.setColorAt(0.0, QColor(end))
+    gradient.setColorAt(1.0, QColor(start))
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setBrush(gradient)
+    painter.drawRoundedRect(0, 0, size * 2, size * 2, 14, 14)
+    icon(symbol, "#FFFFFF").paint(painter, 12, 12, size * 2 - 24, size * 2 - 24)
+    painter.end()
+    pixmap.setDevicePixelRatio(2)
+    return pixmap
 
-    def __init__(self, flow):
-        super().__init__(flow)
-        self.flow = flow
-        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self.setAccessibleName("Aedrova welcome and setup")
 
-    def paintEvent(self, event):
-        f, w, h = self.flow, self.width(), self.height()
-        t = f.theme
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        p.fillRect(self.rect(), QColor(t.bg))
-        elapsed = f.now() - f.entered
-        lift = 0 if f.reduced else 10 * (1 - settled_spring(elapsed))
-        p.translate(0, lift)
+class FeatureRow(QFrame):
+    def __init__(self, symbol, text, start, end):
+        super().__init__()
+        self.setObjectName("FeatureRow")
+        row = QHBoxLayout(self)
+        row.setContentsMargins(10, 9, 14, 9)
+        row.setSpacing(12)
+        tile = QLabel()
+        tile.setFixedSize(26, 26)
+        tile.setPixmap(feature_tile(symbol, start, end))
+        row.addWidget(tile)
+        row.addWidget(label(text, wrap=True), 1)
 
-        def text(rect, value, size=14, color=None, weight=QFont.Weight.Normal):
-            font = system_font(size, weight)
-            p.setFont(font)
-            p.setPen(QColor(color or t.text))
-            p.drawText(rect, Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap, value)
-
-        titles = (
-            (
-                "Welcome to Aedrova",
-                "Build with your team",
-                "Shared context",
-                "Meet the command menu",
-            )
-            + tuple(x[0] for x in SETUP_STEPS)
-            + ("Your workspace is ready",)
-        )
-        subtitles = (
-            (
-                "A shared workspace where conversations become working products.",
-                "Try one mention. This is a preview; no work runs.",
-                "Chats, approved decisions and consented meeting text. One useful brief.",
-                "Press ⌘ K to find your next conversation.",
-            )
-            + tuple(x[1] for x in SETUP_STEPS)
-            + ("Your settings are saved. Let’s explore your workspace.",)
-        )
-        if not f.logo.isNull():
-            p.drawPixmap(QRectF(w / 2 - 18, 46, 36, 36).toRect(), f.logo)
-        text(QRectF(w / 2 - 100, 86, 200, 24), "Aedrova", 15, weight=QFont.Weight.DemiBold)
-        text(QRectF(50, 146, w - 100, 44), titles[f.stage], 28, weight=QFont.Weight.DemiBold)
-        text(
-            QRectF(w / 2 - min(270, w / 2 - 30), 198, min(540, w - 60), 42),
-            subtitles[f.stage],
-            13,
-            t.secondary,
-        )
-        area = QRectF(w / 2 - 220, 272, 440, min(230, max(180, h - 410)))
-        if 0 < f.stage < 4:
-            p.setPen(QPen(QColor(t.border), 1))
-            p.setBrush(QColor(t.bg))
-            p.drawRoundedRect(area, 10, 10)
-        if f.stage == 0 or f.stage == LAST_STAGE:
-            from aedrova.desktop.teammate_habitat import paint_orb
-
-            paint_orb(
-                p,
-                QRectF(w / 2 - 52, area.top() + 30, 104, 104),
-                {"color": "#4388F5", "shape": "round"},
-                phase=0 if f.reduced else elapsed,
-                blink=not f.reduced and elapsed % 4.4 < 0.14,
-            )
-            text(
-                QRectF(w / 2 - 190, area.top() + 145, 380, 48),
-                "Team context. Real work.\nAll in your workspace.",
-                15,
-                t.secondary,
-            )
-        elif f.stage == 1:
-            text(
-                QRectF(w / 2 - 180, area.top() + 14, 360, 24),
-                "# product · Interactive preview",
-                12,
-                t.muted,
-            )
-            text(
-                QRectF(w / 2 - 184, area.top() + 62, 368, 50),
-                "A shared decision\nBuild from the context we already have.",
-                15,
-            )
-            text(
-                QRectF(w / 2 - 180, area.top() + 128, 360, 54),
-                "Brief ready · sources connected ✓"
-                if f.success
-                else "@" + f.agent + ", build our agreed feature",
-                14,
-                t.accent,
-            )
-        elif f.stage == 2:
-            text(QRectF(w / 2 - 160, area.top() + 50, 320, 50), "Organizing the demo context…", 16)
-            bar = QRectF(w / 2 - 150, area.top() + 116, 300, 5)
-            p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QColor(t.border))
-            p.drawRoundedRect(bar, 2.5, 2.5)
-            p.setBrush(QColor(t.accent))
-            p.drawRoundedRect(QRectF(bar.x(), bar.y(), bar.width() * f.processing, 5), 2.5, 2.5)
-            text(
-                QRectF(w / 2 - 170, area.top() + 144, 340, 30),
-                "Illustrative preview · nothing is indexed",
-                11,
-                t.muted,
-            )
-        elif f.stage == 3:
-            text(
-                QRectF(w / 2 - 150, area.top() + 40, 300, 76),
-                "⌘  K",
-                44,
-                t.accent if f.unlocked else t.text,
-                QFont.Weight.Medium,
-            )
-            text(
-                QRectF(w / 2 - 150, area.top() + 140, 300, 36),
-                "That was easy." if f.unlocked else "Or click Continue to try it later.",
-                13,
-                t.secondary,
-            )
-        for i in range(LAST_STAGE + 1):
-            p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QColor(t.accent if i <= f.stage else t.border))
-            p.drawEllipse(QRectF(w / 2 - (LAST_STAGE * 14) / 2 + i * 14 - 2, h - 42, 4, 4))
-        text(
-            QRectF(w / 2 - 100, h - 30, 200, 18), f"{f.stage + 1} of {LAST_STAGE + 1}", 10, t.muted
-        )
+    def set_active(self, active):
+        self.setProperty("active", active)
+        self.style().unpolish(self)
+        self.style().polish(self)
 
 
 class ZenOnboarding(AppDialog):
-    """A tactile introduction with explicit configuration; never starts work itself."""
-
-    now = staticmethod(time.monotonic)
-
     def __init__(self, window):
         super().__init__(window)
         from aedrova.desktop.onboarding import account_key
 
         self.window = window
+        user = window.current_user()
         self.prefix = account_key(window)
-        self.owner = str(window.current_user().id) if window.current_user() else None
-        self.reduced = bool(window.reduced_motion)
-        self.stage = 0
-        self.entered = self.now()
-        self.action_started = None
-        self.flash_started = None
-        self.success = self.unlocked = False
-        self.command_down = self.k_down = False
-        self.processing = 0.0
-        self.button_scale = 1.0
-        self.scale_origin = self.scale_target = 1.0
-        self.scale_started = self.now()
-        try:
-            self.logo = QPixmap.fromImage(brand_image()).scaled(
-                128,
-                128,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            )
-        except (RuntimeError, ValueError):
-            self.logo = QPixmap()
-        self.finished_once = False
+        self.owner = str(user.id) if user else None
+        self.review_profile = getattr(window, "review_onboarding_profile", False)
+        self.profile_reviewed = False
+        self.created_workspace = None
+        self.workspace_selected = False
         self.closed = False
-        composer = getattr(window, "composer", None)
-        self.agent = str(getattr(composer, "agent_name", "Aedrova"))[:32] or "Aedrova"
+        self.celebrated = False
+        self.reduced_motion = window.reduced_motion
+        self.appear_ms = 700  # the first thing a person sees should arrive, not pop
         self.setWindowTitle("Aedrova · Welcome")
-        self.setWindowModality(Qt.WindowModality.WindowModal)
-        self.resize(1120, 820)
-        self.setMinimumSize(640, 620)
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
+        self.setMinimumSize(780, 540)
+        self.resize(900, 600)
+
+        # Theme first: the art and the colour wash read it while they are built.
         self.theme_mode = window.theme_mode
         self.theme = resolve_theme(self.theme_mode)
-        self.apply_appearance(self.theme_mode)
-        self.canvas = ZenCanvas(self)
-        from aedrova.desktop.onboarding_scene import OpeningScene
-        self.opening_scene = OpeningScene(self)
-        self.primary = QPushButton("Get started", self)
-        self.primary.setObjectName("OnboardingContinue")
-        self.primary.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.primary.clicked.connect(self.activate)
-        self.primary.installEventFilter(self)
-        self.skip = QPushButton("Skip intro", self)
-        self.skip.setObjectName("ZenSkip")
-        self.skip.clicked.connect(self.defer)
-        self.back = QPushButton("← Back", self)
-        self.back.clicked.connect(lambda: self.setup.go_back())
-        self.back.hide()
-        self.setup = SetupPages(self)
-        self.setup.hide()
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        QApplication.instance().installEventFilter(self)
-        self.timer = QTimer(self)
-        self.timer.setTimerType(Qt.TimerType.PreciseTimer)
-        self.timer.setInterval(16)
-        self.timer.timeout.connect(self.tick)
-        self.finished.connect(self.cleanup)
-        QApplication.instance().styleHints().colorSchemeChanged.connect(
-            self.system_appearance_changed
+        self.setPalette(palette(self.theme))
+
+        outer = QHBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        surface = AuroraSurface()
+        self.surface = surface
+        outer.addWidget(surface, 10)
+        self.art = StageArt(self)
+        outer.addWidget(self.art, 9)
+
+        shell = QHBoxLayout(surface)
+        shell.setContentsMargins(0, 0, 0, 0)
+        shell.addStretch(1)
+        panel = QWidget()
+        panel.setMaximumWidth(580)
+        shell.addWidget(panel, 100)
+        shell.addStretch(1)
+        left = QVBoxLayout(panel)
+        left.setContentsMargins(44, 30, 36, 26)
+        left.setSpacing(0)
+        self.top = QWidget()
+        top = QHBoxLayout(self.top)
+        top.setContentsMargins(0, 0, 0, 0)
+        self.brand = BrandLockup(24, 15)
+        top.addWidget(self.brand)
+        top.addStretch()
+        self.dots = StepDots(7)
+        top.addWidget(self.dots)
+        left.addWidget(self.top)
+        self.top_gap = QSpacerItem(0, 30, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        left.addItem(self.top_gap)
+
+        scroll = QScrollArea()
+        scroll.setObjectName("ZenSettings")
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.viewport().setAutoFillBackground(False)
+        self.scroll = scroll
+        left.addWidget(scroll, 1)
+        self.content = QWidget()
+        self.content.setAutoFillBackground(False)
+        scroll.setWidget(self.content)
+        column = QVBoxLayout(self.content)
+        column.setContentsMargins(0, 0, 10, 8)
+        column.setSpacing(14)
+
+        self.pages = OnboardingStack(self)
+        self.pages.reduced = lambda: True  # the screen change below does its own, richer motion
+        intro = QWidget()
+        welcome = QVBoxLayout(intro)
+        welcome.setContentsMargins(0, 0, 0, 0)
+        welcome.setSpacing(8)
+        title = heading("Welcome to Aedrova")
+        subtitle = label(
+            "Set up your workspace for chat, Buds and building together.", "muted", wrap=True
         )
-        self.timer.start()
-        self.show_stage(0)
+        welcome.addWidget(title)
+        welcome.addWidget(subtitle)
+        welcome.addSpacing(16)
+        self.feature_rows = []
+        for _, symbol, text, start, end in FEATURES:
+            row = FeatureRow(symbol, text, start, end)
+            welcome.addWidget(row)
+            self.feature_rows.append(row)
+        welcome.addStretch()
+        self.welcome_pieces = (title, subtitle, *self.feature_rows)
+        self.highlight = 0
+        self.feature_rows[0].set_active(True)
+        self.pages.addWidget(intro)
+        self.setup = SetupPages(self)
+        self.pages.addWidget(self.setup)
+        self.pages.addWidget(self.build_opener())
+        column.addWidget(self.pages)
+        column.addStretch()
+        self.column = column
+
+        self.readiness = ReadinessChip(window, self.setup)
+        left.addSpacing(8)
+        left.addWidget(self.readiness, alignment=Qt.AlignmentFlag.AlignLeft)
+        left.addSpacing(10)
+        self.actions = QWidget()
+        actions = QHBoxLayout(self.actions)
+        actions.setContentsMargins(0, 0, 0, 0)
+        actions.setSpacing(10)
+        self.back = button("Back")
+        self.back.setObjectName("OnboardingBack")
+        self.back.clicked.connect(self.go_back)
+        actions.addWidget(self.back)
+        actions.addStretch()
+        self.skip = button("Set up later")
+        self.skip.setObjectName("OnboardingBack")
+        self.skip.clicked.connect(self.skip_step)
+        actions.addWidget(self.skip)
+        self.primary = button("Get started", role="primary")
+        self.primary.setObjectName("OnboardingContinue")
+        self.primary.setProperty("onboardingAction", True)
+        self.primary.setMinimumHeight(38)
+        self.primary.setMinimumWidth(110)
+        self.primary.setDefault(True)
+        self.primary.clicked.connect(self.activate)
+        actions.addWidget(self.primary)
+        left.addWidget(self.actions)
+
+        self.cycle = QTimer(self)
+        self.cycle.setInterval(2200)
+        self.cycle.timeout.connect(self.next_highlight)
+        self.apply_appearance(self.theme_mode)
+        self.style_hints = QApplication.instance().styleHints()
+        self.style_hints.colorSchemeChanged.connect(self.system_appearance_changed)
+        self.show_stage(OPENING if self.shows_theme() else WELCOME)
+
+    def cover_screen(self):
+        """Fill the screen without macOS's full-screen Space, so file pickers and other windows
+        open on top of setup and focus never wanders off to another desktop."""
+        self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
+        screen = self.window.screen() or QApplication.primaryScreen()
+        self.setGeometry(screen.geometry())
+        self.appear_rise = 0
+
+    def regain_focus(self):
+        self.raise_()
+        self.activateWindow()
+        if not self.primary.isHidden():
+            self.primary.setFocus()
+
+    def resizeEvent(self, event):  # noqa: N802
+        super().resizeEvent(event)
+        # On a big display the title sits a little lower instead of hugging the top edge.
+        self.top_gap.changeSize(
+            0,
+            30 + max(0, int((self.height() - 620) * 0.14)),
+            QSizePolicy.Policy.Minimum,
+            QSizePolicy.Policy.Fixed,
+        )
+        self.surface.layout().invalidate()
+
+    def build_opener(self):
+        """The first screen: the mark, one sentence, one button. Nothing else."""
+        page = QWidget()
+        stack = QVBoxLayout(page)
+        stack.setContentsMargins(0, 0, 0, 0)
+        stack.setSpacing(10)
+        stack.addStretch(2)
+        self.opener_mark = BrandMark(72)
+        stack.addWidget(self.opener_mark, alignment=Qt.AlignmentFlag.AlignHCenter)
+        stack.addSpacing(22)
+        self.opener_title = label("Your team, plus Agents.", "display", wrap=True)
+        self.opener_title.setObjectName("ZenOpening")
+        self.opener_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        stack.addWidget(self.opener_title)
+        self.opener_text = label("Chat, plan and build together.", "muted", wrap=True)
+        self.opener_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        stack.addWidget(self.opener_text)
+        stack.addSpacing(26)
+        self.begin = button("Get started", role="primary")
+        self.begin.setObjectName("OnboardingContinue")
+        self.begin.setMinimumHeight(44)
+        self.begin.setFixedWidth(200)
+        self.begin.clicked.connect(self.activate)
+        stack.addWidget(self.begin, alignment=Qt.AlignmentFlag.AlignHCenter)
+        stack.addStretch(3)
+        self.opening_pieces = (self.opener_mark, self.opener_title, self.opener_text, self.begin)
+        return page
+
+    def next_highlight(self):
+        if self.stage != WELCOME or not self.isVisible():
+            return
+        self.feature_rows[self.highlight].set_active(False)
+        self.highlight = (self.highlight + 1) % len(self.feature_rows)
+        self.feature_rows[self.highlight].set_active(True)
 
     def apply_appearance(self, mode):
         self.theme_mode = mode
         self.theme = resolve_theme(mode)
         self.setPalette(palette(self.theme))
         self.setStyleSheet(onboarding_styles(self.theme))
-        self.update()
-        for widget in self.findChildren(QWidget):
-            widget.update()
+        if hasattr(self, "art"):
+            self.art.update()
+            self.surface.update()
 
     def system_appearance_changed(self, *_):
-        if not self.closed and self.theme_mode == "system":
+        if self.theme_mode == "system":
             self.apply_appearance("system")
 
-    @property
-    def step(self):
-        return self.stage
+    ORDER = (WELCOME, ACCOUNT, PRIVACY, THEME, PERMISSIONS, PROJECT, GOAL)
+    ORDER_INDEX = {
+        OPENING: -1,
+        WELCOME: 0,
+        ACCOUNT: 1,
+        PRIVACY: 2,
+        THEME: 3,
+        PERMISSIONS: 4,
+        PROJECT: 5,
+        GOAL: 6,
+    }
+    SCENES = {
+        WELCOME: "welcome",
+        ACCOUNT: "account",
+        PRIVACY: "privacy",
+        THEME: "theme",
+        PERMISSIONS: "permissions",
+        PROJECT: "project",
+        GOAL: "goal",
+    }
 
-    def resizeEvent(self, event):  # noqa: N802
-        super().resizeEvent(event)
-        self.canvas.setGeometry(self.rect())
-        self.opening_scene.setGeometry(40, 254, self.width() - 80, min(270, self.height() - 374))
-        self.primary.setGeometry(self.width() // 2 - 200, self.height() - 102, 400, 40)
-        self.skip.setGeometry(self.width() - 164, 24, 148, 40)
-        self.back.setGeometry(20, 24, 128, 40)
-        self.layout_setup()
+    def slide_out(self, forward):
+        """The screen you are leaving glides away and fades, as the next one arrives."""
+        if motion.reduced() or not self.isVisible():
+            return
+        from PySide6.QtCore import QParallelAnimationGroup, QPoint, QPropertyAnimation
+        from PySide6.QtWidgets import QGraphicsOpacityEffect
+
+        area = self.scroll.viewport()
+        ghost = QLabel(area)
+        ghost.setPixmap(area.grab())
+        ghost.setGeometry(area.rect())
+        ghost.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        effect = QGraphicsOpacityEffect(ghost)
+        ghost.setGraphicsEffect(effect)
+        ghost.show()
+        ghost.raise_()
+        group = QParallelAnimationGroup(ghost)
+        fade = QPropertyAnimation(effect, b"opacity", ghost)
+        fade.setStartValue(1.0)
+        fade.setEndValue(0.0)
+        slide = QPropertyAnimation(ghost, b"pos", ghost)
+        slide.setStartValue(QPoint(0, 0))
+        slide.setEndValue(QPoint(-44 if forward else 44, 0))
+        for part in (fade, slide):
+            part.setDuration(motion.SLOW)
+            part.setEasingCurve(motion.EASE)
+            group.addAnimation(part)
+        group.finished.connect(ghost.deleteLater)
+        group.start()
+        self.ghost = ghost
 
     def show_stage(self, stage):
+        previous = getattr(self, "stage", None)
+        forward = previous is None or self.ORDER_INDEX.get(stage, -1) >= self.ORDER_INDEX.get(
+            previous, -1
+        )
+        if previous is not None and previous != stage:
+            self.slide_out(forward)
         self.stage = stage
-        self.opening_scene.setVisible(stage == 0)
-        self.entered = self.now()
-        self.action_started = None
-        actions = (
-            "Get started",
-            "Send the demo mention",
-            "Mapping demo context…",
-            "Continue",
-        )
-        self.primary.setText(
-            actions[stage]
-            if stage < 4
-            else "Opening your workspace…"
-            if stage == LAST_STAGE
-            else SETUP_STEPS[stage - 4][2]
-        )
-        self.primary.setAccessibleName(self.primary.text())
-        self.primary.setVisible(stage not in (2, LAST_STAGE))
-        self.back.setVisible(4 < stage < LAST_STAGE)
+        opening = stage == OPENING
+        self.top.setVisible(not opening)
+        self.art.setVisible(not opening)
+        self.surface.opening = opening
+        self.back.setVisible(stage not in (WELCOME, OPENING))
         self.back.setEnabled(True)
-        self.skip.setEnabled(True)
-        self.skip.setText("Set up later" if stage >= 4 else "Skip intro")
-        self.skip.setEnabled(stage < 4 or self.profile_complete())
-        self.skip.setToolTip("" if self.skip.isEnabled() else "Confirm your account profile first.")
-        self.setup.setVisible(4 <= stage < LAST_STAGE)
-        if 4 <= stage < LAST_STAGE:
-            self.setup.render(stage)
-        self.animate_scale(1)
-        self.layout_setup()
-        self.primary.setEnabled(True)
-        if stage == 2:
-            self.processing = 0
-        if 4 <= stage < LAST_STAGE:
-            title, subtitle, _ = SETUP_STEPS[stage - 4]
-            self.canvas.setAccessibleName(title + " · " + subtitle)
-        else:
-            self.canvas.setAccessibleName(
-                self.primary.text()
-                + (" · Simulated product preview" if stage < 4 else " · Settings saved")
-            )
-        self.primary.setFocus()
-        self.canvas.update()
-
-    def layout_setup(self):
-        if not hasattr(self, "setup"):
-            return
-        lift = 0 if self.reduced else int(16 * (1 - settled_spring(self.now() - self.entered)))
-        self.setup.setGeometry(
-            max(32, self.width() // 2 - 250),
-            254 + lift,
-            min(500, self.width() - 64),
-            max(170, self.height() - 380),
+        self.skip.setVisible(stage in (GOAL, PROJECT))
+        self.skip.setText("Skip for now" if stage == GOAL else "Set up later")
+        self.primary.setVisible(
+            stage not in (GOAL, OPENING)
+            and (stage != ACCOUNT or self.window.current_user() is not None)
         )
+        self.primary.setEnabled(True)
+        labels = {
+            WELCOME: "Get started",
+            PROJECT: "Connect project" if self.created_workspace else "Open workspace",
+        }
+        self.primary.setText(labels.get(stage, "Continue"))
+        self.primary.setAccessibleName(self.primary.text())
+        if stage not in (WELCOME, OPENING):
+            self.setup.render(stage)
+        self.actions.setVisible(
+            any(not control.isHidden() for control in (self.back, self.skip, self.primary))
+        )
+        page_index = {WELCOME: 0, OPENING: 2}.get(stage, 1)
+        for index in range(self.pages.count()):
+            self.pages.widget(index).setSizePolicy(
+                QSizePolicy.Policy.Expanding,
+                (
+                    QSizePolicy.Policy.Expanding
+                    if index == page_index and opening
+                    else QSizePolicy.Policy.Preferred
+                    if index == page_index
+                    else QSizePolicy.Policy.Ignored
+                ),
+            )
+        self.column.setStretch(0, 1 if opening else 0)
+        self.pages.setCurrentIndex(page_index)
+        self.pages.updateGeometry()
+        self.content.updateGeometry()
+        if not self.primary.isHidden():
+            self.primary.setFocus()
+        elif self.setup.first_action is not None:
+            self.setup.first_action.setFocus()
+        position = self.ORDER.index(stage) if stage in self.ORDER else 0
+        self.dots.set_current(position)
+        self.surface.set_active(True)
+        self.surface.set_stage(position)
+        if stage != OPENING:
+            self.art.show_scene(self.SCENES[stage], forward)
+        if stage == WELCOME and not motion.reduced():
+            self.cycle.start()
+        else:
+            self.cycle.stop()
+        if stage != WELCOME and self.window.current_user():
+            self.readiness.watch()
+        if stage == GOAL and not self.celebrated and self.isVisible():
+            self.celebrated = True
+            if not motion.reduced():
+                Confetti(self)
+        self.reveal_stage()
+
+    def reveal_stage(self):
+        """Each screen arrives piece by piece, like a sentence being said."""
+        from aedrova.desktop.motion import reveal
+
+        if not self.isVisible():
+            return
+        if self.stage == OPENING:
+            pieces = list(self.opening_pieces)
+        elif self.stage == WELCOME:
+            pieces = list(self.welcome_pieces)
+        else:
+            pieces = [
+                self.setup.column.itemAt(i).widget()
+                for i in range(self.setup.column.count())
+                if self.setup.column.itemAt(i).widget() is not None
+            ]
+        pieces.extend(c for c in (self.actions,) if not self.actions.isHidden())
+        reveal(pieces, step={OPENING: 170, WELCOME: 110}.get(self.stage, 70), delay=150)
+
+    def shows_theme(self):
+        """The appearance choice is part of first-run setup, not of reviewing it later."""
+        return not self.window.settings.value(self.prefix + "/setup", False, type=bool)
+
+    def next_after_privacy(self):
+        if self.shows_theme():
+            return THEME
+        return self.next_after_theme()
+
+    def next_after_theme(self):
+        if pending_kinds():
+            return PERMISSIONS
+        return GOAL if not self.setup.needs_workspace() else PROJECT
+
+    def choose_theme(self, mode):
+        self.window.set_theme(mode)
+        self.apply_appearance(mode)
+        self.art.set_preview(mode)
+
+    def permissions_changed(self):
+        rows = self.setup.permissions.rows
+        self.art.set_granted([kind for kind, row in rows.items() if row.state == "granted"])
+
+    def go_back(self):
+        earlier = THEME if self.shows_theme() else PRIVACY
+        if self.stage == PERMISSIONS:
+            previous = earlier
+        elif self.stage == PROJECT:
+            previous = PERMISSIONS if pending_kinds() else earlier
+        else:
+            previous = {ACCOUNT: WELCOME, PRIVACY: ACCOUNT, THEME: PRIVACY, GOAL: PRIVACY}.get(
+                self.stage, WELCOME
+            )
+        self.show_stage(previous)
+
+    def choose_goal(self, goal):
+        self.finish(goal=goal)
+
+    def skip_step(self):
+        if (
+            self.stage == PROJECT
+            and self.created_workspace
+            and self.created_workspace == self.setup.workspace
+        ):
+            self.show_stage(GOAL)
+        else:
+            self.finish()
 
     def activate(self):
-        if self.action_started is not None or self.stage in (2, LAST_STAGE):
-            return
-        if 4 <= self.stage < LAST_STAGE:
-            from aedrova.desktop.onboarding import account_key
-
-            if account_key(self.window) != self.prefix:
-                self.reject()
-                return
-            if self.stage == 5:
-                self.setup.advance_profile()
-                return
-            self.setup.capture()
-            if self.stage in (6, 7, 8, 10) and not self.setup.valid():
-                return
-            if self.stage == LAST_STAGE - 1 and not self.setup.save():
-                return
-            self.show_stage(self.stage + 1)
-            return
-        self.action_started = self.now()
-        self.primary.setEnabled(False)
-        if self.stage == 0:
-            self.flash_started = self.now()
-            self.animate_scale(0.82)
-        elif self.stage == 1:
-            self.success = True
-            self.primary.setText("Context → Build brief → Result  ✓")
-        elif self.stage == 3:
-            self.unlocked = True
-            self.command_down = self.k_down = True
-            self.primary.setText("Access granted  ✓")
-        self.canvas.update()
-
-    def animate_scale(self, target):
-        self.scale_origin = self.button_scale
-        self.scale_target = target
-        self.scale_started = self.now()
-
-    def tick(self):
         from aedrova.desktop.onboarding import account_key
-
-        if self.owner is not None and account_key(self.window) != self.prefix:
-            self.reject()
-            return
-        elapsed = self.now() - self.entered
-        self.button_scale = (
-            1
-            if self.reduced
-            else (
-                self.scale_origin
-                + (self.scale_target - self.scale_origin)
-                * settled_spring(self.now() - self.scale_started)
-            )
-        )
-        width = int(400 * self.button_scale)
-        height = int(40 * self.button_scale)
-        self.primary.setGeometry(
-            (self.width() - width) // 2,
-            (min(self.height() - 102, 530) if self.stage < 4 else self.height() - 102),
-            width,
-            height,
-        )
-        if self.flash_started is not None and self.now() - self.flash_started >= 0.42:
-            self.flash_started = None
-        if self.stage == 2:
-            self.processing = processing_progress(elapsed)
-            if elapsed >= PROCESSING_SECONDS:
-                self.show_stage(3)
-        elif self.stage == LAST_STAGE and elapsed >= (0.05 if self.reduced else 0.9):
-            self.complete()
-        elif self.action_started is not None:
-            delay = 0.05 if self.reduced else (0.42, 0.95, 0, 0.65, 0)[self.stage]
-            if self.now() - self.action_started >= delay:
-                self.show_stage(self.stage + 1)
-        if self.stage == LAST_STAGE and QApplication.platformName() != "offscreen":
-            self.setWindowOpacity(1 - settled_spring(self.now() - self.entered, 5) * 0.9)
-        self.layout_setup()
-        self.canvas.update()
-
-    def eventFilter(self, obj, event):  # noqa: N802
-        if (
-            not self.isVisible()
-            or not isinstance(obj, QWidget)
-            or not (obj is self or self.isAncestorOf(obj))
-        ):
-            return False
-        kind = event.type()
-        if obj is self.primary and kind == QEvent.Type.Enter:
-            self.animate_scale(0.96)
-        if obj is self.primary and kind == QEvent.Type.Leave:
-            self.animate_scale(1)
-        if obj is self.primary and kind == QEvent.Type.MouseButtonPress:
-            self.animate_scale(0.82)
-        if obj is self.primary and kind == QEvent.Type.MouseButtonRelease:
-            self.animate_scale(1)
-        if kind in (QEvent.Type.KeyPress, QEvent.Type.KeyRelease, QEvent.Type.ShortcutOverride):
-            if event.isAutoRepeat():
-                return False
-            key = event.key()
-            if kind == QEvent.Type.ShortcutOverride and key in (
-                Qt.Key.Key_K,
-                Qt.Key.Key_Return,
-                Qt.Key.Key_Enter,
-            ):
-                event.accept()
-                return True
-            if kind == QEvent.Type.KeyPress and key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-                if self.stage == 0:
-                    self.activate()
-                    return True
-            if self.stage == 3:
-                down = kind == QEvent.Type.KeyPress
-                if key in (Qt.Key.Key_Meta, Qt.Key.Key_Control):
-                    self.command_down = down
-                if key == Qt.Key.Key_K:
-                    self.k_down = down
-                    self.command_down = bool(
-                        event.modifiers()
-                        & (Qt.KeyboardModifier.MetaModifier | Qt.KeyboardModifier.ControlModifier)
-                    )
-                if self.command_down and self.k_down:
-                    self.activate()
-                self.canvas.update()
-                if key in (Qt.Key.Key_Meta, Qt.Key.Key_Control, Qt.Key.Key_K):
-                    return True
-        return False
-
-    def complete(self):
-        from aedrova.desktop.onboarding import account_key
-
-        if self.finished_once:
-            return
 
         if account_key(self.window) != self.prefix:
             self.reject()
+        elif self.stage == OPENING:
+            self.show_stage(WELCOME)
+        elif self.stage == WELCOME:
+            self.show_stage(PRIVACY if self.profile_complete() else ACCOUNT)
+        elif self.stage == ACCOUNT:
+            self.setup.advance_profile()
+        elif self.stage == PRIVACY:
+            self.show_stage(self.next_after_privacy())
+        elif self.stage == THEME:
+            self.show_stage(self.next_after_theme())
+        elif self.stage == PERMISSIONS:
+            self.show_stage(GOAL if not self.setup.needs_workspace() else PROJECT)
+        elif self.setup.save():
+            self.skip_step()
+
+    def profile_complete(self):
+        account = getattr(self.window, "account_dialog", None)
+        profile = account.snapshot.get("user_profile") if account else None
+        return bool(
+            self.window.current_user()
+            and isinstance(profile, dict)
+            and (
+                self.profile_reviewed
+                or (profile.get("profile_completed") and not self.review_profile)
+            )
+        )
+
+    def finish(self, *, goal=None):
+        from aedrova.desktop.onboarding import account_key
+
+        if self.closed:
             return
-        if not getattr(self, "bud_setup_completed", False):
-            if getattr(self, "buds_dialog", None) is not None:
-                return
-            if not self.window.current_user() or not self.window.workspace_id:
-                self.show_stage(5)
-                self.setup.status.setText(
-                    "Sign in and select your workspace before configuring your Bud."
-                )
-                return
-            from aedrova.desktop.dots import DotDialog
-
-            self.buds_dialog = DotDialog(self.window, required=True)
-            self.hide()
-
-            def bud_finished(result):
-                deferred = getattr(self.buds_dialog, "deferred_setup", False)
-                self.buds_dialog = None
-                if result == self.DialogCode.Accepted:
-                    self.bud_setup_completed = True
-                    self.complete()
-                elif deferred:
-                    self.window.settings.setValue(self.prefix + "/budsDeferred", True)
-                    self.bud_setup_completed = (
-                        True
-                    )
-                    self.complete()
-                else:
-                    self.show_stage(LAST_STAGE - 1)
-                    self.show()
-                    self.setup.status.setText(
-                        "Configure a Bud and connect a tool to finish onboarding."
-                    )
-
-            self.buds_dialog.finished.connect(bud_finished)
-            self.buds_dialog.open()
+        if account_key(self.window) != self.prefix:
+            self.reject()
             return
-        self.finished_once = True
+        account = getattr(self.window, "account_dialog", None)
+        if not self.setup.has_workspace() or self.setup.workspace != self.window.workspace_id:
+            self.setup.workspace_settings()
+            return
+        first_run = not self.window.settings.value(self.prefix + "/setup", False, type=bool)
         self.window.settings.setValue(self.prefix + "/hasCompletedOnboarding", True)
         self.window.settings.setValue(self.prefix + "/setup", True)
         self.window.settings.sync()
         self.accept()
-        self.window.show()
+        if not (self.window.connected and self.window.connected.active):
+            account.open_dashboard(require_profile=False)
         self.window.raise_()
         self.window.activateWindow()
         self.window.select_tab(0)
+        if first_run or goal:
+            self.window.getting_started.open(goal=goal)
+        from aedrova.desktop.team_invite import open_workspace_join_code
 
-        QTimer.singleShot(0, self.start_controls_tour)
-
-    def start_controls_tour(self):
-        from aedrova.desktop.onboarding import account_key
-
-        if account_key(self.window) != self.prefix:
-            return
-        self.window.settings.setValue(self.prefix + "/step", 0)
-        self.window.settings.setValue(self.prefix + "/status", "pending")
-        self.window.show_tour()
-        self.window.tour.next.setFocus()
-
-    def focus_workspace(self):
-        from aedrova.desktop.onboarding import account_key
-
-        if account_key(self.window) != self.prefix:
-            return
-        composer = getattr(self.window, "composer", None)
-        if composer is not None:
-            self.window.activateWindow()
-            QApplication.setActiveWindow(self.window)
-            getattr(composer, "editor", composer).setFocus()
-
-    def profile_complete(self):
-        account = getattr(self.window, "account_dialog", None)
-        return bool(
-            self.window.current_user()
-            and account is not None
-            and account.snapshot.get("user_profile", {}).get("profile_completed")
-        )
-
-    def defer(self):
-        if self.stage < 4:
-            self.show_stage(4)
-            return
-        if not self.profile_complete():
-            self.show_stage(5)
-            self.setup.status.setText("Confirm your account profile before continuing.")
-            return
-        self.window.settings.setValue(self.prefix + "/deferred", True)
-        self.reject()
-        self.window.show()
-        self.window.activateWindow()
-
-    def cleanup(self, *_):
-        if self.closed:
-            return
-        self.closed = True
-        QApplication.instance().styleHints().colorSchemeChanged.disconnect(
-            self.system_appearance_changed
-        )
-        self.timer.stop()
-        self.opening_scene.timer.stop()
-        self.setup.stop_workspace_wait()
-        QApplication.instance().removeEventFilter(self)
+        if not first_run or not open_workspace_join_code(self.window, self.setup.workspace):
+            QTimer.singleShot(0, self.window.composer.editor.setFocus)
+            if first_run:
+                # Once setup has closed and the workspace is in view, tag what is where.
+                QTimer.singleShot(900, self.window, self.window.start_first_tour)
 
     def done(self, result):
-        self.cleanup()
+        if not self.closed:
+            self.closed = True
+            self.style_hints.colorSchemeChanged.disconnect(self.system_appearance_changed)
+            self.setup.stop_workspace_wait()
+            self.setup.disconnect_login()
         super().done(result)
-
-    def closeEvent(self, event):  # noqa: N802
-        self.cleanup()
-        super().closeEvent(event)

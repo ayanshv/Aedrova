@@ -6,7 +6,13 @@ import time
 from dataclasses import dataclass
 
 MAX_CONTEXT_BYTES = 8 * 1024 * 1024
-TEXT_EXTENSIONS = {".txt", ".md", ".py", ".json", ".csv", ".html", ".css", ".js", ".ts", ".sql"}
+TEXT_EXTENSIONS = {
+    ".txt", ".md", ".rst", ".log", ".csv", ".json", ".yaml", ".yml", ".toml", ".ini", ".xml",
+    ".html", ".css", ".js", ".jsx", ".ts", ".tsx", ".py", ".sql", ".sh", ".swift", ".kt",
+    ".java", ".go", ".rs", ".c", ".h", ".cpp",
+}
+CURRENT_CHANNEL_MESSAGES = 400  # the discussion the request was made in, read in depth
+RECENT_MESSAGES = 20
 
 
 @dataclass(frozen=True)
@@ -41,6 +47,7 @@ def gather(
     *,
     query="",
     preferred_channel="",
+    include_slack=False,
 ):
     """Collect authorized evidence with explicit limits; production uses indexed search.
 
@@ -134,8 +141,15 @@ def gather(
                 raise InterruptedError("Cancelled")
             if time.monotonic() - started > 180:
                 raise TimeoutError("Context retrieval timed out. Retry with a narrower request.")
-            rows = service.recent_context(channel)
-            if len(rows) > 20 or any(row["channel_id"] != channel for row in rows):
+            deep = channel == preferred_channel and hasattr(service, "channel_history")
+            rows = (
+                service.channel_history(channel, CURRENT_CHANNEL_MESSAGES)
+                if deep
+                else service.recent_context(channel)
+            )
+            if len(rows) > (CURRENT_CHANNEL_MESSAGES if deep else RECENT_MESSAGES) or any(
+                row["channel_id"] != channel for row in rows
+            ):
                 raise PermissionError("Recent evidence has invalid channel scope.")
             candidates.update({row["id"]: row for row in rows})
             selected_channels.add(channel)
@@ -146,7 +160,8 @@ def gather(
                     "query": query[:1000],
                     "search_results": len(ranked),
                     "recent_channel_limit": 32,
-                    "recent_messages_per_channel": 20,
+                    "recent_messages_per_channel": RECENT_MESSAGES,
+                    "current_channel_messages": CURRENT_CHANNEL_MESSAGES,
                     "matched_threads": 12,
                     "replies_per_thread": 20,
                     "recent_decisions_per_selected_channel": 50,
@@ -155,6 +170,17 @@ def gather(
                 }
             }
         )
+
+    slack_history = getattr(service, "slack_history", None) if include_slack else None
+    imported = []
+    if slack_history is not None:
+        imported = slack_history(workspace, search if bounded else query)
+        for row in imported:
+            add({"imported_slack_message": {
+                "citation": row["id"], "channel": row["channel_name"],
+                "author": row["author"], "timestamp": row["source_ts"],
+                "thread_timestamp": row["thread_ts"], "text": row["body"],
+            }})
 
     memory_snapshot = None
     if hasattr(service, "memory_list"):
@@ -229,12 +255,12 @@ def gather(
             for row in rows:
                 add({"meeting_text": row})
         cursor = 0
+        progress(f"Reading #{channel['name']}…")
         while True:
             if cancelled():
                 raise InterruptedError("Cancelled")
             if time.monotonic() - started > 180:
                 raise TimeoutError("Context retrieval timed out. Check your connection and retry.")
-            progress(f"Reading #{channel['name']} · {count} messages gathered…")
             rows = (
                 sorted(
                     (row for row in candidates.values() if row["channel_id"] == channel["id"]),
@@ -304,15 +330,34 @@ def gather(
         fresh_memory = snapshot_record(read_memory(workspace), workspace, current)
         if fresh_memory != memory_snapshot:
             raise ValueError("Product memory changed during retrieval. Refresh and retry.")
+    total = count + len(imported)
+    if total:
+        progress(f"Gathered {total} {'message' if total == 1 else 'messages'} for context")
+    else:
+        progress("No chat messages found in the selected context")
     return WorkspaceContext(
         workspace,
         user,
         channels,
         "\n".join(lines),
-        count,
+        total,
         preference.get("nickname", "Aedrova"),
         preference.get("provider", "codex"),
     )
+
+
+def recheck_slack(service, context):
+    sources = [json.loads(line)["imported_slack_message"] for line in context.text.splitlines()
+               if line.startswith('{"imported_slack_message":')]
+    if not sources:
+        return False
+    selected = " ".join(source["citation"] for source in sources)
+    current = service.slack_history(context.workspace_id, selected, len(sources))
+    if {row["id"]: row["body"] for row in current} != {
+        row["citation"]: row["text"] for row in sources
+    }:
+        raise PermissionError("Imported Slack history changed. Ask the agent again.")
+    return True
 
 
 def agent_mention(text, nickname="Aedrova"):

@@ -147,9 +147,19 @@ class WorkspaceSearch(QLineEdit):
                 self.notice.setText("Showing available results. Type to retry online search.")
 
         QTimer.singleShot(10000, self, timed_out)
+        def search():
+            data = service.chat_inventory(workspace, query, "search", None)
+            if hasattr(service, "slack_history"):
+                try:
+                    data["slack_history"] = service.slack_history(workspace, query, 6)
+                except Exception:
+                    # Archive availability must not interrupt ordinary workspace search.
+                    pass
+            return data
+
         connected.enqueue(
             ("header-search", workspace, generation, query),
-            lambda: service.chat_inventory(workspace, query, "search", None),
+            search,
             loaded,
         )
 
@@ -162,6 +172,8 @@ class WorkspaceSearch(QLineEdit):
             return ("channel", data["workspace"], data["channel"])
         if "person" in data:
             return ("person", data["person"].get("user_id"))
+        if "slack" in data:
+            return ("slack", data["slack"])
         return ("message", data["message"].get("id"))
 
     def render(self, data, *, preserve_selection=False):
@@ -185,6 +197,9 @@ class WorkspaceSearch(QLineEdit):
                 f"{message['author']} · #{message['channel']}\n{content[:180]}",
                 {"message": message},
             )
+        for row in data.get("slack_history", []):
+            self.add(f"Slack · #{row['channel_name']} · {row['author']}\n{row['body'][:150]}",
+                     {"slack": row["id"]})
         if self.results.count():
             row = next(
                 (i for i in range(self.results.count())
@@ -218,6 +233,12 @@ class WorkspaceSearch(QLineEdit):
             self.host.composer.editor.setFocus()
         elif "person" in data:
             self.host.collaboration.profile(data["person"])
+        elif "slack" in data:
+            from aedrova.desktop.slack_history import open_slack_history
+
+            workspace, _connected, service, _user = self.current_scope()
+            open_slack_history(self.host, service, workspace, mode="history",
+                               query=data["slack"], selected=data["slack"])
         else:
             self.host.collaboration.open_message(data["message"])
 

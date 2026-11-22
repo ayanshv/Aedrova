@@ -79,6 +79,44 @@ def environment(*, anthropic=False):
     return result
 
 
+PRIVATE_HOME_PATHS = (
+    ".ssh",
+    ".aws",
+    ".azure",
+    ".gnupg",
+    ".kube",
+    ".docker",
+    ".config/gcloud",
+    ".config/gh",
+    ".netrc",
+    ".npmrc",
+    ".pypirc",
+    ".git-credentials",
+    ".claude",
+    ".codex",
+    "Library/Keychains",
+    "Library/Cookies",
+    "Library/Safari",
+    "Library/Mail",
+    "Library/Messages",
+    "Library/Application Support/Google/Chrome",
+    "Library/Application Support/Firefox",
+    "Library/Application Support/BraveSoftware",
+    "Library/Application Support/Microsoft Edge",
+    "Library/Application Support/Aedrova",
+    "AppData",
+)
+PRIVATE_FILE_PATTERNS = (
+    ".env*",
+    "*.pem",
+    "*.p12",
+    "*.pfx",
+    "id_rsa*",
+    "id_ed25519*",
+    "*.keychain*",
+)
+
+
 def codex_permissions(project, *, plan):
     root = Path(project).resolve()
     paths = {
@@ -95,6 +133,15 @@ def codex_permissions(project, *, plan):
         if binary.is_file():
             paths[str(binary)] = "read"
             paths[str(binary.parent)] = "read"
+    home = Path.home().resolve()
+    if home.is_dir() and home != root:
+        # The agent may search the user's files. Reading is never writing, and credential
+        # stores and browser profiles stay out of reach.
+        paths[str(home)] = "read"
+        for private in PRIVATE_HOME_PATHS:
+            paths[str(home / private)] = "deny"
+        for pattern in PRIVATE_FILE_PATTERNS:
+            paths[str(home / "**" / pattern)] = "deny"
     paths[str(root / ".git")] = "read"
     for private in (".claude", ".codex", ".agents"):
         paths[str(root / private)] = "deny"
@@ -110,6 +157,16 @@ def codex_permissions(project, *, plan):
     ]
 
 
+RESPONSE_STYLE = (
+    "Write the way a senior engineer talks in Claude Code or Codex: plain, direct and "
+    "complete. Start with the answer or the result in natural sentences, then give the "
+    "detail that matters, such as what you found, what you did, what you verified and what "
+    "comes next. Use short paragraphs, and bullets for lists of steps, files or options. "
+    "Use bold only for a key term, never as a label on every line. Do not use headings or "
+    "titles unless the answer is long with clearly separate parts. Put paths, commands and "
+    "identifiers in backticks. Do not pad with greetings or restate the request, and do not "
+    "over-compress: finish your thoughts in full sentences."
+)
 CLARIFICATION = "AEDROVA_CLARIFICATION"
 
 
@@ -209,17 +266,19 @@ def instructions(task, context_file, *, plan, approved_plan=""):
             "Use single for one choice, multiple for checkboxes, and text for open answers. "
             "Use at most four fields and two to five options per choice. "
             "Ask in the user's language. Otherwise return the plan as Markdown. "
-            "Open with one sentence describing the intended outcome. Use level-two headings for "
-            "the implementation steps, acceptance criteria and planned checks. "
-            "Use numbered steps and concise bullets. Put paths and commands in backticks. "
-            "Keep source IDs beside the relevant requirement.\n"
+            "Open with one sentence describing the intended outcome. "
+            + RESPONSE_STYLE
+            + " Give the implementation as a short numbered list, followed by the acceptance "
+            "checks and the tests you plan to run, each introduced by one plain sentence "
+            "rather than a heading. Keep source IDs beside the relevant requirement.\n"
             if plan
             else "IMPLEMENT the approved plan. Run the smallest relevant checks first. "
             "For UI work, use existing project interaction tests or offscreen previews "
             "where available in the sandbox. Return a short Markdown report. Open with the "
-            "result in one sentence, then use level-two headings for changes and verification. "
-            "Use bullets for changed files and check results. Put paths and commands in backticks. "
-            "State whether checks passed, failed or were skipped. Add a next step only when "
+            "result in a sentence or two, then say what changed (a bullet per file or area), "
+            "what you verified and what the checks showed. "
+            + RESPONSE_STYLE
+            + " State whether checks passed, failed or were skipped. Add a next step only when "
             "something remains. Keep raw command output out of the report.\nApproved plan:\n"
             + approved_plan
             + "\n"
@@ -503,7 +562,7 @@ class LocalRunner:
         )
         for feature in ("hooks", "plugins", "multi_agent", "multi_agent_v2", "apps", "browser_use"):
             command[2:2] = ["-c", "features." + feature + "=false"]
-        command[2:2] = ["-c", 'web_search="disabled"']
+        command[2:2] = ["-c", 'web_search="live"']
         provider_env = environment()
         if self.managed:
             access = self.managed
@@ -518,7 +577,7 @@ class LocalRunner:
                 "model_providers.aedrova_managed.supports_websockets": False,
                 "model_providers.aedrova_managed.request_max_retries": 0,
                 "model_providers.aedrova_managed.stream_max_retries": 0,
-                "web_search": "disabled",
+                "web_search": "live",
                 "features.multi_agent": False,
                 "features.multi_agent_v2": False,
                 "features.hooks": False,

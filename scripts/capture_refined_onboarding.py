@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication
 
 from aedrova.desktop.window import AedrovaWindow
 from aedrova.desktop.zen_onboarding import ZenOnboarding
+from aedrova.desktop.zen_setup import ACCOUNT, GOAL, PRIVACY, PROJECT, WELCOME
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "work" / "onboarding-refinement"
@@ -93,15 +94,15 @@ for mode in ("light", "dark"):
     QTest.qWait(60)
     window.grab().save(str(OUTPUT / ("workspace-" + mode + ".png")))
     flow = ZenOnboarding(window)
-    flow.reduced = True
+    flow.reduced_motion = True
     flow.show()
     flow.resize(1120, 820)
-    for stage in (0, 1, 3, 4, 5, 6, 7, 8, 9, 10):
+    for stage in (WELCOME, ACCOUNT, PRIVACY, GOAL, PROJECT):
         flow.show_stage(stage)
         QTest.qWait(60)
         flow.grab().save(str(OUTPUT / ("onboarding-" + mode + "-" + str(stage) + ".png")))
     flow.resize(640, 620)
-    flow.show_stage(7)
+    flow.show_stage(PROJECT)
     QTest.qWait(60)
     flow.grab().save(str(OUTPUT / ("onboarding-" + mode + "-compact.png")))
     flow.reject()

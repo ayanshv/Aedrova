@@ -25,6 +25,7 @@ def render_callback(success=True, *, appearance="system"):
         dark_styles = ""
     logo = Path(__file__).parents[1] / "desktop" / "assets" / "aedrova.png"
     image = base64.b64encode(logo.read_bytes()).decode("ascii")
+    wordmark = logo.with_name("aedrova-wordmark.svg").read_text(encoding="utf-8")
     heading = "Your space is waiting." if success else "Let’s try that again."
     description = (
         "Return to Aedrova to finish signing in. You can close this tab."
@@ -64,11 +65,13 @@ box-shadow:0 24px 90px var(--shadow),inset 0 1px 0 var(--shine);
 backdrop-filter:blur(24px);
  -webkit-backdrop-filter:blur(24px);
  animation:arrive .65s ease-out both}}
-.brand {{font-size:18px; font-weight:600; letter-spacing:-.5px; margin:0}}
-.mark {{width:160px;height:160px; position:relative; margin:24px auto 20px}}
+.brand {{display:flex;align-items:center;justify-content:center;gap:12px;
+color:var(--ink);margin:0 auto 26px}}
+.brand svg {{display:block;width:148px;height:auto}}
+.mark {{width:64px;height:64px;position:relative;flex:none;overflow:hidden}}
 .mark img {{position:absolute;
-width:400px;
-height:400px;
+width:160px;
+height:160px;
  max-width:none;
 left:50%;
 top:50%;
@@ -102,8 +105,9 @@ transform:translateY(0)}}}}
 @media(prefers-reduced-motion:reduce) {{main {{animation:none}}}}
 @media(prefers-reduced-transparency:reduce) {{main {{background:var(--bg);backdrop-filter:none}}}}
 </style></head><body><div class="aura" aria-hidden="true"></div>
-<div class="wrap"><main aria-labelledby="title"><p class="brand">Aedrova</p>
+<div class="wrap"><main aria-labelledby="title"><div class="brand" role="img" aria-label="Aedrova">
 <div class="mark"><img src="data:image/png;base64,{image}" alt="" aria-hidden="true"></div>
+{wordmark}</div>
 <p class="kicker">{status}</p><h1 id="title">{heading}</h1>
 <p class="description">{description}</p>
 <p class="hint">Switch to the <strong>Aedrova app</strong>

@@ -302,9 +302,10 @@ class TeamSection(QFrame):
         self.window = window
         self.setObjectName("TeamSection")
         column = QVBoxLayout(self)
-        column.setContentsMargins(8, 10, 8, 8)
+        column.setContentsMargins(8, 4, 8, 8)
         column.setSpacing(4)
         header = QHBoxLayout()
+        header.setContentsMargins(2, 0, 0, 0)
         self.title = label("AI teammates", "section")
         header.addWidget(self.title)
         header.addStretch()

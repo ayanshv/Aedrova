@@ -107,6 +107,8 @@ def test_coworker_picker_creates_and_reopens_server_dm(qtbot, tmp_path, monkeypa
     opened = []
 
     def rpc(name, params):
+        if name == "mark_channel_read":
+            return None
         assert name == "start_direct_message" and params == {"p_workspace": "w", "p_user": "v"}
         opened.append(True)
         if len(opened) == 1:
@@ -131,8 +133,10 @@ def test_coworker_picker_creates_and_reopens_server_dm(qtbot, tmp_path, monkeypa
     window.start_dm_button.click()
     qtbot.waitUntil(lambda: window.channel_id == "dm")
     assert window.dm_list.item(0).text().endswith("Avery")
+    window.switch_channel("c")
+    assert window.channel_id == "c"
     window.start_dm_button.click()
-    qtbot.waitUntil(lambda: len(opened) == 2)
+    qtbot.waitUntil(lambda: len(opened) == 2 and window.channel_id == "dm")
     assert len([c for c in window.workspace.channels if c.direct]) == 1
 
 

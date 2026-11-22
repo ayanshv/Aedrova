@@ -113,7 +113,21 @@ try {
    'supabase/migrations/202611050001_shared_work_revocation_lock.sql',
    'supabase/tests/shared_agent_work.sql',
    'supabase/migrations/202611070001_agent_reply_history.sql',
-   'supabase/tests/agent_reply_history.sql']) {
+   'supabase/tests/agent_reply_history.sql',
+   'supabase/migrations/202611110001_chat_request_budgets.sql',
+   'supabase/tests/chat_request_budgets.sql',
+   'supabase/migrations/202611140001_account_deletion_requests.sql',
+   'supabase/tests/account_deletion_requests.sql',
+   'supabase/migrations/202611140002_workspace_join_codes.sql',
+   'supabase/tests/workspace_join_codes.sql',
+   'supabase/migrations/202611140003_shared_chat_activity.sql',
+   'supabase/tests/shared_chat_activity.sql',
+   'supabase/migrations/202611150001_chat_safety.sql',
+   'supabase/tests/chat_safety.sql',
+   'supabase/migrations/202611200001_shared_pin_updates.sql',
+   'supabase/tests/shared_pin_updates.sql',
+   'supabase/migrations/202611210001_slack_history.sql',
+   'supabase/tests/slack_history.sql']) {
   let sql = fs.readFileSync(file,'utf8');
   // Reproduce the already-activated original function, then verify its additive
   // conflict-response upgrade before running the lifecycle tests.

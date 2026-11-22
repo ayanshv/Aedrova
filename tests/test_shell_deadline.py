@@ -63,3 +63,23 @@ def test_unrecognized_stalled_shell_cancels_without_waiting_whole_build(tmp_path
     with pytest.raises(TimeoutError, match="shell command exceeded"):
         runner.run("claude_code", tmp_path, "synthetic request", plan=False)
     assert stopped == [True]
+
+
+def test_agent_can_search_the_web_and_read_the_users_files_but_not_secrets(tmp_path, monkeypatch):
+    import json
+    from pathlib import Path
+
+    from aedrova.agents import runtime
+
+    home = tmp_path / "home"
+    project = home / "project"
+    project.mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
+    args = runtime.codex_permissions(project, plan=False)
+    table = args[3]
+    root = str(home.resolve())
+    assert json.dumps(root) + '="read"' in table
+    assert json.dumps(str(project.resolve())) + '="write"' in table
+    assert json.dumps(root + "/.ssh") + '="deny"' in table
+    assert json.dumps(root + "/**/.env*") + '="deny"' in table
+    assert "permissions.aedrova.network.enabled=false" in args
