@@ -528,3 +528,14 @@ def test_setup_covers_the_screen_and_takes_focus_back_after_pickers(fresh_window
     assert flow.windowFlags() & Qt.WindowType.FramelessWindowHint
     assert not flow.isFullScreen()  # no macOS Space for file pickers to wander off to
     flow.setup.flow.regain_focus()
+
+
+def test_a_first_run_opens_light_even_when_the_app_is_dark(fresh_window, qtbot):
+    fresh_window.set_theme("dark")
+    flow = SetupDialog(fresh_window)
+    qtbot.addWidget(flow)
+    assert flow.theme.name == "light" and flow.theme_mode == "light"
+    fresh_window.settings.setValue(flow.prefix + "/setup", True)
+    later = SetupDialog(fresh_window)
+    qtbot.addWidget(later)
+    assert later.theme.name == "dark"  # reviewing setup keeps their own appearance

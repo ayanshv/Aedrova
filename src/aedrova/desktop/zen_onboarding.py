@@ -194,7 +194,9 @@ class ZenOnboarding(AppDialog):
         self.resize(900, 600)
 
         # Theme first: the art and the colour wash read it while they are built.
-        self.theme_mode = window.theme_mode
+        # A first run opens light, whatever the system or an earlier install said; the theme step
+        # is where someone chooses otherwise. Reviewing setup later keeps their own choice.
+        self.theme_mode = "light" if self.shows_theme() else window.theme_mode
         self.theme = resolve_theme(self.theme_mode)
         self.setPalette(palette(self.theme))
 
