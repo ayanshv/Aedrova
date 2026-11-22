@@ -624,6 +624,8 @@ class ZenOnboarding(AppDialog):
         self.accept()
         if not (self.window.connected and self.window.connected.active):
             account.open_dashboard(require_profile=False)
+        if first_run:
+            self.window.showFullScreen()  # setup ends with the workspace filling the screen
         self.window.raise_()
         self.window.activateWindow()
         self.window.select_tab(0)
@@ -631,11 +633,13 @@ class ZenOnboarding(AppDialog):
             self.window.getting_started.open(goal=goal)
         from aedrova.desktop.team_invite import open_workspace_join_code
 
-        if not first_run or not open_workspace_join_code(self.window, self.setup.workspace):
+        invited = first_run and open_workspace_join_code(self.window, self.setup.workspace)
+        if not invited:
             QTimer.singleShot(0, self.window.composer.editor.setFocus)
-            if first_run:
-                # Once setup has closed and the workspace is in view, tag what is where.
-                QTimer.singleShot(900, self.window, self.window.start_first_tour)
+        if first_run:
+            # Once setup has closed and the workspace is in view, tag what is where. Owners also
+            # get an invite window; the tour waits for it rather than being skipped.
+            QTimer.singleShot(1200, self.window, self.window.start_first_tour)
 
     def done(self, result):
         if not self.closed:

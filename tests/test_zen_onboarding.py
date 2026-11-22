@@ -124,6 +124,7 @@ def test_signed_in_profile_completion_opens_workspace_with_no_tour(qtbot, tmp_pa
     assert flow.stage == GOAL
     next(b for b in flow.setup.findChildren(QPushButton) if b.text() == "Build something").click()
     assert flow.closed and window.tour is None
+    assert window.isFullScreen()  # the workspace fills the screen when setup ends
     assert window.getting_started.examples.currentIndex() == 1
     assert window.getting_started.isVisible()
     assert window.settings.value(account_key(window) + "/setup", False, type=bool)

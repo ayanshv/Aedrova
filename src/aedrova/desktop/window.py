@@ -2129,12 +2129,18 @@ class AedrovaWindow(QMainWindow):
         self.setup_dialog.show()
         self.setup_dialog.raise_()
 
-    def start_first_tour(self):
+    def start_first_tour(self, waited=0):
         """Offer the short tour once, right after first-run setup. Never twice, never over work."""
+        from PySide6.QtWidgets import QDialog
+
         from aedrova.desktop.onboarding import account_key
 
         status = self.settings.value(account_key(self) + "/status")
         if self.tour or status in {"completed", "skipped", "paused"}:
+            return
+        if waited < 600 and any(d.isVisible() for d in self.findChildren(QDialog)):
+            # An invite or getting-started window is open; the tour comes when it is closed.
+            QTimer.singleShot(700, self, lambda: self.start_first_tour(waited + 1))
             return
         self.show_tour()
 

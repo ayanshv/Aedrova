@@ -150,3 +150,17 @@ def test_clicking_the_dimmed_window_does_nothing(window, qtbot):
     qtbot.mouseClick(tour, Qt.MouseButton.LeftButton, pos=tour.rect().center())
     assert window.tour is tour and tour.index == before
     tour.finish("paused")
+
+
+def test_the_tour_waits_for_an_open_dialog_instead_of_being_skipped(window, qtbot):
+    from PySide6.QtWidgets import QDialog
+
+    window.set_reduced_motion(True)
+    dialog = QDialog(window)
+    qtbot.addWidget(dialog)
+    dialog.show()
+    window.start_first_tour()
+    assert window.tour is None
+    dialog.close()
+    qtbot.waitUntil(lambda: window.tour is not None, timeout=3000)
+    window.tour.finish("skipped")
