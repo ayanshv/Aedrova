@@ -156,7 +156,6 @@ class IdentityService:
     def fork_for_context(self):
         """Called in the serialized transport worker; never expose tokens to UI/logs."""
 
-
         if self.client is None or self.user is None:
             raise PermissionError("Sign in first.")
         session = self.client.auth.get_session()
@@ -171,7 +170,6 @@ class IdentityService:
             fork.user = result.user
             if fork.user is None or str(fork.user.id) != str(self.user.id):
                 raise PermissionError("Session changed. Sign in again.")
-
 
             fork._bud_catalog_owner = getattr(self, "_bud_catalog_owner", self)
             return fork
@@ -210,13 +208,29 @@ class IdentityService:
         if result.session is None or result.user is None:
             raise PermissionError("Sign-in did not return a session")
         self.user = result.user
+        self.require_beta_access()
         return self.user
+
+    def require_beta_access(self):
+        """During the invited beta, turn away emails that are not on the list, clearly."""
+        try:
+            status = self.client.rpc("beta_access_status", {}).execute().data
+        except Exception:
+            return  # an older database has no gate
+        if isinstance(status, dict) and status.get("gate") and not status.get("allowed"):
+            email = getattr(self.user, "email", "") or "This email"
+            self.sign_out()
+            raise PermissionError(
+                f"Aedrova is in a private beta, and {email} is not on the list yet. "
+                "Ask the team to add you, then sign in again."
+            )
 
     def sign_in(self, email, password):
         result = self.client.auth.sign_in_with_password(
             {"email": email.strip(), "password": password}
         )
         self.user = result.user
+        self.require_beta_access()
         return self.user
 
     def sign_up(self, email, password):
@@ -229,6 +243,7 @@ class IdentityService:
             {"email": email.strip(), "token": code.strip(), "type": "signup"}
         )
         self.user = result.user
+        self.require_beta_access()
         return self.user
 
     def update_profile(self, name):
@@ -247,7 +262,6 @@ class IdentityService:
         try:
             self.client.auth.sign_out({"scope": "local"})
         finally:
-
             self._bud_catalog_cache = {}
             self._bud_catalog_scope = None
             self.user = None
@@ -334,7 +348,6 @@ class IdentityService:
             )
         except Exception as error:
             if getattr(error, "code", None) == "PGRST202":
-
                 return None
             raise
 
@@ -357,7 +370,6 @@ class IdentityService:
             return self.client.rpc("save_workspace_bud", parameters).execute().data
         except Exception as error:
             if getattr(error, "code", None) == "PGRST202":
-
                 if parameters.get("p_role") or parameters.get("p_instructions"):
                     raise ValueError(
                         "Bud purpose and instructions need the Buds SQL update. "
@@ -518,9 +530,14 @@ class IdentityService:
         from postgrest.exceptions import APIError
 
         try:
-            return self.rpc("slack_history", {
-                "p_workspace": workspace, "p_query": query[:1400], "p_limit": limit,
-            })
+            return self.rpc(
+                "slack_history",
+                {
+                    "p_workspace": workspace,
+                    "p_query": query[:1400],
+                    "p_limit": limit,
+                },
+            )
         except APIError as error:
             if error.code == "PGRST202":
                 return []
@@ -609,7 +626,6 @@ class IdentityService:
                 path, avatar, {"content-type": "image/png", "upsert": "false"}
             )
             data = {**data, "avatar_path": path}
-
 
         return self.rpc("save_chat_profile", {"p_data": data})
 
@@ -927,8 +943,10 @@ class IdentityService:
         self._authenticated()
         try:
             query = (
-                self.client.table("my_agent_replies").select("*")
-                .eq("workspace_id", workspace).eq("channel_id", channel)
+                self.client.table("my_agent_replies")
+                .select("*")
+                .eq("workspace_id", workspace)
+                .eq("channel_id", channel)
             )
             query = query.eq("parent_id", parent) if parent else query.is_("parent_id", "null")
             return query.order("created_at", desc=True).order("id").limit(200).execute().data
@@ -959,8 +977,13 @@ class IdentityService:
         self._authenticated()
         try:
             return (
-                self.client.table("chat_agent_progress").select("author_id,parent_id,phase")
-                .eq("channel_id", channel).order("expires_at", desc=True).limit(12).execute().data
+                self.client.table("chat_agent_progress")
+                .select("author_id,parent_id,phase")
+                .eq("channel_id", channel)
+                .order("expires_at", desc=True)
+                .limit(12)
+                .execute()
+                .data
             )
         except Exception as error:
             if getattr(error, "code", None) == "PGRST205":
@@ -1167,7 +1190,6 @@ class IdentityService:
                 "/api/files/verify", {"identifier": identifier, "parent": parent}
             )["message"]
         except UploadCancelled:
-
             try:
                 self.client.storage.from_("aedrova-files").remove([object_path])
                 self.rpc("abandon_attachment", {"p_id": identifier})
@@ -1175,8 +1197,6 @@ class IdentityService:
                 pass
             return None
         except Exception:
-
-
             raise
 
     def download_attachment(self, identifier):

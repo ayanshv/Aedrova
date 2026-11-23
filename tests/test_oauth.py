@@ -34,7 +34,11 @@ def test_loopback_ignores_wrong_path_and_exchanges_only_valid_code(appearance):
     opened = Event()
     with ThreadPoolExecutor() as pool:
         future = pool.submit(
-            google_sign_in, service, opener=lambda _: opened.set() or True, port=0, timeout=3,
+            google_sign_in,
+            service,
+            opener=lambda _: opened.set() or True,
+            port=0,
+            timeout=3,
             appearance=appearance,
         )
         assert opened.wait(2)
@@ -101,6 +105,8 @@ def test_pkce_authorization_and_exchange_use_matching_memory_verifier(provider):
     }
 
     def respond(request):
+        if "/rest/v1/" in request.url.path:
+            return httpx.Response(404, json={"code": "PGRST202", "message": "no gate"})
         requests.append(request)
         return httpx.Response(
             200,
@@ -256,19 +262,25 @@ def test_callback_page_is_branded_self_contained_and_has_safe_error_variant():
 
 def test_sequential_signins_reuse_closed_port_but_active_listener_is_exclusive():
     port = 0
-    for code in ('first', 'second'):
+    for code in ("first", "second"):
         service, opened, cancel = FakeService(), Event(), Event()
         with ThreadPoolExecutor() as pool:
-            future = pool.submit(google_sign_in, service, cancel, port=port,
-                                 opener=lambda _, opened=opened: opened.set() or True, timeout=3)
+            future = pool.submit(
+                google_sign_in,
+                service,
+                cancel,
+                port=port,
+                opener=lambda _, opened=opened: opened.set() or True,
+                timeout=3,
+            )
             assert opened.wait(2)
             port = urlsplit(service.redirect).port
             try:
                 with pytest.raises(OSError):
-                    google_sign_in(FakeService(), port=port, opener=lambda _: True, timeout=.1)
-                with urlopen(service.redirect + '?code=' + code, timeout=2) as response:
+                    google_sign_in(FakeService(), port=port, opener=lambda _: True, timeout=0.1)
+                with urlopen(service.redirect + "?code=" + code, timeout=2) as response:
                     response.read()
-                assert future.result(3) == 'signed-in-user'
+                assert future.result(3) == "signed-in-user"
             finally:
                 cancel.set()
         assert service.exchanged == [code]
@@ -293,3 +305,46 @@ def test_apple_loopback_reuses_hardened_exchange():
             assert b"apple-code" not in response.read()
         assert future.result(3) == "signed-in-user"
     assert service.exchanged == ["apple-code"]
+
+
+def test_unlisted_email_is_turned_away_clearly_during_the_beta(monkeypatch):
+    from types import SimpleNamespace
+
+    signed_out = []
+
+    class Rpc:
+        def __init__(self, data):
+            self.data = data
+
+        def execute(self):
+            return SimpleNamespace(data=self.data)
+
+    class Client:
+        def __init__(self, data):
+            self.data = data
+            self.auth = SimpleNamespace(
+                exchange_code_for_session=lambda _: SimpleNamespace(
+                    session=object(), user=SimpleNamespace(email="late@example.com")
+                )
+            )
+
+        def rpc(self, name, parameters):
+            assert name == "beta_access_status"
+            return Rpc(self.data)
+
+    key = "sb_publishable_abcdefghijk1234567890"
+    for data, ok in (
+        ({"gate": True, "allowed": False}, False),
+        ({"gate": True, "allowed": True}, True),
+        ({"gate": False, "allowed": False}, True),
+    ):
+        service = IdentityService(
+            Connection("https://example.supabase.co", key), client=Client(data)
+        )
+        monkeypatch.setattr(service, "sign_out", lambda: signed_out.append(True))
+        if ok:
+            assert service.finish_google_sign_in("code").email == "late@example.com"
+        else:
+            with pytest.raises(PermissionError, match="private beta.*late@example.com"):
+                service.finish_google_sign_in("code")
+    assert signed_out == [True]
