@@ -6,7 +6,7 @@ import os
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QObject, QSettings, QTimer
+from PySide6.QtCore import QCoreApplication, QEvent, QObject, QSettings, Qt, QTimer
 from PySide6.QtWidgets import QApplication
 
 from aedrova.desktop.brand import app_icon
@@ -34,6 +34,10 @@ def main():
         return
 
     os.environ["QT_MEDIA_BACKEND"] = "ffmpeg"
+    # The built-in browser needs these two things before the application object exists.
+    QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
+    import PySide6.QtWebEngineWidgets  # noqa: F401
+
     app = QApplication.instance() or QApplication(sys.argv[:1])
     app.setApplicationName("Aedrova")
     app.setOrganizationName("Aedrova")
