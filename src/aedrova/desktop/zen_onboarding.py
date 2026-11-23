@@ -27,6 +27,7 @@ from aedrova.desktop.theme import palette
 from aedrova.desktop.zen_setup import (
     ACCOUNT,
     GOAL,
+    IMPORT,
     OPENING,
     PERMISSIONS,
     PRIVACY,
@@ -225,7 +226,7 @@ class ZenOnboarding(AppDialog):
         self.brand = BrandLockup(24, 15)
         top.addWidget(self.brand)
         top.addStretch()
-        self.dots = StepDots(7)
+        self.dots = StepDots(8)
         top.addWidget(self.dots)
         left.addWidget(self.top)
         self.top_gap = QSpacerItem(0, 30, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
@@ -384,7 +385,7 @@ class ZenOnboarding(AppDialog):
         if self.theme_mode == "system":
             self.apply_appearance("system")
 
-    ORDER = (WELCOME, ACCOUNT, PRIVACY, THEME, PERMISSIONS, PROJECT, GOAL)
+    ORDER = (WELCOME, ACCOUNT, PRIVACY, THEME, PERMISSIONS, PROJECT, IMPORT, GOAL)
     ORDER_INDEX = {
         OPENING: -1,
         WELCOME: 0,
@@ -393,7 +394,8 @@ class ZenOnboarding(AppDialog):
         THEME: 3,
         PERMISSIONS: 4,
         PROJECT: 5,
-        GOAL: 6,
+        IMPORT: 6,
+        GOAL: 7,
     }
     SCENES = {
         WELCOME: "welcome",
@@ -402,6 +404,7 @@ class ZenOnboarding(AppDialog):
         THEME: "theme",
         PERMISSIONS: "permissions",
         PROJECT: "project",
+        IMPORT: "import",
         GOAL: "goal",
     }
 
@@ -450,10 +453,10 @@ class ZenOnboarding(AppDialog):
         self.surface.opening = opening
         self.back.setVisible(stage not in (WELCOME, OPENING))
         self.back.setEnabled(True)
-        self.skip.setVisible(stage in (GOAL, PROJECT))
-        self.skip.setText("Skip for now" if stage == GOAL else "Set up later")
+        self.skip.setVisible(stage in (GOAL, PROJECT, IMPORT))
+        self.skip.setText("Skip for now" if stage in (GOAL, IMPORT) else "Set up later")
         self.primary.setVisible(
-            stage not in (GOAL, OPENING)
+            stage not in (GOAL, OPENING, IMPORT)
             and (stage != ACCOUNT or self.window.current_user() is not None)
         )
         self.primary.setEnabled(True)
@@ -563,13 +566,19 @@ class ZenOnboarding(AppDialog):
     def choose_goal(self, goal):
         self.finish(goal=goal)
 
+    def after_project(self):
+        """A new workspace offers its owner the optional Slack import before the first task."""
+        return IMPORT if self.setup.can_import_history() else GOAL
+
     def skip_step(self):
-        if (
+        if self.stage == IMPORT:
+            self.show_stage(GOAL)
+        elif (
             self.stage == PROJECT
             and self.created_workspace
             and self.created_workspace == self.setup.workspace
         ):
-            self.show_stage(GOAL)
+            self.show_stage(self.after_project())
         else:
             self.finish()
 
@@ -590,6 +599,8 @@ class ZenOnboarding(AppDialog):
             self.show_stage(self.next_after_theme())
         elif self.stage == PERMISSIONS:
             self.show_stage(GOAL if not self.setup.needs_workspace() else PROJECT)
+        elif self.stage == IMPORT:
+            self.show_stage(GOAL)
         elif self.setup.save():
             self.skip_step()
 
@@ -647,4 +658,6 @@ class ZenOnboarding(AppDialog):
             self.style_hints.colorSchemeChanged.disconnect(self.system_appearance_changed)
             self.setup.stop_workspace_wait()
             self.setup.disconnect_login()
+            if getattr(self.setup, "import_panel", None) is not None:
+                self.setup.import_panel.stop()
         super().done(result)

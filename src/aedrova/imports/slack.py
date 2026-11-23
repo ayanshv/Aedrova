@@ -212,8 +212,11 @@ def read_archive(archive):
     return list(records.values()), counts, skipped
 
 
-def upload(service, workspace, rows, cancelled=lambda: False):
-    """Retrying the same selected export resumes its unpublished import."""
+def upload(service, workspace, rows, cancelled=lambda: False, progress=lambda sent, total: None):
+    """Retrying the same selected export resumes its unpublished import.
+
+    `progress(sent, total)` reports whole batches, so a screen can show how far along it is.
+    """
     from hashlib import sha256
     from uuid import NAMESPACE_URL, uuid5
 
@@ -227,15 +230,24 @@ def upload(service, workspace, rows, cancelled=lambda: False):
     identifier = str(uuid5(NAMESPACE_URL, f"aedrova:slack:{workspace}:{digest.hexdigest()}"))
     parameters = {"p_workspace": workspace, "p_import": identifier}
     user = str(service.user.id)
-    batch, size, sequence = [], 0, 0
+
+    batches, batch, size = [], [], 0
+    for row in encoded:
+        if len(batch) == 200 or size + len(row) > 240_000:
+            batches.append(batch)
+            batch, size = [], 0
+        batch.append(json.loads(row))
+        size += len(row)
+    batches.append(batch)
 
     imports = service.rpc("list_slack_imports", {"p_workspace": workspace})
     previous = next((item for item in imports if item["id"] == identifier), {})
     if previous.get("published_at"):
+        progress(len(batches), len(batches))
         return previous["message_count"]
     checkpoint = previous.get("next_batch", 0)
 
-    def send(rows, finish=False):
+    def send(sequence, rows, finish=False):
         if cancelled():
             raise InterruptedError("Import stopped. Choose the same ZIP to resume.")
         if not service.user or str(service.user.id) != user:
@@ -250,12 +262,11 @@ def upload(service, workspace, rows, cancelled=lambda: False):
             },
         )
 
-    for row in encoded:
-        if len(batch) == 200 or size + len(row) > 240_000:
-            if sequence >= checkpoint:
-                send(batch)
-            sequence += 1
-            batch, size = [], 0
-        batch.append(json.loads(row))
-        size += len(row)
-    return send(batch, finish=True)
+    progress(min(checkpoint, len(batches) - 1), len(batches))
+    result = 0
+    for sequence, rows_in_batch in enumerate(batches):
+        last = sequence == len(batches) - 1
+        if sequence >= checkpoint or last:
+            result = send(sequence, rows_in_batch, finish=last)
+        progress(sequence + 1, len(batches))
+    return result

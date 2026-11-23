@@ -198,3 +198,23 @@ Primary sources checked for planning:
 M18 security/production launch acceptance includes all import/account-linking surfaces.
 Remaining M14 owner/release actions follow all planned feature implementation, per the
 October 5 authoritative order in milestones.md. Apple enrollment is deferred until then.
+
+## Slack import status (November 22, 2026)
+
+**Confirmed in source and embedded PostgreSQL**
+- ZIP parser limits, public-channel filtering, attribution-only authors, thread/reaction/link
+  handling, malformed and oversized archives (`tests/test_slack_import.py`, 9 tests).
+- Batched, resumable upload with a stable import identity and batch progress.
+- Migration `202611210001_slack_history.sql` and `supabase/tests/slack_history.sql` pass in
+  PGlite via `scripts/test_database.py`: owner/admin write and remove, members read, outsiders
+  refused, checkpoint resume, overlap dedupe, removal revokes search.
+- Agent retrieval cites `slack:` records, re-checks them before sharing, and keeps replies that
+  used them private to the requester.
+- Entry points: optional onboarding step (after a new workspace is created, owners and admins
+  only) and Workspace settings → Imported history (import, manage, view).
+
+**Still needs the owner**
+1. Apply `202611210001_slack_history.sql` to staging, then production, after review.
+2. Run a real authorized Slack export through signed Mac and Windows builds.
+3. Second-account isolation, a cited Aedrova and Bud answer, and removal checks on staging.
+4. The iPhone and web create flows should point owners to the desktop uploader.

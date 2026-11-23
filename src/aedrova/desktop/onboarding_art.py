@@ -112,7 +112,16 @@ class AuroraSurface(QWidget):
 class StageArt(QWidget):
     """The right half of setup. A new scene blurs and rises into place; nothing bounces."""
 
-    SCENES = ("welcome", "account", "privacy", "theme", "permissions", "project", "goal")
+    SCENES = (
+        "welcome",
+        "account",
+        "privacy",
+        "theme",
+        "permissions",
+        "project",
+        "import",
+        "goal",
+    )
 
     def __init__(self, flow):
         super().__init__(flow)
@@ -429,6 +438,31 @@ class StageArt(QWidget):
             p.drawRoundedRect(
                 QRectF(terminal.left() + 18, terminal.top() + 20 + i * 22, shown, 7), 3.5, 3.5
             )
+
+    def paint_import(self, p):
+        """Channels on one side, Aedrova on the other, messages travelling across."""
+        left = QRectF(-190, -70, 120, 140)
+        right = QRectF(70, -70, 120, 140)
+        self.card(p, left, 16)
+        for i in range(4):
+            y = left.top() + 22 + i * 28
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QColor("#E5589F" if i == 0 else "#8275E6" if i == 1 else "#48A9AF"))
+            p.drawRoundedRect(QRectF(left.left() + 14, y, 12, 12), 4, 4)
+            self.bar(p, left.left() + 34, y + 2, 60 - i * 8, 7, 44)
+        self.card(p, right, 16)
+        icon("work", "#3D74FF").paint(
+            p, QRectF(right.center().x() - 18, right.top() + 24, 36, 36).toRect()
+        )
+        self.bar(p, right.left() + 22, right.top() + 80, 76, 7, 50)
+        self.bar(p, right.left() + 34, right.top() + 98, 52, 6, 30)
+        run = self.tick * 0.9 if not motion.reduced() else 0.6
+        for i in range(5):
+            t = (run + i / 5) % 1.0
+            x = left.right() + 10 + (right.left() - left.right() - 20) * t
+            y = math.sin(t * math.pi * 2 + i) * 8
+            alpha = round(255 * math.sin(t * math.pi))
+            self.dot(p, x, y, 4, QColor(61, 116, 255, alpha))
 
     def paint_goal(self, p):
         for turn, shift, color in ((-9, -46, "#C9B6FF"), (0, 0, "#FFB5DA"), (9, 46, "#B9DCFF")):

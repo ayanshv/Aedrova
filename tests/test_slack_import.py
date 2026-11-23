@@ -162,3 +162,117 @@ def test_native_dialog_previews_before_confirming(qtbot, tmp_path):
     assert not dialog.isVisible()
     open_slack_history(parent, service, "workspace")
     assert parent.slack_history_dialog is not dialog
+
+
+def test_upload_reports_progress_in_batches_and_skips_saved_ones():
+    class Service:
+        user = SimpleNamespace(id="owner")
+        calls = []
+
+        def rpc(self, name, body):
+            if name == "list_slack_imports":
+                return []
+            self.calls.append(body)
+            return len(body["p_rows"])
+
+    service, seen = Service(), []
+    rows = [{"channel_id": "C123", "source_ts": f"1700000000.{i:06d}"} for i in range(450)]
+    upload(service, "workspace", rows, progress=lambda sent, total: seen.append((sent, total)))
+    assert seen[0] == (0, 3) and seen[-1] == (3, 3)
+    assert [s for s, _ in seen] == sorted(s for s, _ in seen)
+
+
+def test_panel_shows_a_plain_message_for_a_bad_zip(qtbot, tmp_path):
+    from aedrova.desktop.slack_history import SlackImportPanel
+
+    panel = SlackImportPanel(SimpleNamespace(user=SimpleNamespace(id="owner")), "workspace")
+    qtbot.addWidget(panel)
+    bad = tmp_path / "bad.zip"
+    bad.write_bytes(b"not a zip")
+    panel.load_zip(bad)
+    qtbot.waitUntil(lambda: not panel.busy)
+    assert "valid Slack" in panel.status.text()
+    assert not panel.primary.isEnabled() and panel.items.isHidden()
+
+
+def message(ts="1700000000.000001", **fields):
+    return {"type": "message", "ts": ts, "user": "U1", "text": "hello", **fields}
+
+
+def test_hostile_or_broken_archives_are_refused_with_plain_messages(tmp_path, monkeypatch):
+    from aedrova.imports import slack
+
+    plain = {"channels.json": [{"id": "C1", "name": "general"}]}
+    path = export(tmp_path, plain | {"general/2023-11-14.json": [message()]})
+    monkeypatch.setattr(slack, "MAX_ZIP", 10)
+    with pytest.raises(ValueError, match="smaller than 32 MB"):
+        preview(path)
+    monkeypatch.undo()
+    monkeypatch.setattr(slack, "MAX_EXPANDED", 10)
+    with pytest.raises(ValueError, match="exceeds the import limits"):
+        preview(path)
+    monkeypatch.undo()
+    monkeypatch.setattr(slack, "MAX_ROWS", 1)
+    many = export(
+        tmp_path,
+        plain
+        | {
+            "general/2023-11-14.json": [
+                message(),
+                message("1700000001.000001"),
+                message("1700000002.000001"),
+            ]
+        },
+    )
+    with pytest.raises(ValueError, match="over 50,000"):
+        preview(many)
+    monkeypatch.undo()
+    missing = tmp_path / "missing.zip"
+    with ZipFile(missing, "w") as archive:
+        archive.writestr("general/2023-11-14.json", "[]")
+    with pytest.raises(ValueError, match="public-channel manifest"):
+        preview(missing)
+    garbage = tmp_path / "garbage.zip"
+    garbage.write_bytes(b"PK not really")
+    with pytest.raises(ValueError, match="valid Slack"):
+        preview(garbage)
+    broken = tmp_path / "broken.zip"
+    with ZipFile(broken, "w") as archive:
+        archive.writestr("channels.json", "{not json")
+    with pytest.raises(ValueError, match="valid Slack"):
+        preview(broken)
+    twins = export(
+        tmp_path,
+        {"channels.json": [{"id": "C1", "name": "a"}, {"id": "C1", "name": "b"}]},
+    )
+    with pytest.raises(ValueError, match="duplicate channel"):
+        preview(twins)
+
+
+def test_only_real_messages_in_public_channels_come_through(tmp_path):
+    path = export(
+        tmp_path,
+        {
+            "channels.json": [
+                {"id": "C1", "name": "general"},
+                {"id": "C2", "name": "partner", "shared_team_ids": ["T1", "T2"]},
+                {"id": "C3", "name": "secret", "is_private": True},
+            ],
+            "users.json": [{"id": "U1", "real_name": "Maya"}],
+            "general/2023-11-14.json": [
+                message(text="keep \x00this"),
+                message("1700000001.000001", subtype="channel_join"),
+                message("1700000002.000001", subtype="message_deleted"),
+                message("1700000003.000001", hidden=True),
+                message("not-a-timestamp"),
+                message("1700000004.000001", text="   "),
+                message("1700000005.000001", user="B1", text="bot says hi"),
+            ],
+            "partner/2023-11-14.json": [message()],
+            "secret/2023-11-14.json": [message()],
+        },
+    )
+    rows, counts, skipped = preview(path)
+    assert counts == {"general": 2} and skipped == 2
+    assert [row["body"] for row in rows] == ["keep this", "bot says hi"]
+    assert rows[1]["author"] == "B1"  # attribution only: no account is created or linked

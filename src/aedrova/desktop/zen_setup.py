@@ -15,7 +15,7 @@ from aedrova.desktop.icons import assign, icon
 from aedrova.desktop.projects import binding, save_binding
 from aedrova.identity.oauth import apple_login_enabled
 
-WELCOME, ACCOUNT, PRIVACY, GOAL, PROJECT, PERMISSIONS, THEME, OPENING = range(8)
+WELCOME, ACCOUNT, PRIVACY, GOAL, PROJECT, PERMISSIONS, THEME, OPENING, IMPORT = range(9)
 
 
 def heading(text):
@@ -100,6 +100,8 @@ class SetupPages(QFrame):
             self.render_permissions()
         elif stage == THEME:
             self.render_theme()
+        elif stage == IMPORT:
+            self.render_import()
         else:
             self.render_project()
         self.column.addWidget(self.status)
@@ -189,6 +191,41 @@ class SetupPages(QFrame):
         self.permissions.changed.connect(self.flow.permissions_changed)
         self.flow.permissions_changed()
         self.first_action = self.permissions.all
+
+    def can_import_history(self):
+        """Only the person who just made the workspace (an owner or admin) is offered the import."""
+        account = getattr(self.window, "account_dialog", None)
+        user = self.window.current_user()
+        if not account or not user or not self.workspace:
+            return False
+        return any(
+            str(member.get("user_id")) == str(user.id)
+            and str(member.get("workspace_id")) == str(self.workspace)
+            and member.get("role") in {"owner", "admin"}
+            for member in account.snapshot.get("members", [])
+        )
+
+    def render_import(self):
+        from aedrova.desktop.slack_history import SlackImportPanel
+
+        self.column.addWidget(heading("Bring your Slack history"))
+        self.note(
+            "Optional. Drop a public-channel export and past decisions become searchable. "
+            "You can also do this later in Workspace settings."
+        )
+        self.import_panel = SlackImportPanel(self.window.account_dialog.service, self.workspace)
+        self.import_panel.imported.connect(self.history_imported)
+        self.column.addWidget(self.import_panel)
+        self.first_action = self.import_panel.choose_button
+        self.note("Members can search it. Agents use it only when your workspace AI is on.")
+
+    def history_imported(self, count):
+        self.flow.history_imported = count
+        self.flow.primary.setText("Continue")
+        self.flow.primary.show()
+        self.flow.skip.hide()
+        self.flow.actions.show()
+        self.flow.primary.setFocus()
 
     def render_theme(self):
         from PySide6.QtWidgets import QButtonGroup

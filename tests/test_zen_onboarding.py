@@ -11,7 +11,7 @@ from aedrova.desktop.account import AccountDialog
 from aedrova.desktop.onboarding import SetupDialog, account_key
 from aedrova.desktop.projects import binding
 from aedrova.desktop.window import AedrovaWindow
-from aedrova.desktop.zen_setup import ACCOUNT, GOAL, OPENING, PRIVACY, PROJECT, THEME, WELCOME
+from aedrova.desktop.zen_setup import ACCOUNT, GOAL, IMPORT, OPENING, PRIVACY, PROJECT, THEME, WELCOME
 
 
 @pytest.fixture(autouse=True)
@@ -310,6 +310,8 @@ def test_fresh_walkthrough_reviews_existing_profile_then_creates_and_invites(
     assert flow.stage == PROJECT and flow.created_workspace == created
     assert not invites
     flow.skip.click()
+    assert flow.stage == IMPORT  # a just-made workspace offers the optional Slack import
+    flow.skip.click()
     assert flow.stage == GOAL
     flow.skip.click()
     qtbot.waitUntil(lambda: invites == [created])
@@ -540,3 +542,58 @@ def test_a_first_run_opens_light_even_when_the_app_is_dark(fresh_window, qtbot):
     later = SetupDialog(fresh_window)
     qtbot.addWidget(later)
     assert later.theme.name == "dark"  # reviewing setup keeps their own appearance
+
+
+def slack_zip(tmp_path):
+    import json
+    from zipfile import ZipFile
+
+    path = tmp_path / "export.zip"
+    with ZipFile(path, "w") as archive:
+        archive.writestr("channels.json", json.dumps([{"id": "C123", "name": "general"}]))
+        archive.writestr(
+            "general/2023-11-14.json",
+            json.dumps([{"type": "message", "ts": "1700000000.000001", "text": "Ship it"}]),
+        )
+    return path
+
+
+def test_the_slack_step_is_optional_inline_and_can_import(qtbot, tmp_path):
+    window, service = setup(qtbot, tmp_path)
+    window.set_reduced_motion(True)
+    writes = []
+    service.rpc = lambda name, params: (
+        [] if name == "list_slack_imports" else writes.append(params) or len(params["p_rows"])
+    )
+    account = window.account_dialog
+    account.snapshot["members"] = [{"workspace_id": "w", "user_id": "u", "role": "owner"}]
+    service.user = SimpleNamespace(id="u")
+    flow = show_setup(window, qtbot)
+    flow.created_workspace = flow.setup.workspace = "w"
+    assert flow.setup.can_import_history()
+    flow.show_stage(IMPORT)
+    assert flow.art.scene == "import" and flow.dots.count == 8
+    assert not flow.skip.isHidden() and flow.skip.text() == "Skip for now"
+    assert flow.primary.isHidden()  # nothing to continue from until something was imported
+    panel = flow.setup.import_panel
+    panel.load_zip(slack_zip(tmp_path))
+    qtbot.waitUntil(panel.primary.isEnabled)
+    assert panel.items.count() == 1 and not writes
+    panel.primary.click()
+    qtbot.waitUntil(lambda: panel.finished, timeout=5000)
+    assert writes[-1]["p_finish"] and panel.bar.isHidden()
+    assert not flow.primary.isHidden() and flow.primary.text() == "Continue"
+    flow.primary.click()
+    assert flow.stage == GOAL
+
+
+def test_only_an_owner_or_admin_is_offered_the_slack_step(qtbot, tmp_path):
+    window, service = setup(qtbot, tmp_path)
+    window.account_dialog.snapshot["members"] = [
+        {"workspace_id": "w", "user_id": "u", "role": "member"}
+    ]
+    service.user = SimpleNamespace(id="u")
+    flow = show_setup(window, qtbot)
+    flow.setup.workspace = flow.created_workspace = "w"
+    assert not flow.setup.can_import_history()
+    assert flow.after_project() == GOAL

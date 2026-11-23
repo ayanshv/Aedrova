@@ -3,17 +3,20 @@
 from datetime import UTC, datetime
 from threading import Event
 
-from PySide6.QtCore import Qt, QThreadPool, QTimer, QUrl, Slot
+from PySide6.QtCore import Qt, QThreadPool, QTimer, QUrl, Signal, Slot
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QFileDialog,
+    QFrame,
     QHBoxLayout,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
     QPlainTextEdit,
+    QProgressBar,
     QVBoxLayout,
+    QWidget,
 )
 
 from aedrova.desktop.controls import AppDialog
@@ -346,3 +349,191 @@ class SlackHistoryDialog(AppDialog):
 
 def date_label(value):
     return datetime.fromtimestamp(float(value), UTC).strftime("%b %d, %Y")
+
+
+class SlackImportPanel(QWidget):
+    """Choose or drop an export, check what will come in, then import it. Used inside setup."""
+
+    imported = Signal(int)
+    progressed = Signal(int, int)
+
+    def __init__(self, service, workspace, parent=None):
+        super().__init__(parent)
+        self.service, self.workspace = service, str(workspace)
+        self.user = str(service.user.id)
+        self.cancelled = Event()
+        self.rows = []
+        self.busy = False
+        self.finished = False
+        self.setAcceptDrops(True)
+        self.setAccessibleName("Slack import")
+        column = QVBoxLayout(self)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(10)
+        self.drop = QFrame()
+        self.drop.setObjectName("SlackDrop")
+        zone = QVBoxLayout(self.drop)
+        zone.setContentsMargins(16, 18, 16, 16)
+        zone.setSpacing(10)
+        self.drop_text = label("Drop your Slack export ZIP here, or choose it.", "muted", wrap=True)
+        self.drop_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        zone.addWidget(self.drop_text)
+        row = QHBoxLayout()
+        row.addStretch()
+        self.choose_button = button("Choose ZIP", role="outline")
+        self.choose_button.clicked.connect(self.choose)
+        row.addWidget(self.choose_button)
+        self.guide = button("How to export", role="outline")
+        self.guide.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(EXPORT_HELP)))
+        row.addWidget(self.guide)
+        row.addStretch()
+        zone.addLayout(row)
+        column.addWidget(self.drop)
+        self.items = QListWidget()
+        self.items.setAccessibleName("Channels to import")
+        self.items.setMaximumHeight(92)
+        self.items.hide()
+        column.addWidget(self.items)
+        self.bar = QProgressBar()
+        self.bar.setTextVisible(False)
+        self.bar.setFixedHeight(4)
+        self.bar.hide()
+        column.addWidget(self.bar)
+        self.status = label("", "muted", wrap=True)
+        self.status.setTextFormat(Qt.TextFormat.PlainText)
+        column.addWidget(self.status)
+        self.primary = button("Import history", role="primary")
+        self.primary.setMinimumHeight(44)
+        self.primary.setEnabled(False)
+        self.primary.clicked.connect(self.start_import)
+        column.addWidget(self.primary)
+        self.progressed.connect(self.show_progress)
+
+    # -- choosing -----------------------------------------------------------------
+    def choose(self):
+        if self.busy or self.finished:
+            return
+        path, _ = QFileDialog.getOpenFileName(self, "Choose Slack export", "", "ZIP files (*.zip)")
+        if path:
+            self.load_zip(path)
+
+    def dragEnterEvent(self, event):  # noqa: N802
+        urls = event.mimeData().urls()
+        if (
+            not self.busy
+            and not self.finished
+            and len(urls) == 1
+            and urls[0].isLocalFile()
+            and urls[0].toLocalFile().lower().endswith(".zip")
+        ):
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):  # noqa: N802
+        self.load_zip(event.mimeData().urls()[0].toLocalFile())
+
+    def load_zip(self, path):
+        if self.busy or self.finished:
+            return
+        self.rows = []
+        self.items.clear()
+        self.primary.setEnabled(False)
+        self.run(lambda: slack.preview(path), self.show_preview, "Reading the Slack export…")
+
+    def show_preview(self, result):
+        self.rows, counts, skipped = result
+        self.items.clear()
+        for name, count in sorted(counts.items()):
+            item = QListWidgetItem(f"#{name}  ·  {count:,} messages")
+            item.setData(Qt.ItemDataRole.UserRole, name)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Checked)
+            self.items.addItem(item)
+        self.items.setVisible(bool(self.rows))
+        if self.rows:
+            oldest = date_label(min(float(row["source_ts"]) for row in self.rows))
+            newest = date_label(max(float(row["source_ts"]) for row in self.rows))
+            message = f"{len(self.rows):,} messages · {oldest} to {newest}"
+            if skipped:
+                message += f" · {skipped:,} day files in private or shared channels skipped"
+        else:
+            message = "No eligible public-channel messages found."
+        self.status.setText(message)
+        self.primary.setEnabled(bool(self.rows))
+
+    # -- importing ----------------------------------------------------------------
+    def start_import(self):
+        checked = {
+            self.items.item(index).data(Qt.ItemDataRole.UserRole)
+            for index in range(self.items.count())
+            if self.items.item(index).checkState() == Qt.CheckState.Checked
+        }
+        rows = [row for row in self.rows if row["channel_name"] in checked]
+        if not rows:
+            self.status.setText("Select at least one channel to import.")
+            return
+        self.bar.setRange(0, 100)
+        self.bar.setValue(0)
+        self.bar.show()
+        self.items.setEnabled(False)
+        self.run(
+            lambda: slack.upload(
+                self.service,
+                self.workspace,
+                rows,
+                self.cancelled.is_set,
+                self.progressed.emit,
+            ),
+            self.done_importing,
+            "Importing history… Keep Aedrova open. Choose the same ZIP again to resume.",
+        )
+
+    def show_progress(self, sent, total):
+        self.bar.setRange(0, max(total, 1))
+        self.bar.setValue(sent)
+
+    def done_importing(self, count):
+        self.finished = True
+        self.rows = []
+        self.items.hide()
+        self.drop.hide()
+        self.bar.hide()
+        self.primary.hide()
+        self.status.setText(
+            f"{count:,} messages are now searchable in this workspace. "
+            "Anything already imported was skipped."
+        )
+        self.imported.emit(int(count))
+
+    # -- running ------------------------------------------------------------------
+    def run(self, operation, completed, notice):
+        self.busy = True
+        self.primary.setEnabled(False)
+        self.choose_button.setEnabled(False)
+        self.status.setText(notice)
+        self.completed = completed
+
+        def authorized():
+            if str(getattr(self.service.user, "id", "")) != self.user:
+                raise PermissionError("Your session changed. Reopen setup to continue.")
+            return operation()
+
+        job = Job(authorized)
+        job.signals.finished.connect(self.finished_job)
+        QThreadPool.globalInstance().start(job)
+
+    @Slot(object)
+    def finished_job(self, result):
+        self.busy = False
+        self.choose_button.setEnabled(not self.finished)
+        if self.cancelled.is_set():
+            return
+        if "error" in result:
+            self.status.setText(result["error"])
+            self.items.setEnabled(True)
+            self.bar.hide()
+            self.primary.setEnabled(bool(self.rows))
+        else:
+            self.completed(result["value"])
+
+    def stop(self):
+        self.cancelled.set()

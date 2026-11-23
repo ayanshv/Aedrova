@@ -71,11 +71,22 @@ def onboarding_styles(theme):
         QPushButton#OnboardingBack {{background:transparent;border:0;color:{theme.muted};
             padding:8px 10px;}}
         QPushButton#OnboardingBack:hover {{color:{theme.text};}}
-        QFrame#FeatureRow {{background:{"rgba(255,255,255,0.80)" if theme.name == "light"
-            else theme.surface};border:1px solid {theme.border};border-radius:12px;}}
+        QFrame#FeatureRow {{background:{
+            "rgba(255,255,255,0.80)" if theme.name == "light" else theme.surface
+        };border:1px solid {theme.border};border-radius:12px;}}
         QFrame#FeatureRow[active="true"] {{border:1px solid #E58BC8;}}
-        QFrame#PermissionRow {{background:{"rgba(255,255,255,0.88)" if theme.name == "light"
-            else theme.surface};border:1px solid {theme.border};border-radius:12px;}}
+        QFrame#SlackDrop {{background:{
+            "rgba(255,255,255,0.7)" if theme.name == "light" else theme.surface
+        };
+            border:1px dashed {theme.border};border-radius:12px;}}
+        QListWidget {{background:transparent;border:1px solid {theme.border};
+            border-radius:10px;padding:4px;}}
+        QListWidget::item {{padding:4px 6px;}}
+        QProgressBar {{background:{theme.border};border:0;border-radius:2px;}}
+        QProgressBar::chunk {{background:{theme.accent};border-radius:2px;}}
+        QFrame#PermissionRow {{background:{
+            "rgba(255,255,255,0.88)" if theme.name == "light" else theme.surface
+        };border:1px solid {theme.border};border-radius:12px;}}
         QFrame#PermissionRow[asking="true"] {{border:1px solid {theme.accent};}}
         QScrollArea#ZenSettings > QWidget > QWidget {{background:transparent;}}
         QPushButton#OnboardingContinue {{background:{theme.accent};color:{theme.primary_text};
