@@ -83,3 +83,30 @@ class ExportSteps(QWidget):
             holder.setContentsMargins(12, 10, 12, 10)
             holder.addWidget(label(note, "muted", wrap=True))
             column.addWidget(line)
+
+
+QUICK = (
+    "In Slack, open Workspace settings, then Import/Export Data, then Export.",
+    "Start the export and download the .zip. Do not unzip it.",
+    "Drop the .zip below, then click Import history.",
+)
+
+
+class QuickSteps(QWidget):
+    """The short version for setup: three lines and a link to Slack's own guide."""
+
+    def __init__(self, *, open_url=QDesktopServices.openUrl):
+        super().__init__()
+        column = QVBoxLayout(self)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(8)
+        self.steps = []
+        for number, text in enumerate(QUICK, 1):
+            step = NumberedStep(number, text)
+            self.steps.append(step)
+            column.addWidget(step)
+        self.guide = button("Slack’s export guide", role="outline")
+        self.guide.setIcon(slack_icon(16))
+        self.guide.clicked.connect(lambda: open_url(QUrl(EXPORT_HELP)))
+        column.addSpacing(2)
+        column.addWidget(self.guide, alignment=Qt.AlignmentFlag.AlignLeft)

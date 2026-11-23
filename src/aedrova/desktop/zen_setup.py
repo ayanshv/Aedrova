@@ -210,26 +210,24 @@ class SetupPages(QFrame):
 
         from aedrova.desktop.slack_history import SlackImportPanel
         from aedrova.desktop.slack_logo import slack_pixmap
-        from aedrova.desktop.slack_steps import ExportSteps
+        from aedrova.desktop.slack_steps import QuickSteps
 
         top = QFrame()
         title = QHBoxLayout(top)
         title.setContentsMargins(0, 0, 0, 0)
         title.setSpacing(12)
         logo = QLabel()
-        logo.setPixmap(slack_pixmap(34))
-        logo.setFixedSize(34, 34)
+        logo.setPixmap(slack_pixmap(32))
+        logo.setFixedSize(32, 32)
         logo.setAccessibleName("Slack")
         title.addWidget(logo)
         title.addWidget(heading("Bring your Slack history"), 1)
         self.column.addWidget(top)
-        self.note(
-            "Optional. This copies your public Slack channels into Aedrova as read-only "
-            "channels you can search. It takes about five minutes. You can skip it and do it "
-            "later in Workspace settings."
-        )
-        self.export_steps = ExportSteps()
+        self.note("Optional. Public channels only. You can also do this later in settings.")
+        self.column.addSpacing(6)
+        self.export_steps = QuickSteps()
         self.column.addWidget(self.export_steps)
+        self.column.addSpacing(6)
         self.import_panel = SlackImportPanel(self.window.account_dialog.service, self.workspace)
         self.import_panel.imported.connect(self.history_imported)
         self.column.addWidget(self.import_panel)

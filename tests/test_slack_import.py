@@ -385,3 +385,12 @@ def test_the_slack_mark_renders_in_its_four_colours(qtbot):
     image = slack_pixmap(64).toImage()
     colours = {image.pixelColor(x, y).name() for x in range(0, 128, 4) for y in range(0, 128, 4)}
     assert {"#35c5f0", "#2eb67d", "#ecb22e", "#de1c59"} <= colours
+
+
+def test_setup_uses_three_short_lines_and_the_settings_dialog_keeps_all_eight(qtbot):
+    from aedrova.desktop.slack_steps import QUICK, QuickSteps
+
+    quick = QuickSteps(open_url=lambda url: None)
+    qtbot.addWidget(quick)
+    assert len(quick.steps) == len(QUICK) == 3
+    assert all(len(step.text.text().split()) <= 16 for step in quick.steps)
