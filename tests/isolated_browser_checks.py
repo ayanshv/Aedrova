@@ -231,7 +231,13 @@ def test_the_empty_panel_invites_you_to_browse_and_makes_no_page_yet(qtbot):
     assert panel.view is None and panel.page is None  # nothing heavy until it is used
     assert panel.welcome_title.text() == "Browse with Aedrova"
     assert "Open any website" in panel.welcome_text.text()
-    assert panel.stack.currentIndex() == 0 and not panel.welcome_icon.pixmap().isNull()
+    assert panel.stack.currentIndex() == 0 and panel.welcome_icon.width() == 56
+    from PySide6.QtCore import Qt
+
+    needed = panel.welcome_text.fontMetrics().boundingRect(
+        0, 0, panel.welcome_text.width(), 10000, Qt.TextFlag.TextWordWrap, panel.TEXT
+    )
+    assert panel.welcome_text.height() >= needed.height()  # the whole description is visible
     assert not panel.back.isEnabled()
     panel.ensure_view()
     assert panel.stack.currentWidget() is panel.view and panel.back.isEnabled()

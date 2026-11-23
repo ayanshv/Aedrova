@@ -6,6 +6,7 @@ from PySide6.QtCore import (
     QEvent,
     QPointF,
     QPropertyAnimation,
+    QRectF,
     QStandardPaths,
     Qt,
     QTimer,
@@ -22,7 +23,6 @@ from PySide6.QtWebEngineCore import (
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
-    QLabel,
     QLineEdit,
     QSizePolicy,
     QStackedWidget,
@@ -33,7 +33,7 @@ from PySide6.QtWidgets import (
 from aedrova.browser.policy import Refusal, check_url, host_of
 from aedrova.desktop import motion
 from aedrova.desktop.dialogs import button, label
-from aedrova.desktop.icons import assign, icon
+from aedrova.desktop.icons import assign
 
 
 def storage_path():
@@ -53,6 +53,36 @@ def is_local_host(host):
         and (host[0].isdigit() or ":" in host or host.startswith("["))
         and not is_public_address(host.strip("[]"))
     )
+
+
+class GlobeMark(QWidget):
+    """The web icon, drawn as vectors so it stays sharp at any display scale."""
+
+    def __init__(self, size=56):
+        super().__init__()
+        self.setFixedSize(size, size)
+        self.setAccessibleName("Web")
+
+    def paintEvent(self, event):  # noqa: N802
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        ink = QColor(self.palette().color(self.palette().ColorRole.Text))
+        ink.setAlpha(200)
+        painter.setPen(QPen(ink, 2.2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        side = min(self.width(), self.height()) - 8
+        box = QRectF((self.width() - side) / 2, (self.height() - side) / 2, side, side)
+        painter.drawEllipse(box)
+        painter.drawEllipse(QRectF(box.center().x() - side * 0.2, box.top(), side * 0.4, side))
+        middle = box.center().y()
+        painter.drawLine(QPointF(box.left(), middle), QPointF(box.right(), middle))
+        radius = side / 2
+        for fraction in (0.27, 0.73):  # latitude lines, as wide as the circle is at that height
+            y = box.top() + side * fraction
+            half = (radius**2 - (y - middle) ** 2) ** 0.5
+            painter.drawLine(
+                QPointF(box.center().x() - half, y), QPointF(box.center().x() + half, y)
+            )
 
 
 class Guard(QWebEngineUrlRequestInterceptor):
@@ -248,9 +278,8 @@ class BrowserPanel(QWidget):
         box.setContentsMargins(32, 0, 32, 0)
         box.setSpacing(10)
         box.addStretch(3)
-        self.welcome_icon = QLabel()
-        self.welcome_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        box.addWidget(self.welcome_icon)
+        self.welcome_icon = GlobeMark(56)
+        box.addWidget(self.welcome_icon, alignment=Qt.AlignmentFlag.AlignHCenter)
         box.addSpacing(8)
         self.welcome_title = label(self.TITLE, "heading")
         self.welcome_title.setObjectName("BrowserWelcomeTitle")
@@ -262,19 +291,24 @@ class BrowserPanel(QWidget):
         self.welcome_text.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
         box.addWidget(self.welcome_text, alignment=Qt.AlignmentFlag.AlignHCenter)
         box.addStretch(4)
-        self.paint_welcome_icon()
         return page
 
-    def paint_welcome_icon(self):
-        color = self.palette().color(self.palette().ColorRole.Text)
-        color.setAlpha(190)
-        self.welcome_icon.setPixmap(
-            icon("globe", color.name(color.NameFormat.HexArgb)).pixmap(56, 56)
-        )
+    def fit_welcome(self):
+        """Give the description exactly the height its wrapped text needs on this display."""
+        metrics = self.welcome_text.fontMetrics()
+        wanted = metrics.boundingRect(
+            0, 0, self.welcome_text.width(), 10000, Qt.TextFlag.TextWordWrap, self.TEXT
+        ).height()
+        self.welcome_text.setFixedHeight(wanted + 6)
+
+    def showEvent(self, event):  # noqa: N802
+        super().showEvent(event)
+        self.fit_welcome()
 
     def changeEvent(self, event):  # noqa: N802
-        if event.type() == QEvent.Type.PaletteChange and hasattr(self, "welcome_icon"):
-            self.paint_welcome_icon()
+        if event.type() in (QEvent.Type.FontChange, QEvent.Type.StyleChange):
+            if hasattr(self, "welcome_text"):
+                self.fit_welcome()
         super().changeEvent(event)
 
     # -- the page, made only when it is needed ---------------------------------------
