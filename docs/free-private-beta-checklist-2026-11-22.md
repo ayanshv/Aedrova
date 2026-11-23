@@ -13,7 +13,7 @@ refunds and Stripe live mode are out of scope. Written November 22, 2026. Status
 |---|---|---|
 | ★ Decide the gate: a shared password on the download page, per-person invite codes, or an email allowlist in the database | Owner | Recommended: password on the download page plus an allowlist so a leaked link or password is not enough to sign in. |
 | ★ Enforce the allowlist at sign-in | Open | Today anyone can sign in with Google. Needs a database check on first sign-in and a clear "you are not on the list yet" screen. |
-| ★ A way to give a workspace AI capacity without Stripe | Partial | Built on the early-access gift: Pro-sized allowance per workspace, $100 shared cap, Free workspaces upgraded once by the app. Needs the staging push, four Render settings and a retest (see `early-access-offer.md`). Production unchanged. |
+| ★ A way to give a workspace AI capacity without Stripe | Partial | Done and verified on staging November 23: Pro-sized gift, $100 shared pool, Free workspace upgraded by the app; the same web summary used 3% of the five-hour window instead of 81%. Production still needs the same settings and deploy, and the gift should be checked once the invite gate exists. |
 | Invite email and a one-page install guide | Open | Download link, password, first-run steps, known issues, who to contact. |
 | Tester list with name, email, OS and version | Owner | A simple sheet is enough. |
 
