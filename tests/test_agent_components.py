@@ -223,7 +223,9 @@ def test_pull_request_needs_a_prepared_scope_then_a_separate_confirmation(qtbot)
     assert dialog.calls == ["prepare"]  # nothing is published yet
     card.confirm_button.click()
     assert dialog.calls == ["prepare", ("publish", True)]
-    dialog.state.emit("published", {"message": "Draft PR created", "url": "https://github.com/t/a/pull/1"})
+    dialog.state.emit(
+        "published", {"message": "Draft PR created", "url": "https://github.com/t/a/pull/1"}
+    )
     assert card.link_button.isVisible() and not card.pr_button.isVisible()
 
 
@@ -252,3 +254,27 @@ def test_message_times_read_like_a_person_wrote_them(qtbot):
     assert human_time("2026-09-27 05:00", now).startswith("Sep 27, ")
     assert human_time("2025-09-27 05:00", now).startswith("Sep 27 2025, ")
     assert human_time("not a time") == "not a time"
+
+
+def test_the_reply_row_says_what_it_is_built_from_instead_of_repeating_the_status(qtbot):
+    steps = StepChecklist()
+    qtbot.addWidget(steps)
+    steps.observe("Checking workspace access…")
+    steps.observe("Gathered 142 messages for context")
+    steps.observe("Writing a response…")
+    respond = steps.find("respond")
+    assert respond["state"] == "running"
+    assert respond["label"] == "Replying from 142 messages of context"
+    assert "Writing" not in respond["label"]  # the status line above already says it
+
+
+def test_without_a_count_the_reply_row_is_still_not_a_duplicate(qtbot):
+    steps = StepChecklist()
+    qtbot.addWidget(steps)
+    steps.observe("Writing a response…")
+    assert steps.find("respond")["label"] == "Putting the reply together"
+    one = StepChecklist()
+    qtbot.addWidget(one)
+    one.observe("Gathered 1 messages for context")
+    one.observe("Writing a response…")
+    assert one.find("respond")["label"] == "Replying from 1 message of context"

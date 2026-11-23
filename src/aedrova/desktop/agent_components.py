@@ -174,7 +174,7 @@ CONTEXT_PHASES = (
 CHAT_STEPS = (
     ("access", "Checking workspace access"),
     ("context", "Gathering context"),
-    ("respond", "Writing the response"),
+    ("respond", "Putting the reply together"),
 )
 BUILD_STEPS = (
     ("copy", "Preparing a safe copy of your project"),
@@ -195,6 +195,7 @@ class StepChecklist(QWidget):
         self.flow = None
         self.rows = []
         self.phase = 0
+        self.read_count = None  # how many messages were actually read, for the reply step
         self.setAccessibleName("Agent task list")
         self.column = QVBoxLayout(self)
         self.column.setContentsMargins(0, 2, 0, 2)
@@ -289,9 +290,17 @@ class StepChecklist(QWidget):
             step = self.find("context")
             if step is not None:  # the real amount read, e.g. "Read 142 messages"
                 step["label"] = text.removesuffix(" for context").replace("Gathered", "Read", 1)
+            found = re.search(r"(\d[\d,]*)\s+messages?", text)
+            self.read_count = int(found.group(1).replace(",", "")) if found else None
         elif lowered.startswith(CONTEXT_PHASES):
             self.start("context", "Gathering context")
         elif lowered.startswith("writing a response"):
+            # The status line above already says "Writing a response", so this row says what
+            # the reply is built from instead of repeating it.
+            respond = self.find("respond")
+            if respond is not None and self.read_count:
+                noun = "message" if self.read_count == 1 else "messages"
+                respond["label"] = f"Replying from {self.read_count:,} {noun} of context"
             self.start("respond")
         elif lowered.startswith("checking reply sources"):
             self.start("sources", "Checking sources")
@@ -589,7 +598,7 @@ class PromptCard(Card):
             return
         self.resolved = True
         for _, control, chips in self.inputs:
-            for widget in ([control] if control else chips):
+            for widget in [control] if control else chips:
                 widget.setEnabled(False)
         self.send_button.hide()
         self.note.setText("Answer sent. Continuing…")
