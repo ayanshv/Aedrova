@@ -61,6 +61,7 @@ def tone(theme, color):
 
 
 def onboarding_styles(theme):
+    note_fill = "rgba(255,255,255,0.7)" if theme.name == "light" else theme.surface
     return (
         stylesheet(theme)
         + f"""
@@ -75,6 +76,10 @@ def onboarding_styles(theme):
             "rgba(255,255,255,0.80)" if theme.name == "light" else theme.surface
         };border:1px solid {theme.border};border-radius:12px;}}
         QFrame#FeatureRow[active="true"] {{border:1px solid #E58BC8;}}
+        QLabel#StepBadge {{background:{theme.accent};color:{theme.primary_text};
+            border-radius:12px;font-weight:600;font-size:12px;}}
+        QFrame#StepNote {{background:{note_fill};
+            border:1px solid {theme.border};border-radius:10px;}}
         QFrame#SlackDrop {{background:{
             "rgba(255,255,255,0.7)" if theme.name == "light" else theme.surface
         };

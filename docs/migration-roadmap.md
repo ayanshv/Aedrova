@@ -218,3 +218,18 @@ October 5 authoritative order in milestones.md. Apple enrollment is deferred unt
 2. Run a real authorized Slack export through signed Mac and Windows builds.
 3. Second-account isolation, a cited Aedrova and Bud answer, and removal checks on staging.
 4. The iPhone and web create flows should point owners to the desktop uploader.
+
+### Update, November 22, 2026 (evening)
+
+- **Channels.** Imported Slack channels are shown under **From Slack** in the sidebar. Each opens
+  as a read-only copy of that channel with its messages, authors, times, thread replies and
+  reactions. They are not live chat channels: nobody can post in them, they send no
+  notifications, and historical authors are text, not accounts. Converting one to a writable
+  channel is a possible later feature.
+- **New database functions** (same unapplied migration): `slack_channels` and
+  `slack_channel_messages`, both member-readable and outsider-refused; search results are now
+  ranked by relevance. Embedded PostgreSQL tests cover them.
+- **Agents.** A mention that asks about past decisions searches the archive with any of the
+  words in the question, cites messages as `slack:CHANNEL:TIMESTAMP`, and re-checks them
+  before sharing (`tests/test_context_retrieval.py`).
+- **Onboarding** now spells out the Slack export in eight numbered steps with the Slack mark.

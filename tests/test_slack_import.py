@@ -276,3 +276,112 @@ def test_only_real_messages_in_public_channels_come_through(tmp_path):
     assert counts == {"general": 2} and skipped == 2
     assert [row["body"] for row in rows] == ["keep this", "bot says hi"]
     assert rows[1]["author"] == "B1"  # attribution only: no account is created or linked
+
+
+def test_a_channel_opens_as_a_read_only_copy_with_its_messages(qtbot):
+    from PySide6.QtWidgets import QWidget
+
+    from aedrova.desktop.slack_history import open_slack_history
+
+    parent = QWidget()
+    qtbot.addWidget(parent)
+    parent.show()
+    pages = []
+    rows = [
+        {
+            "id": "slack:C1:1700000000.000001",
+            "author": "Maya",
+            "body": "Launch plan is set",
+            "source_ts": "1700000000.000001",
+            "thread_ts": None,
+            "links": [],
+            "reactions": {"tada": 2},
+        },
+        {
+            "id": "slack:C1:1700000100.000001",
+            "author": "Sam",
+            "body": "<b>Agreed</b>",
+            "source_ts": "1700000100.000001",
+            "thread_ts": "1700000000.000001",
+            "links": [],
+            "reactions": {},
+        },
+    ]
+
+    def messages(workspace, channel, before=None, limit=100):
+        pages.append((workspace, channel, before, limit))
+        return rows
+
+    service = SimpleNamespace(user=SimpleNamespace(id="u"), slack_channel_messages=messages)
+    open_slack_history(
+        parent,
+        service,
+        "w",
+        mode="channel",
+        channel={"channel_id": "C1", "channel_name": "launch"},
+    )
+    dialog = parent.slack_history_dialog
+    qtbot.waitUntil(lambda: bool(dialog.log.toPlainText()), timeout=3000)
+    text = dialog.log.toPlainText()
+    assert dialog.windowTitle() == "#launch" and pages == [("w", "C1", None, 100)]
+    assert "Maya · Nov 14, 2023 22:13 UTC" in text and "Launch plan is set" in text
+    assert "Reply · Sam" in text and "<b>Agreed</b>" in text  # shown as text, never interpreted
+    assert ":tada: 2" in text and not dialog.earlier.isVisible()
+    assert dialog.log.isReadOnly() and dialog.items.isHidden()
+    dialog.accept()
+
+
+def test_the_sidebar_lists_imported_channels_and_opens_one(qtbot, tmp_path):
+    import sys
+
+    sys.path.insert(0, "tests")
+    from test_connected import setup
+
+    window, service = setup(qtbot, tmp_path)
+    service.slack_channels = lambda workspace: [
+        {"channel_id": "C1", "channel_name": "general", "message_count": 120},
+        {"channel_id": "C2", "channel_name": "launch", "message_count": 8},
+    ]
+    service.slack_channel_messages = lambda *a, **k: []
+    window.slack_archive.refresh(force=True)
+    qtbot.waitUntil(lambda: window.slack_archive.list.count() == 2, timeout=3000)
+    assert window.slack_archive.isVisible()
+    assert window.slack_archive.list.item(0).text().endswith("general")
+    window.slack_archive.open_channel(window.slack_archive.list.item(1))
+    assert window.slack_history_dialog.windowTitle() == "#launch"
+    window.slack_history_dialog.accept()
+    service.slack_channels = lambda workspace: []
+    window.slack_archive.refresh(force=True)
+    qtbot.waitUntil(lambda: window.slack_archive.isHidden(), timeout=3000)
+    window.connected.timer.stop()
+
+
+def test_instructions_are_numbered_explicit_and_open_slacks_guide(qtbot):
+    from aedrova.desktop.slack_steps import EXPORT_HELP, IN_AEDROVA, IN_SLACK, ExportSteps
+
+    opened = []
+    steps = ExportSteps(open_url=lambda url: opened.append(url.toString()))
+    qtbot.addWidget(steps)
+    assert len(steps.steps) == len(IN_SLACK) + len(IN_AEDROVA) == 8
+    text = " ".join(step.text.text() for step in steps.steps)
+    for must_say in (
+        "Workspace settings",
+        "Export tab",
+        "Start export",
+        "Download",
+        ".zip",
+        "Import history",
+        "Untick",
+    ):
+        assert must_say in text
+    assert not steps.guide.icon().isNull()  # the Slack mark
+    steps.guide.click()
+    assert opened == [EXPORT_HELP]
+
+
+def test_the_slack_mark_renders_in_its_four_colours(qtbot):
+    from aedrova.desktop.slack_logo import slack_pixmap
+
+    image = slack_pixmap(64).toImage()
+    colours = {image.pixelColor(x, y).name() for x in range(0, 128, 4) for y in range(0, 128, 4)}
+    assert {"#35c5f0", "#2eb67d", "#ecb22e", "#de1c59"} <= colours

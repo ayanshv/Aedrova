@@ -206,18 +206,34 @@ class SetupPages(QFrame):
         )
 
     def render_import(self):
-        from aedrova.desktop.slack_history import SlackImportPanel
+        from PySide6.QtWidgets import QLabel
 
-        self.column.addWidget(heading("Bring your Slack history"))
+        from aedrova.desktop.slack_history import SlackImportPanel
+        from aedrova.desktop.slack_logo import slack_pixmap
+        from aedrova.desktop.slack_steps import ExportSteps
+
+        top = QFrame()
+        title = QHBoxLayout(top)
+        title.setContentsMargins(0, 0, 0, 0)
+        title.setSpacing(12)
+        logo = QLabel()
+        logo.setPixmap(slack_pixmap(34))
+        logo.setFixedSize(34, 34)
+        logo.setAccessibleName("Slack")
+        title.addWidget(logo)
+        title.addWidget(heading("Bring your Slack history"), 1)
+        self.column.addWidget(top)
         self.note(
-            "Optional. Drop a public-channel export and past decisions become searchable. "
-            "You can also do this later in Workspace settings."
+            "Optional. This copies your public Slack channels into Aedrova as read-only "
+            "channels you can search. It takes about five minutes. You can skip it and do it "
+            "later in Workspace settings."
         )
+        self.export_steps = ExportSteps()
+        self.column.addWidget(self.export_steps)
         self.import_panel = SlackImportPanel(self.window.account_dialog.service, self.workspace)
         self.import_panel.imported.connect(self.history_imported)
         self.column.addWidget(self.import_panel)
         self.first_action = self.import_panel.choose_button
-        self.note("Members can search it. Agents use it only when your workspace AI is on.")
 
     def history_imported(self, count):
         self.flow.history_imported = count

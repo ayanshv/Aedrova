@@ -444,12 +444,11 @@ class StageArt(QWidget):
         left = QRectF(-190, -70, 120, 140)
         right = QRectF(70, -70, 120, 140)
         self.card(p, left, 16)
-        for i in range(4):
-            y = left.top() + 22 + i * 28
-            p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QColor("#E5589F" if i == 0 else "#8275E6" if i == 1 else "#48A9AF"))
-            p.drawRoundedRect(QRectF(left.left() + 14, y, 12, 12), 4, 4)
-            self.bar(p, left.left() + 34, y + 2, 60 - i * 8, 7, 44)
+        from aedrova.desktop.slack_logo import paint_logo
+
+        paint_logo(p, QRectF(left.center().x() - 24, left.top() + 20, 48, 48))
+        for i in range(3):
+            self.bar(p, left.left() + 22, left.top() + 84 + i * 16, 76 - i * 14, 7, 40)
         self.card(p, right, 16)
         icon("work", "#3D74FF").paint(
             p, QRectF(right.center().x() - 18, right.top() + 24, 36, 36).toRect()

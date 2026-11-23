@@ -28,8 +28,15 @@ begin
  assert public.write_slack_history(workspace,overlap,0,items,true) = 0;
  assert jsonb_array_length(public.slack_history(workspace,'onboarding')) = 1;
  assert public.slack_history(workspace,'slack:C123:1700000000.000001')->0->>'author' = 'Maya';
+ assert public.slack_channels(workspace)->0->>'channel_name' = 'launch';
+ assert (public.slack_channels(workspace)->0->>'message_count')::int = 1;
+ assert public.slack_channel_messages(workspace,'C123')->0->>'body' = 'Onboarding beta decision';
+ assert public.slack_channel_messages(workspace,'C123',1700000000.000001) = '[]'::jsonb;
+ assert public.slack_channel_messages(workspace,'C999') = '[]'::jsonb;
  perform set_config('request.jwt.claim.sub', reader_id, true);
  assert jsonb_array_length(public.slack_history(workspace,'onboarding')) = 1;
+ assert jsonb_array_length(public.slack_channels(workspace)) = 1;
+ assert jsonb_array_length(public.slack_channel_messages(workspace,'C123')) = 1;
  begin
    perform public.write_slack_history(workspace,gen_random_uuid(),0,items,true);
    raise exception 'member could write an import';
@@ -46,9 +53,20 @@ begin
    raise exception 'outsider could see import';
  exception when insufficient_privilege then null;
  end;
+ begin
+   perform public.slack_channels(workspace);
+   raise exception 'outsider could list channels';
+ exception when insufficient_privilege then null;
+ end;
+ begin
+   perform public.slack_channel_messages(workspace,'C123');
+   raise exception 'outsider could read a channel';
+ exception when insufficient_privilege then null;
+ end;
  perform set_config('request.jwt.claim.sub', owner_id, true);
  assert public.remove_slack_import(workspace,batch);
  assert public.slack_history(workspace,'onboarding') = '[]'::jsonb;
+ assert public.slack_channels(workspace) = '[]'::jsonb;
  reset role;
 end $$;
 rollback;

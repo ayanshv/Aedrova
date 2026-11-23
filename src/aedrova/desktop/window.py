@@ -256,6 +256,10 @@ class AedrovaWindow(QMainWindow):
         self.channel_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.channel_list.currentItemChanged.connect(self._channel_selected)
         side.addWidget(self.channel_list, 3)
+        from aedrova.desktop.slack_archive import SlackArchiveList
+
+        self.slack_archive = SlackArchiveList(self)
+        side.addWidget(self.slack_archive)
         side.addSpacing(16)
         dm_header = QHBoxLayout()
         dm_header.setContentsMargins(10, 0, 0, 0)
@@ -662,6 +666,7 @@ class AedrovaWindow(QMainWindow):
         self.dm_list.setVisible(self.dm_list.count() > 0)
         for listing in (self.channel_list, self.dm_list):
             listing.blockSignals(False)
+        self.slack_archive.refresh()
 
     def _channel_selected(self, item, previous):
         if item and item.data(Qt.ItemDataRole.UserRole + 1) != "bud":

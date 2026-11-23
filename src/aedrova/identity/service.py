@@ -504,6 +504,8 @@ class IdentityService:
             "set_workspace_archived",
             "write_slack_history",
             "slack_history",
+            "slack_channels",
+            "slack_channel_messages",
             "list_slack_imports",
             "remove_slack_import",
         }
@@ -523,6 +525,23 @@ class IdentityService:
             if error.code == "PGRST202":
                 return []
             raise
+
+    def slack_channels(self, workspace):
+        """Channels from published Slack imports; empty until the migration is installed."""
+        from postgrest.exceptions import APIError
+
+        try:
+            return self.rpc("slack_channels", {"p_workspace": workspace})
+        except APIError as error:
+            if error.code == "PGRST202":
+                return []
+            raise
+
+    def slack_channel_messages(self, workspace, channel, before=None, limit=100):
+        return self.rpc(
+            "slack_channel_messages",
+            {"p_workspace": workspace, "p_channel": channel, "p_before": before, "p_limit": limit},
+        )
 
     def message_interactions(self, identifiers):
         self._authenticated()

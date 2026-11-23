@@ -407,3 +407,35 @@ def test_deep_history_never_accepts_rows_from_another_channel():
     source.channel_history = lambda channel, limit: [{"id": "9", "channel_id": "other"}]
     with pytest.raises(PermissionError, match="invalid"):
         gather(source, "w", query="invoice", preferred_channel="c")
+
+
+def test_imported_slack_messages_reach_the_agent_as_cited_evidence():
+    source = bounded_service()
+    asked = []
+    citation = "slack:C123:1700000000.000001"
+
+    def slack_history(workspace, query, limit=20):
+        asked.append((workspace, query))
+        return [
+            {
+                "id": citation,
+                "channel_name": "launch",
+                "author": "Maya",
+                "source_ts": "1700000000.000001",
+                "thread_ts": None,
+                "body": "We decided the beta onboarding must be skippable.",
+            }
+        ]
+
+    source.slack_history = slack_history
+    context = gather(source, "w", query="beta onboarding decision", include_slack=True)
+    assert asked == [("w", '"beta" OR "onboarding" OR "decision"')]  # any word can match
+    records = [json.loads(line) for line in context.text.splitlines()]
+    imported = [r["imported_slack_message"] for r in records if "imported_slack_message" in r]
+    assert imported and imported[0]["citation"] == citation and imported[0]["author"] == "Maya"
+    results = ContextIndex(context).search("skippable onboarding")
+    assert results and results[0].citation == citation  # the agent can find and cite it
+    # Not asked for Slack (for example a build): nothing imported is read.
+    quiet = bounded_service()
+    quiet.slack_history = lambda *a, **k: pytest.fail("Slack history must be opt in")
+    assert "imported_slack_message" not in gather(quiet, "w", query="beta onboarding").text

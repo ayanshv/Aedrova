@@ -3,8 +3,7 @@
 from datetime import UTC, datetime
 from threading import Event
 
-from PySide6.QtCore import Qt, QThreadPool, QTimer, QUrl, Signal, Slot
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import Qt, QThreadPool, QTimer, Signal, Slot
 from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
@@ -24,10 +23,10 @@ from aedrova.desktop.dialogs import button, label
 from aedrova.desktop.projects import Job
 from aedrova.imports import slack
 
-EXPORT_HELP = "https://slack.com/help/articles/201658943-Export-your-workspace-data"
 
-
-def open_slack_history(parent, service, workspace, *, mode="import", query="", selected=None):
+def open_slack_history(
+    parent, service, workspace, *, mode="import", query="", selected=None, channel=None
+):
     if not workspace or not service or not service.user:
         return
     existing = getattr(parent, "slack_history_dialog", None)
@@ -36,16 +35,17 @@ def open_slack_history(parent, service, workspace, *, mode="import", query="", s
         return
     if existing:
         existing.deleteLater()
-    dialog = SlackHistoryDialog(parent, service, str(workspace), mode, query, selected)
+    dialog = SlackHistoryDialog(parent, service, str(workspace), mode, query, selected, channel)
     parent.slack_history_dialog = dialog
     dialog.open()
 
 
 class SlackHistoryDialog(AppDialog):
-    def __init__(self, parent, service, workspace, mode, query, selected):
+    def __init__(self, parent, service, workspace, mode, query, selected, channel=None):
         super().__init__(parent)
+        self.channel, self.oldest, self.loaded = channel, None, []
         self.setWindowModality(Qt.WindowModality.WindowModal)
-        self.resize(555, 480)
+        self.resize(600, 700)
         self.service, self.workspace = service, workspace
         self.user = str(service.user.id)
         self.cancelled = Event()
@@ -58,6 +58,7 @@ class SlackHistoryDialog(AppDialog):
             "import": "Import from Slack",
             "history": "Imported history",
             "manage": "Manage Slack imports",
+            "channel": "#" + (channel or {}).get("channel_name", "channel"),
         }[mode]
         self.setWindowTitle(title)
         layout = QVBoxLayout(self)
@@ -66,22 +67,38 @@ class SlackHistoryDialog(AppDialog):
         layout.addWidget(label(title, "heading"))
 
         if mode == "import":
-            layout.addWidget(
-                label(
-                    "Export public channels from Slack, then drop the ZIP here. Workspace members "
-                    "can search the archive. Agents can use it when workspace AI is allowed.",
-                    "muted",
-                    wrap=True,
-                )
-            )
+            from PySide6.QtWidgets import QScrollArea
+
+            from aedrova.desktop.slack_steps import ExportSteps
+
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QFrame.Shape.NoFrame)
+            scroll.setMaximumHeight(230)
+            scroll.setWidget(ExportSteps())
+            layout.addWidget(scroll)
             actions = QHBoxLayout()
-            guide = button("Slack export instructions", role="outline")
-            guide.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(EXPORT_HELP)))
-            actions.addWidget(guide)
             self.choose_button = button("Choose ZIP", role="outline")
             self.choose_button.clicked.connect(self.choose)
             actions.addWidget(self.choose_button)
             layout.addLayout(actions)
+        elif mode == "channel":
+            layout.addWidget(
+                label(
+                    "A read-only copy of this Slack channel. Workspace members can search it, "
+                    "and agents use it when workspace AI is on.",
+                    "muted",
+                    wrap=True,
+                )
+            )
+            self.earlier = button("Load earlier messages", role="outline")
+            self.earlier.clicked.connect(lambda: self.load_channel(self.oldest))
+            self.earlier.hide()
+            layout.addWidget(self.earlier, alignment=Qt.AlignmentFlag.AlignLeft)
+            self.log = QPlainTextEdit()
+            self.log.setReadOnly(True)
+            self.log.setAccessibleName("Slack channel messages")
+            layout.addWidget(self.log, 1)
         elif mode == "history":
             field = QLineEdit(query)
             field.setPlaceholderText("Search Slack history")
@@ -94,6 +111,7 @@ class SlackHistoryDialog(AppDialog):
         self.items = QListWidget()
         self.items.setAccessibleName(title)
         layout.addWidget(self.items, 1)
+        self.items.setVisible(mode != "channel")
         if mode == "history":
             self.detail = QPlainTextEdit()
             self.detail.setReadOnly(True)
@@ -108,7 +126,7 @@ class SlackHistoryDialog(AppDialog):
             "Import history" if mode == "import" else "Remove import", role="primary"
         )
         self.primary.setEnabled(False)
-        if mode != "history":
+        if mode not in ("history", "channel"):
             if mode == "import":
                 self.primary.clicked.connect(self.start_import)
             else:
@@ -119,7 +137,9 @@ class SlackHistoryDialog(AppDialog):
         close.clicked.connect(self.accept)
         actions.addWidget(close)
         layout.addLayout(actions)
-        if mode == "history":
+        if mode == "channel":
+            QTimer.singleShot(0, self, self.load_channel)
+        elif mode == "history":
             QTimer.singleShot(0, self, lambda: self.load_history(query))
         elif mode == "manage":
             QTimer.singleShot(0, self, self.load_imports)
@@ -130,6 +150,9 @@ class SlackHistoryDialog(AppDialog):
         self.items.clear()
         if self.mode == "history":
             self.detail.clear()
+        elif self.mode == "channel":
+            self.log.clear()
+            self.loaded.clear()
         super().done(result)
 
     def scoped(self):
@@ -240,6 +263,7 @@ class SlackHistoryDialog(AppDialog):
         self.status.setText(
             f"{count:,} archived messages in this import. Previously imported messages are skipped."
         )
+        refresh_archive(self.parentWidget())
         self.primary.setText("View imported history")
         self.primary.clicked.disconnect(self.start_import)
         self.primary.clicked.connect(self.view_imported)
@@ -252,6 +276,25 @@ class SlackHistoryDialog(AppDialog):
         service, workspace = self.service, self.workspace
         self.accept()
         open_slack_history(parent, service, workspace, mode="history")
+
+    def load_channel(self, before=None):
+        self.run(
+            lambda: self.service.slack_channel_messages(
+                self.workspace, self.channel["channel_id"], before, 100
+            ),
+            lambda rows: self.channel_loaded(rows, before),
+            "Loading messages…",
+        )
+
+    def channel_loaded(self, rows, before):
+        self.loaded = [*rows, *self.loaded] if before else list(rows)
+        if rows:
+            self.oldest = rows[0]["source_ts"]
+        self.log.setPlainText(format_messages(self.loaded) or "No messages in this channel.")
+        bar = self.log.verticalScrollBar()
+        bar.setValue(bar.minimum() if before else bar.maximum())
+        self.earlier.setVisible(len(rows) >= 100)
+        self.status.setText(f"{len(self.loaded):,} messages shown. Read-only.")
 
     def load_history(self, query):
         self.run(
@@ -342,13 +385,40 @@ class SlackHistoryDialog(AppDialog):
                     "p_import": identifier,
                 },
             ),
-            lambda _: self.load_imports(),
+            lambda _: (refresh_archive(self.parentWidget()), self.load_imports()),
             "Removing Slack history…",
         )
 
 
 def date_label(value):
     return datetime.fromtimestamp(float(value), UTC).strftime("%b %d, %Y")
+
+
+def stamp_label(value):
+    return datetime.fromtimestamp(float(value), UTC).strftime("%b %d, %Y %H:%M UTC")
+
+
+def format_messages(rows):
+    """A channel as plain text: who, when, what. Imported text is shown, never interpreted."""
+    blocks = []
+    for row in rows:
+        reply = "Reply · " if row.get("thread_ts") else ""
+        lines = [f"{reply}{row['author']} · {stamp_label(row['source_ts'])}", row["body"]]
+        if row.get("reactions"):
+            lines.append(" · ".join(f":{key}: {count}" for key, count in row["reactions"].items()))
+        lines.extend(row.get("links") or [])
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks)
+
+
+def refresh_archive(widget, *, force=True):
+    """Ask the main window to reload its 'From Slack' channels, after an import or removal."""
+    while widget is not None:
+        archive = getattr(widget, "slack_archive", None)
+        if archive is not None:
+            archive.refresh(force=force)
+            return
+        widget = widget.parentWidget()
 
 
 class SlackImportPanel(QWidget):
@@ -383,9 +453,6 @@ class SlackImportPanel(QWidget):
         self.choose_button = button("Choose ZIP", role="outline")
         self.choose_button.clicked.connect(self.choose)
         row.addWidget(self.choose_button)
-        self.guide = button("How to export", role="outline")
-        self.guide.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(EXPORT_HELP)))
-        row.addWidget(self.guide)
         row.addStretch()
         zone.addLayout(row)
         column.addWidget(self.drop)
@@ -493,14 +560,15 @@ class SlackImportPanel(QWidget):
 
     def done_importing(self, count):
         self.finished = True
+        refresh_archive(self.parentWidget())
         self.rows = []
         self.items.hide()
         self.drop.hide()
         self.bar.hide()
         self.primary.hide()
         self.status.setText(
-            f"{count:,} messages are now searchable in this workspace. "
-            "Anything already imported was skipped."
+            f"Done. {count:,} messages imported. Look for your channels under From Slack in the "
+            "sidebar. Anything already imported was skipped."
         )
         self.imported.emit(int(count))
 

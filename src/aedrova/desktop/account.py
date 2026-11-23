@@ -423,7 +423,10 @@ class AccountDialog(AppDialog):
             "Bring your team’s Slack history into Aedrova.",
             "archive",
         )
+        from aedrova.desktop.slack_logo import slack_icon
+
         self.slack_import_button = button("Import from Slack", role="primary")
+        self.slack_import_button.setIcon(slack_icon(18))
         self.slack_manage_button = button("Manage Slack imports", role="outline")
         self.slack_history_button = button("View imported history", role="outline")
         for control, mode in ((self.slack_import_button, "import"),

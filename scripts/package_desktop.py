@@ -113,6 +113,7 @@ for asset in (
     "aedrova.icns",
     "google-g.png",
     "google-play.svg",
+    "slack-logo.svg",
     "apple.svg",
     "checkbox-checked.svg",
     "emoji.json",
