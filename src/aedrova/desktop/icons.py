@@ -172,6 +172,10 @@ def icon(name, color):
         p.drawArc(QRectF(4, 4, 12, 12), 35 * 16, 300 * 16)
         p.drawLine(16, 3, 16, 8)
         p.drawLine(12, 8, 16, 8)
+    elif name == "globe":
+        p.drawEllipse(QRectF(3.5, 3.5, 13, 13))
+        p.drawEllipse(QRectF(7.5, 3.5, 5, 13))
+        p.drawLine(3.5, 10, 16.5, 10)
     elif name == "back":
         p.drawLine(16, 10, 4, 10)
         p.drawLine(9, 5, 4, 10)

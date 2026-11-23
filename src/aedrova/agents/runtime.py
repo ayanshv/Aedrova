@@ -117,6 +117,24 @@ PRIVATE_FILE_PATTERNS = (
 )
 
 
+def codex_browser(config):
+    """Codex settings that start the browser tool server. Its safety rules live in the app."""
+    prefix = "mcp_servers.aedrova_browser."
+    environment = ",".join(f"{key}={json.dumps(value)}" for key, value in config["env"].items())
+    return [
+        "-c",
+        prefix + "command=" + json.dumps(config["command"]),
+        "-c",
+        prefix + "args=" + json.dumps(config["args"]),
+        "-c",
+        prefix + "env={" + environment + "}",
+        "-c",
+        prefix + 'default_tools_approval_mode="approve"',
+        "-c",
+        prefix + "startup_timeout_sec=30",
+    ]
+
+
 def codex_permissions(project, *, plan):
     root = Path(project).resolve()
     paths = {
@@ -457,6 +475,7 @@ class LocalRunner:
         self.lease_fd = None
         self.managed = None
         self.permission_mode = None
+        self.browser = None  # how to reach the in-app browser's tool server, when it is on
 
     def cancel(self):
         self.cancelled.set()
@@ -563,6 +582,8 @@ class LocalRunner:
         for feature in ("hooks", "plugins", "multi_agent", "multi_agent_v2", "apps", "browser_use"):
             command[2:2] = ["-c", "features." + feature + "=false"]
         command[2:2] = ["-c", 'web_search="live"']
+        if self.browser:
+            command[2:2] = codex_browser(self.browser)
         provider_env = environment()
         if self.managed:
             access = self.managed

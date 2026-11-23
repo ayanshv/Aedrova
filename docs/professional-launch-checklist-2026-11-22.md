@@ -54,7 +54,7 @@ Written November 22, 2026 from the repository, the live site, Render, and the ga
 | Claude provider and model routing | Deferred | Post-launch by your decision. |
 | Agent-to-Bud collaboration | Deferred | Post-launch; see `post-launch-plans.md`. |
 
-## 5. Native browser panel for Buds and the agent (new feature)
+## 5. Native browser panel for Buds and the agent (built in source; see `browser-panel-2026-11-22.md`)
 
 A panel inside Aedrova where the agent or a Bud can open a page, read it, click and fill
 non-sensitive fields, and show the user what it is doing, with the user able to take over.

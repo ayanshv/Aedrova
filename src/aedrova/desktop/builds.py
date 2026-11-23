@@ -1013,6 +1013,9 @@ class BuildDialog(AppDialog):
 
             self.job.runner.permission_mode = mode(self.window, self.workspace)
             self.job.permission_mode = self.job.runner.permission_mode
+            from aedrova.desktop.window_browser import browser_launch_config
+
+            self.job.runner.browser = browser_launch_config(self.window)
             self.job.teammate = getattr(self, "teammate", None)
             self.job.bud = getattr(self, "bud", None)
             self.job.managed_client = result.get("managed")

@@ -6,7 +6,7 @@ import os
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QObject, QSettings, QTimer
+from PySide6.QtCore import QCoreApplication, QEvent, QObject, QSettings, Qt, QTimer
 from PySide6.QtWidgets import QApplication
 
 from aedrova.desktop.brand import app_icon
@@ -25,9 +25,19 @@ def main():
     parser.add_argument("--account", action="store_true", help="Open account and workspace setup")
     parser.add_argument("--width", type=int, default=1440)
     parser.add_argument("--height", type=int, default=940)
+    parser.add_argument("--browser-mcp", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if args.browser_mcp:  # the agent's browser tool server: no window, just the tools
+        from aedrova.browser.mcp_server import main as serve_browser_tools
+
+        serve_browser_tools()
+        return
 
     os.environ["QT_MEDIA_BACKEND"] = "ffmpeg"
+    # The built-in browser needs these two things before the application object exists.
+    QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
+    import PySide6.QtWebEngineWidgets  # noqa: F401
+
     app = QApplication.instance() or QApplication(sys.argv[:1])
     app.setApplicationName("Aedrova")
     app.setOrganizationName("Aedrova")

@@ -11,7 +11,16 @@ from aedrova.desktop.account import AccountDialog
 from aedrova.desktop.onboarding import SetupDialog, account_key
 from aedrova.desktop.projects import binding
 from aedrova.desktop.window import AedrovaWindow
-from aedrova.desktop.zen_setup import ACCOUNT, GOAL, IMPORT, OPENING, PRIVACY, PROJECT, THEME, WELCOME
+from aedrova.desktop.zen_setup import (
+    ACCOUNT,
+    GOAL,
+    IMPORT,
+    OPENING,
+    PRIVACY,
+    PROJECT,
+    THEME,
+    WELCOME,
+)
 
 
 @pytest.fixture(autouse=True)

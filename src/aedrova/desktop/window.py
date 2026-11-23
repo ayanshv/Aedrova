@@ -361,6 +361,13 @@ class AedrovaWindow(QMainWindow):
             self.tab_buttons.append(tab)
             tabs_layout.addWidget(tab)
         tab_area_layout.addStretch()
+        self.browser_button = button("Browser", "Open the browser panel", "outline")
+        self.browser_button.setCheckable(True)
+        from aedrova.desktop.icons import assign as assign_icon
+
+        assign_icon(self.browser_button, "globe")
+        self.browser_button.clicked.connect(self.toggle_browser)
+        tab_area_layout.addWidget(self.browser_button)
         self.memory_button = button("Team context", "Open product memory", "outline")
         self.memory_button.clicked.connect(self.open_product_memory)
         self.workspace_tools_layout.addWidget(self.memory_button)
@@ -496,6 +503,7 @@ class AedrovaWindow(QMainWindow):
         composition.addWidget(footer)
         chat.addWidget(compose_area)
         row.addWidget(self.chat_column, 1)
+        self.chat_row = row
         self.thread_panel = GlassFrame(layer="thread", radius=0)
         self.thread_panel.setObjectName("ThreadPanel")
         thread = QVBoxLayout(self.thread_panel)
@@ -546,6 +554,8 @@ class AedrovaWindow(QMainWindow):
         jump = view.addAction("Jump to conversation…", self.open_switcher)
         jump.setShortcut(QKeySequence("Ctrl+K"))
         view.addAction("Toggle sidebar", self.toggle_sidebar)
+        browser_action = view.addAction("Browser", self.toggle_browser)
+        browser_action.setShortcut(QKeySequence("Ctrl+Shift+B"))
         from aedrova.desktop.localization import show_language_settings
 
         view.addAction("Language & translation…", lambda: show_language_settings(self))
@@ -2041,6 +2051,11 @@ class AedrovaWindow(QMainWindow):
             self.setup_dialog.close()
         account.sign_out()
         self.update_profile_button()
+
+    def toggle_browser(self, *_):
+        from aedrova.desktop.window_browser import toggle_browser
+
+        toggle_browser(self)
 
     def ensure_account_dialog(self):
         """The account machinery, created but not shown, for flows that draw their own screens."""
