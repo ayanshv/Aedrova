@@ -2143,6 +2143,8 @@ class AedrovaWindow(QMainWindow):
                 existing.activateWindow()
             return
         self.setup_dialog = SetupDialog(self)
+        if not (self.connected and self.connected.active):
+            self.hide()  # no sample workspace behind setup; it appears when setup is done
         if stage is not None:
             self.setup_dialog.show_stage(stage)
         self.setup_dialog.cover_screen()

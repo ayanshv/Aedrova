@@ -69,8 +69,8 @@ def main():
     account_first = args.account or (
         not args.demo and not args.smoke_report and not args.onboarding
     )
-    if not account_first:
-        window.show()
+    if not account_first and not args.onboarding:
+        window.show()  # setup shows the workspace itself when it is done
     if args.onboarding:
         QTimer.singleShot(0, window.show_setup)
     if args.thread:

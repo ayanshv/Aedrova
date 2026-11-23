@@ -621,3 +621,14 @@ def test_escape_leaves_the_full_screen_cover_but_never_cancels_setup(fresh_windo
     assert not flow.closed and flow.isVisible() and flow.result() == 0
     qtbot.keyClick(flow.primary, Qt.Key.Key_Escape)  # from a focused button too
     assert not flow.closed and flow.isVisible()
+
+
+def test_no_sample_workspace_shows_behind_setup(fresh_window, qtbot):
+    window = fresh_window
+    assert window.isVisible()
+    window.show_setup()
+    assert not window.isVisible()  # nothing behind setup, in cover or windowed form
+    window.setup_dialog.leave_cover()
+    assert not window.isVisible()
+    window.setup_dialog.reject()  # cancelled: the app must not be left with no window
+    assert window.isVisible()

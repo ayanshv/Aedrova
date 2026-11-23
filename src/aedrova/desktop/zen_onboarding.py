@@ -661,6 +661,8 @@ class ZenOnboarding(AppDialog):
             account.open_dashboard(require_profile=False)
         if first_run:
             self.window.showFullScreen()  # setup ends with the workspace filling the screen
+        else:
+            self.window.show()
         self.window.raise_()
         self.window.activateWindow()
         self.window.select_tab(0)
@@ -679,6 +681,8 @@ class ZenOnboarding(AppDialog):
     def done(self, result):
         if not self.closed:
             self.closed = True
+            if result == 0 and not self.window.isVisible():
+                self.window.show()  # setup was cancelled: do not leave the app with no window
             self.style_hints.colorSchemeChanged.disconnect(self.system_appearance_changed)
             self.setup.stop_workspace_wait()
             self.setup.disconnect_login()
