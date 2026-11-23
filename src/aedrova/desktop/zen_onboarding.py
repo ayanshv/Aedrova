@@ -319,6 +319,30 @@ class ZenOnboarding(AppDialog):
         screen = self.window.screen() or QApplication.primaryScreen()
         self.setGeometry(screen.geometry())
         self.appear_rise = 0
+        self.covering = True
+
+    def leave_cover(self):
+        """Escape steps out of the full-screen cover into an ordinary window. It never cancels."""
+        if not getattr(self, "covering", False):
+            return
+        self.covering = False
+        self.setWindowFlag(Qt.WindowType.FramelessWindowHint, False)
+        screen = (self.window.screen() or QApplication.primaryScreen()).availableGeometry()
+        width, height = min(980, screen.width() - 120), min(680, screen.height() - 120)
+        self.setGeometry(
+            screen.x() + (screen.width() - width) // 2,
+            screen.y() + (screen.height() - height) // 2,
+            width,
+            height,
+        )
+        self.show()
+
+    def keyPressEvent(self, event):  # noqa: N802
+        if event.key() == Qt.Key.Key_Escape:
+            event.accept()  # setup is never abandoned by a stray Escape
+            self.leave_cover()
+            return
+        super().keyPressEvent(event)
 
     def regain_focus(self):
         self.raise_()

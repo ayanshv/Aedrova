@@ -606,3 +606,18 @@ def test_only_an_owner_or_admin_is_offered_the_slack_step(qtbot, tmp_path):
     flow.setup.workspace = flow.created_workspace = "w"
     assert not flow.setup.can_import_history()
     assert flow.after_project() == GOAL
+
+
+def test_escape_leaves_the_full_screen_cover_but_never_cancels_setup(fresh_window, qtbot):
+    flow = show_setup(fresh_window, qtbot)
+    flow.cover_screen()
+    flow.show()
+    assert flow.covering and flow.windowFlags() & Qt.WindowType.FramelessWindowHint
+    qtbot.keyClick(flow, Qt.Key.Key_Escape)
+    assert not flow.covering and not flow.closed and flow.isVisible()
+    assert not flow.windowFlags() & Qt.WindowType.FramelessWindowHint
+    assert flow.width() <= 980
+    qtbot.keyClick(flow, Qt.Key.Key_Escape)  # again: still nothing is cancelled
+    assert not flow.closed and flow.isVisible() and flow.result() == 0
+    qtbot.keyClick(flow.primary, Qt.Key.Key_Escape)  # from a focused button too
+    assert not flow.closed and flow.isVisible()
