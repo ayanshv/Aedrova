@@ -298,9 +298,13 @@ class StepChecklist(QWidget):
             # The status line above already says "Writing a response", so this row says what
             # the reply is built from instead of repeating it.
             respond = self.find("respond")
-            if respond is not None and self.read_count:
+            on_web = " web" in lowered
+            if respond is not None and (self.read_count or on_web):
                 noun = "message" if self.read_count == 1 else "messages"
-                respond["label"] = f"Replying from {self.read_count:,} {noun} of context"
+                parts = [f"{self.read_count:,} {noun} of context"] if self.read_count else []
+                if on_web:
+                    parts.append("the live web")
+                respond["label"] = "Replying from " + " and ".join(parts)
             self.start("respond")
         elif lowered.startswith("checking reply sources"):
             self.start("sources", "Checking sources")

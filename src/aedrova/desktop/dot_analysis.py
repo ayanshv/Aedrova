@@ -66,11 +66,15 @@ class QueryJob(QRunnable):
             and re.search(r"\b(project|codebase|repository|repo|folder|source code)\b", task, re.I)
             else ""
         )
-        self.local_only = bool(self.project_folder) and not self.recap and not re.search(
-            r"\b(workspace|team|chat|messages?|meetings?|github|notion|figma|stripe|"
-            r"instagram|tiktok|vercel|supabase|slack|archive)\b",
-            task,
-            re.I,
+        self.local_only = (
+            bool(self.project_folder)
+            and not self.recap
+            and not re.search(
+                r"\b(workspace|team|chat|messages?|meetings?|github|notion|figma|stripe|"
+                r"instagram|tiktok|vercel|supabase|slack|archive)\b",
+                task,
+                re.I,
+            )
         )
         self.signals = Signals()
         from aedrova.dots.personality import progress_emitter
@@ -105,7 +109,6 @@ class QueryJob(QRunnable):
             )
             encoded, retrieval_task = "", self.task
             if private:
-
                 history = [
                     {"role": row["role"], "body": row["body"]} for row in self.private_history[-40:]
                 ]
@@ -145,7 +148,6 @@ class QueryJob(QRunnable):
                         preferred_channel=self.channel,
                         include_slack=True,
                     )
-
 
             from aedrova.agents.replies import greeting_reply
 
@@ -191,7 +193,6 @@ class QueryJob(QRunnable):
                         ),
                     )
                 if private:
-
                     context = replace(context, text=context.text + "\n" + encoded)
                 evidence = project / "context.jsonl"
                 evidence.touch(mode=0o600)
@@ -300,14 +301,18 @@ class QueryJob(QRunnable):
                         "executable builds use the existing Build studio with its approvals."
                     )
                 prompt += "\nQuestion: " + json.dumps(self.task)
-                self.signals.progress.emit("Writing a response…")
+                from aedrova.agents.replies import wants_web
+
+                web = wants_web(self.task)
+                self.signals.progress.emit(
+                    "Writing a response using the web…" if web else "Writing a response…"
+                )
                 result = self.runner.answer(
                     self.provider,
                     project,
                     prompt,
                     context=context.text,
-
-
+                    web=web,
                     emit=self.signals.reply.emit if not self.sources else None,
                 )
                 if private and (not result.strip() or len(result) > 20000):
@@ -336,8 +341,12 @@ class QueryJob(QRunnable):
             outcome = {"text": result}
             if not private:
                 outcome["source_channels"] = sorted(context.channel_ids or {self.channel})
-                outcome["shareable"] = not uses_slack and not self.project_folder and not any(
-                    line.startswith('{"dot_evidence":') for line in context.text.splitlines()
+                outcome["shareable"] = (
+                    not uses_slack
+                    and not self.project_folder
+                    and not any(
+                        line.startswith('{"dot_evidence":') for line in context.text.splitlines()
+                    )
                 )
         except Exception as error:
             from aedrova.agents.runtime import BuildCancelled
@@ -447,7 +456,6 @@ def start_analysis(window, task, *, bud=None):
         )
         window.archive_finished_agent()
 
-
         window.agent_feed.character_config = bud_avatar
         window.dot_query = job
         job.runner.cancelled = cancelled
@@ -469,8 +477,12 @@ def start_analysis(window, task, *, bud=None):
 
         def reply_received(text):
             nonlocal phase, streamed
-            if (not window.current_user() or str(window.current_user().id) != user
-                or window.dot_query is not job or job.runner.cancelled.is_set()):
+            if (
+                not window.current_user()
+                or str(window.current_user().id) != user
+                or window.dot_query is not job
+                or job.runner.cancelled.is_set()
+            ):
                 return
             if not streamed:
                 streamed = True

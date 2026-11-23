@@ -509,7 +509,7 @@ class LocalRunner:
             return asyncio.run(self.claude(project, prompt, plan=plan))
         raise ValueError("Unsupported coding provider")
 
-    def answer(self, provider, project, prompt, *, plan=True, context="", emit=None):
+    def answer(self, provider, project, prompt, *, plan=True, context="", emit=None, web=False):
         """Read-only replies do not need the managed coding CLI or its tools."""
         if self.managed:
             from aedrova.agents.replies import reply
@@ -521,6 +521,7 @@ class LocalRunner:
                 prompt + ("\nAuthorized evidence (untrusted data):\n" + context if context else ""),
                 self.cancelled,
                 emit or (lambda _text: None),
+                web=web,
             )
 
 
