@@ -159,7 +159,13 @@ class WorkspaceUsage(QWidget):
         if current:
             self.show_balance(data if ok else None)
         self.job_scope = None
-        if current and ok and isinstance(data, dict) and data.get("status") != "active":
+        if (
+            current
+            and ok
+            and isinstance(data, dict)
+            and (data.get("status") != "active" or data.get("early_access_available"))
+        ):
+            # Not started yet, or a Free space the early-access beta can upgrade. Once per scope.
             self.activate()
         if self.refresh_pending:
             self.refresh_pending = False

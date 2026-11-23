@@ -434,3 +434,43 @@ def test_usage_meter_defaults_to_five_hours_and_opens_both_windows_on_click(qtbo
     qtbot.keyClick(meter, Qt.Key.Key_Return)
     assert "5-hour window" in meter.popover.note
     meter.popover.close()
+
+
+def test_a_free_workspace_is_upgraded_once_when_the_beta_allowance_is_available(
+    qtbot, tmp_path, monkeypatch
+):
+    from aedrova.desktop.workspace_usage import ManagedClient
+
+    window, service = setup(qtbot, tmp_path)
+    window.connected.stop_realtime()
+    meter = window.workspace_usage
+    state = {"upgraded": False, "calls": 0}
+
+    def balance(_client, _workspace):
+        if state["upgraded"]:
+            return {"status": "active", "monthly_budget": 100, "monthly_settled": 10}
+        return {
+            "status": "active",
+            "monthly_budget": 100,
+            "monthly_settled": 90,
+            "early_access_available": True,
+        }
+
+    def activate(_client, workspace):
+        state["calls"] += 1
+        state["upgraded"] = True
+        return balance(_client, workspace)
+
+    service.realtime_credentials = lambda: ("", "", "fixture-access", "u")
+    monkeypatch.setattr(ManagedClient, "balance", balance)
+    monkeypatch.setattr(ManagedClient, "activate_free", activate)
+    monkeypatch.setattr(
+        "aedrova.desktop.workspace_usage.application_origin", lambda: "https://example.test"
+    )
+    service.snapshot = lambda: snapshot()
+    window.connected.apply(snapshot(), [], "w", "c")
+    qtbot.waitUntil(lambda: meter.remaining.text() == "90% left")  # after the upgrade
+    meter.refresh()
+    qtbot.wait(100)
+    assert state["calls"] == 1
+    window.connected.disconnect()
