@@ -39,8 +39,8 @@ STEPS = (
         side="right",
     ),
     Step(
-        "Invite your team",
-        "Add people by email or link.",
+        "Share your join code",
+        "Give teammates a code to join.",
         "invite_teammates_button",
         side="right",
     ),

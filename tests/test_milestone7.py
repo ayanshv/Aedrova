@@ -27,8 +27,11 @@ def test_account_menu_routes_real_actions(qtbot, tmp_path):
     assert "Invite teammates…" not in actions
     window.profile_menu.close()
     window.workspace_settings_button.click()
+    assert window.invite_teammates_button.text().strip() == "Share join code"
     window.invite_teammates_button.click()
-    assert calls == ["manage", "invite"]
+    assert calls == ["manage"]
+    assert window.onboarding_team_invite.isVisible()
+    window.onboarding_team_invite.close()
     assert "Log out" in actions
     window.profile_menu.close()
 

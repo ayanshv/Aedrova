@@ -208,8 +208,8 @@ class AedrovaWindow(QMainWindow):
         quick_actions = QVBoxLayout(self.workspace_quick_actions)
         quick_actions.setContentsMargins(0, 0, 0, 0)
         quick_actions.setSpacing(1)
-        self.invite_teammates_button = row_button("invite", "Invite teammates")
-        self.invite_teammates_button.clicked.connect(lambda: self.show_account("invite"))
+        self.invite_teammates_button = row_button("invite", "Share join code")
+        self.invite_teammates_button.clicked.connect(self.show_join_code)
         self.workspace_settings_button = row_button("settings", "Workspace settings")
         self.workspace_settings_button.clicked.connect(lambda: self.show_account("manage"))
         self.workspace_connectors_button = row_button("link", "Connectors")
@@ -549,7 +549,7 @@ class AedrovaWindow(QMainWindow):
         workspace_menu = self.menuBar().addMenu("Workspace")
         workspace_menu.addAction("New workspace…", self.create_workspace)
         workspace_menu.addAction("New channel…", self.create_channel)
-        workspace_menu.addAction("Invite teammates…", lambda: self.show_account("invite"))
+        workspace_menu.addAction("Share join code…", self.show_join_code)
         view = self.menuBar().addMenu("View")
         jump = view.addAction("Jump to conversation…", self.open_switcher)
         jump.setShortcut(QKeySequence("Ctrl+K"))
@@ -2067,6 +2067,13 @@ class AedrovaWindow(QMainWindow):
                 self.localizer.bind(self.account_dialog)
             self.account_dialog.dashboard_requested.connect(self.open_dashboard)
         return self.account_dialog
+
+    def show_join_code(self):
+        """Open the workspace join code; the email form stays the fallback for non-admins."""
+        from aedrova.desktop.team_invite import open_workspace_join_code
+
+        if not open_workspace_join_code(self, self.workspace_id):
+            self.show_account("invite")
 
     def show_account(self, intent=None):
         self.ensure_account_dialog()
