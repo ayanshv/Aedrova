@@ -632,3 +632,31 @@ def test_no_sample_workspace_shows_behind_setup(fresh_window, qtbot):
     assert not window.isVisible()
     window.setup_dialog.reject()  # cancelled: the app must not be left with no window
     assert window.isVisible()
+
+
+def test_the_background_chip_spinner_turns_smoothly_on_its_own_clock(fresh_window, qtbot):
+    fresh_window.set_reduced_motion(False)
+    flow = show_setup(fresh_window, qtbot)
+    chip = flow.readiness
+    chip.icon.state = "running"
+    chip.turn.start()
+    before = chip.icon.angle
+    qtbot.wait(150)
+    steps = (chip.icon.angle - before) % 360
+    assert steps >= 36  # several small turns, not one jump per refresh
+    assert chip.turn.interval() <= 40 and chip.timer.interval() >= 1000
+    chip.turn.stop()
+
+
+def test_the_colour_wash_is_drawn_small_and_cached(fresh_window, qtbot):
+    flow = show_setup(fresh_window, qtbot)
+    surface = flow.surface
+    surface.resize(1200, 800)
+    surface.grab()
+    first = surface.cache
+    assert first is not None and first.width() <= 200 and first.height() <= 140
+    surface.grab()
+    assert surface.cache is first  # nothing to redraw until it drifts
+    surface.advance()
+    surface.grab()
+    assert surface.cache is not first

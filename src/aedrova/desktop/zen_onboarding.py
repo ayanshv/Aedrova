@@ -56,9 +56,16 @@ class ReadinessChip(QFrame):
         self.text = label("", "muted")
         row.addWidget(self.text)
         self.timer = QTimer(self)
-        self.timer.setInterval(700)
+        self.timer.setInterval(1000)  # what is finished changes slowly; check slowly
         self.timer.timeout.connect(self.refresh)
+        self.turn = QTimer(self)  # the spinner turns on its own clock so it never stutters
+        self.turn.setInterval(30)
+        self.turn.timeout.connect(self.spin)
         self.hide()
+
+    def spin(self):
+        self.icon.angle = (self.icon.angle + 12) % 360
+        self.icon.update()
 
     def tasks(self):
         tasks = [("Setting up your workspace", self.setup.has_workspace())]
@@ -78,17 +85,23 @@ class ReadinessChip(QFrame):
             self.icon.state = "running"
             self.text.setText(waiting[0] + "…  You can keep going.")
             self.timer.start()
+            if not motion.reduced() and not self.turn.isActive():
+                self.turn.start()
         else:
             self.icon.state = "done"
             self.text.setText("You’re all set.")
             self.timer.stop()
+            self.turn.stop()
             QTimer.singleShot(1600, self, self.hide)
-        self.icon.angle = (self.icon.angle + 40) % 360
         self.icon.update()
 
     def watch(self):
         self.refresh()
         self.timer.start()
+
+    def hideEvent(self, event):  # noqa: N802
+        self.turn.stop()
+        super().hideEvent(event)
 
 
 class StepDots(QWidget):

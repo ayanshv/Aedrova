@@ -7,9 +7,10 @@ display, and goes still when Reduce Motion is on.
 import math
 import random
 
-from PySide6.QtCore import QPointF, QRectF, Qt, QTimer, QVariantAnimation
+from PySide6.QtCore import QPointF, QRectF, QSize, Qt, QTimer, QVariantAnimation
 from PySide6.QtGui import (
     QColor,
+    QImage,
     QLinearGradient,
     QPainter,
     QPainterPath,
@@ -34,9 +35,10 @@ class AuroraSurface(QWidget):
     def __init__(self):
         super().__init__()
         self.phase, self.bias, self.level = 0.0, 0.0, 1.0
+        self.cache, self.cache_key = None, None
         self.opening = False  # the first screen: a fuller wash, centred, nothing above it
         self.timer = QTimer(self)
-        self.timer.setInterval(33)
+        self.timer.setInterval(40)
         self.timer.timeout.connect(self.advance)
         self.lean = QVariantAnimation(self)
         self.lean.setDuration(1100)
@@ -67,7 +69,7 @@ class AuroraSurface(QWidget):
         self.update()
 
     def advance(self):
-        self.phase += 0.010
+        self.phase += 0.012
         self.update()
 
     def showEvent(self, event):  # noqa: N802
@@ -80,13 +82,34 @@ class AuroraSurface(QWidget):
         super().hideEvent(event)
 
     def paintEvent(self, event):  # noqa: N802
-        painter = QPainter(self)
         base = self.palette().color(QPalette.ColorRole.Window)
-        painter.fillRect(self.rect(), base)
+        painter = QPainter(self)
         if self.level <= 0.01:
+            painter.fillRect(self.rect(), base)
             return
+        # The wash is soft, so it is drawn small and stretched: about a thirtieth of the
+        # pixels, which keeps every other animation on screen smooth.
+        scale = 6
+        size = QSize(max(8, self.width() // scale), max(8, self.height() // scale))
+        key = (
+            size.width(),
+            size.height(),
+            round(self.phase, 3),
+            round(self.bias, 3),
+            base.rgb(),
+            self.opening,
+        )
+        if key != self.cache_key:
+            self.cache_key, self.cache = key, self.render_wash(size, base)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        painter.drawImage(self.rect(), self.cache)
+
+    def render_wash(self, size, base):
+        image = QImage(size, QImage.Format.Format_ARGB32_Premultiplied)
+        image.fill(base)
+        painter = QPainter(image)
         dark = base.lightness() < 128
-        width, height = self.width(), self.height()
+        width, height = size.width(), size.height()
         radius = max(width, height) * 0.62
         for index, hex_color in enumerate(WASH_DARK if dark else WASH_LIGHT):
             angle = self.phase * (0.8 + index * 0.25) + index * 1.7 + self.bias
@@ -100,13 +123,14 @@ class AuroraSurface(QWidget):
             gradient.setColorAt(0.0, color)
             color.setAlpha(0)
             gradient.setColorAt(1.0, color)
-            painter.fillRect(self.rect(), gradient)
+            painter.fillRect(image.rect(), gradient)
         if not dark and not self.opening:
-            # Keep the top clean for the title; the colour gathers toward the bottom.
             fade = QLinearGradient(0, 0, 0, height * 0.55)
             fade.setColorAt(0.0, QColor(255, 255, 255, 235))
             fade.setColorAt(1.0, QColor(255, 255, 255, 0))
-            painter.fillRect(self.rect(), fade)
+            painter.fillRect(image.rect(), fade)
+        painter.end()
+        return image
 
 
 class StageArt(QWidget):
@@ -140,7 +164,7 @@ class StageArt(QWidget):
         self.arrival.valueChanged.connect(self.set_enter)
         self.arrival.finished.connect(self.settled)
         self.timer = QTimer(self)
-        self.timer.setInterval(33)
+        self.timer.setInterval(40)
         self.timer.timeout.connect(self.advance)
         self.setAccessibleName("Setup illustration")
 
@@ -173,7 +197,7 @@ class StageArt(QWidget):
         self.enter = float(value)
         effect = self.graphicsEffect()
         if isinstance(effect, QGraphicsBlurEffect):
-            effect.setBlurRadius(16 * math.sin(math.pi * self.enter))
+            effect.setBlurRadius(9 * math.sin(math.pi * self.enter))
         self.update()
 
     def settled(self):
@@ -192,7 +216,7 @@ class StageArt(QWidget):
         self.update()
 
     def advance(self):
-        self.tick += 0.033
+        self.tick += 0.04
         for kind, level in self.levels.items():
             goal = 1.0 if kind in self.granted else 0.0
             self.levels[kind] = level + max(-0.12, min(0.12, goal - level))
@@ -218,8 +242,8 @@ class StageArt(QWidget):
 
     def card(self, p, rect, radius=16, fill=None):
         p.setPen(Qt.PenStyle.NoPen)
-        for spread in range(8, 0, -1):
-            shadow = QColor(0, 0, 0, 3 if self.dark() else 4)
+        for spread in range(8, 0, -2):
+            shadow = QColor(0, 0, 0, 6 if self.dark() else 8)
             p.setBrush(shadow)
             p.drawRoundedRect(
                 rect.adjusted(-spread, -spread + 5, spread, spread + 5),
