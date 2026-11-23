@@ -1,3 +1,11 @@
+## November 23 — free, private beta final gate
+
+Owner decision: [Before the free, private beta](free-private-beta-checklist-2026-11-22.md) is
+the final gate before launching the invited beta. Every item marked ★ must be Done before
+any tester is invited. Billing, tax, refunds and Stripe live mode stay out of scope. Do not
+call the beta ready while a ★ item is Open, Partial or Owner. Report its status at the end of
+each response until it is closed.
+
 ## November 22 — mention-to-build workflow, deeper context, quieter replies
 
 Owner vision recorded: discuss in chat, then mention `@Aedrova` and it builds, using the
