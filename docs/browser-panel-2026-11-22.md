@@ -50,3 +50,18 @@ Owner actions
 1. Have counsel review the drafted privacy and terms sections, then merge and deploy the site.
 2. Decide whether the browser is on for the first public launch (`browser/enabled` setting).
 3. Approve a packaging pass for the larger installer.
+
+## Update: the browser is its own process (November 22, 2026)
+
+Clicking the Browser button crashed the app. Qt WebEngine's internal objects and the app's
+application-wide Python event filters (tooltips, localization, search, links) cannot share one
+process: the first focus event on the page sent one of those objects through a filter and
+PySide recursed until it crashed. It reproduces with any such filter and a bare web view.
+
+The panel, its rules and the agent bridge therefore run in `aedrova/browser/host.py`, started
+on first use by `window_browser.py` and told over standard input to show, hide or change access
+mode. It appears as a companion window beside the main window rather than inside it.
+Packaged builds start it with `--browser-host`, like `--browser-mcp`.
+
+Follow-up if you want it inside the main window again: replace the application-wide filters with
+filters on specific windows, then the panel can be embedded without a second process.

@@ -221,25 +221,3 @@ def test_the_tool_server_lists_its_tools_over_stdio():
         "browser_screenshot",
     }
     assert "not available" in unavailable  # no app listening: a plain sentence, not a crash
-
-
-def test_the_window_docks_the_panel_and_hands_agents_a_launch_config(qtbot, tmp_path, request):
-    from PySide6.QtCore import QSettings
-
-    from aedrova.desktop.window import AedrovaWindow
-    from aedrova.desktop.window_browser import browser_launch_config
-
-    window = AedrovaWindow(settings=QSettings(str(tmp_path / "b.ini"), QSettings.Format.IniFormat))
-    qtbot.addWidget(window)
-    window.show()
-    assert getattr(window, "browser_panel", None) is None  # nothing is loaded until it is used
-    window.browser_button.click()
-    request.addfinalizer(window.browser_panel.shutdown)
-    assert window.browser_panel.isVisible() and window.browser_button.isChecked()
-    window.browser_panel.close_button.click()
-    assert not window.browser_panel.isVisible() and not window.browser_button.isChecked()
-    config = browser_launch_config(window)
-    assert config["env"]["AEDROVA_BROWSER_TOKEN"] and config["env"]["AEDROVA_BROWSER_PORT"]
-    window.settings.setValue("browser/enabled", False)
-    assert browser_launch_config(window) is None  # the owner can switch it off
-    window.browser_bridge.stop()
