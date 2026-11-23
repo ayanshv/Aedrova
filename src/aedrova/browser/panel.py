@@ -2,7 +2,16 @@
 
 from pathlib import Path
 
-from PySide6.QtCore import QPointF, QPropertyAnimation, QStandardPaths, Qt, QTimer, QUrl, Signal
+from PySide6.QtCore import (
+    QEvent,
+    QPointF,
+    QPropertyAnimation,
+    QStandardPaths,
+    Qt,
+    QTimer,
+    QUrl,
+    Signal,
+)
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWebEngineCore import (
     QWebEnginePage,
@@ -10,13 +19,21 @@ from PySide6.QtWebEngineCore import (
     QWebEngineSettings,
     QWebEngineUrlRequestInterceptor,
 )
-from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLineEdit, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QSizePolicy,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 from aedrova.browser.policy import Refusal, check_url, host_of
 from aedrova.desktop import motion
 from aedrova.desktop.dialogs import button, label
-from aedrova.desktop.icons import assign
+from aedrova.desktop.icons import assign, icon
 
 
 def storage_path():
@@ -141,12 +158,21 @@ class Bar(QFrame):
 class BrowserPanel(QWidget):
     closed = Signal()
     stop_requested = Signal()
+    view_changed = Signal(bool)
+
+    TITLE = "Browse with Aedrova"
+    TEXT = (
+        "Open any website here. Ask Aedrova to read it, research it or do the clicking for "
+        "you, and watch every step. You can take over or press Stop at any time."
+    )
 
     def __init__(self, parent=None, *, persistent=True):
         super().__init__(parent)
         self.setObjectName("BrowserPanel")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.approved = set()
         self.pending = None
+        self.page = self.view = self.cursor = None
         self.profile = (
             QWebEngineProfile("AedrovaBrowser", self) if persistent else QWebEngineProfile(self)
         )
@@ -159,8 +185,6 @@ class BrowserPanel(QWidget):
         self.profile.downloadRequested.connect(self.refuse_download)
         self.guard = Guard(self)
         self.profile.setUrlRequestInterceptor(self.guard)
-        self.page = BrowserPage(self.profile, self)
-        self.page.notice.connect(self.say)
 
         column = QVBoxLayout(self)
         column.setContentsMargins(0, 0, 0, 0)
@@ -210,15 +234,103 @@ class BrowserPanel(QWidget):
         self.notice = Bar("BrowserNotice")
         column.addWidget(self.notice)
 
+        self.stack = QStackedWidget()
+        self.stack.addWidget(self.build_welcome())
+        column.addWidget(self.stack, 1)
+        self.setMinimumWidth(380)
+        self.set_navigation(False)
+
+    # -- the empty state ------------------------------------------------------------
+    def build_welcome(self):
+        page = QWidget()
+        page.setObjectName("BrowserWelcome")
+        box = QVBoxLayout(page)
+        box.setContentsMargins(32, 0, 32, 0)
+        box.setSpacing(10)
+        box.addStretch(3)
+        self.welcome_icon = QLabel()
+        self.welcome_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        box.addWidget(self.welcome_icon)
+        box.addSpacing(8)
+        self.welcome_title = label(self.TITLE, "heading")
+        self.welcome_title.setObjectName("BrowserWelcomeTitle")
+        self.welcome_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        box.addWidget(self.welcome_title)
+        self.welcome_text = label(self.TEXT, "muted", wrap=True)
+        self.welcome_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.welcome_text.setFixedWidth(340)
+        self.welcome_text.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
+        box.addWidget(self.welcome_text, alignment=Qt.AlignmentFlag.AlignHCenter)
+        box.addStretch(4)
+        self.paint_welcome_icon()
+        return page
+
+    def paint_welcome_icon(self):
+        color = self.palette().color(self.palette().ColorRole.Text)
+        color.setAlpha(190)
+        self.welcome_icon.setPixmap(
+            icon("globe", color.name(color.NameFormat.HexArgb)).pixmap(56, 56)
+        )
+
+    def changeEvent(self, event):  # noqa: N802
+        if event.type() == QEvent.Type.PaletteChange and hasattr(self, "welcome_icon"):
+            self.paint_welcome_icon()
+        super().changeEvent(event)
+
+    # -- the page, made only when it is needed ---------------------------------------
+    def ensure_view(self):
+        """Create the web view on first use. Application-wide event filters are lifted while
+        it exists, because the engine's internal objects crash them."""
+        if self.view is not None:
+            return self.view
+        from PySide6.QtWebEngineWidgets import QWebEngineView
+
+        from aedrova.desktop.appfilters import registry
+
+        registry.hold("browser")
+        self.page = BrowserPage(self.profile, self)
+        self.page.notice.connect(self.say)
         self.view = QWebEngineView()
         self.view.setPage(self.page)
-        column.addWidget(self.view, 1)
+        self.stack.addWidget(self.view)
+        self.stack.setCurrentWidget(self.view)
         self.cursor = AgentCursor(self.view)
         self.back.clicked.connect(self.view.back)
         self.forward.clicked.connect(self.view.forward)
         self.reload.clicked.connect(self.view.reload)
-        self.view.urlChanged.connect(lambda url: self.address.setText(url.toString()))
-        self.setMinimumWidth(360)
+        self.view.urlChanged.connect(self.url_changed)
+        self.set_navigation(True)
+        self.view_changed.emit(True)
+        return self.view
+
+    def release_view(self):
+        """Close the page and give the application its event filters back."""
+        if self.view is None:
+            return
+        import shiboken6
+
+        from aedrova.desktop.appfilters import registry
+
+        view, page = self.view, self.page
+        self.view = self.page = self.cursor = None
+        self.stack.removeWidget(view)
+        self.stack.setCurrentIndex(0)
+        view.hide()
+        view.setParent(None)
+        view.deleteLater()
+        if page is not None and shiboken6.isValid(page):
+            page.deleteLater()
+        self.address.clear()
+        self.set_navigation(False)
+        registry.release("browser")
+        self.view_changed.emit(False)
+
+    def set_navigation(self, on):
+        for control in (self.back, self.forward, self.reload):
+            control.setEnabled(on)
+
+    def url_changed(self, url):
+        self.address.setText(url.toString())
 
     # -- people ---------------------------------------------------------------------
     def go(self, text):
@@ -230,7 +342,7 @@ class BrowserPanel(QWidget):
             text = "https://duckduckgo.com/?q=" + QUrl.toPercentEncoding(text).data().decode()
         elif "://" not in text:
             text = "https://" + text
-        self.view.load(QUrl(text))
+        self.ensure_view().load(QUrl(text))
 
     def refuse_download(self, download):
         download.cancel()
@@ -276,8 +388,7 @@ class BrowserPanel(QWidget):
 
     def clear_data(self):
         """Forget cookies and sign-ins for the panel's own profile."""
-        store = self.profile.cookieStore()
-        store.deleteAllCookies()
+        self.profile.cookieStore().deleteAllCookies()
         self.profile.clearHttpCache()
         self.approved.clear()
 
@@ -285,10 +396,15 @@ class BrowserPanel(QWidget):
         """Chromium wants its page gone before its profile; call this before quitting."""
         import shiboken6
 
-        page, self.page = self.page, None
-        if page is not None and shiboken6.isValid(page):
+        from aedrova.desktop.appfilters import registry
+
+        page = self.page
+        self.page = None
+        if self.view is not None:
             self.view.setPage(None)
+        if page is not None and shiboken6.isValid(page):
             shiboken6.delete(page)
+        registry.release("browser")
 
     def current_host(self):
-        return host_of(self.view.url().toString())
+        return host_of(self.view.url().toString()) if self.view is not None else ""

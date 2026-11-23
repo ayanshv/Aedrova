@@ -7,7 +7,6 @@ from PySide6.QtCore import QEvent, QObject, Qt, QThreadPool, QTimer, Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QAbstractButton,
-    QApplication,
     QCheckBox,
     QComboBox,
     QHBoxLayout,
@@ -128,9 +127,16 @@ class Localizer(QObject):
         self.scan_timer = QTimer(self)
         self.scan_timer.setSingleShot(True)
         self.scan_timer.timeout.connect(self.scan)
-        QApplication.instance().installEventFilter(self)
+        from aedrova.desktop.appfilters import install
+
+        install(self, self.rescan)
         self.changed.connect(self.repaint_messages)
         self.scan_timer.start(0)
+
+    def rescan(self):
+        """Stand-in for the Show and layout events, while application filters are paused."""
+        if not self.applying and not self.scan_timer.isActive():
+            self.scan_timer.start(100)
 
     def bind(self, account):
         account.snapshot_loaded.connect(self.restore_preference)

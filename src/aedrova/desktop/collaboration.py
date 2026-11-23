@@ -419,9 +419,21 @@ class Collaboration(QObject):
         self.timer.setInterval(2000)
         self.timer.timeout.connect(self.pulse)
         self.timer.start()
-        QApplication.instance().installEventFilter(self)
+        from aedrova.desktop.appfilters import install
+
+        install(self, self.read_pointer)
+        self.pointer = None
         self.last_input = time.monotonic()
         self.last_availability = "online"
+
+    def read_pointer(self):
+        """Stand-in for input events, while application filters are paused."""
+        from PySide6.QtGui import QCursor
+
+        position = QCursor.pos()
+        if position != self.pointer:
+            self.pointer = position
+            self.last_input = time.monotonic()
 
     def eventFilter(self, watched, event):
         if event.type() in (

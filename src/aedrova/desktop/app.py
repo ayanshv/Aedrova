@@ -26,13 +26,7 @@ def main():
     parser.add_argument("--width", type=int, default=1440)
     parser.add_argument("--height", type=int, default=940)
     parser.add_argument("--browser-mcp", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--browser-host", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
-    if args.browser_host:  # the browser panel's own process: it keeps Qt WebEngine apart
-        from aedrova.browser.host import main as run_browser_host
-
-        run_browser_host()
-        return
     if args.browser_mcp:  # the agent's browser tool server: no window, just the tools
         from aedrova.browser.mcp_server import main as serve_browser_tools
 
@@ -64,7 +58,9 @@ def main():
             return False
 
     links = Links(app)
-    app.installEventFilter(links)
+    from aedrova.desktop.appfilters import install
+
+    install(links)
     if args.theme:
         window.set_theme(args.theme, persist=False)
     window.resize(args.width, args.height)

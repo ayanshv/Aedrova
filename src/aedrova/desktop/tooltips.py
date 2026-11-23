@@ -41,7 +41,9 @@ class Tooltips(QObject):
         self.timer = QTimer(self)
         self.timer.setSingleShot(True)
         self.timer.timeout.connect(self.hide)
-        app.installEventFilter(self)
+        from aedrova.desktop.appfilters import install
+
+        install(self)  # the system's own tooltips take over while the browser is open
         app.aboutToQuit.connect(self.tip.close)
 
     def hide(self):

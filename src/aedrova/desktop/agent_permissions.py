@@ -103,10 +103,6 @@ def sync(window):
     build = getattr(window, "build_dialog", None)
     if build and hasattr(build, "sync_permissions"):
         build.sync_permissions()
-    if getattr(window, "browser_host", None) is not None:
-        from aedrova.desktop.window_browser import push_mode
-
-        push_mode(window)  # the browser follows the access mode the person just chose
 
 
 def change(window, value):

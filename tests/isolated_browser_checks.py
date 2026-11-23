@@ -28,6 +28,7 @@ def browser(qtbot, request):
     panel = BrowserPanel(persistent=False)
     qtbot.addWidget(panel)
     request.addfinalizer(panel.shutdown)
+    panel.ensure_view()
     panel.resize(700, 600)
     panel.show()
     modes = {"mode": "full"}
@@ -221,3 +222,52 @@ def test_the_tool_server_lists_its_tools_over_stdio():
         "browser_screenshot",
     }
     assert "not available" in unavailable  # no app listening: a plain sentence, not a crash
+
+
+def test_the_empty_panel_invites_you_to_browse_and_makes_no_page_yet(qtbot):
+    panel = BrowserPanel(persistent=False)
+    qtbot.addWidget(panel)
+    panel.show()
+    assert panel.view is None and panel.page is None  # nothing heavy until it is used
+    assert panel.welcome_title.text() == "Browse with Aedrova"
+    assert "Open any website" in panel.welcome_text.text()
+    assert panel.stack.currentIndex() == 0 and not panel.welcome_icon.pixmap().isNull()
+    assert not panel.back.isEnabled()
+    panel.ensure_view()
+    assert panel.stack.currentWidget() is panel.view and panel.back.isEnabled()
+    panel.release_view()
+    assert panel.view is None and panel.stack.currentIndex() == 0
+    panel.shutdown()
+
+
+def test_opening_the_panel_in_the_real_window_survives_focus_and_clicks(qtbot, tmp_path, request):
+    """The crash this guards against: application-wide filters met the page's focus event."""
+    from PySide6.QtCore import QSettings, Qt, QUrl
+    from PySide6.QtTest import QTest
+
+    from aedrova.desktop.appfilters import registry
+    from aedrova.desktop.window import AedrovaWindow
+
+    window = AedrovaWindow(settings=QSettings(str(tmp_path / "w.ini"), QSettings.Format.IniFormat))
+    qtbot.addWidget(window)
+    window.resize(1300, 800)
+    window.show()
+    qtbot.waitUntil(lambda: not registry.suspended, timeout=4000)  # earlier tests' pages are gone
+    assert registry.filters
+    window.browser_button.click()
+    panel = window.browser_panel
+    request.addfinalizer(panel.shutdown)
+    assert panel.isVisible() and window.browser_button.isChecked()
+    assert panel.width() > window.width() * 0.3  # a large side panel, not a sliver
+    panel.go("localhost")  # creates the page; filters are lifted while it exists
+    panel.page.allow_html = True
+    panel.page.setHtml("<h1>hi</h1><input id=a>", QUrl("https://example.com/"))
+    assert registry.suspended
+    qtbot.waitUntil(lambda: panel.page.title() != "" or True, timeout=3000)
+    QTest.mouseClick(panel.view, Qt.MouseButton.LeftButton, pos=panel.view.rect().center())
+    QTest.keyClicks(panel.view, "abc")
+    qtbot.wait(1200)
+    window.browser_button.click()  # close: the page goes and the filters return
+    assert not panel.isVisible() and panel.view is None
+    qtbot.waitUntil(lambda: not registry.suspended, timeout=4000)
+    assert not window.browser_button.isChecked()

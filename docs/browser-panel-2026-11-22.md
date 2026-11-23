@@ -51,17 +51,19 @@ Owner actions
 2. Decide whether the browser is on for the first public launch (`browser/enabled` setting).
 3. Approve a packaging pass for the larger installer.
 
-## Update: the browser is its own process (November 22, 2026)
+## Update: a large side panel inside the workspace (November 22, 2026)
 
-Clicking the Browser button crashed the app. Qt WebEngine's internal objects and the app's
-application-wide Python event filters (tooltips, localization, search, links) cannot share one
-process: the first focus event on the page sent one of those objects through a filter and
-PySide recursed until it crashed. It reproduces with any such filter and a bare web view.
+Opening the browser crashed the app. Qt WebEngine's internal objects and the app's
+application-wide Python event filters cannot both be alive: the first focus event on a page
+sends one of those objects through a filter and PySide recurses until it dies. A bare web view
+plus a do-nothing filter reproduces it.
 
-The panel, its rules and the agent bridge therefore run in `aedrova/browser/host.py`, started
-on first use by `window_browser.py` and told over standard input to show, hide or change access
-mode. It appears as a companion window beside the main window rather than inside it.
-Packaged builds start it with `--browser-host`, like `--browser-mcp`.
+The panel now docks inside the workspace, beside the conversation, and stays out of the way of
+that bug: `aedrova/desktop/appfilters.py` is the one place application-wide filters register.
+While a page exists they are lifted (tooltips use the system's, translation rescans on a timer,
+idle time is read from the pointer); closing the panel closes the page and puts them back. The
+web page is only created when someone opens an address or an agent acts, and the empty panel
+shows "Browse with Aedrova".
 
-Follow-up if you want it inside the main window again: replace the application-wide filters with
-filters on specific windows, then the panel can be embedded without a second process.
+Known limit: with the browser open, custom tooltips and instant translation of new widgets are
+replaced by simpler stand-ins until it is closed.

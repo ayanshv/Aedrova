@@ -330,6 +330,11 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QPushButton#TourNext {{ background: {t.accent}; color: {t.primary_text}; border: none;
         border-radius: 10px; padding: 8px 18px; font-weight: 600; }}
     QPushButton#TourNext:hover {{ background: {t.accent_text}; }}
+    QWidget#BrowserPanel {{ background: {t.bg}; border-left: 1px solid {t.border}; }}
+    QFrame#BrowserToolbar {{ background: transparent; border-bottom: 1px solid {t.border}; }}
+    QFrame#BrowserBanner, QFrame#BrowserApproval, QFrame#BrowserNotice {{
+        background: {t.accent_bg}; border-bottom: 1px solid {t.border}; }}
+    QWidget#BrowserWelcome {{ background: transparent; }}
     QFrame#UsagePopover {{ background: {overlay}; border: 1px solid {t.border};
         border-radius: 12px; }}
     QFrame#UsagePopover QLabel {{ background: transparent; }}

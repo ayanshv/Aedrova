@@ -62,6 +62,7 @@ class BrowserController(QObject):
         if self.busy or not self.queue:
             return
         self.busy = True
+        self.panel.ensure_view()
         self.panel.set_agent_active(True)
         action, args, future = self.queue.popleft()
         try:
@@ -100,6 +101,7 @@ class BrowserController(QObject):
 
     # -- helpers --------------------------------------------------------------------
     def page(self):
+        self.panel.ensure_view()
         return self.panel.page
 
     def run_script(self, source, then):

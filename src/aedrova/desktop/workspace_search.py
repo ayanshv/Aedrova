@@ -3,7 +3,6 @@
 from PySide6.QtCore import QEvent, QPoint, Qt, QTimer
 from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import (
-    QApplication,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -58,7 +57,9 @@ class WorkspaceSearch(QLineEdit):
         self.timer.setInterval(250)
         self.timer.timeout.connect(self.remote)
         self.textChanged.connect(self.refresh)
-        QApplication.instance().installEventFilter(self)
+        from aedrova.desktop.appfilters import install
+
+        install(self)
 
     def current_scope(self):
         owner = getattr(self.host, "collaboration", None)
