@@ -1122,6 +1122,38 @@ class IdentityService:
             .data
         )
 
+    def meeting_note_messages(self, channel):
+        """The newest reviewed meeting-notes shares in a channel, found by file name.
+
+        Search only sees the message text ("Shared a file"), not the file, so a question that
+        never says "meeting" or "notes" would otherwise miss them.
+        """
+        self._authenticated()
+        shared = (
+            self.client.table("attachments")
+            .select("message_id")
+            .eq("channel_id", channel)
+            .eq("filename", "meeting-notes.txt")
+            .not_.is_("message_id", "null")
+            .limit(100)
+            .execute()
+            .data
+        )
+        identifiers = [row["message_id"] for row in shared if row.get("message_id")]
+        if not identifiers:
+            return []
+        rows = (
+            self.client.table("messages")
+            .select("id,created_at")
+            .eq("channel_id", channel)
+            .in_("id", identifiers)
+            .order("created_at", desc=True)
+            .limit(3)
+            .execute()
+            .data
+        )
+        return [row["id"] for row in rows]
+
     def attachments_for(self, message_ids):
         self._authenticated()
         if not message_ids:

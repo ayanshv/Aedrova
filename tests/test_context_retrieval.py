@@ -439,3 +439,52 @@ def test_imported_slack_messages_reach_the_agent_as_cited_evidence():
     quiet = bounded_service()
     quiet.slack_history = lambda *a, **k: pytest.fail("Slack history must be opt in")
     assert "imported_slack_message" not in gather(quiet, "w", query="beta onboarding").text
+
+
+def test_reviewed_meeting_notes_reach_context_even_when_the_question_never_matches_them():
+    source = bounded_service()
+    note = {
+        "id": "9",
+        "channel_id": "c",
+        "body": "Shared a file: meeting-notes.txt",
+        "sequence": 9,
+        "parent_id": None,
+    }
+    plain_thread = source.thread_context
+    source.thread_context = lambda channel, parent: (
+        [note] if parent == "9" else plain_thread(channel, parent)
+    )
+    source.meeting_note_messages = lambda channel: ["9"] if channel == "c" else []
+    source.attachments_for = lambda ids: (
+        [
+            {
+                "id": "a1",
+                "channel_id": "c",
+                "message_id": "9",
+                "filename": "meeting-notes.txt",
+                "byte_size": 80,
+            }
+        ]
+        if "9" in ids
+        else []
+    )
+    source.download_attachment = lambda identifier: (
+        b"Reviewed meeting notes\n- Decided to launch the beta next Monday."
+    )
+    progress = []
+    context = gather(source, "w", progress=progress.append, query="export invoices")
+    assert "Decided to launch the beta next Monday" in context.text
+    assert "Reading reviewed meeting notes shared with this channel…" in progress
+
+
+def test_meeting_notes_from_another_channel_are_refused():
+    source = bounded_service()
+    source.meeting_note_messages = lambda channel: ["9"]
+    plain_thread = source.thread_context
+    source.thread_context = lambda channel, parent: (
+        [{"id": "9", "channel_id": "foreign", "sequence": 9, "parent_id": None}]
+        if parent == "9"
+        else plain_thread(channel, parent)
+    )
+    with pytest.raises(PermissionError, match="Meeting notes evidence"):
+        gather(source, "w", query="export invoices")

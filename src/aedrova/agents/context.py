@@ -7,9 +7,34 @@ from dataclasses import dataclass
 
 MAX_CONTEXT_BYTES = 8 * 1024 * 1024
 TEXT_EXTENSIONS = {
-    ".txt", ".md", ".rst", ".log", ".csv", ".json", ".yaml", ".yml", ".toml", ".ini", ".xml",
-    ".html", ".css", ".js", ".jsx", ".ts", ".tsx", ".py", ".sql", ".sh", ".swift", ".kt",
-    ".java", ".go", ".rs", ".c", ".h", ".cpp",
+    ".txt",
+    ".md",
+    ".rst",
+    ".log",
+    ".csv",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".ini",
+    ".xml",
+    ".html",
+    ".css",
+    ".js",
+    ".jsx",
+    ".ts",
+    ".tsx",
+    ".py",
+    ".sql",
+    ".sh",
+    ".swift",
+    ".kt",
+    ".java",
+    ".go",
+    ".rs",
+    ".c",
+    ".h",
+    ".cpp",
 }
 CURRENT_CHANNEL_MESSAGES = 400  # the discussion the request was made in, read in depth
 RECENT_MESSAGES = 20
@@ -63,7 +88,6 @@ def gather(
         return service.snapshot()
 
     snapshot = inventory()
-
 
     if not hasattr(service, "context_snapshot") and len(snapshot["channels"]) >= 1000:
         raise ValueError(
@@ -153,6 +177,20 @@ def gather(
                 raise PermissionError("Recent evidence has invalid channel scope.")
             candidates.update({row["id"]: row for row in rows})
             selected_channels.add(channel)
+        if hasattr(service, "meeting_note_messages") and hasattr(service, "thread_context"):
+            # Reviewed meeting notes are always in scope for the channels being read.
+            for channel in sorted(selected_channels):
+                if cancelled():
+                    raise InterruptedError("Cancelled")
+                for note in service.meeting_note_messages(channel)[:3]:
+                    rows = service.thread_context(channel, note)
+                    if len(rows) > 21 or any(
+                        row["channel_id"] != channel
+                        or (row["id"] != note and row.get("parent_id") != note)
+                        for row in rows
+                    ):
+                        raise PermissionError("Meeting notes evidence has invalid scope.")
+                    candidates.update({row["id"]: row for row in rows if row["id"] == note})
         add(
             {
                 "coverage": {
@@ -176,11 +214,18 @@ def gather(
     if slack_history is not None:
         imported = slack_history(workspace, search if bounded else query)
         for row in imported:
-            add({"imported_slack_message": {
-                "citation": row["id"], "channel": row["channel_name"],
-                "author": row["author"], "timestamp": row["source_ts"],
-                "thread_timestamp": row["thread_ts"], "text": row["body"],
-            }})
+            add(
+                {
+                    "imported_slack_message": {
+                        "citation": row["id"],
+                        "channel": row["channel_name"],
+                        "author": row["author"],
+                        "timestamp": row["source_ts"],
+                        "thread_timestamp": row["thread_ts"],
+                        "text": row["body"],
+                    }
+                }
+            )
 
     memory_snapshot = None
     if hasattr(service, "memory_list"):
@@ -347,8 +392,11 @@ def gather(
 
 
 def recheck_slack(service, context):
-    sources = [json.loads(line)["imported_slack_message"] for line in context.text.splitlines()
-               if line.startswith('{"imported_slack_message":')]
+    sources = [
+        json.loads(line)["imported_slack_message"]
+        for line in context.text.splitlines()
+        if line.startswith('{"imported_slack_message":')
+    ]
     if not sources:
         return False
     selected = " ".join(source["citation"] for source in sources)

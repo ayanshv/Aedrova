@@ -31,6 +31,15 @@ builds now hide them unless built with `AEDROVA_HOSTED_CALLS_ENABLED=true`.
 3. **Hosted entries are hidden in packaged builds** unless switched on, so testers do not meet a
    "meeting service is not configured" error. Source runs are unchanged.
 
+## Context after Confirm
+
+Confirm shares `meeting-notes.txt` as a channel file. The agent and channel Buds read it through
+the same retrieval, and it is now always included: for every channel being read, the three newest
+`meeting-notes.txt` shares are brought in by file name. Before this, a note was found only when the
+question's words matched the message "Shared a file: meeting-notes.txt" or it was among the
+latest messages, so asking from another channel or after many newer messages could miss it.
+Private Bud conversations still read workspace context only when "workspace context" is ticked.
+
 ## Limits testers should know
 
 - **Mac only.** Windows and Linux have no capture or detection.
