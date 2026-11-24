@@ -41,7 +41,7 @@ class LocalMeetingNotes(AppDialog):
         self.service = getattr(self.account, "service", None)
         self.rows, self.jobs = [], []
         self.closed = False
-        self.downloading = self.saving = self.writing = False
+        self.downloading = self.saving = self.writing = self.shared = False
         self.cancelled = threading.Event()
         self.identifier = str(uuid4())
         self.capture = capture or LocalCapture(self)
@@ -142,6 +142,10 @@ class LocalMeetingNotes(AppDialog):
         actions.addWidget(self.start)
         actions.addWidget(self.stop)
         actions.addStretch()
+        self.close_button = button("Close", role="outline")
+        self.close_button.setAccessibleName("Close meeting notes")
+        self.close_button.clicked.connect(self.reject)
+        actions.addWidget(self.close_button)
         actions.addWidget(self.confirm)
         layout.addLayout(actions)
         self.start.clicked.connect(self.begin)
@@ -196,8 +200,10 @@ class LocalMeetingNotes(AppDialog):
             and not self.rows
         )
         self.stop.setEnabled(self.capture.active and not self.closed)
+        self.close_button.setEnabled(not self.capture.active and not self.saving)
         self.confirm.setEnabled(
-            bool(self.rows)
+            self.shared
+            or bool(self.rows)
             and not self.capture.active
             and not self.closed
             and not self.saving
@@ -306,6 +312,7 @@ class LocalMeetingNotes(AppDialog):
         if self.writing or self.closed or not self.rows or not self.service:
             return
         transcript = self.transcript.toPlainText()
+        title = self.title.text()
         service, workspace = self.service, self.workspace
         self.writing = True
         self.notes.setReadOnly(True)
@@ -318,7 +325,11 @@ class LocalMeetingNotes(AppDialog):
             from aedrova.meetings.ai_notes import write_notes
 
             try:
-                return {"notes": write_notes(service, workspace, transcript, self.cancelled)}
+                return {
+                    "notes": write_notes(
+                        service, workspace, transcript, self.cancelled, title=title
+                    )
+                }
             except (ValueError, RuntimeError) as error:
                 return {"problem": str(error)[:300]}
 
@@ -345,6 +356,9 @@ class LocalMeetingNotes(AppDialog):
         QThreadPool.globalInstance().start(job)
 
     def share(self):
+        if self.shared:
+            self.accept()
+            return
         connected = getattr(self.window, "connected", None)
         if (
             self.closed
@@ -410,8 +424,10 @@ class LocalMeetingNotes(AppDialog):
                 self.status.setText(
                     "Shared with this channel. Aedrova and its Buds can use the reviewed text."
                 )
-                self.confirm.setEnabled(False)
+                self.shared = True
                 self.rows.clear()
+                self.confirm.setText("Done")
+                self.update_controls()
                 QTimer.singleShot(0, connected.refresh)
             else:
                 self.status.setText(
@@ -432,6 +448,9 @@ class LocalMeetingNotes(AppDialog):
         self.cancelled.set()
         self.detector.stop()
         self.indicator.hide()
+        detection = getattr(self.window, "meeting_detection", None)
+        if detection is not None:  # the same call should not offer notes again straight away
+            detection.dismiss()
         self.capture.discard()
         self.rows.clear()
         self.notes.clear()

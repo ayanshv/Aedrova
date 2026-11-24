@@ -154,8 +154,10 @@ def test_no_recording_or_upload_on_open_and_review_before_confirm(notes):
     assert len(uploads) == 1 and uploads[0][1] == "channel"
     assert "Reviewed: follow up Friday" in uploads[0][2]
     assert "Reviewed transcript" in uploads[0][2]
-    assert not dialog.confirm.isEnabled()
-    dialog.reject()
+    assert dialog.shared and dialog.confirm.text() == "Done" and dialog.confirm.isEnabled()
+    assert dialog.close_button.isEnabled()
+    dialog.confirm.click()
+    assert dialog.closed and not dialog.isVisible()
     assert capture.discarded
 
 
@@ -235,7 +237,7 @@ def test_notes_are_written_by_ai_when_the_person_finishes_with_a_loader(notes, m
     _, dialog, capture, queued, uploads = notes
     release = threading.Event()
 
-    def slow_notes(service, workspace, transcript, cancelled=None):
+    def slow_notes(service, workspace, transcript, cancelled=None, **kwargs):
         assert "Microphone" in transcript or "Computer audio" in transcript
         release.wait(5)
         return "Summary\n- Review on Friday."
@@ -261,7 +263,7 @@ def test_notes_are_written_by_ai_when_the_person_finishes_with_a_loader(notes, m
 def test_failed_ai_notes_keep_the_draft_lines(notes, monkeypatch):
     _, dialog, capture, _, _ = notes
 
-    def broken(service, workspace, transcript, cancelled=None):
+    def broken(service, workspace, transcript, cancelled=None, **kwargs):
         raise RuntimeError("Aedrova AI is not available in this build.")
 
     monkeypatch.setattr("aedrova.meetings.ai_notes.write_notes", broken)
@@ -305,3 +307,34 @@ def qtbot_wait(dialog):
         QApplication.processEvents()
         time.sleep(0.01)
     QApplication.processEvents()
+
+
+def test_close_is_always_available_except_while_recording_or_sharing(notes):
+    _, dialog, capture, _, _ = notes
+    assert dialog.close_button.isEnabled()
+    dialog.consent.setChecked(True)
+    dialog.begin()
+    capture.active = True
+    dialog.update_controls()
+    assert not dialog.close_button.isEnabled()
+    capture.active = False
+    dialog.update_controls()
+    dialog.close_button.click()
+    assert dialog.closed and not dialog.isVisible()
+
+
+def test_notes_prompt_asks_for_specifics_and_carries_the_title():
+    from aedrova.agents.replies import reply_request
+    from aedrova.meetings.ai_notes import notes_prompt
+
+    prompt = notes_prompt("[00:01] Microphone: make it 17 steps", "Onboarding sync")
+    assert "Meeting title: Onboarding sync" in prompt
+    assert "Specific beats general" in prompt
+    assert "Never invent decisions" in prompt
+    for section in ("Summary:", "Key points:", "Decisions:", "Action items:", "Open questions:"):
+        assert section in prompt
+    access = SimpleNamespace(provider="codex", model="gpt-5.5", limits={}, base_url="x", token="t")
+    _, body = reply_request(access, prompt, effort="medium")
+    assert body["reasoning"] == {"effort": "medium"}
+    _, quick = reply_request(access, prompt)
+    assert quick["reasoning"] == {"effort": "low"}

@@ -108,16 +108,18 @@ def needs_sources(question):
     )
 
 
-def reply(access, prompt, cancelled, emit=lambda _text: None, *, timeout=90, web=False):
+def reply(
+    access, prompt, cancelled, emit=lambda _text: None, *, timeout=90, web=False, effort="low"
+):
     """No local process, tools, implicit retries or shared provider key.
 
     The gateway retains membership checks, reservations and conservative settlement.
     Poll cancellation even when the upstream connection is waiting for its first byte.
     """
-    return asyncio.run(_reply(access, prompt, cancelled, emit, timeout, web))
+    return asyncio.run(_reply(access, prompt, cancelled, emit, timeout, web, effort))
 
 
-def reply_request(access, prompt, web=False):
+def reply_request(access, prompt, web=False, effort="low"):
     """The path and body for one reply. Search is added only when asked for."""
     limit = min(4096, access.limits.get("output_tokens", 4096))
     language_instruction = (
@@ -136,7 +138,7 @@ def reply_request(access, prompt, web=False):
             "tools": [{"type": "web_search"}] if web else [],
         }
         if access.model.startswith("gpt-5"):
-            body["reasoning"] = {"effort": "low"}
+            body["reasoning"] = {"effort": effort}
     elif access.provider == "claude_code":
         path = "/v1/messages"
         body = {
@@ -152,12 +154,12 @@ def reply_request(access, prompt, web=False):
     return path, body
 
 
-async def _reply(access, prompt, cancelled, emit, timeout, web=False):
+async def _reply(access, prompt, cancelled, emit, timeout, web=False, effort="low"):
     if cancelled.is_set():
         raise BuildCancelled()
     if len(prompt.encode()) > 240000:
         raise ValueError("This question has too much context. Try a narrower request.")
-    path, body = reply_request(access, prompt, web)
+    path, body = reply_request(access, prompt, web, effort)
 
     async def consume():
         text, complete, size, stopped = "", False, 0, False
