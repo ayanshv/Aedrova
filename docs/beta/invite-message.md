@@ -26,7 +26,7 @@ It runs on Mac (macOS 14 or newer, Apple silicon). Full steps are in the install
   on your Mac.
 - Your allowance is sized for a few weeks of testing.
 
-Questions or problems: reply to this email or write to {feedback address}.
+Questions or problems: reply to this email or write to contact@aedrova.com.
 
 Thank you,
 {name}
