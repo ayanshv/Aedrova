@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # Finder lays out the installer window: the app on the left, Applications on the right.
 LAYOUT = """
 tell application "Finder"
-    set installer to disk "Aedrova"
+    set installer to disk "VOLUME"
     open installer
     set window_ to container window of installer
     set current view of window_ to icon view
@@ -98,10 +98,17 @@ def main():
             "-ov",
             str(writable),
         )
-        command("hdiutil", "attach", str(writable), "-noverify")
-        mount = Path("/Volumes/Aedrova")
+        attached = command("hdiutil", "attach", str(writable), "-noverify").stdout
+        # Another mounted "Aedrova" volume would make this one "Aedrova 1".
+        mount = Path(
+            next(
+                line.split("\t")[-1].strip()
+                for line in attached.splitlines()
+                if "/Volumes/" in line
+            )
+        )
         try:
-            command("osascript", "-e", LAYOUT)
+            command("osascript", "-e", LAYOUT.replace("VOLUME", mount.name))
             command("sync")
         finally:
             command("hdiutil", "detach", str(mount), "-force")
