@@ -87,7 +87,12 @@ def test_transcript_shrink_resize_and_repeated_scroll_stop_at_final_message(qtbo
     view.scrollToBottom()
     qtbot.wait(50)
     assert view.verticalScrollBar().maximum() > 0
-    for text in ("Final result. " * 200, "Finished. Here is the result."):
+    # Under the long-reply limit (longer ones show a preview and a download link), yet tall
+    # enough to overflow a 400 px viewport.
+    for text in (
+        "\n\n".join(f"Result paragraph {n}." for n in range(20)),
+        "Finished. Here is the result.",
+    ):
         feed.finish_with_result(text)
         view.set_agent_visible(True)
         for width in (450, 900):

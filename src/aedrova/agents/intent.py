@@ -77,3 +77,28 @@ def wants_build(text):
     if STRONG_VERB.match(match["verb"].strip()):
         return True
     return bool(SOFTWARE.search(match["rest"]) or LOCAL.search(match["rest"]))
+
+
+FOLDER_REQUEST = re.compile(
+    r"\b(?:create|make|set\s+up|start|open)\s+(?:a\s+|the\s+)?(?:new\s+)?"
+    r"(?:project\s+)?(?:folder|directory|project)\s+"
+    r"(?:(?:in|inside|under|on)\s+(?:my\s+)?(?P<where>documents|desktop|home)"
+    r"(?:\s+(?:folder|directory))?\s+)?"
+    r"(?:called|named)\s+[\"“'‘]?(?P<name>[A-Za-z0-9][\w .-]{0,58}?)[\"”'’]?"
+    r"(?:\s+(?:in|inside|on)\s+(?:my\s+)?(?P<after>documents|desktop|home)"
+    r"(?:\s+(?:folder|directory))?)?"
+    r"(?=\s+(?:and|then|with|in|on|for)\b|\s*[,.;!?]|\s*$)",
+    re.IGNORECASE,
+)
+
+
+def requested_project(text):
+    """A request that names the project folder to create, e.g. 'create a project folder in my
+    documents folder called "Soysee"'. Returns (name, location) or None."""
+    match = FOLDER_REQUEST.search(" ".join(str(text or "").split()))
+    if not match:
+        return None
+    name = re.sub(r"[^\w .-]", "", match["name"]).strip(" .-")
+    if not name or ".." in name:
+        return None
+    return name[:60], (match["where"] or match["after"] or "documents").lower()

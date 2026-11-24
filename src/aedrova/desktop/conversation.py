@@ -71,7 +71,9 @@ from aedrova.desktop.response_actions import (
     append_response_actions,
     citations,
     compact_citations,
+    long_reply,
     response_parts,
+    write_reply_file,
 )
 from aedrova.desktop.theme import LIGHT, Theme, link_color
 
@@ -233,7 +235,7 @@ def space_agent_response(document):
 
 def markdown_html(
     text, *, base_font=None, agent=False, options=None, rating="", file_summary=None,
-    show_choices=True, copied=False,
+    show_choices=True, copied=False, long_words=None,
 ):
     document = markdown_document(text, base_font=base_font)
     action_images = set()
@@ -248,6 +250,7 @@ def markdown_html(
             card_background=palette.color(QPalette.ColorRole.AlternateBase).name(),
             show_choices=show_choices,
             copied=copied,
+            long_words=long_words,
         )
     elif agent:
         compact_citations(document, color=QApplication.palette().link().color().name())
@@ -303,6 +306,11 @@ class MessageDelegate(QStyledItemDelegate):
             if voice_only:
                 text = ""
                 hint = ""
+            long_words = None
+            if message.agent:
+                shortened = long_reply(text)
+                if shortened:
+                    text, long_words = shortened
             if hint:
                 text += "\n\n_" + hint + "_"
             document.setMarkdown(text, QTextDocument.MarkdownFeature.MarkdownNoHTML)
@@ -331,6 +339,7 @@ class MessageDelegate(QStyledItemDelegate):
                     card_background=self.theme.surface,
                     show_choices=False,  # the newest reply offers buttons instead
                     copied=copied,
+                    long_words=long_words,
                 )
                 space_agent_response(document)
             block = document.begin()
@@ -962,6 +971,8 @@ class MessageView(QListView):
                 text += "\n\n" + "\n".join(f"{i}. {option}" for i, option in enumerate(options, 1))
             QApplication.clipboard().setText(text)
             self.show_copied(identifier, row)
+        elif action in ("pdf", "markdown-file"):
+            self.save_reply_file(body, "pdf" if action == "pdf" else "md")
         elif action in ("good", "bad"):
             rating = "" if self.reply_feedback.get(identifier) == action else action
             self.reply_feedback[identifier] = rating
@@ -980,6 +991,39 @@ class MessageView(QListView):
             index = int(action[7:])
             if index < len(options):
                 self.agent_choice_requested.emit(author, options[index])
+
+    def save_reply_file(self, body, kind):
+        """Save the whole reply as a file the person can keep, then open it."""
+        from datetime import datetime
+        from pathlib import Path
+
+        from PySide6.QtCore import QStandardPaths, QUrl
+        from PySide6.QtGui import QDesktopServices
+        from PySide6.QtWidgets import QFileDialog
+
+        folder = (
+            QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DownloadLocation)
+            or str(Path.home())
+        )
+        default = str(Path(folder) / f"Aedrova response {datetime.now():%Y-%m-%d %H%M}.{kind}")
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save response",
+            default,
+            "PDF document (*.pdf)" if kind == "pdf" else "Markdown (*.md)",
+        )
+        window = self.window()
+        if not path:
+            return
+        try:
+            write_reply_file(path, body, kind)
+        except OSError:
+            if hasattr(window, "notify"):
+                window.notify("The response could not be saved there. Choose another folder.")
+            return
+        if hasattr(window, "notify"):
+            window.notify(f"Saved {Path(path).name}")
+        QDesktopServices.openUrl(QUrl.fromLocalFile(path))
 
     def show_copied(self, identifier, row=None):
         """The copy icon becomes a check for a moment, right where the person clicked."""

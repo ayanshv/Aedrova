@@ -1219,6 +1219,17 @@ class AedrovaWindow(QMainWindow):
 
         request = candidate if bud else task
         options = {"bud": bud} if bud else {}
+        from aedrova.agents.intent import requested_project
+        from aedrova.desktop.projects import use_named_project
+
+        named = requested_project(candidate)
+        if named:
+            try:
+                folder = use_named_project(self, *named)
+                self.notify(f"Using the project folder {folder}")
+            except (OSError, ValueError, PermissionError):
+                self.notify("Could not create that project folder. Check the name and try again.")
+                return True
         if not binding(self).get("folder"):
             try:
                 created = ensure_project(self, request)

@@ -126,6 +126,24 @@ def ensure_project(window, task, root=None):
     return folder
 
 
+def use_named_project(window, name, where="documents", home=None):
+    """Create (or reuse) the folder the person asked for and make it this workspace's project."""
+    base = Path(home) if home else Path.home()
+    parent = {"desktop": base / "Desktop", "home": base}.get(where, base / "Documents")
+    if not parent.is_dir():
+        parent = base
+    folder = parent / name
+    if folder.exists() and not folder.is_dir():
+        raise ValueError("A file with that name already exists there.")
+    folder.mkdir(exist_ok=True)
+    saved = binding(window)
+    data = {**saved, "folder": str(folder), "provider": saved.get("provider", "codex")}
+    if "background_build" not in saved:
+        data["background_build"] = True
+    save_binding(window, data)
+    return folder
+
+
 def open_editor(window, project):
     project = Path(project).resolve(strict=True)
     editor = window.settings.value("editor", "Visual Studio Code")

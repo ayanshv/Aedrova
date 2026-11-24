@@ -29,6 +29,54 @@ REPLY_ACTIONS = (
 REPLY_ACTION_LABELS = {ACTION_PREFIX + action: title for action, title, _ in REPLY_ACTIONS}
 
 
+LONG_REPLY_CHARS = 2400
+LONG_REPLY_LINES = 45
+PREVIEW_CHARS = 900
+
+
+def long_reply(body):
+    """(preview, word count) for a reply too long to sit in the chat, else None.
+
+    The conversation keeps the full text; the chat shows the opening and offers the whole
+    thing as a file, so a long answer never pushes the rest of the channel off screen.
+    """
+    text = str(body or "").strip()
+    if len(text) <= LONG_REPLY_CHARS and text.count("\n") <= LONG_REPLY_LINES:
+        return None
+    cut = text[:PREVIEW_CHARS]
+    paragraph = cut.rfind("\n\n")
+    if paragraph > PREVIEW_CHARS // 3:
+        cut = cut[:paragraph]
+    else:
+        sentence = max(cut.rfind(". "), cut.rfind("\n"))
+        if sentence > PREVIEW_CHARS // 3:
+            cut = cut[: sentence + 1]
+    if cut.count("```") % 2:  # never leave a code block open
+        cut = cut[: cut.rfind("```")]
+    return cut.rstrip() + "\n\n…", len(text.split())
+
+
+def write_reply_file(path, body, kind):
+    """Save a reply as a PDF or Markdown file the person can keep and share."""
+    from pathlib import Path
+
+    text = str(body).strip() + "\n"
+    if kind == "md":
+        Path(path).write_text(text, encoding="utf-8")
+        return
+    from PySide6.QtCore import QMarginsF
+    from PySide6.QtGui import QFont, QPageLayout, QPageSize, QPdfWriter
+
+    document = QTextDocument()
+    document.setDefaultFont(QFont("Helvetica", 11))
+    document.setMarkdown(text)
+    writer = QPdfWriter(str(path))
+    writer.setPageSize(QPageSize(QPageSize.PageSizeId.A4))
+    writer.setPageMargins(QMarginsF(18, 18, 18, 18), QPageLayout.Unit.Millimeter)
+    writer.setTitle("Aedrova response")
+    document.print_(writer)
+
+
 def citations(text):
     return tuple(
         dict.fromkeys(match[0].translate(_DASHES).lower() for match in _SOURCE.finditer(text))
@@ -49,10 +97,11 @@ def compact_citations(document, *, color):
                     for match in _SOURCE.finditer(text):
                         source = match[0].translate(_DASHES).lower()
                         number = numbered.setdefault(source, len(numbered) + 1)
-                        start = len(text[:match.start()].encode("utf-16-le")) // 2
-                        end = len(text[:match.end()].encode("utf-16-le")) // 2
-                        edits.append((fragment.position() + start, fragment.position() + end,
-                                      source, number))
+                        start = len(text[: match.start()].encode("utf-16-le")) // 2
+                        end = len(text[: match.end()].encode("utf-16-le")) // 2
+                        edits.append(
+                            (fragment.position() + start, fragment.position() + end, source, number)
+                        )
                 fragments += 1
         block = block.next()
     cursor = QTextCursor(document)
@@ -112,7 +161,7 @@ def response_parts(text):
         r"(?P<options>(?:[ \t]*\d+[.)][ \t]+[^\n]+\n?){2,})",
         text,
     )
-    if not match or text[:match.start()].count("```") % 2:
+    if not match or text[: match.start()].count("```") % 2:
         return text, ()
     options = tuple(
         re.sub(r"^[ \t]*\d+[.)][ \t]+", "", line).replace("**", "").strip()
@@ -125,8 +174,17 @@ def response_parts(text):
 
 
 def append_response_actions(
-    document, options, rating, *, choice_color="#1759bf", action_color="#525d6b",
-    file_summary=None, card_background="", show_choices=True, copied=False,
+    document,
+    options,
+    rating,
+    *,
+    choice_color="#1759bf",
+    action_color="#525d6b",
+    file_summary=None,
+    card_background="",
+    show_choices=True,
+    copied=False,
+    long_words=None,
 ):
     block = document.begin()
     while block.isValid():
@@ -157,10 +215,19 @@ def append_response_actions(
         cursor.insertHtml(
             f'<a href="{ACTION_PREFIX}choice-{index}" '
             f'style="text-decoration:none;font-weight:600;color:{choice_color}">'
-            f'›&nbsp; {escape(option)}</a>'
+            f"›&nbsp; {escape(option)}</a>"
         )
     if file_summary:
         append_file_summary(cursor, file_summary, card_background)
+    if long_words:
+        cursor.insertBlock(QTextBlockFormat(), QTextCharFormat())
+        cursor.insertHtml(
+            f"Full response · {long_words:,} words &nbsp; "
+            f'<a href="{ACTION_PREFIX}pdf" style="font-weight:600;color:{choice_color}">'
+            "Save as PDF</a> &nbsp;·&nbsp; "
+            f'<a href="{ACTION_PREFIX}markdown-file" style="font-weight:600;color:{choice_color}">'
+            "Save as Markdown</a>"
+        )
     cursor.insertBlock(QTextBlockFormat(), QTextCharFormat())
     links, images = [], set()
     for action, title, glyph in REPLY_ACTIONS:
@@ -186,20 +253,18 @@ def append_file_summary(cursor, summary, background):
     rows = []
     for path, plus, minus in files:
         numbers = change_numbers(plus, minus)
-        wrapped_path = "&#8203;".join(
-            escape(path[i : i + 28]) for i in range(0, len(path), 28)
-        )
-        rows.append(
-            f'<tr><td>{wrapped_path}</td><td align="right">{numbers}</td></tr>'
-        )
+        wrapped_path = "&#8203;".join(escape(path[i : i + 28]) for i in range(0, len(path), 28))
+        rows.append(f'<tr><td>{wrapped_path}</td><td align="right">{numbers}</td></tr>')
     remaining = total - len(files)
     footer = f"<tr><td>+ {remaining} more</td><td></td></tr>" if remaining else ""
     cursor.insertBlock(QTextBlockFormat(), QTextCharFormat())
     cursor.insertHtml(
         f'<table cellspacing="0" cellpadding="6" width="100%" bgcolor="{background}">'
-        f'<tr><td><b>{title}</b> &nbsp; {change_numbers(additions, deletions)}</td>'
+        f"<tr><td><b>{title}</b> &nbsp; {change_numbers(additions, deletions)}</td>"
         f'<td align="right"><a href="{ACTION_PREFIX}changes">Review changes</a></td></tr>'
-        + "".join(rows) + footer + "</table>"
+        + "".join(rows)
+        + footer
+        + "</table>"
     )
     cursor.movePosition(QTextCursor.MoveOperation.End)
 

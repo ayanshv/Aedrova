@@ -111,3 +111,54 @@ def test_an_explicit_manual_workflow_choice_is_never_overridden(qtbot, tmp_path)
     folder = ensure_project(window, "build a page", tmp_path / "projects")
     assert folder and binding(window)["folder"] == str(folder)
     assert binding(window)["background_build"] is False
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        (
+            'create a project folder in my documents folder called "Soysee" and add a page',
+            ("Soysee", "documents"),
+        ),
+        ("make a folder named Notes on my desktop", ("Notes", "desktop")),
+        ("create a project folder called Soy See, then build a UI", ("Soy See", "documents")),
+        ("create a folder called Work in my home folder", ("Work", "home")),
+        ("build me a calculator", None),
+        ("what is a folder called", None),
+        ("create a folder called ../escape", None),
+    ],
+)
+def test_a_named_project_folder_is_understood(text, expected):
+    from aedrova.agents.intent import requested_project
+
+    assert requested_project(text) == expected
+
+
+def test_named_project_is_created_in_documents_and_connected(qtbot, tmp_path):
+    from aedrova.desktop.projects import use_named_project
+
+    window, _ = setup(qtbot, tmp_path)
+    (tmp_path / "Documents").mkdir()
+    save_binding(window, {"folder": str(tmp_path / "old-project"), "provider": "codex"})
+    folder = use_named_project(window, "Soysee", "documents", home=tmp_path)
+    assert folder == tmp_path / "Documents" / "Soysee" and folder.is_dir()
+    assert binding(window)["folder"] == str(folder)
+    assert use_named_project(window, "Soysee", "documents", home=tmp_path) == folder  # reuse
+
+
+def test_asking_for_a_named_project_moves_the_build_there(qtbot, tmp_path, monkeypatch):
+    window, _ = setup(qtbot, tmp_path)
+    (tmp_path / "Documents").mkdir()
+    monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
+    save_binding(window, {"folder": str(tmp_path / "other"), "provider": "codex"})
+    started = []
+    monkeypatch.setattr(
+        "aedrova.desktop.builds.start_background_build",
+        lambda win, request, **options: started.append(request) or True,
+    )
+    window.send_message(
+        '@Aedrova create a project folder in my documents folder called "Soysee" '
+        "and create the basic MVP UI"
+    )
+    assert binding(window)["folder"] == str(tmp_path / "Documents" / "Soysee")
+    assert (tmp_path / "Documents" / "Soysee").is_dir() and len(started) == 1

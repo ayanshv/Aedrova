@@ -172,12 +172,16 @@ class ActivityRow(QFrame):
 
 
         from aedrova.desktop.conversation import markdown_html
-        from aedrova.desktop.response_actions import response_parts, streaming_body
+        from aedrova.desktop.response_actions import long_reply, response_parts, streaming_body
 
         body = streaming_body(text) if self.streaming else text
         options = None
+        long_words = None
         if self.response_id:
             body, options = response_parts(text)
+            shortened = None if self.streaming else long_reply(body)
+            if shortened:
+                body, long_words = shortened
         self.message.setProperty("aedrovaSourceText", body)
         self.message.setProperty("aedrovaReplyOptions", options)
         self.message.setProperty("aedrovaReplyRating", self.rating)
@@ -191,6 +195,7 @@ class ActivityRow(QFrame):
                 markdown_html(
                     "", base_font=self.message.font(), agent=True, options=(),
                     rating=self.rating, file_summary=self.file_summary, copied=self.copied,
+                    long_words=long_words,
                 )
             )
             return
@@ -198,6 +203,7 @@ class ActivityRow(QFrame):
             markdown_html(
                 body, base_font=self.message.font(), agent=True, options=options,
                 rating=self.rating, file_summary=self.file_summary, copied=self.copied,
+                long_words=long_words,
             )
         )
 

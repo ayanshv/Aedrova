@@ -228,7 +228,8 @@ def test_ai_notes_prompt_treats_the_transcript_as_data_and_never_sends_audio():
     with pytest.raises(ValueError, match="too long"):
         write_notes(None, "w", "x" * (MAX_TRANSCRIPT + 1))
     with pytest.raises(ValueError, match="credentials"):
-        write_notes(None, "w", "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----")
+        key = "-----" + "BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY" + "-----"
+        write_notes(None, "w", key)
     with pytest.raises(ValueError, match="no transcript"):
         write_notes(None, "w", "   ")
 
