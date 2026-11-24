@@ -351,3 +351,34 @@ def test_a_plan_without_citations_is_asked_once_to_cite_before_failing(
     dialog = window.build_dialog
     qtbot.waitUntil(lambda: dialog.successful_build, timeout=10000)
     assert [plan for plan, _ in prompts] == [True, True, False]
+
+
+def test_a_build_that_writes_under_the_documents_path_is_repaired_before_review(
+    qtbot, tmp_path, monkeypatch
+):
+    window, service, root = configured(qtbot, tmp_path, monkeypatch)
+    target = tmp_path / "Documents" / "Test Calc"
+    target.mkdir(parents=True)
+    save_binding(window, {"folder": str(target), "provider": "codex", "background_build": True})
+    seen = []
+
+    def run(self, provider, project, prompt, *, plan):
+        if plan:
+            return "Create calculator.py. Sources: none needed"
+        seen.append(prompt)
+        nested = project / "Documents" / "Test Calc"
+        nested.mkdir(parents=True)
+        (nested / "calculator.py").write_text("print(1 + 1)\n")
+        return "Implemented calculator.py"
+
+    monkeypatch.setattr(LocalRunner, "run", run)
+    window.composer.editor.setPlainText(
+        "@Aedrova build a calculator in my Documents/Test Calc folder"
+    )
+    window.send_message(window.composer.editor.toPlainText())
+    dialog = window.build_dialog
+    qtbot.waitUntil(lambda: dialog.successful_build, timeout=10000)
+    assert "Test Calc" in seen[0] and "never recreate that path" in seen[0]
+    assert (dialog.project / "calculator.py").is_file()
+    assert not (dialog.project / "Documents").exists()
+    assert not (target / "calculator.py").exists()  # applying still needs the person's review

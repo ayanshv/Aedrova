@@ -1,5 +1,6 @@
 """Independent local Git copies; the user's checkout is never edited implicitly."""
 
+import json
 import os
 import shutil
 import subprocess
@@ -198,3 +199,52 @@ def prepare(repository, builds):
 
 def changes(project):
     return git(project, "status", "--short") + "\n" + git(project, "diff", "--stat", "HEAD")
+
+
+def original_folder(project):
+    """The folder the person chose, recorded when the safe copy was made."""
+    try:
+        info = json.loads((Path(project).parent / "snapshot-info.json").read_text())
+        return Path(info["source"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def hoist_misplaced_project(project):
+    """Move work the agent wrote under a path like Documents/<folder> up to the project root.
+
+    The agent works inside the copy, and the project root *is* the person's folder. When the
+    request said "in Documents/Test Calc", it sometimes recreated that path inside the copy, so
+    the files would have landed in Test Calc/Documents/Test Calc/. Only a brand new directory
+    (nothing tracked under it) is moved, and nothing already in the project is overwritten.
+    Returns the prefix that was removed, or None.
+    """
+    project = Path(project)
+    original = original_folder(project)
+    if original is None or not original.parts:
+        return None
+    tail = [part for part in original.parts if part not in {"/", ""}]
+    for length in range(min(len(tail), 3), 0, -1):
+        nested = project.joinpath(*tail[-length:])
+        if not nested.is_dir() or nested.is_symlink():
+            continue
+        if git(project, "ls-files", "--", str(nested.relative_to(project))).strip():
+            continue  # a real folder that already belongs to the project
+        for source in sorted(nested.rglob("*")):
+            if source.is_symlink() or not source.is_file():
+                continue
+            target = project / source.relative_to(nested)
+            if target.exists():
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(source), str(target))
+        # Remove the now-empty chain, deepest first, never anything that still has content.
+        for directory in sorted(nested.rglob("*"), key=lambda p: -len(p.parts)):
+            if directory.is_dir() and not any(directory.iterdir()):
+                directory.rmdir()
+        walk = nested
+        while walk != project and walk.is_dir() and not any(walk.iterdir()):
+            walk.rmdir()
+            walk = walk.parent
+        return "/".join(tail[-length:])
+    return None

@@ -326,6 +326,13 @@ def append_file_summary(cursor, summary, background):
         + "</table>"
     )
     cursor.movePosition(QTextCursor.MoveOperation.End)
+    if total:
+        cursor.insertBlock(QTextBlockFormat(), QTextCharFormat())
+        cursor.insertHtml(
+            "Your folder is unchanged so far. Choose <b>Review changes</b> to check these files "
+            "and apply them."
+        )
+        cursor.movePosition(QTextCursor.MoveOperation.End)
 
 
 def change_numbers(plus, minus):

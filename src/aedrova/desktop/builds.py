@@ -242,6 +242,17 @@ class BuildJob(QRunnable):
             prompt = instructions(
                 self.task, context_file, plan=self.plan, approved_plan=self.approved
             )
+            from aedrova.agents.checkout import original_folder
+
+            folder = original_folder(self.project)
+            if folder is not None:
+                prompt += (
+                    "\nProject root: the current directory is the person’s folder "
+                    f"“{folder.name}”. "
+                    "Create and edit files directly in it. If the request names that folder or a "
+                    f"path to it (for example Documents/{folder.name}), it means this project "
+                    "root itself; never recreate that path inside the project."
+                )
             if self.bud:
                 prompt += (
                     "\nRespond as the addressed Bud, never as the central agent. "
@@ -315,6 +326,12 @@ class BuildJob(QRunnable):
                     if self.runner.cancelled.is_set():
                         raise BuildCancelled() from None
                     validate_citations(self.context, result)
+            if not self.plan and not question:
+                from aedrova.agents.checkout import hoist_misplaced_project
+
+                moved = hoist_misplaced_project(self.project)
+                if moved:
+                    self.signals.progress.emit(f"Moved the files from {moved} to the project root")
             outcome = {
                 "ok": True,
                 "text": question["title"] if question else result,
