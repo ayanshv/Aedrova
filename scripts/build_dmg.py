@@ -7,10 +7,35 @@ import platform
 import plistlib
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+# Finder lays out the installer window: the app on the left, Applications on the right.
+LAYOUT = """
+tell application "Finder"
+    set installer to disk "Aedrova"
+    open installer
+    set window_ to container window of installer
+    set current view of window_ to icon view
+    set toolbar visible of window_ to false
+    set statusbar visible of window_ to false
+    set the bounds of window_ to {200, 120, 860, 548}
+    set options to the icon view options of window_
+    set arrangement of options to not arranged
+    set icon size of options to 112
+    set text size of options to 13
+    set background picture of options to file ".background:background.png" of installer
+    set position of item "Aedrova.app" of window_ to {180, 215}
+    set position of item "Applications" of window_ to {480, 215}
+    update installer without registering applications
+    delay 2
+    close window_
+end tell
+"""
 
 
 def command(*args):
@@ -54,21 +79,34 @@ def main():
         command("spctl", "--assess", "--type", "execute", str(app))
     target = ROOT / ("work/Aedrova-preview.dmg" if args.preview else "dist/Aedrova.dmg")
     with TemporaryDirectory(prefix="aedrova-installer-") as folder:
-        stage = Path(folder)
+        stage = Path(folder) / "stage"
+        stage.mkdir()
         shutil.copytree(app, stage / "Aedrova.app", symlinks=True)
         (stage / "Applications").symlink_to("/Applications")
+        background = stage / ".background/background.png"
+        command(sys.executable, str(ROOT / "scripts/dmg_background.py"), str(background))
+        writable = Path(folder) / "installer.dmg"
         command(
             "hdiutil",
             "create",
             "-volname",
             "Aedrova",
             "-srcfolder",
-            folder,
+            str(stage),
             "-format",
-            "UDZO",
+            "UDRW",
             "-ov",
-            str(target),
+            str(writable),
         )
+        command("hdiutil", "attach", str(writable), "-noverify")
+        mount = Path("/Volumes/Aedrova")
+        try:
+            command("osascript", "-e", LAYOUT)
+            command("sync")
+        finally:
+            command("hdiutil", "detach", str(mount), "-force")
+        target.unlink(missing_ok=True)
+        command("hdiutil", "convert", str(writable), "-format", "UDZO", "-o", str(target))
     if not args.preview:
         identity = next(
             line.removeprefix("Authority=")
