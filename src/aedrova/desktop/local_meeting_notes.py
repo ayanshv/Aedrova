@@ -23,6 +23,7 @@ from aedrova.desktop.controls import AppDialog
 from aedrova.desktop.dialogs import button, label
 from aedrova.desktop.meeting_listening import ListeningCapsule
 from aedrova.desktop.meeting_transcript import ReviewJob
+from aedrova.desktop.spinner import CenteredSpinner
 from aedrova.meetings.local_capture import LocalCapture, possible_meeting_apps
 from aedrova.meetings.local_speech import download, draft_notes, ready, render_transcript
 
@@ -69,13 +70,16 @@ class LocalMeetingNotes(AppDialog):
         self.title.setMaxLength(120)
         self.title.setAccessibleName("Meeting title")
         layout.addWidget(self.title)
-        self.consent = QCheckBox("Everyone has agreed to transcription and sharing reviewed notes")
+        self.consent = QCheckBox(
+            "Everyone has agreed to transcription, AI-written notes and sharing reviewed notes"
+        )
         layout.addWidget(self.consent)
         layout.addWidget(
             label(
                 "Microphone and computer audio are captured, including other apps’ sounds. "
                 "No video is saved. Audio stays on this Mac and is removed after processing. "
-                "Only Confirm shares text with the selected channel.",
+                "When you finish, the transcript text (never audio) goes to Aedrova AI to write "
+                "the notes. Only Confirm shares text with the selected channel.",
                 "muted",
                 wrap=True,
             )
@@ -97,24 +101,34 @@ class LocalMeetingNotes(AppDialog):
         self.transcript = QPlainTextEdit()
         self.transcript.setPlaceholderText("Your local transcript will appear here.")
         self.transcript.setAccessibleName("Edit meeting transcript")
+        self.notes_loading = CenteredSpinner(self.notes)
+        self.notes_loading.setAccessibleName("Writing notes")
+        self.notes_loading_label = label("Writing your notes…", "muted")
+        self.notes_loading.layout().insertWidget(
+            2, self.notes_loading_label, alignment=Qt.AlignmentFlag.AlignHCenter
+        )
         self.tabs.addTab(self.notes, "Notes")
         self.tabs.addTab(self.transcript, "Transcript")
         layout.addWidget(self.tabs, 1)
         self.share_transcript = QCheckBox("Include the reviewed transcript")
         self.share_transcript.setChecked(True)
-        layout.addWidget(self.share_transcript)
-        self.ai_notes = button("Write notes with AI", role="outline")
-        self.ai_notes.setEnabled(False)
-        self.ai_notes.clicked.connect(self.write_ai_notes)
-        layout.addWidget(self.ai_notes, alignment=Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(
-            label(
-                "Optional. Sends the transcript text, never audio, to Aedrova AI and uses your "
-                "team’s AI allowance. It replaces the draft notes above.",
-                "muted",
-                wrap=True,
-            )
+        self.auto_ai = QCheckBox("Write notes with AI when I finish")
+        settings = getattr(window, "settings", None)
+        self.auto_ai.setChecked(
+            settings.value("meetings/autoAiNotes", True, type=bool) if settings else True
         )
+        if settings:
+            self.auto_ai.toggled.connect(lambda on: settings.setValue("meetings/autoAiNotes", on))
+        self.ai_notes = button("Rewrite notes with AI", role="outline")
+        self.ai_notes.setEnabled(False)
+        self.ai_notes.clicked.connect(lambda: self.write_ai_notes())
+        options = QHBoxLayout()  # one row keeps the notes area tall
+        options.setSpacing(18)
+        options.addWidget(self.share_transcript)
+        options.addWidget(self.auto_ai)
+        options.addStretch()
+        options.addWidget(self.ai_notes)
+        layout.addLayout(options)
         destination = getattr(getattr(window, "channel", None), "name", self.channel)
         layout.addWidget(label("Share to #" + destination, "muted", wrap=True))
         self.status = label("Not listening", "muted", wrap=True)
@@ -187,6 +201,7 @@ class LocalMeetingNotes(AppDialog):
             and not self.capture.active
             and not self.closed
             and not self.saving
+            and not self.writing
             and self.consent.isChecked()
         )
         self.ai_notes.setEnabled(
@@ -276,20 +291,26 @@ class LocalMeetingNotes(AppDialog):
             return
         self.transcript.setReadOnly(False)
         self.notes.setReadOnly(False)
-        self.notes.setPlainText(draft_notes(self.rows))
+        fallback = draft_notes(self.rows)
+        self.notes.setPlainText(fallback)
         self.status.setText(
             "Share with Aedrova? Review the draft notes and transcript, then Confirm."
             if self.rows
             else "No speech was transcribed. Check your devices and permissions."
         )
         self.update_controls()
+        if self.rows and self.service and self.consent.isChecked() and self.auto_ai.isChecked():
+            self.write_ai_notes(fallback=fallback)
 
-    def write_ai_notes(self):
+    def write_ai_notes(self, fallback=None):
         if self.writing or self.closed or not self.rows or not self.service:
             return
         transcript = self.transcript.toPlainText()
         service, workspace = self.service, self.workspace
         self.writing = True
+        self.notes.setReadOnly(True)
+        self.tabs.setCurrentWidget(self.notes)
+        self.notes_loading.set_active(True)
         self.update_controls()
         self.status.setText("Writing notes with AI…")
 
@@ -305,20 +326,20 @@ class LocalMeetingNotes(AppDialog):
             self.writing = False
             if self.closed or not isValid(self):
                 return
+            self.notes_loading.set_active(False)
+            self.notes.setReadOnly(False)
             value = result.get("value") or {}
             if value.get("notes"):
                 self.notes.setPlainText(value["notes"])
-                self.tabs.setCurrentWidget(self.notes)
                 self.status.setText("AI notes are ready. Edit them, then Confirm to share.")
             else:
-                self.status.setText(
-                    value.get("problem")
-                    or result.get("error")
-                    or "AI notes did not finish. Your draft is unchanged."
-                )
+                reason = value.get("problem") or result.get("error") or "AI notes did not finish."
+                if fallback is not None:
+                    self.notes.setPlainText(fallback)
+                self.status.setText(reason + " The draft lines are kept so you can edit them.")
             self.update_controls()
 
-        job = ReviewJob(operation, error="AI notes did not finish. Your draft is unchanged.")
+        job = ReviewJob(operation, error="AI notes did not finish.")
         self.jobs.append(job)
         job.signals.result.connect(written)
         QThreadPool.globalInstance().start(job)

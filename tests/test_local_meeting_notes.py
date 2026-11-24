@@ -1,3 +1,4 @@
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -126,6 +127,7 @@ def notes(qtbot, monkeypatch):
     )
     capture = Capture()
     dialog = LocalMeetingNotes(window, capture=capture)
+    dialog.auto_ai.setChecked(False)  # AI notes have their own tests below
     qtbot.addWidget(window)
     qtbot.addWidget(dialog)
     dialog.show()
@@ -227,3 +229,79 @@ def test_ai_notes_prompt_treats_the_transcript_as_data_and_never_sends_audio():
         write_notes(None, "w", "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----")
     with pytest.raises(ValueError, match="no transcript"):
         write_notes(None, "w", "   ")
+
+
+def test_notes_are_written_by_ai_when_the_person_finishes_with_a_loader(notes, monkeypatch):
+    _, dialog, capture, queued, uploads = notes
+    release = threading.Event()
+
+    def slow_notes(service, workspace, transcript, cancelled=None):
+        assert "Microphone" in transcript or "Computer audio" in transcript
+        release.wait(5)
+        return "Summary\n- Review on Friday."
+
+    monkeypatch.setattr("aedrova.meetings.ai_notes.write_notes", slow_notes)
+    dialog.auto_ai.setChecked(True)
+    dialog.consent.setChecked(True)
+    dialog.begin()
+    for row in rows():
+        capture.segment.emit(row)
+    capture.stop()
+    assert dialog.writing and dialog.notes_loading.isVisible()
+    assert dialog.notes.isReadOnly() and not dialog.confirm.isEnabled()
+    assert dialog.tabs.currentWidget() is dialog.notes
+    release.set()
+    qtbot_wait(dialog)
+    assert not dialog.writing and not dialog.notes_loading.isVisible()
+    assert dialog.notes.toPlainText().startswith("Summary")
+    assert dialog.confirm.isEnabled() and not dialog.notes.isReadOnly()
+    assert not queued and not uploads
+
+
+def test_failed_ai_notes_keep_the_draft_lines(notes, monkeypatch):
+    _, dialog, capture, _, _ = notes
+
+    def broken(service, workspace, transcript, cancelled=None):
+        raise RuntimeError("Aedrova AI is not available in this build.")
+
+    monkeypatch.setattr("aedrova.meetings.ai_notes.write_notes", broken)
+    dialog.auto_ai.setChecked(True)
+    dialog.consent.setChecked(True)
+    dialog.begin()
+    for row in rows():
+        capture.segment.emit(row)
+    capture.stop()
+    qtbot_wait(dialog)
+    assert "We agreed to review Friday." in dialog.notes.toPlainText()
+    assert (
+        "not available" in dialog.status.text() and "draft lines are kept" in dialog.status.text()
+    )
+    assert dialog.confirm.isEnabled()
+
+
+def test_turning_automatic_ai_off_keeps_notes_offline(notes, monkeypatch):
+    _, dialog, capture, _, _ = notes
+    called = []
+    monkeypatch.setattr(
+        "aedrova.meetings.ai_notes.write_notes", lambda *a, **k: called.append(1) or "x"
+    )
+    dialog.auto_ai.setChecked(False)
+    dialog.consent.setChecked(True)
+    dialog.begin()
+    for row in rows():
+        capture.segment.emit(row)
+    capture.stop()
+    assert not dialog.writing and not called
+    assert dialog.notes.toPlainText() == "• We agreed to review Friday."
+
+
+def qtbot_wait(dialog):
+    import time
+
+    from PySide6.QtWidgets import QApplication
+
+    deadline = time.monotonic() + 5
+    while dialog.writing and time.monotonic() < deadline:
+        QApplication.processEvents()
+        time.sleep(0.01)
+    QApplication.processEvents()
