@@ -162,3 +162,61 @@ def test_asking_for_a_named_project_moves_the_build_there(qtbot, tmp_path, monke
     )
     assert binding(window)["folder"] == str(tmp_path / "Documents" / "Soysee")
     assert (tmp_path / "Documents" / "Soysee").is_dir() and len(started) == 1
+
+
+def test_what_is_left_after_the_folder_clause_decides_between_direct_and_build():
+    from aedrova.agents.intent import (
+        only_makes_a_folder,
+        wants_folder_opened,
+        without_folder_request,
+    )
+
+    assert only_makes_a_folder("create a folder called Test Calc in my Documents folder.")
+    assert only_makes_a_folder("create a folder called Notes on my desktop and open it in finder")
+    assert wants_folder_opened("create a folder called Notes and open it in finder")
+    mixed = (
+        'ok, now create a project folder in my documents folder called "Soysee" '
+        "and create the basic MVP UI. Then open locally on my computer."
+    )
+    assert not only_makes_a_folder(mixed)
+    assert without_folder_request(mixed).startswith("create the basic MVP UI")
+    assert not only_makes_a_folder("create a folder called X and tell me a joke")
+
+
+def test_a_folder_only_request_is_answered_directly_with_no_build(qtbot, tmp_path, monkeypatch):
+    window, _ = setup(qtbot, tmp_path)
+    (tmp_path / "Documents").mkdir()
+    monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
+    started, answers = [], []
+    monkeypatch.setattr(
+        "aedrova.desktop.builds.start_background_build",
+        lambda *a, **k: started.append(a) or True,
+    )
+    monkeypatch.setattr(
+        "aedrova.desktop.builds.open_build", lambda *a, **k: started.append(a) or True
+    )
+    window.connected.complete_agent_reply = lambda *args, **kw: answers.append(args[2])
+    window.send_message("@Aedrova create a folder called Test Calc in my Documents folder.")
+    qtbot.waitUntil(lambda: bool(answers), timeout=2000)
+    assert not started
+    assert (tmp_path / "Documents" / "Test Calc").is_dir()
+    assert "Test Calc" in answers[0] and str(tmp_path / "Documents" / "Test Calc") in answers[0]
+    assert binding(window)["folder"] == str(tmp_path / "Documents" / "Test Calc")
+
+
+def test_a_mixed_request_tells_the_builder_the_folder_already_exists(qtbot, tmp_path, monkeypatch):
+    window, _ = setup(qtbot, tmp_path)
+    (tmp_path / "Documents").mkdir()
+    monkeypatch.setattr("pathlib.Path.home", classmethod(lambda cls: tmp_path))
+    started = []
+    monkeypatch.setattr(
+        "aedrova.desktop.builds.start_background_build",
+        lambda win, request, **options: started.append(request) or True,
+    )
+    window.send_message(
+        '@Aedrova create a project folder in my documents folder called "Soysee" '
+        "and create the basic MVP UI"
+    )
+    assert len(started) == 1
+    assert "already exists" in started[0] and "do not try to create it" in started[0]
+    assert "create the basic MVP UI" in started[0]

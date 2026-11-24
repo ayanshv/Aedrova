@@ -102,3 +102,36 @@ def requested_project(text):
     if not name or ".." in name:
         return None
     return name[:60], (match["where"] or match["after"] or "documents").lower()
+
+
+CONNECTORS = re.compile(r"^(?:[\s,.;:!?]|and|then|also|please|now|ok|okay|so)+", re.IGNORECASE)
+OPEN_REQUEST = re.compile(
+    r"\b(?:open|show|reveal|launch)\b[^.?!]*\b(?:locally|on my (?:computer|mac|machine)|"
+    r"in (?:finder|vs\s*code|my editor)|folder)\b",
+    re.IGNORECASE,
+)
+
+
+def without_folder_request(text):
+    """The message with the 'create a folder called X in Documents' clause taken out."""
+    value = " ".join(str(text or "").split())
+    match = FOLDER_REQUEST.search(value)
+    if not match:
+        return value
+    rest = (value[: match.start()] + " " + value[match.end() :]).strip()
+    # "create a project folder ..." leaves a dangling verb or connector at the start.
+    rest = re.sub(r"^(?:ok(?:ay)?[,\s]+)?(?:now[,\s]+)?", "", rest, flags=re.IGNORECASE)
+    return CONNECTORS.sub("", rest).strip()
+
+
+def only_makes_a_folder(text):
+    """True when creating the folder (and perhaps opening it) is the whole request."""
+    rest = OPEN_REQUEST.sub("", without_folder_request(text))
+    rest = re.sub(
+        r"[\s,.;:!?]|\b(?:and|then|also|please|it|there|for me|thanks|thank you)\b", "", rest
+    )
+    return not rest.strip()
+
+
+def wants_folder_opened(text):
+    return bool(OPEN_REQUEST.search(str(text or "")))

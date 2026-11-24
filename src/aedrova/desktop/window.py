@@ -643,7 +643,6 @@ class AedrovaWindow(QMainWindow):
                 )
             )
 
-
             self.rail_items.addWidget(item)
             item.setVisible(workspace.id == self.workspace_id)
             self.workspace_buttons[workspace.id] = item
@@ -843,7 +842,8 @@ class AedrovaWindow(QMainWindow):
         self.pinned.setVisible(bool(count) or any(m.decision for m in messages))
         self.pinned.setText(
             f"{count} pinned " + ("message" if count == 1 else "messages")
-            if count else "Pinned decision  ·  Three steps. Less friction."
+            if count
+            else "Pinned decision  ·  Three steps. Less friction."
         )
 
     def open_pinned(self):
@@ -1028,15 +1028,12 @@ class AedrovaWindow(QMainWindow):
         if workspace == self.workspace_id:
             self.activity_channel = getattr(self, "activity_channel", self.channel_id)
             build = getattr(self, "build_dialog", None)
-            if (
-                getattr(self, "dot_query", None)
-                or (
-                    build
-                    and (
-                        build.pending
-                        or build.background_transition
-                        or getattr(build, "clarification", None)
-                    )
+            if getattr(self, "dot_query", None) or (
+                build
+                and (
+                    build.pending
+                    or build.background_transition
+                    or getattr(build, "clarification", None)
                 )
             ):
                 self.agent_feed.set_status(nickname, text)
@@ -1097,8 +1094,15 @@ class AedrovaWindow(QMainWindow):
             return
         workspace, channel, text, author, sent_at, response_id, bud_avatar, sources = finished
         self.connected.complete_agent_reply(
-            workspace, channel, text, author, sent_at=sent_at, response_id=response_id,
-            bud_avatar=bud_avatar, source_channels=sources, share=False,
+            workspace,
+            channel,
+            text,
+            author,
+            sent_at=sent_at,
+            response_id=response_id,
+            bud_avatar=bud_avatar,
+            source_channels=sources,
+            share=False,
         )
 
     def send_agent_choice(self, author, text, free):
@@ -1140,14 +1144,47 @@ class AedrovaWindow(QMainWindow):
             self.messages.agent_anchor = identifier
             self.messages.refresh_agent()
 
+    def _answer_directly(self, text, composer, author, reply):
+        """Post the person's message and answer it at once, without a model call."""
+        workspace, channel = self.workspace_id, self.channel_id
+        parent = self.thread_id if composer is self.thread_composer else None
+
+        def deliver():
+            origin = getattr(self, "agent_request_origin", None)
+            prompt_id = origin[3] if origin and origin[:2] == (workspace, channel) else None
+            self.finish_conversation_response(workspace, channel, parent, reply, author, prompt_id)
+
+        def launch():
+            QTimer.singleShot(0, deliver)
+            return True
+
+        self._start_chat_agent(text, composer, launch)
+
     def finish_conversation_response(
-        self, workspace, channel, parent, text, author, prompt_id=None, *,
-        source_channels=None, bud_avatar=None, successful=True, share=True,
+        self,
+        workspace,
+        channel,
+        parent,
+        text,
+        author,
+        prompt_id=None,
+        *,
+        source_channels=None,
+        bud_avatar=None,
+        successful=True,
+        share=True,
     ):
         self.completed_agent_response = None
         self.connected.complete_agent_reply(
-            workspace, channel, text, author, parent, prompt_id,
-            source_channels=source_channels, bud_avatar=bud_avatar, share=share and successful,
+            workspace,
+            channel,
+            text,
+            author,
+            parent,
+            prompt_id,
+            source_channels=source_channels,
+            bud_avatar=bud_avatar,
+            share=share and successful,
         )
         self.agent_feed.clear()
         self.build_activity.hide()
@@ -1211,9 +1248,7 @@ class AedrovaWindow(QMainWindow):
         if not building:
             from aedrova.desktop.dot_analysis import start_analysis
 
-            self._start_chat_agent(
-                text, composer, lambda: start_analysis(self, candidate, bud=bud)
-            )
+            self._start_chat_agent(text, composer, lambda: start_analysis(self, candidate, bud=bud))
             return True
         from aedrova.desktop.projects import binding, ensure_project
 
@@ -1224,12 +1259,41 @@ class AedrovaWindow(QMainWindow):
 
         named = requested_project(candidate)
         if named:
+            from aedrova.agents.intent import (
+                only_makes_a_folder,
+                wants_folder_opened,
+                without_folder_request,
+            )
+
             try:
                 folder = use_named_project(self, *named)
-                self.notify(f"Using the project folder {folder}")
             except (OSError, ValueError, PermissionError):
                 self.notify("Could not create that project folder. Check the name and try again.")
                 return True
+            if only_makes_a_folder(candidate):
+                # The agent works inside a copy of the project and cannot create folders
+                # elsewhere, so the app does this itself and answers directly.
+                opened = False
+                if wants_folder_opened(candidate):
+                    from PySide6.QtCore import QUrl
+                    from PySide6.QtGui import QDesktopServices
+
+                    opened = QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+                self._answer_directly(
+                    text,
+                    composer,
+                    nickname,
+                    f"I created the folder **{folder.name}** at `{folder}`"
+                    + (" and opened it." if opened else ".")
+                    + " It is now this workspace’s project, so the next build starts there.",
+                )
+                return True
+            request = (
+                f'The project folder "{folder.name}" already exists at {folder} and is the '
+                "working project. Aedrova created it and it is empty, so do not try to create "
+                "it. Do this in the project: " + without_folder_request(candidate)
+            )
+            self.notify(f"Using the project folder {folder}")
         if not binding(self).get("folder"):
             try:
                 created = ensure_project(self, request)
@@ -2109,8 +2173,6 @@ class AedrovaWindow(QMainWindow):
             if not self.account_dialog.busy or getattr(
                 self.account_dialog, "background_job", False
             ):
-
-
                 if self.account_dialog.snapshot.get("workspaces"):
                     if self.connected and self.connected.active and not self.connected.failures:
                         self.account_dialog.status.setText("Connected")
@@ -2118,10 +2180,10 @@ class AedrovaWindow(QMainWindow):
                         intent, self.account_dialog.pending_workspace
                     )
 
-
-
-                    if intent != "create" and not self.account_dialog.busy and not (
-                        self.connected and self.connected.active
+                    if (
+                        intent != "create"
+                        and not self.account_dialog.busy
+                        and not (self.connected and self.connected.active)
                     ):
                         self.account_dialog.refresh()
                 elif not self.account_dialog.busy:
