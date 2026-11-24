@@ -70,6 +70,18 @@ WEB_INSTRUCTION = (
 )
 
 
+def small_talk(question):
+    """A bare greeting or thanks never needs a connector read, even for a Bud."""
+    text = " ".join(str(question).split()).strip("!.,?？。 ").lower()
+    return not text or bool(
+        re.fullmatch(
+            r"(?:hi|hey|hello|yo|thanks|thank you|thx|ok|okay|cool|nice|great|good morning|"
+            r"good afternoon|good evening|good night|bye|goodbye)(?: there| everyone| team)?",
+            text,
+        )
+    )
+
+
 def needs_sources(question):
     """Keep general conversation out of workspace/connector retrieval.
 

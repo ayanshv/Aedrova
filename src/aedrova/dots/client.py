@@ -9,6 +9,7 @@ from dataclasses import replace
 from urllib.parse import quote, urlencode, urlsplit
 
 from aedrova.agents.managed import ManagedClient, connector_origin
+from aedrova.agents.replies import small_talk
 
 
 class BudClient(ManagedClient):
@@ -85,6 +86,19 @@ def mention(text, rows):
     return matches[0] if matches else None
 
 
+def first_json_object(text):
+    """The model sometimes wraps its JSON in a sentence; take the first complete object."""
+    decoder = json.JSONDecoder()
+    for start in (m.start() for m in re.finditer(r"\{", text)):
+        try:
+            value, _ = decoder.raw_decode(text[start:])
+        except ValueError:
+            continue
+        if isinstance(value, dict):
+            return value
+    return None
+
+
 def calls_from_model(output, rows):
     output = output.strip()
     if output.startswith("```"):
@@ -92,9 +106,11 @@ def calls_from_model(output, rows):
     try:
         value = json.loads(output)
     except ValueError:
-        raise ValueError(
-            "The agent could not select Bud tools. Please try a more specific request."
-        ) from None
+        value = first_json_object(output)
+        if value is None:
+            raise ValueError(
+                "The agent could not select Bud tools. Please try a more specific request."
+            ) from None
     if (
         not isinstance(value, dict)
         or set(value) != {"calls"}
@@ -140,6 +156,15 @@ def direct_research_call(rows, task, bud_id):
     if tools[0] != connections[0]["id"] + ".search":
         return None
     return [{"dot": bud_id, "tool": tools[0]}]
+
+
+def task_text(task):
+    """The question itself, whether it arrived plain or as a private-conversation JSON bundle."""
+    try:
+        value = json.loads(task)
+    except (TypeError, ValueError):
+        return str(task)
+    return str(value.get("question", task)) if isinstance(value, dict) else str(task)
 
 
 def retrieve(api, context, task, runner, provider, project, emit, *, bud_id=None):
@@ -207,6 +232,12 @@ def retrieve(api, context, task, runner, provider, project, emit, *, bud_id=None
         finally:
             runner.emit = original_emit
             runner.command_results = []
+    if not selected and bud_id and not small_talk(task_text(task)):
+        # The addressed Bud was asked something and its router chose nothing. Its connected
+        # sources are read-only and bounded, so read them rather than answer blind.
+        own = next((r for r in connected if r["id"] == bud_id), None)
+        if own:
+            selected = [{"dot": bud_id, "tool": tool} for tool in list(own["tools"])[:3]]
     if not selected:
         return context
     names = list(

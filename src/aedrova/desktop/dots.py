@@ -848,6 +848,23 @@ class DotDialog(AppDialog):
 
         self.run(lambda service: service.save_bud(parameters), saved)
 
+    def show_brief(self):
+        """Write this Bud's role brief from its current setup and open it."""
+        row = self.current()
+        if not row:
+            return
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
+        from aedrova.dots.brief import write_brief
+
+        try:
+            path = write_brief(row)
+        except OSError:
+            self.status.setText("The Bud brief could not be written on this Mac.")
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+
     def open_connectors(self):
         self.show_step(5)
 
