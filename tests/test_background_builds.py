@@ -327,3 +327,27 @@ def test_visible_controls_do_not_require_plan_creation(qtbot, tmp_path):
     assert not dialog.plan_button.isVisible()
     assert not dialog.build_button.isVisible()
     assert dialog.start_button.isVisible()
+
+
+def test_a_plan_without_citations_is_asked_once_to_cite_before_failing(
+    qtbot, tmp_path, monkeypatch
+):
+    window, service, root = configured(qtbot, tmp_path, monkeypatch)
+    prompts = []
+
+    def run(self, provider, project, prompt, *, plan):
+        prompts.append((plan, prompt))
+        if plan and len(prompts) == 1:
+            return "Create hello.py."  # no citation and no 'none needed' declaration
+        if plan:
+            assert "previous plan cited no sources" in prompt
+            return "Create hello.py. Sources: none needed"
+        (project / "hello.py").write_text("hello = True\n")
+        return "Implemented hello.py"
+
+    monkeypatch.setattr(LocalRunner, "run", run)
+    window.composer.editor.setPlainText("@Aedrova build our feature")
+    window.send_message(window.composer.editor.toPlainText())
+    dialog = window.build_dialog
+    qtbot.waitUntil(lambda: dialog.successful_build, timeout=10000)
+    assert [plan for plan, _ in prompts] == [True, True, False]

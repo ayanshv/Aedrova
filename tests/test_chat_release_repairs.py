@@ -68,7 +68,6 @@ def test_each_reply_stays_between_its_prompt_and_the_next_prompt(qtbot, tmp_path
     window.connected.render_local_messages()
     messages = window.channel.messages[0].replies if thread else window.channel.messages
 
-
     for r in window.connected.agent_replies[("w", "c")]:
         if r["body"] == "Second answer":
             r["created_at"] = (now + timedelta(seconds=2)).isoformat()
@@ -228,3 +227,22 @@ def test_completed_build_answer_survives_next_request_and_signout_clears_it(qtbo
     window.connected.disconnect()
     assert window.completed_agent_response is None
     assert not window.connected.agent_replies
+
+
+def test_a_self_contained_plan_may_declare_that_it_needs_no_sources():
+    import inspect
+
+    from test_context_retrieval import corpus
+
+    from aedrova.agents import runtime
+
+    context = corpus()
+    with pytest.raises(ValueError, match="omitted source citations"):
+        validate_citations(context, "Create the folder Test Calc.")
+    assert validate_citations(context, "Create the folder Test Calc.\n\nSources: none needed") == []
+    assert validate_citations(context, "Plan.\n- Sources: None needed.") == []
+    assert validate_citations(context, "Create hello.py. Sources: none needed") == []
+    # Mentioning the phrase mid-sentence is not a declaration.
+    with pytest.raises(ValueError, match="omitted"):
+        validate_citations(context, "We discussed whether sources: none needed would be fine.")
+    assert "Sources: none needed" in inspect.getsource(runtime)

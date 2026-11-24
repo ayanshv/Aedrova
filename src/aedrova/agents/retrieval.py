@@ -361,7 +361,8 @@ def validate_citations(context, plan):
                 "Plan contains unknown source citations. Create a fresh plan: "
                 + ", ".join(sorted(unknown)[:5])
             )
-        if available and not cited:
+        declared_none = re.search(r"(?im)(?:^|[.!?]\s+)\W*sources:\s*none needed\b", plan)
+        if available and not cited and not declared_none:
             raise ValueError(
                 "The plan omitted source citations. Create a fresh plan before approval."
             )

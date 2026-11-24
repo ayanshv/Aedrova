@@ -296,7 +296,25 @@ class BuildJob(QRunnable):
             if question and credential_rules(json.dumps(question, ensure_ascii=False).encode()):
                 raise ValueError("The agent’s question contained a credential and was hidden.")
             if self.plan and not question:
-                validate_citations(self.context, result)
+                try:
+                    validate_citations(self.context, result)
+                except ValueError as error:
+                    if "omitted source citations" not in str(error):
+                        raise
+                    # Ask once, plainly, rather than make the person start over.
+                    self.signals.progress.emit("Asking the agent to cite its sources…")
+                    result = CodingAdapter(self.provider, self.runner).execute(
+                        self.project,
+                        prompt
+                        + "\nYour previous plan cited no sources. Cite the exact sources you "
+                        "relied on, or, if this request is self-contained and used no workspace "
+                        "evidence, write the single line 'Sources: none needed'. Return the "
+                        "complete plan again.",
+                        plan=self.plan,
+                    )
+                    if self.runner.cancelled.is_set():
+                        raise BuildCancelled() from None
+                    validate_citations(self.context, result)
             outcome = {
                 "ok": True,
                 "text": question["title"] if question else result,
@@ -311,7 +329,10 @@ class BuildJob(QRunnable):
 
                 try:
                     outcome["file_summary"] = make_review(self.project).file_summary() or (
-                        0, 0, 0, ()
+                        0,
+                        0,
+                        0,
+                        (),
                     )
                 except (OSError, ValueError):
                     pass  # The review dialog can explain why these files need attention.
@@ -337,7 +358,6 @@ class BuildJob(QRunnable):
                 try:
                     (self.project.parent / ".last-used").touch(mode=0o600)
                 except OSError:
-
                     pass
                 finally:
                     retention_lease.close()
@@ -688,11 +708,7 @@ class BuildDialog(AppDialog):
         if not self.clarification or self.pending or self.invalidated:
             return
         user = self.window.current_user()
-        if (
-            not user
-            or str(user.id) != self.user
-            or self.workspace != self.window.workspace_id
-        ):
+        if not user or str(user.id) != self.user or self.workspace != self.window.workspace_id:
             self.status.setText("Return to this workspace to answer.")
             return
         if self.background_run and not self.background_authorized():
@@ -959,11 +975,8 @@ class BuildDialog(AppDialog):
                 self.invalidate()
                 return
             if self.background_run and not self.background_authorized():
-                self.stop_before_run(
-                    "Project permissions changed. Send a new request after setup."
-                )
+                self.stop_before_run("Project permissions changed. Send a new request after setup.")
                 return
-
 
             if (
                 not plan
@@ -1065,8 +1078,11 @@ class BuildDialog(AppDialog):
     def context_progress(self, text):
         current = self.context_jobs.get(self.generation)
         if (
-            current and self.sender() is current.signals and self.pending
-            and not self.invalidated and not self.collection_cancelled.is_set()
+            current
+            and self.sender() is current.signals
+            and self.pending
+            and not self.invalidated
+            and not self.collection_cancelled.is_set()
         ):
             self.status.setText(text)
             self.window.agent_activity(self.workspace, text)
@@ -1096,9 +1112,11 @@ class BuildDialog(AppDialog):
         teammate = getattr(self, "teammate", None)
         reporting = teammate["config"]["reporting"] if teammate else "detailed"
         now = time.monotonic()
-        if reporting != "quiet" and (
-            reporting == "detailed" or now - getattr(self, "last_teammate_update", 0) > 2
-        ) and not self.collection_cancelled.is_set():
+        if (
+            reporting != "quiet"
+            and (reporting == "detailed" or now - getattr(self, "last_teammate_update", 0) > 2)
+            and not self.collection_cancelled.is_set()
+        ):
             self.window.agent_event(self.workspace, text)
             self.last_teammate_update = now
 
@@ -1239,9 +1257,7 @@ class BuildDialog(AppDialog):
             self.status.setText("Run stopped. See the details below.")
             self.window.agent_activity(self.workspace, "Needs attention · open to continue")
         self.set_busy(False)
-        self.start_button.setText(
-            "Approve plan and build" if self.approved_plan else "Start build"
-        )
+        self.start_button.setText("Approve plan and build" if self.approved_plan else "Start build")
         analysis = bool(
             getattr(self, "teammate", None) and self.teammate["config"]["role"] != "engineering"
         )
@@ -1280,11 +1296,13 @@ class BuildDialog(AppDialog):
                 unknown = len(commands) - passed - failed
                 verification = (
                     f"{passed} passed · {failed} failed · {unknown} unverified"
-                    if commands else "No command results were recorded."
+                    if commands
+                    else "No command results were recorded."
                 )
                 text += f"\n\n**Recorded command results**  \n{verification}"
             self.window.finish_agent_response(
-                self.workspace, text,
+                self.workspace,
+                text,
                 source_channels=self.context.channel_ids if self.context else (),
                 file_summary=summary,
                 open_changes=review_current_build if summary else None,
@@ -1464,9 +1482,7 @@ class BuildDialog(AppDialog):
             self.permission_box.resolve(False)
         self.status.setText("Cancellation requested. Waiting for the provider to stop…")
         if not self.invalidated:
-            self.window.agent_activity(
-                self.workspace, "Stopping…" if self.job else "Cancelled"
-            )
+            self.window.agent_activity(self.workspace, "Stopping…" if self.job else "Cancelled")
             if not self.job:
                 self.window.finish_agent_response(
                     self.workspace,
@@ -1489,7 +1505,6 @@ class BuildDialog(AppDialog):
             super().reject()
 
     def closeEvent(self, event):  # noqa: N802
-
 
         if self.pending and not self.background_run:
             self.cancel()
