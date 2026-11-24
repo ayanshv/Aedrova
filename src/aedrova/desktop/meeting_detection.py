@@ -6,8 +6,7 @@ import time
 from PySide6.QtCore import QObject, QThreadPool, QTimer
 from PySide6.QtWidgets import QApplication
 
-from aedrova.desktop.icons import assign
-from aedrova.desktop.meeting_listening import ListeningCapsule
+from aedrova.desktop.meeting_suggestion import MeetingSuggestion
 from aedrova.desktop.meeting_transcript import ReviewJob
 from aedrova.meetings.local_capture import possible_meeting_apps
 
@@ -34,14 +33,11 @@ class MeetingDetection(QObject):
     def ensure_capsule(self):
         if self.capsule is not None:
             return
-        self.capsule = ListeningCapsule(self.window)
-        self.capsule.review.setToolTip("Start meeting notes")
-        self.capsule.review.setAccessibleName("Start meeting notes")
+        self.capsule = MeetingSuggestion(self.window)
         self.capsule.review_requested.connect(self.open_notes)
-        assign(self.capsule.stop, "close")
-        self.capsule.stop.setToolTip("Dismiss suggestion")
-        self.capsule.stop.setAccessibleName("Dismiss meeting notes suggestion")
         self.capsule.stop_requested.connect(self.dismiss)
+        self.capsule.disable_requested.connect(self.turn_off)
+        self.capsule.expired.connect(self.snooze_briefly)
 
     def enabled(self):
         return self.window.settings.value("meetings/localNotesSuggestions", True, type=bool)
@@ -75,7 +71,6 @@ class MeetingDetection(QObject):
         if self.can_suggest() and data.get("active") and data.get("names"):
             self.ensure_capsule()
             self.capsule.set_state("Take meeting notes?")
-            self.capsule.pulse.pending = False
             if not self.capsule.isVisible():
                 self.capsule.show_on_side()
         else:
@@ -84,6 +79,12 @@ class MeetingDetection(QObject):
     def dismiss(self):
         self.snoozed_until = time.monotonic() + 30 * 60
         self.hide_suggestion()
+
+    def snooze_briefly(self):
+        self.snoozed_until = time.monotonic() + 5 * 60
+
+    def turn_off(self):
+        self.set_enabled(False)
 
     def open_notes(self):
         from aedrova.desktop.local_meeting_notes import open_local_meeting_notes

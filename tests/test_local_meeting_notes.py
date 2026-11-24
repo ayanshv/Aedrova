@@ -166,3 +166,31 @@ def test_changed_destination_does_not_share(notes):
     dialog.share()
     assert not queued and not uploads
     assert "original" in dialog.status.text()
+
+
+def test_suggestion_pill_offers_start_snooze_and_turn_off(qtbot, tmp_path):
+    from PySide6.QtCore import QSettings
+
+    from aedrova.desktop.window import AedrovaWindow
+
+    window = AedrovaWindow(
+        settings=QSettings(str(tmp_path / "pill.ini"), QSettings.Format.IniFormat)
+    )
+    qtbot.addWidget(window)
+    window.show()
+    detector = window.meeting_detection
+    detector.detected({"value": {"active": True, "names": ["Zoom"]}})
+    pill = detector.capsule
+    assert pill.title.text() == "Take meeting notes?"
+    assert "stays on this Mac" in pill.detail.text()
+    assert pill.start.text() == "Start notes"
+    with qtbot.waitSignal(pill.expired, timeout=100):
+        pill.remaining = 0.0
+        pill.tick()
+    assert not pill.isVisible()
+    assert detector.snoozed_until > 0
+    detector.snoozed_until = 0
+    detector.detected({"value": {"active": True, "names": ["Zoom"]}})
+    assert pill.isVisible()
+    detector.turn_off()
+    assert not pill.isVisible() and not detector.enabled()
