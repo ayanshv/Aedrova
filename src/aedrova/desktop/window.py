@@ -1203,7 +1203,11 @@ class AedrovaWindow(QMainWindow):
             candidate,
             re.IGNORECASE,
         )
-        building = explicit_build or (not drafting and (build_verb or localized_build(candidate)))
+        from aedrova.agents.intent import wants_build
+
+        building = explicit_build or (
+            not drafting and (build_verb or wants_build(candidate) or localized_build(candidate))
+        )
         if not building:
             from aedrova.desktop.dot_analysis import start_analysis
 
@@ -1211,10 +1215,17 @@ class AedrovaWindow(QMainWindow):
                 text, composer, lambda: start_analysis(self, candidate, bud=bud)
             )
             return True
-        from aedrova.desktop.projects import binding
+        from aedrova.desktop.projects import binding, ensure_project
 
         request = candidate if bud else task
         options = {"bud": bud} if bud else {}
+        if not binding(self).get("folder"):
+            try:
+                created = ensure_project(self, request)
+            except (OSError, PermissionError):
+                created = None
+            if created:
+                self.notify(f"Starting in a new project folder: {created}")
         if explicit_build or binding(self).get("background_build") is False:
             self._start_chat_agent(text, composer, lambda: open_build(self, request, **options))
         else:

@@ -1,6 +1,7 @@
 """Per-account, per-workspace project bindings kept locally on this Mac."""
 
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -41,7 +42,6 @@ def save_binding(window, data, workspace=None):
         raise PermissionError("Sign in before connecting a project.")
     scope = workspace or window.workspace_id
     if binding(window, scope).get("folder") != data.get("folder"):
-
         window.settings.remove(f"agent-permissions/{user.id}/{scope}")
         dialog = getattr(window, "build_dialog", None)
         if (
@@ -58,6 +58,72 @@ def save_binding(window, data, workspace=None):
         binding_key(str(user.id), workspace or window.workspace_id), json.dumps(data)
     )
     window.settings.sync()
+
+
+def projects_root():
+    documents = Path.home() / "Documents"
+    return (documents if documents.is_dir() else Path.home()) / "Aedrova Projects"
+
+
+def project_slug(task):
+    words = [
+        w
+        for w in re.findall(r"[a-z0-9]+", str(task).lower())
+        if w
+        not in {
+            "a",
+            "an",
+            "the",
+            "me",
+            "my",
+            "please",
+            "can",
+            "could",
+            "you",
+            "build",
+            "make",
+            "create",
+            "write",
+            "i",
+            "want",
+            "need",
+            "to",
+            "locally",
+            "only",
+            "that",
+            "for",
+            "and",
+            "with",
+            "of",
+            "in",
+            "on",
+        }
+    ]
+    return "-".join(words[:4])[:40].strip("-") or "new-project"
+
+
+def ensure_project(window, task, root=None):
+    """Give a first build somewhere to live: a fresh folder, connected for background builds.
+
+    Without a project, "build me a calculator" had nowhere to put its files and fell back to
+    pasting code. The folder is empty and new, so nothing existing is at risk, and the finished
+    work still goes through the review step before it is applied.
+    """
+    saved = binding(window)
+    if saved.get("folder"):
+        return None
+    base = Path(root) if root else projects_root()
+    base.mkdir(parents=True, exist_ok=True)
+    name, folder, number = project_slug(task), None, 1
+    while folder is None or folder.exists():
+        folder = base / (name if number == 1 else f"{name}-{number}")
+        number += 1
+    folder.mkdir()
+    data = {**saved, "folder": str(folder), "provider": saved.get("provider", "codex")}
+    if "background_build" not in saved:  # an explicit choice, either way, is never overridden
+        data["background_build"] = True
+    save_binding(window, data)
+    return folder
 
 
 def open_editor(window, project):
