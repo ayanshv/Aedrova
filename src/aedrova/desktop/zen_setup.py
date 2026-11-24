@@ -1,5 +1,6 @@
 """Account and project forms for the desktop first-run flow."""
 
+import sys
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, QTimer
@@ -105,8 +106,8 @@ class SetupPages(QFrame):
         else:
             self.render_project()
         self.column.addWidget(self.status)
-        if stage == ACCOUNT and not self.profile_form:
-            # Sign-in is short: keep it together at the top, whatever the window height.
+        if sys.platform == "win32" and stage == ACCOUNT and not self.profile_form:
+            # Windows spreads this short step down the screen; the Mac layout is unchanged.
             self.column.addStretch(1)
         self.updateGeometry()
 

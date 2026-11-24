@@ -123,8 +123,11 @@ def test_google_still_works_when_apple_is_disabled(fresh_window, qtbot, monkeypa
     assert flow.isVisible() and flow.stage == ACCOUNT
 
 
-def test_sign_in_keeps_its_heading_note_and_buttons_together(fresh_window, qtbot, monkeypatch):
+def test_on_windows_sign_in_keeps_its_heading_note_and_buttons_together(
+    fresh_window, qtbot, monkeypatch
+):
     monkeypatch.setenv("AEDROVA_APPLE_LOGIN_ENABLED", "false")
+    monkeypatch.setattr("aedrova.desktop.zen_setup.sys.platform", "win32")
     flow = show_setup(fresh_window, qtbot)
     flow.primary.click()
     qtbot.wait(50)
