@@ -13,6 +13,13 @@ from aedrova.desktop.brand import app_icon
 from aedrova.desktop.window import AedrovaWindow
 
 
+def first_run_onboarding(settings):
+    """Use the introduction until this installation has an account to reopen."""
+    return not settings.value("onboarding/everSignedIn", False, type=bool) and not any(
+        key.startswith(("sessionSlot/", "lastWorkspace/")) for key in settings.allKeys()
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description="Aedrova desktop · local preview")
     parser.add_argument("--theme", choices=("light", "dark", "system"))
@@ -68,12 +75,15 @@ def main():
     if args.theme:
         window.set_theme(args.theme, persist=False)
     window.resize(args.width, args.height)
-    account_first = args.account or (
-        not args.demo and not args.smoke_report and not args.onboarding
-    )
-    if not account_first and not args.onboarding:
-        window.show()  # setup shows the workspace itself when it is done
-    if args.onboarding:
+    normal_launch = not (args.account or args.demo or args.smoke_report or args.onboarding)
+    first_run = normal_launch and first_run_onboarding(window.settings)
+    show_setup = args.onboarding or first_run
+    account_first = args.account or (normal_launch and not first_run)
+    if not account_first and not show_setup:
+        window.show()
+    if show_setup:
+        if first_run and not args.settings_file:
+            window.ensure_account_dialog().enable_session_restore()
         QTimer.singleShot(0, window.show_setup)
     if args.thread:
         window.open_pinned()

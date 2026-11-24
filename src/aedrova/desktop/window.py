@@ -56,7 +56,7 @@ class AedrovaWindow(QMainWindow):
         self.channel_id = "product"
         self.thread_id = ""
         self.last_channels = {"northstar": "product", "orbit": "orbit-general"}
-        self.theme_mode = self.settings.value("appearance", "system")
+        self.theme_mode = self.settings.value("appearance", "light")
         if self.theme_mode not in ("light", "dark", "system"):
             self.theme_mode = "system"
         self.theme = LIGHT
@@ -1448,8 +1448,10 @@ class AedrovaWindow(QMainWindow):
         self.theme = DARK if dark else LIGHT
         QApplication.instance().setPalette(palette(self.theme))
         self.setPalette(palette(self.theme))
+        setup_dialog = getattr(self, "setup_dialog", None)
         for dialog in self.findChildren(AppDialog):
-            dialog.setPalette(palette(self.theme))
+            if dialog is not setup_dialog:
+                dialog.setPalette(palette(self.theme))
         self.setStyleSheet(stylesheet(self.theme, reduced_transparency=self.reduced_transparency))
         self.build_activity.configure(self.theme, self.reduced_motion, self.build_activity.active)
         self.messages.set_theme(self.theme)

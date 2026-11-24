@@ -14,7 +14,6 @@ from PySide6.QtGui import (
     QLinearGradient,
     QPainter,
     QPainterPath,
-    QPalette,
     QPen,
     QRadialGradient,
 )
@@ -22,6 +21,7 @@ from PySide6.QtWidgets import QGraphicsBlurEffect, QWidget
 
 from aedrova.desktop import motion
 from aedrova.desktop.icons import icon
+from aedrova.desktop.zen_theme import visual_theme
 
 WASH_LIGHT = ("#FFD3E8", "#DCD0FF", "#FFE3CF", "#D2E8FF")
 WASH_DARK = ("#2A2D42", "#243241", "#312E3E", "#233436")
@@ -82,7 +82,7 @@ class AuroraSurface(QWidget):
         super().hideEvent(event)
 
     def paintEvent(self, event):  # noqa: N802
-        base = self.palette().color(QPalette.ColorRole.Window)
+        base = QColor(visual_theme(self).bg)
         painter = QPainter(self)
         if self.level <= 0.01:
             painter.fillRect(self.rect(), base)

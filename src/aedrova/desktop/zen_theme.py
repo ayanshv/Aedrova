@@ -98,8 +98,8 @@ def onboarding_styles(theme):
             border-radius:10px;text-align:center;font-weight:600;padding:8px 18px;}}
         QPushButton#OnboardingContinue:focus {{border:2px solid rgba(255,255,255,0.75);}}
         QLabel#ZenHeading {{font-size:30px;font-weight:600;}}
-        QLabel#ZenOpening {{font-size:42px;font-weight:600;}}
-        QLabel[role='muted'] {{font-size:13px;}}
+        QLabel#ZenOpening {{color:{theme.text};font-size:42px;font-weight:600;}}
+        QLabel[role='muted'] {{color:{theme.muted};font-size:13px;}}
         QPushButton#OnboardingContinue:hover {{background:{theme.accent_text};}}
         QPushButton#OnboardingContinue:disabled {{background:{theme.surface};color:{theme.muted};}}
         QLineEdit {{background:{theme.bg};border:1px solid {theme.border};border-radius:12px;

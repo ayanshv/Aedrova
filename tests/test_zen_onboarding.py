@@ -4,12 +4,14 @@ from types import SimpleNamespace
 
 import pytest
 from PySide6.QtCore import QSettings, Qt
+from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication, QLabel, QPushButton
 from test_connected import setup, snapshot
 
 from aedrova.desktop.account import AccountDialog
 from aedrova.desktop.onboarding import SetupDialog, account_key
 from aedrova.desktop.projects import binding
+from aedrova.desktop.theme import DARK, LIGHT
 from aedrova.desktop.window import AedrovaWindow
 from aedrova.desktop.zen_setup import (
     ACCOUNT,
@@ -551,6 +553,32 @@ def test_a_first_run_opens_light_even_when_the_app_is_dark(fresh_window, qtbot):
     later = SetupDialog(fresh_window)
     qtbot.addWidget(later)
     assert later.theme.name == "dark"  # reviewing setup keeps their own appearance
+
+
+def test_welcome_uses_one_palette_even_when_the_desktop_appearance_changes(qtbot, tmp_path):
+    settings = QSettings(str(tmp_path / "fresh.ini"), QSettings.IniFormat)
+    settings.setValue("reduceMotion", True)
+    hints = QApplication.instance().styleHints()
+    hints.setColorScheme(Qt.ColorScheme.Dark)
+    try:
+        window = AedrovaWindow(settings=settings)
+        qtbot.addWidget(window)
+        assert window.theme_mode == "light"
+        window.show_setup()
+        flow = window.setup_dialog
+        assert flow.stage == OPENING
+        window.set_theme("dark", persist=False)
+        assert flow.theme == LIGHT
+
+        for theme in (LIGHT, DARK):
+            flow.apply_appearance(theme.name)
+            for label, ink in ((flow.opener_title, theme.text), (flow.opener_text, theme.muted)):
+                label.ensurePolished()
+                assert label.palette().color(QPalette.ColorRole.WindowText) == QColor(ink)
+            corner = flow.surface.grab().toImage().pixelColor(0, 0)
+            assert (corner.lightness() < 128) == (theme == DARK)
+    finally:
+        hints.unsetColorScheme()
 
 
 def slack_zip(tmp_path):

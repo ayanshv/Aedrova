@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import httpx
+import pytest
 from PySide6.QtCore import QSettings
 from supabase_auth.errors import AuthApiError
 
@@ -21,6 +22,23 @@ USER = {
     "user_metadata": {},
     "created_at": "2026-09-26T00:00:00Z",
 }
+
+
+@pytest.mark.parametrize(
+    "returning_setting",
+    [
+        ("onboarding/everSignedIn", True),
+        ("sessionSlot/one-project", SLOT),
+        ("lastWorkspace/desktop-test.example/u", "w"),
+    ],
+)
+def test_dmg_startup_detects_a_fresh_profile(tmp_path, returning_setting):
+    from aedrova.desktop.app import first_run_onboarding
+
+    settings = QSettings(str(tmp_path / "first-run.ini"), QSettings.Format.IniFormat)
+    assert first_run_onboarding(settings)
+    settings.setValue(*returning_setting)
+    assert not first_run_onboarding(settings)
 
 
 class CredentialStore:

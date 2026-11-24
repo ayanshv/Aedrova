@@ -1351,6 +1351,7 @@ class AccountDialog(AppDialog):
             self.status.setText("Sign-in did not finish. Please try again.")
             return
         self.awaiting_sign_in_snapshot = True
+        self.settings.setValue("onboarding/everSignedIn", True)
         if not self.quiet:  # setup draws its own screens and keeps this window out of the way
             self.show()
             self.raise_()
