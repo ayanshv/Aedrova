@@ -105,6 +105,9 @@ class SetupPages(QFrame):
         else:
             self.render_project()
         self.column.addWidget(self.status)
+        if stage == ACCOUNT and not self.profile_form:
+            # Sign-in is short: keep it together at the top, whatever the window height.
+            self.column.addStretch(1)
         self.updateGeometry()
 
     def render_account(self):

@@ -123,6 +123,21 @@ def test_google_still_works_when_apple_is_disabled(fresh_window, qtbot, monkeypa
     assert flow.isVisible() and flow.stage == ACCOUNT
 
 
+def test_sign_in_keeps_its_heading_note_and_buttons_together(fresh_window, qtbot, monkeypatch):
+    monkeypatch.setenv("AEDROVA_APPLE_LOGIN_ENABLED", "false")
+    flow = show_setup(fresh_window, qtbot)
+    flow.primary.click()
+    qtbot.wait(50)
+    column = flow.setup
+    heading = next(w for w in column.findChildren(QLabel) if w.text() == "Sign in")
+    google = next(w for w in column.findChildren(QPushButton) if w.text() == "Continue with Google")
+    gap = (
+        google.mapTo(column, google.rect().topLeft()).y()
+        - heading.mapTo(column, heading.rect().bottomLeft()).y()
+    )
+    assert gap < 140
+
+
 def test_signed_in_profile_completion_opens_workspace_with_no_tour(qtbot, tmp_path):
     window, service = setup(qtbot, tmp_path)
     sample_code = "A2-0123-4567-89AB-CDEF"
