@@ -54,11 +54,13 @@ class MeetingSuggestion(QWidget):
         self.theme = None
 
         outer = QHBoxLayout(self)
-        outer.setContentsMargins(34, 14, 28, 14)
+        # The painted pill is inset 18/10/18/18; these margins centre the content inside it.
+        outer.setContentsMargins(34, 18, 34, 26)
         outer.setSpacing(16)
         outer.addWidget(BrandMark(40), alignment=Qt.AlignmentFlag.AlignVCenter)
         copy = QVBoxLayout()
-        copy.setSpacing(1)
+        copy.setSpacing(0)
+        copy.setContentsMargins(0, 0, 0, 4)  # centres the text block on the logo
         self.title = QLabel("Take meeting notes?")
         self.detail = QLabel("Transcription stays on this Mac")
         copy.addStretch()
