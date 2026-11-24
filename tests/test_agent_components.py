@@ -312,3 +312,28 @@ def test_checklist_drops_rows_for_steps_that_never_applied(qtbot):
     checklist.observe("Writing a response…")  # skips access and context
     assert [key for key, _ in checklist.states()] == ["respond"]
     assert len(checklist.parts) == 1 and len(checklist.rows) == 1
+
+
+def test_a_late_access_report_keeps_its_place_and_capital_letter(qtbot):
+    from aedrova.desktop.agent_components import StepChecklist
+
+    checklist = StepChecklist()
+    qtbot.addWidget(checklist)
+    # The window reports "Finding relevant context" before the context gatherer reports access.
+    checklist.observe("Finding relevant context…")
+    checklist.observe("Checking workspace access…")
+    states = checklist.states()
+    assert [key for key, _ in states][:2] == ["access", "context"]
+    assert dict(states) == {"access": "done", "context": "running", "respond": "pending"}
+    parts = [checklist.parts[("step", step["key"])] for step in checklist.steps]
+    labels = [part["label"].text() for part in parts]
+    assert labels[0] == "Checking workspace access"
+    positions = [checklist.column.indexOf(part["layout"]) for part in parts]
+    assert positions == sorted(positions)  # the widgets sit in the same order as the steps
+    assert all(label[0].isupper() for label in labels)
+    checklist.observe("Gathered 12 messages for context")
+    checklist.observe("Writing a response…")
+    checklist.observe("Checking workspace access…")  # a repeat never reorders or reopens it
+    assert [key for key, _ in checklist.states()] == ["access", "context", "respond"]
+    assert dict(checklist.states())["access"] == "done"
+    assert [i.state for i in checklist.rows].count("running") == 1

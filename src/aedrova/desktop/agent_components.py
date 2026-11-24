@@ -220,12 +220,53 @@ class StepChecklist(QWidget):
     def current(self):
         return next((s for s in self.steps if s["state"] == "running"), None)
 
+    @staticmethod
+    def rank(key):
+        for order in (CHAT_STEPS, BUILD_STEPS):
+            for position, (name, _) in enumerate(order):
+                if name == key:
+                    return position
+        return 50  # extra steps (checking sources, ad hoc work) belong after the standard ones
+
+    @staticmethod
+    def default_label(key):
+        for order in (CHAT_STEPS, BUILD_STEPS):
+            for name, label in order:
+                if name == key:
+                    return label
+        return {"sources": "Checking sources", "work": "Working"}.get(key, key.capitalize())
+
     def start(self, key, label=None):
         step = self.find(key)
         if step is None:
-            step = {"key": key, "label": label or key, "state": "pending", "commands": []}
-            self.steps.append(step)
+            text = label or self.default_label(key)
+            step = {
+                "key": key,
+                "label": text[:1].upper() + text[1:],
+                "state": "pending",
+                "commands": [],
+            }
+            # Keep the standard order even when a step is reported late: access is checked
+            # while context is already being gathered, and must not jump below it.
+            at = next(
+                (
+                    i
+                    for i, other in enumerate(self.steps)
+                    if self.rank(other["key"]) > self.rank(key)
+                ),
+                len(self.steps),
+            )
+            self.steps.insert(at, step)
         if step["state"] == "running":
+            return
+        if any(
+            other["state"] in {"running", "done"} and self.rank(other["key"]) > self.rank(key)
+            for other in self.steps
+        ):
+            # A later step is already under way, so this one finished before the report
+            # arrived (or is being repeated). Never reopen it or disturb the current step.
+            if step["state"] == "pending":
+                step["state"] = "done"
             return
         position = self.steps.index(step)
         for other in list(self.steps[:position]):
