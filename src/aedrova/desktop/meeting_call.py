@@ -1,5 +1,7 @@
 """Native channel-call controls. Device access is always an explicit action."""
 
+import base64
+import json
 import time
 
 from PySide6.QtCore import QEvent, QSize, Qt, QTimer, Signal
@@ -1191,6 +1193,37 @@ class AudioCall(MeetingCall):
             self.duration.setText("Call ended")
 
 
+def token_expiry(token):
+    try:
+        payload = token.split(".")[1]
+        payload += "=" * (-len(payload) % 4)
+        return int(json.loads(base64.urlsafe_b64decode(payload))["exp"])
+    except (IndexError, KeyError, ValueError, TypeError, AttributeError):
+        return 0
+
+
+def fresh_token_source(service, user, first):
+    """Refresh the account token a little before it expires, so long calls are not dropped."""
+    state = {"token": first}
+
+    def source():
+        if token_expiry(state["token"]) - time.time() > 180:
+            return state["token"]
+        clone = None
+        try:
+            clone = service.fork_for_context()
+            _, _, token, identity = clone.realtime_credentials()
+            if identity == user and token:
+                state["token"] = token
+        finally:
+            if clone:
+                clone.close_context()
+        return state["token"]
+
+    return source
+
+
+
 def open_channel_call(window, *, mode=None, auto_join=False):
     existing = getattr(window, "meeting_call", None)
     if existing and existing.isVisible():
@@ -1248,7 +1281,7 @@ def open_channel_call(window, *, mode=None, auto_join=False):
             return
         token = result["token"]
         worker = CallWorker(
-            MeetingClient(origin, token),
+            MeetingClient(origin, token, token_source=fresh_token_source(service, user, token)),
             workspace=workspace,
             channel=channel,
             user=user,

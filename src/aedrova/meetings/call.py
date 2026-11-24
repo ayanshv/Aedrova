@@ -151,10 +151,27 @@ class CallWorker(QObject):
 
     async def _heartbeat(self):
         """HTTP authorization must not block the video frame pump."""
+        # Presence lasts 60 seconds on the server, so a few missed beats are survivable. Refused
+        # access ends the call at once; network blips and a waking server do not.
+        misses = 0
         while not self.stop_requested.is_set():
-            snapshot = await asyncio.wait_for(
-                asyncio.to_thread(self.client.pulse, self.meeting), 20
-            )
+            try:
+                snapshot = await asyncio.wait_for(
+                    asyncio.to_thread(self.client.pulse, self.meeting), 12
+                )
+            except (TimeoutError, MeetingRequestError) as error:
+                misses += 1
+                if (
+                    misses >= 3
+                    or isinstance(error, MeetingRequestError)
+                    and not getattr(error, "retryable", False)
+                ):
+                    raise
+                if self.stop_requested.is_set() or self.cleaning:
+                    return
+                await asyncio.sleep(3)
+                continue
+            misses = 0
             if self.stop_requested.is_set() or self.cleaning:
                 return
             self.update_consent(snapshot)

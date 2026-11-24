@@ -72,17 +72,42 @@ class MeetingAccess:
 
 
 class MeetingRequestError(RuntimeError):
-    """Only curated, credential-free messages are safe to show in the call UI."""
+    """Only curated, credential-free messages are safe to show in the call UI.
+
+    `retryable` marks blips (network, busy or waking server) that a live call should ride out,
+    as opposed to access being refused.
+    """
+
+    retryable = False
+
+
+class RetryableMeetingError(MeetingRequestError):
+    retryable = True
 
 
 class MeetingClient(ManagedClient):
+    def __init__(self, origin, access_token, *, token_source=None):
+        super().__init__(origin, access_token)
+        self.token_source = token_source
+
+    def _fresh_token(self):
+        """Long calls outlive one access token, so ask the source again before it runs out."""
+        if self.token_source is not None:
+            try:
+                token = self.token_source()
+            except Exception:
+                token = None
+            if isinstance(token, str) and token:
+                self._access_token = token
+        return self._access_token
+
     def request(self, path, body=None, *, timeout=20):
         try:
             with httpx.Client(timeout=timeout, follow_redirects=False, trust_env=False) as client:
                 response = client.request(
                     "GET" if body is None else "POST",
                     self.origin + path,
-                    headers={"Authorization": "Bearer " + self._access_token},
+                    headers={"Authorization": "Bearer " + self._fresh_token()},
                     json=body,
                 )
             if response.status_code in {401, 403}:
@@ -108,14 +133,16 @@ class MeetingClient(ManagedClient):
                     "Meeting service is not configured. Contact contact@aedrova.com."
                 )
             if response.status_code == 429:
-                raise MeetingRequestError("Too many meeting requests. Wait a moment and try again.")
+                raise RetryableMeetingError(
+                    "Too many meeting requests. Wait a moment and try again."
+                )
             if response.status_code != 200:
-                raise MeetingRequestError(
+                raise RetryableMeetingError(
                     "Meeting service is temporarily unavailable. Wait a moment and try again."
                 )
             return response.json()
         except (httpx.HTTPError, ValueError) as error:
-            raise MeetingRequestError(
+            raise RetryableMeetingError(
                 "Cannot reach the meeting service. Check your connection and try again."
             ) from error
 
@@ -206,7 +233,7 @@ class MeetingClient(ManagedClient):
         return self.request("/api/meetings/text/withdraw", {"meeting": meeting, "delete": delete})
 
     def pulse(self, meeting):
-        return self.request("/api/meetings/pulse", {"meeting": meeting})
+        return self.request("/api/meetings/pulse", {"meeting": meeting}, timeout=10)
 
     def leave(self, meeting):
         return self.request("/api/meetings/leave", {"meeting": meeting})
