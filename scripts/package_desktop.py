@@ -241,6 +241,12 @@ info.update(
 info.update(install_macos_icon(ROOT, bundle / "Contents"))
 with info_path.open("wb") as stream:
     plistlib.dump(info, stream)
+if identity:
+    from web_engine_bundle import repair as repair_web_engine
+    from web_engine_bundle import sign as sign_web_engine
+
+    repair_web_engine(bundle)
+    sign_web_engine(bundle, identity, ROOT / "scripts/release-entitlements.plist")
 resign = ["codesign", "--force", "--sign", identity or "-"]
 if identity:
     resign.extend(
