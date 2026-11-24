@@ -2,11 +2,16 @@
 
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from aedrova.agents.managed import application_origin, connector_origin  # noqa: E402
+from aedrova.identity.service import Connection  # noqa: E402
 
 
 def main():
@@ -43,10 +48,30 @@ def main():
         "--specpath",
         str(work),
         "--add-data",
-        f"{source / 'desktop/assets'}:aedrova/desktop/assets",
+        f"{source / 'desktop/assets'}{os.pathsep}aedrova/desktop/assets",
         "--add-data",
-        f"{source / 'localization/models.json'}:aedrova/localization",
+        f"{source / 'localization/models.json'}{os.pathsep}aedrova/localization",
     ]
+    # The beta build talks to the staging service; its public settings come from the environment.
+    connection = Connection.from_environment()
+    if connection:
+        config_path = work / "public-config.json"
+        config_path.write_text(
+            json.dumps(
+                {
+                    "supabase_url": connection.url,
+                    "supabase_publishable_key": connection.public_key,
+                    "managed_origin": application_origin(),
+                    "connector_origin": connector_origin(),
+                    "ai_access_mode": "included",
+                    "apple_login_enabled": False,
+                    "meeting_context_enabled": False,
+                    "hosted_calls_enabled": False,
+                }
+            ),
+            encoding="utf-8",
+        )
+        command.extend(["--add-data", f"{config_path}{os.pathsep}aedrova/desktop/assets"])
     for module in (
         "claude_agent_sdk",
         "faster_whisper",
