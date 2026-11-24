@@ -53,7 +53,6 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QStyle,
     QStyledItemDelegate,
-    QToolTip,
     QVBoxLayout,
     QWidget,
 )
@@ -66,12 +65,13 @@ from aedrova.desktop.emojis import QUICK_EMOJI, pick_emoji
 from aedrova.desktop.materials import SpringButton, system_font
 from aedrova.desktop.response_actions import (
     ACTION_PREFIX,
-    REPLY_ACTION_LABELS,
     SOURCE_PREFIX,
+    HoverTip,
     append_response_actions,
     citations,
     compact_citations,
     long_reply,
+    reply_action_label,
     response_parts,
     write_reply_file,
 )
@@ -1117,20 +1117,38 @@ class MessageView(QListView):
         if emoji:
             self.react(identifier, emoji)
 
+    def action_under(self, position):
+        """(link, tooltip) for the reply action icon under the pointer, else None."""
+        hit = self.text_hit(position)
+        if not hit:
+            return None
+        index, document, _ = hit
+        rect = self.visualRect(index)
+        point = QPointF(
+            position.x() - rect.x() - 74,
+            position.y() - rect.top() - self.delegate.body_offset(index),
+        )
+        link = document.documentLayout().anchorAt(point)
+        message = index.data(MESSAGE_ROLE)
+        label = reply_action_label(
+            link,
+            copied=message.id in self.reply_copied,
+            rating=self.reply_feedback.get(message.id, ""),
+        )
+        return (link, label) if label else None
+
+    def update_action_tip(self, position):
+        found = self.action_under(position)
+        if getattr(self, "hover_tip", None) is None:
+            self.hover_tip = HoverTip(self)
+        if found:
+            self.hover_tip.move(found, found[1], self.viewport())
+        else:
+            self.hover_tip.leave()
+
     def viewportEvent(self, event):  # noqa: N802
-        if event.type() == QEvent.Type.ToolTip:
-            hit = self.text_hit(event.pos())
-            if hit:
-                index, document, _ = hit
-                rect = self.visualRect(index)
-                point = QPointF(
-                    event.pos().x() - rect.x() - 74,
-                    event.pos().y() - rect.top() - self.delegate.body_offset(index),
-                )
-                title = REPLY_ACTION_LABELS.get(document.documentLayout().anchorAt(point))
-                if title:
-                    QToolTip.showText(event.globalPos(), title, self.viewport())
-                    return True
+        if event.type() == QEvent.Type.ToolTip and self.action_under(event.pos()):
+            return True  # the paced tooltip above is the only one shown over these icons
         return super().viewportEvent(event)
 
     def mouseMoveEvent(self, event):  # noqa: N802
@@ -1146,6 +1164,7 @@ class MessageView(QListView):
             self.reaction_bar.hide()
             return
         super().mouseMoveEvent(event)
+        self.update_action_tip(event.position().toPoint())
         index = self.indexAt(event.position().toPoint())
         if not index.isValid():
             self.reaction_bar.hide()
@@ -1165,6 +1184,8 @@ class MessageView(QListView):
         self.reaction_bar.raise_()
 
     def leaveEvent(self, event):  # noqa: N802
+        if getattr(self, "hover_tip", None) is not None:
+            self.hover_tip.leave()
         if not self.reaction_bar.underMouse():
             self.reaction_bar.hide()
         super().leaveEvent(event)

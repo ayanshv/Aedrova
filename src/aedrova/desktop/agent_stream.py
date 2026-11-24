@@ -9,7 +9,6 @@ from urllib.parse import urlsplit
 from uuid import uuid4
 
 from PySide6.QtCore import QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QCursor
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -19,7 +18,6 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
-    QToolTip,
     QVBoxLayout,
     QWidget,
 )
@@ -226,13 +224,15 @@ class ActivityRow(QFrame):
         return self.choice_card
 
     def show_action_tooltip(self, link):
-        from aedrova.desktop.response_actions import REPLY_ACTION_LABELS
+        from aedrova.desktop.response_actions import HoverTip, reply_action_label
 
-        title = REPLY_ACTION_LABELS.get(link)
-        if self.response_id and title:
-            QToolTip.showText(QCursor.pos(), title, self.message)
-        elif not link:
-            QToolTip.hideText()
+        if getattr(self, "hover_tip", None) is None:
+            self.hover_tip = HoverTip(self)
+        label = reply_action_label(link, copied=self.copied, rating=self.rating)
+        if self.response_id and label:
+            self.hover_tip.move((link, label), label, self.message)
+        else:
+            self.hover_tip.leave()
 
     def open_source(self, value):
         from aedrova.desktop.response_actions import ACTION_PREFIX, SOURCE_PREFIX

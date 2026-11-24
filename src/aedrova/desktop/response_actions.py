@@ -26,7 +26,66 @@ REPLY_ACTIONS = (
     ("good", "Good response", "thumb_up"),
     ("bad", "Bad response", "thumb_down"),
 )
-REPLY_ACTION_LABELS = {ACTION_PREFIX + action: title for action, title, _ in REPLY_ACTIONS}
+REPLY_ACTION_LABELS = {ACTION_PREFIX + action: title for action, title, _ in REPLY_ACTIONS} | {
+    ACTION_PREFIX + "pdf": "Save the full response as a PDF",
+    ACTION_PREFIX + "markdown-file": "Save the full response as Markdown",
+}
+
+
+def reply_action_label(link, *, copied=False, rating=""):
+    """The tooltip for an action icon, matching what the icon shows right now."""
+    title = REPLY_ACTION_LABELS.get(link)
+    if not title:
+        return None
+    if link == ACTION_PREFIX + "copy" and copied:
+        return "Copied"
+    for action in ("good", "bad"):
+        if link == ACTION_PREFIX + action and rating == action:
+            return title + " (selected)"
+    return title
+
+
+class HoverTip:
+    """One tooltip at a time: after a short pause on an icon, once, and gone when you leave.
+
+    Showing a tooltip on every hover event made labels flash repeatedly when the pointer
+    crossed the icons, and showed a stale label after an icon had changed.
+    """
+
+    DELAY = 450
+
+    def __init__(self, owner):
+        from PySide6.QtCore import QTimer
+
+        self.key, self.pending = None, None
+        self.timer = QTimer(owner)
+        self.timer.setSingleShot(True)
+        self.timer.setInterval(self.DELAY)
+        self.timer.timeout.connect(self.show)
+
+    def move(self, key, text, widget):
+        """Call on every pointer move with the icon under it (key None when over none)."""
+        from PySide6.QtWidgets import QToolTip
+
+        if key == self.key:
+            return
+        self.key = key
+        self.timer.stop()
+        QToolTip.hideText()
+        self.pending = (text, widget) if key is not None and text else None
+        if self.pending:
+            self.timer.start()
+
+    def show(self):
+        from PySide6.QtGui import QCursor
+        from PySide6.QtWidgets import QToolTip
+
+        if self.pending:
+            text, widget = self.pending
+            QToolTip.showText(QCursor.pos(), text, widget)
+
+    def leave(self):
+        self.move(None, None, None)
 
 
 LONG_REPLY_CHARS = 2400
@@ -240,7 +299,7 @@ def append_response_actions(
         document.addResource(QTextDocument.ResourceType.ImageResource, QUrl(url), image)
         images.add(url)
         links.append(
-            f'<a href="{ACTION_PREFIX}{action}" title="{label}">'
+            f'<a href="{ACTION_PREFIX}{action}">'
             f'<img src="{url}" width="19" height="19" alt="{label}" /></a>'
         )
     cursor.insertHtml("&nbsp;&nbsp;&nbsp;".join(links))
