@@ -145,6 +145,7 @@ if connection:
                 "ai_access_mode": ai_mode,
                 "apple_login_enabled": os.getenv("AEDROVA_APPLE_LOGIN_ENABLED") == "true",
                 "meeting_context_enabled": os.getenv("AEDROVA_MEETING_CONTEXT_ENABLED") == "true",
+                "hosted_calls_enabled": os.getenv("AEDROVA_HOSTED_CALLS_ENABLED") == "true",
             }
         )
     )

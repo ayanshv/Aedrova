@@ -1,47 +1,52 @@
 # Meetings audit, November 23, 2026
 
-Scope: can a tester start and stay in a hosted meeting, and does Aedrova know a person is in one.
-Code-level review plus tests. Hosted meetings are still switched off on the websites (see
-"Turning meetings on").
+## Which path matters
 
-## Fixed in source
+Aedrova does not host the meeting. People stay in Zoom, Google Meet or Teams. The product path is:
 
-1. **One missed beat ended a live call.** The call pinged the server every 8 seconds and any
-   single failure (a slow or waking server, a brief network drop, a rate limit) ended the call.
-   Presence lasts 60 seconds, so the call now rides out up to two missed beats and ends on the
-   third. Refused access (401, 403, 404, 405) still ends the call at once.
-2. **Long calls were dropped when the sign-in token ran out.** The call kept the one token it
-   started with, so every request after it expired (about an hour, less if it was nearly spent)
-   was refused. The call now refreshes the account token about three minutes before expiry and
-   never adopts a token for a different account.
+1. **Detect** (Mac): the native helper sees which app is using the microphone and the capsule
+   asks "Take meeting notes?". Detection never records.
+2. **Capture** after explicit consent: microphone and computer audio, transcribed on this Mac with
+   a pinned Whisper model. No audio leaves the machine.
+3. **Review and Confirm**: the person edits notes and transcript, then Confirm uploads one text
+   file, `meeting-notes.txt`, to the channel through the verified attachment pipeline.
+4. **Context**: the agent reads that attachment with the channel's other evidence and says it is
+   "Reading reviewed meeting notes". No server meeting setting is involved.
 
-Tests: `tests/test_meeting_resilience.py`.
+Hosted calls (LiveKit) are optional and separate. They need the meeting service, so packaged beta
+builds now hide them unless built with `AEDROVA_HOSTED_CALLS_ENABLED=true`.
 
-## Findings that are not code defects
+## Checked
 
-- **Detection is Mac only.** Local meeting suggestions use the native audio helper. Windows and
-  Linux never suggest notes, and macOS before 14.2 cannot see which app is using the microphone.
-- **Detected apps:** Zoom, Teams, Webex, Google Meet in the front browser, and any browser using
-  the microphone. FaceTime, Slack huddles, Discord and WhatsApp are not recognized.
-- **Hosted presence:** a person counts as in a meeting while their last beat is under 60 seconds
-  old. If the app crashes, they disappear after at most a minute; rejoining can be refused for up
-  to 30 seconds while the old connection expires.
-- **The helper must ship signed.** `aedrova-meeting-audio` is built by `scripts/package_desktop.py`
-  into `Contents/Helpers`. Signing and notarization must cover it with the microphone and
-  audio-capture entitlements, or detection and local notes fail silently.
-- **Transcript context is still off by default.** It needs the meeting migration, the server flag
-  and an app built with `AEDROVA_MEETING_CONTEXT_ENABLED=true`.
+- Detection, capture, review, share and agent retrieval each have tests, and they pass.
+- The speech model, on-device runtime and capture helper are bundled by `scripts/package_desktop.py`.
+- A 20-second physical capture passed on November 6 (both sources transcribed, then discarded).
+- The suggestion capsule is an always-on-top tool window, so it shows while Zoom is in front.
 
-## Turning meetings on (owner actions)
+## Changed in source
 
-Hosted meetings need all of these; none can be done from source alone.
+1. **Hosted calls survive brief network trouble.** A single missed check-in used to end a live
+   call; it now takes three in a row, and refused access still ends the call immediately.
+2. **Hosted calls survive long sessions.** The account token is refreshed before it expires.
+3. **Hosted entries are hidden in packaged builds** unless switched on, so testers do not meet a
+   "meeting service is not configured" error. Source runs are unchanged.
 
-1. **Always-on hosting and the independent guard** (`docs/meeting-launch-gates.md`, LG-MTG-02):
-   two Render upgrades of about $7 a month each, submitted by you.
-2. **LiveKit project values** set privately on the service: URL, API key, API secret of at least
-   32 characters. Never paste them into chat.
-3. **Service flags:** `AEDROVA_MEETINGS_ENABLED=true` on the service, and
-   `AEDROVA_MEETING_CONTEXT_ENABLED=true` only after consent testing.
-4. **Database:** the meeting migrations on the project testers use, including
-   `202610030001_meeting_context.sql`.
-5. **Check:** `/health/meetings` returns 200, then a two-device meeting with two accounts.
+## Limits testers should know
+
+- **Mac only.** Windows and Linux have no capture or detection.
+- **macOS 14.2 or newer** is needed to see which app uses the microphone.
+- **Recognized:** Zoom, Teams, Webex, and browsers using the microphone (Google Meet in a
+  browser). FaceTime, Slack huddles and Discord are not recognized; manual Start always works.
+- **A muted call may not be detected**, because detection looks for microphone input.
+- **Browser tab titles** are not readable without Screen Recording permission, so Meet is found
+  by microphone use, not by its page title.
+- **First use downloads a 148 MB speech model** (pinned and checksum-verified).
+- **Speakers are not named.** The transcript labels "Microphone" and "Computer audio" only.
+- **Draft notes are extracted lines, not an AI summary.**
+
+## Still to prove before calling this launch-ready
+
+- A real external call: headphones, mute, a long call, stopping cleanly.
+- Confirm on a real channel, then an agent answer that cites the notes, from a second account.
+- A second account that is not in the channel cannot read the notes.
+- The signed helper in the notarized app: microphone and system-audio prompts on a clean Mac.

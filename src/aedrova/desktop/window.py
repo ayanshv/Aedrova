@@ -1754,8 +1754,11 @@ class AedrovaWindow(QMainWindow):
         suggestion.toggled.connect(self.meeting_detection.set_enabled)
         menu.addAction("Check meeting devices…", lambda: open_meeting_setup(self))
         menu.addAction("Meeting settings & transcripts…", self.open_meeting_hub)
-        menu.addAction("Hosted audio call…", lambda: self.start_channel_call("audio"))
-        menu.addAction("Hosted video call…", lambda: self.start_channel_call("video"))
+        from aedrova.desktop.hosted_calls import hosted_calls_enabled
+
+        if hosted_calls_enabled():
+            menu.addAction("Hosted audio call…", lambda: self.start_channel_call("audio"))
+            menu.addAction("Hosted video call…", lambda: self.start_channel_call("video"))
         self.call_options = menu
         menu.popup(
             self.call_buttons["settings"].mapToGlobal(
