@@ -5,7 +5,7 @@ import threading
 from pathlib import Path
 from uuid import uuid4
 
-from PySide6.QtCore import QObject, QThreadPool, QTimer, Signal
+from PySide6.QtCore import QObject, Qt, QThreadPool, QTimer, Signal
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -40,7 +40,7 @@ class LocalMeetingNotes(AppDialog):
         self.service = getattr(self.account, "service", None)
         self.rows, self.jobs = [], []
         self.closed = False
-        self.downloading = self.saving = False
+        self.downloading = self.saving = self.writing = False
         self.cancelled = threading.Event()
         self.identifier = str(uuid4())
         self.capture = capture or LocalCapture(self)
@@ -103,6 +103,18 @@ class LocalMeetingNotes(AppDialog):
         self.share_transcript = QCheckBox("Include the reviewed transcript")
         self.share_transcript.setChecked(True)
         layout.addWidget(self.share_transcript)
+        self.ai_notes = button("Write notes with AI", role="outline")
+        self.ai_notes.setEnabled(False)
+        self.ai_notes.clicked.connect(self.write_ai_notes)
+        layout.addWidget(self.ai_notes, alignment=Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(
+            label(
+                "Optional. Sends the transcript text, never audio, to Aedrova AI and uses your "
+                "team’s AI allowance. It replaces the draft notes above.",
+                "muted",
+                wrap=True,
+            )
+        )
         destination = getattr(getattr(window, "channel", None), "name", self.channel)
         layout.addWidget(label("Share to #" + destination, "muted", wrap=True))
         self.status = label("Not listening", "muted", wrap=True)
@@ -175,6 +187,14 @@ class LocalMeetingNotes(AppDialog):
             and not self.capture.active
             and not self.closed
             and not self.saving
+            and self.consent.isChecked()
+        )
+        self.ai_notes.setEnabled(
+            bool(self.rows)
+            and not self.capture.active
+            and not self.closed
+            and not self.saving
+            and not self.writing
             and self.consent.isChecked()
         )
         self.consent.setEnabled(not self.capture.active and not self.saving)
@@ -263,6 +283,45 @@ class LocalMeetingNotes(AppDialog):
             else "No speech was transcribed. Check your devices and permissions."
         )
         self.update_controls()
+
+    def write_ai_notes(self):
+        if self.writing or self.closed or not self.rows or not self.service:
+            return
+        transcript = self.transcript.toPlainText()
+        service, workspace = self.service, self.workspace
+        self.writing = True
+        self.update_controls()
+        self.status.setText("Writing notes with AI…")
+
+        def operation():
+            from aedrova.meetings.ai_notes import write_notes
+
+            try:
+                return {"notes": write_notes(service, workspace, transcript, self.cancelled)}
+            except (ValueError, RuntimeError) as error:
+                return {"problem": str(error)[:300]}
+
+        def written(result):
+            self.writing = False
+            if self.closed or not isValid(self):
+                return
+            value = result.get("value") or {}
+            if value.get("notes"):
+                self.notes.setPlainText(value["notes"])
+                self.tabs.setCurrentWidget(self.notes)
+                self.status.setText("AI notes are ready. Edit them, then Confirm to share.")
+            else:
+                self.status.setText(
+                    value.get("problem")
+                    or result.get("error")
+                    or "AI notes did not finish. Your draft is unchanged."
+                )
+            self.update_controls()
+
+        job = ReviewJob(operation, error="AI notes did not finish. Your draft is unchanged.")
+        self.jobs.append(job)
+        job.signals.result.connect(written)
+        QThreadPool.globalInstance().start(job)
 
     def share(self):
         connected = getattr(self.window, "connected", None)

@@ -128,9 +128,20 @@ def render_transcript(rows):
 
 def draft_notes(rows):
     """Extract verbatim lines, not invented decisions, assignments or an AI summary."""
-    cues = ("we will", "we should", "agreed", "decided", "next step", "follow up", "deadline")
+    cues = (
+        "we will", "we should", "we need", "need to", "make sure", "going to", "let's",
+        "agreed", "decided", "decision", "next step", "follow up", "deadline", "plan",
+        "want to", "want a", "action", "by monday", "by friday", "by tomorrow",
+    )
     ordered = sorted(rows, key=lambda row: row["offset"] + row["start"])
-    chosen = [row for row in ordered if any(cue in row["text"].casefold() for cue in cues)]
+    chosen = [
+        row
+        for row in ordered
+        if len(row["text"].split()) >= 4 and any(cue in row["text"].casefold() for cue in cues)
+    ]
     if not chosen:
-        chosen = ordered[:8]
+        # No cue lines at all: use the longest lines, in the order they were said.
+        full = [row for row in ordered if len(row["text"].split()) >= 5] or ordered
+        longest = sorted(full, key=lambda row: -len(row["text"]))[:8]
+        chosen = [row for row in ordered if row in longest]
     return "\n".join("• " + row["text"] for row in chosen[:20])
