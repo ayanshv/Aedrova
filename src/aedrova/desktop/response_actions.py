@@ -25,7 +25,6 @@ REPLY_ACTIONS = (
     ("copy", "Copy response", "copy"),
     ("good", "Good response", "thumb_up"),
     ("bad", "Bad response", "thumb_down"),
-    ("more", "More options", "more_chat"),
 )
 REPLY_ACTION_LABELS = {ACTION_PREFIX + action: title for action, title, _ in REPLY_ACTIONS}
 
@@ -127,7 +126,7 @@ def response_parts(text):
 
 def append_response_actions(
     document, options, rating, *, choice_color="#1759bf", action_color="#525d6b",
-    file_summary=None, card_background="", show_choices=True,
+    file_summary=None, card_background="", show_choices=True, copied=False,
 ):
     block = document.begin()
     while block.isValid():
@@ -166,8 +165,11 @@ def append_response_actions(
     links, images = [], set()
     for action, title, glyph in REPLY_ACTIONS:
         selected = rating == action
-        label = title + (" (selected)" if selected else "")
-        url, image = action_image(glyph, choice_color if selected else action_color)
+        done = copied and action == "copy"
+        label = "Copied" if done else title + (" (selected)" if selected else "")
+        url, image = action_image(
+            "check" if done else glyph, choice_color if selected or done else action_color
+        )
         document.addResource(QTextDocument.ResourceType.ImageResource, QUrl(url), image)
         images.add(url)
         links.append(

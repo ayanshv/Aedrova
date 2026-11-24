@@ -26,7 +26,6 @@ from PySide6.QtCore import (
 from PySide6.QtGui import (
     QAbstractTextDocumentLayout,
     QColor,
-    QCursor,
     QFont,
     QFontMetrics,
     QIcon,
@@ -58,6 +57,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shiboken6 import isValid
 
 from aedrova.desktop.attachment_previews import preview_height
 from aedrova.desktop.brand import paint_brand_mark
@@ -233,7 +233,7 @@ def space_agent_response(document):
 
 def markdown_html(
     text, *, base_font=None, agent=False, options=None, rating="", file_summary=None,
-    show_choices=True,
+    show_choices=True, copied=False,
 ):
     document = markdown_document(text, base_font=base_font)
     action_images = set()
@@ -247,6 +247,7 @@ def markdown_html(
             file_summary=file_summary,
             card_background=palette.color(QPalette.ColorRole.AlternateBase).name(),
             show_choices=show_choices,
+            copied=copied,
         )
     elif agent:
         compact_citations(document, color=QApplication.palette().link().color().name())
@@ -275,8 +276,12 @@ class MessageDelegate(QStyledItemDelegate):
         display = self.view.display_body(message)
         hint = self.view.translation_hint(message)
         rating = self.view.reply_feedback.get(message.id, "")
+        copied = message.id in self.view.reply_copied
         summary = self.view.build_summaries.get(message.id, (None, None, None))[1]
-        key = (message.id, display, hint, width, self.theme.name, message.agent, rating, summary)
+        key = (
+            message.id, display, hint, width, self.theme.name, message.agent, rating, summary,
+            copied,
+        )
         if key not in self.documents:
             document = SafeDocument()
             document.setDefaultFont(font(14))
@@ -325,6 +330,7 @@ class MessageDelegate(QStyledItemDelegate):
                     file_summary=summary,
                     card_background=self.theme.surface,
                     show_choices=False,  # the newest reply offers buttons instead
+                    copied=copied,
                 )
                 space_agent_response(document)
             block = document.begin()
@@ -704,6 +710,7 @@ class MessageView(QListView):
         self.agent_anchor = None
         self.bud_avatars = {}
         self.reply_feedback = {}
+        self.reply_copied = set()
         self.answered_choices = set()
         self.build_summaries = OrderedDict()
         self.source_messages = []
@@ -954,9 +961,7 @@ class MessageView(QListView):
             if options:
                 text += "\n\n" + "\n".join(f"{i}. {option}" for i, option in enumerate(options, 1))
             QApplication.clipboard().setText(text)
-            window = self.window()
-            if hasattr(window, "notify"):
-                window.notify("Response copied.")
+            self.show_copied(identifier, row)
         elif action in ("good", "bad"):
             rating = "" if self.reply_feedback.get(identifier) == action else action
             self.reply_feedback[identifier] = rating
@@ -966,34 +971,6 @@ class MessageView(QListView):
                 self.agent_feed.changed.emit()
             else:
                 self.viewport().update()
-        elif action == "more":
-            menu = AppMenu(self)
-            for key, label in (
-                ("copy", "Copy response"),
-                ("copy-markdown", "Copy as Markdown"),
-                ("good", "Good response"),
-                ("bad", "Bad response"),
-            ):
-                menu.addAction(
-                    label,
-                    lambda checked=False, key=key: self.activate_reply_action(
-                        identifier, author, raw, ACTION_PREFIX + key, row=row
-                    ),
-                )
-            for option in options:
-                menu.addAction(
-                    option.replace("&", "&&"),
-                    lambda checked=False, option=option:
-                    self.agent_choice_requested.emit(author, option),
-                )
-            if identifier in self.build_summaries:
-                menu.addAction(
-                    "View changes",
-                    lambda: self.activate_reply_action(
-                        identifier, author, raw, ACTION_PREFIX + "changes", row=row
-                    ),
-                )
-            menu.exec(QCursor.pos())
         elif action == "changes":
             item = self.build_summaries.get(identifier)
             window = self.window()
@@ -1003,6 +980,29 @@ class MessageView(QListView):
             index = int(action[7:])
             if index < len(options):
                 self.agent_choice_requested.emit(author, options[index])
+
+    def show_copied(self, identifier, row=None):
+        """The copy icon becomes a check for a moment, right where the person clicked."""
+
+        def refresh():
+            if row is not None:
+                row.copied = identifier in self.reply_copied
+                row.set_message(row.summary)
+                self.agent_feed.changed.emit()
+            else:
+                self.viewport().update()
+
+        self.reply_copied.add(identifier)
+        refresh()
+
+        def revert():
+            if not isValid(self):
+                return
+            self.reply_copied.discard(identifier)
+            if row is None or isValid(row):
+                refresh()
+
+        QTimer.singleShot(1600, self, revert)  # tied to the view, so it never outlives it
 
     def remember_build_summary(self, identifier, workspace, summary, open_changes):
         self.build_summaries[identifier] = (workspace, summary, open_changes)

@@ -338,3 +338,35 @@ def test_notes_prompt_asks_for_specifics_and_carries_the_title():
     assert body["reasoning"] == {"effort": "medium"}
     _, quick = reply_request(access, prompt)
     assert quick["reasoning"] == {"effort": "low"}
+
+
+def test_ai_notes_always_close_their_run_so_chat_is_not_blocked(monkeypatch):
+    import aedrova.meetings.ai_notes as ai_notes
+
+    closed = []
+
+    class Client:
+        def __init__(self, origin, token):
+            pass
+
+        def begin(self, workspace, provider, request_id):
+            return SimpleNamespace(provider=provider)
+
+        def close(self):
+            closed.append(True)
+
+    service = SimpleNamespace(realtime_credentials=lambda: (None, None, "token", "user"))
+    monkeypatch.setattr(ai_notes, "ManagedClient", Client)
+    monkeypatch.setattr(ai_notes, "application_ai_origin", lambda: "https://aedrova.test")
+    monkeypatch.setattr("aedrova.agents.replies.reply", lambda *a, **k: "Summary\n- Launch Monday")
+    assert ai_notes.write_notes(service, "w", "[00:01] Microphone: launch Monday").startswith(
+        "Summary"
+    )
+
+    def failing(*a, **k):
+        raise RuntimeError("provider down")
+
+    monkeypatch.setattr("aedrova.agents.replies.reply", failing)
+    with pytest.raises(RuntimeError):
+        ai_notes.write_notes(service, "w", "[00:01] Microphone: launch Monday")
+    assert closed == [True, True]

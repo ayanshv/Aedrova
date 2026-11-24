@@ -278,3 +278,37 @@ def test_without_a_count_the_reply_row_is_still_not_a_duplicate(qtbot):
     one.observe("Gathered 1 messages for context")
     one.observe("Writing a response…")
     assert one.find("respond")["label"] == "Replying from 1 message of context"
+
+
+def test_checklist_updates_rows_in_place_instead_of_rebuilding_them(qtbot):
+    from aedrova.desktop.agent_components import StepChecklist
+
+    checklist = StepChecklist()
+    qtbot.addWidget(checklist)
+    checklist.show()
+    checklist.observe("Checking workspace access…")
+    first_icon = checklist.rows[0]
+    first_label = checklist.parts[("step", "access")]["label"]
+    assert first_icon.state == "running"
+    checklist.observe("Searching permitted workspace evidence…")
+    checklist.observe("Reading #product…")
+    checklist.observe("Gathered 12 messages for context")
+    checklist.observe("Writing a response…")
+    # The same widgets are reused, only their state and text change.
+    assert checklist.parts[("step", "access")]["icon"] is first_icon
+    assert checklist.parts[("step", "access")]["label"] is first_label
+    assert first_icon.state == "done"
+    assert checklist.states()[-1] == ("respond", "running")
+    assert [i.state for i in checklist.rows].count("running") == 1
+    checklist.finish()
+    assert all(i.state == "done" for i in checklist.rows)
+
+
+def test_checklist_drops_rows_for_steps_that_never_applied(qtbot):
+    from aedrova.desktop.agent_components import StepChecklist
+
+    checklist = StepChecklist()
+    qtbot.addWidget(checklist)
+    checklist.observe("Writing a response…")  # skips access and context
+    assert [key for key, _ in checklist.states()] == ["respond"]
+    assert len(checklist.parts) == 1 and len(checklist.rows) == 1

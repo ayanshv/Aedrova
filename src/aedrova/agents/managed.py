@@ -115,6 +115,11 @@ class ManagedClient:
                         "Settings → Your team’s plan & AI access → Activate included AI, "
                         "then retry."
                     )
+                if message == "This workspace is at its concurrent build limit.":
+                    raise RuntimeError(
+                        "Another AI request in this workspace is still finishing. "
+                        "Wait a moment and ask again."
+                    )
                 if message == "Included AI access is not configured yet.":
                     raise RuntimeError(
                         "Your team’s AI service hasn’t been enabled yet. "

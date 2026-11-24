@@ -194,6 +194,7 @@ class StepChecklist(QWidget):
         self.steps = []  # {"key", "label", "state", "commands": [{"text", "state"}]}
         self.flow = None
         self.rows = []
+        self.parts = {}
         self.phase = 0
         self.read_count = None  # how many messages were actually read, for the reply step
         self.setAccessibleName("Agent task list")
@@ -329,47 +330,96 @@ class StepChecklist(QWidget):
 
     # -- view --------------------------------------------------------------
     def rebuild(self):
-        while self.column.count():
-            item = self.column.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-            elif item.layout():
-                self.clear_layout(item.layout())
-        self.rows = []
+        """Bring the rows in line with the steps without recreating widgets.
+
+        Tearing every row down and building it again on each progress line made the list
+        flash and jump while the agent worked. Rows are now kept, updated in place, and
+        only added or removed when a step appears or goes.
+        """
+        desired = []
         for step in self.steps:
-            row = QHBoxLayout()
-            row.setSpacing(9)
-            icon = StepIcon(step["state"])
-            row.addWidget(icon, 0, Qt.AlignmentFlag.AlignTop)
-            title = QLabel(step["label"])
-            title.setWordWrap(True)
-            title.setTextFormat(Qt.TextFormat.PlainText)
-            title.setProperty("role", "muted" if step["state"] == "pending" else "")
-            if step["state"] == "running":
-                title.setStyleSheet("font-weight: 600;")
-            title.setAccessibleName(step["label"] + " · " + step["state"])
-            row.addWidget(title, 1)
-            self.column.addLayout(row)
-            self.rows.append(icon)
-            for command in step["commands"]:
-                sub = QHBoxLayout()
-                sub.setContentsMargins(27, 0, 0, 0)
-                sub.setSpacing(7)
-                mark = StepIcon(command["state"])
-                mark.setFixedSize(14, 14)
-                sub.addWidget(mark)
-                code = QLabel(command["text"][:96])
-                code.setTextFormat(Qt.TextFormat.PlainText)
-                code.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
-                code.setProperty("role", "muted")
-                code.setToolTip(command["text"][:600])
-                sub.addWidget(code, 1)
-                self.column.addLayout(sub)
-                self.rows.append(mark)
+            desired.append((("step", step["key"]), step))
+            for index, command in enumerate(step["commands"]):
+                desired.append((("command", step["key"], index), command))
+        wanted = {key for key, _ in desired}
+        self.setUpdatesEnabled(False)
+        try:
+            for key in [k for k in self.parts if k not in wanted]:
+                self.remove_part(self.parts.pop(key))
+            self.rows = []
+            for position, (key, item) in enumerate(desired):
+                part = self.parts.get(key)
+                if part is None:
+                    part = self.parts[key] = self.make_part(key)
+                    self.column.insertLayout(position, part["layout"])
+                elif self.column.indexOf(part["layout"]) != position:
+                    self.column.removeItem(part["layout"])
+                    self.column.insertLayout(position, part["layout"])
+                self.update_part(key, part, item)
+                self.rows.append(part["icon"])
+        finally:
+            self.setUpdatesEnabled(True)
         self.setVisible(bool(self.steps))
         self.sync_timer()
         self.updateGeometry()
         self.changed.emit()
+
+    def make_part(self, key):
+        if key[0] == "step":
+            row = QHBoxLayout()
+            row.setSpacing(9)
+            icon = StepIcon("pending")
+            row.addWidget(icon, 0, Qt.AlignmentFlag.AlignTop)
+            label = QLabel()
+            label.setWordWrap(True)
+            label.setTextFormat(Qt.TextFormat.PlainText)
+            row.addWidget(label, 1)
+        else:
+            row = QHBoxLayout()
+            row.setContentsMargins(27, 0, 0, 0)
+            row.setSpacing(7)
+            icon = StepIcon("pending")
+            icon.setFixedSize(14, 14)
+            row.addWidget(icon)
+            label = QLabel()
+            label.setTextFormat(Qt.TextFormat.PlainText)
+            label.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
+            label.setProperty("role", "muted")
+            row.addWidget(label, 1)
+        return {"layout": row, "icon": icon, "label": label}
+
+    def update_part(self, key, part, item):
+        icon, label = part["icon"], part["label"]
+        if icon.state != item["state"]:
+            icon.state = item["state"]
+            icon.update()
+        if key[0] == "step":
+            text, state = item["label"], item["state"]
+            if label.text() != text:
+                label.setText(text)
+            role = "muted" if state == "pending" else ""
+            if label.property("role") != role or part.get("state") != state:
+                label.setProperty("role", role)
+                label.setStyleSheet("font-weight: 600;" if state == "running" else "")
+                label.style().unpolish(label)
+                label.style().polish(label)
+            label.setAccessibleName(text + " · " + state)
+            part["state"] = state
+        else:
+            text = item["text"][:96]
+            if label.text() != text:
+                label.setText(text)
+                label.setToolTip(item["text"][:600])
+
+    def remove_part(self, part):
+        layout = part["layout"]
+        self.column.removeItem(layout)
+        while layout.count():
+            widget = layout.takeAt(0).widget()
+            if widget is not None:
+                widget.hide()
+                widget.deleteLater()
+        layout.deleteLater()
 
     def clear_layout(self, layout):
         while layout.count():

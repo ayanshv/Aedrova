@@ -100,13 +100,19 @@ def test_reply_choices_and_feedback_work_after_archiving(qtbot, tmp_path):
     assert row.message.text().count('href="aedrova-reply:choice-') == 1
     row.actions_label.linkActivated.emit(ACTION_PREFIX + "good")
     assert 'alt="Good response (selected)"' in row.actions_label.text()
+    row.copied = True
+    row.set_message(row.summary)
+    assert 'alt="Copied"' in row.actions_label.text()
+    row.copied = False
+    row.set_message(row.summary)
     window.archive_finished_agent()
     message = next(message for message in view.source_messages if message.agent)
     assert message.id == row.response_id
     document = view.delegate.document(message, 500)
     assert 'alt="Good response (selected)"' in document.toHtml()
     assert "Good response" not in document.toPlainText()
-    for action in ("copy", "good", "bad", "more"):
+    assert "More options" not in document.toHtml()
+    for action in ("copy", "good", "bad"):
         assert any(
             document.documentLayout().anchorAt(QPointF(x, y)) == ACTION_PREFIX + action
             for y in range(
@@ -123,6 +129,11 @@ def test_reply_choices_and_feedback_work_after_archiving(qtbot, tmp_path):
     view.activate_message_link(message, ACTION_PREFIX + "copy")
     assert "2. Python calculator" in QApplication.clipboard().text()
     assert "AEDROVA_CHOICES" not in QApplication.clipboard().text()
+    # The copy icon turns into a check right where it was clicked, then goes back.
+    assert message.id in view.reply_copied
+    assert 'alt="Copied"' in view.delegate.document(message, 500).toHtml()
+    view.reply_copied.discard(message.id)
+    assert 'alt="Copy response"' in view.delegate.document(message, 500).toHtml()
 
 
 def test_completed_reply_saves_before_the_next_message_and_rehydrates(qtbot, tmp_path, monkeypatch):

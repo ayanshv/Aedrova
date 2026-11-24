@@ -60,6 +60,7 @@ class ActivityRow(QFrame):
         self.character_config = dict(character_config) if character_config else None
         self.response_id = None
         self.rating = ""
+        self.copied = False
         self.file_summary = None
         self.streaming = streaming
         self.choice_card = None
@@ -189,14 +190,14 @@ class ActivityRow(QFrame):
             self.actions_label.setText(
                 markdown_html(
                     "", base_font=self.message.font(), agent=True, options=(),
-                    rating=self.rating, file_summary=self.file_summary,
+                    rating=self.rating, file_summary=self.file_summary, copied=self.copied,
                 )
             )
             return
         self.message.setText(
             markdown_html(
                 body, base_font=self.message.font(), agent=True, options=options,
-                rating=self.rating, file_summary=self.file_summary,
+                rating=self.rating, file_summary=self.file_summary, copied=self.copied,
             )
         )
 

@@ -56,14 +56,22 @@ def write_notes(service, workspace, transcript, cancelled=None, title=""):
     if not origin:
         raise RuntimeError("Aedrova AI is not available in this build.")
     _, _, token, _ = service.realtime_credentials()
-    access = ManagedClient(origin, token).begin(workspace, "codex", str(uuid4()))
-    result = reply(
-        access,
-        notes_prompt(text, title),
-        cancelled or threading.Event(),
-        timeout=120,
-        effort="medium",
-    )
+    managed = ManagedClient(origin, token)
+    access = managed.begin(workspace, "codex", str(uuid4()))
+    try:
+        result = reply(
+            access,
+            notes_prompt(text, title),
+            cancelled or threading.Event(),
+            timeout=120,
+            effort="medium",
+        )
+    finally:
+        # A run left open keeps counting toward the workspace's concurrent limit for hours.
+        try:
+            managed.close()
+        except RuntimeError:
+            pass
     notes = (result or "").strip()
     if not notes:
         raise RuntimeError("AI returned no notes. Your draft is unchanged.")
