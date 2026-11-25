@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from PySide6.QtGui import QColor, QPalette
+from PySide6.QtGui import QColor, QFontDatabase, QPalette
 
 
 @dataclass(frozen=True)
@@ -130,8 +130,24 @@ def permission_warning(theme):
     return "#ED8B4A", "#3C2B20" if theme.name == "dark" else "#FFF0E4"
 
 
+TITLE_FONT = "Plus Jakarta Sans"
+_title_font_family = None
+
+
+def title_font_family():
+    """Registers the bundled title font once and returns its family, or a system fallback."""
+    global _title_font_family
+    if _title_font_family is None:
+        path = Path(__file__).parent / "assets" / "fonts" / "PlusJakartaSans.ttf"
+        found = QFontDatabase.addApplicationFont(str(path))
+        families = QFontDatabase.applicationFontFamilies(found) if found >= 0 else []
+        _title_font_family = families[0] if families else TITLE_FONT
+    return _title_font_family
+
+
 def stylesheet(t: Theme, *, reduced_transparency=False):
 
+    family = title_font_family()
     checkbox = (Path(__file__).parent / "assets/checkbox-checked.svg").as_posix()
     white = t.name == "light"
     permission_ink, permission_bg = permission_warning(t)
@@ -223,7 +239,7 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QComboBox#AgentPermissions[permissionMode="full"] {{
         background: {permission_bg}; color: {permission_ink}; }}
     QDialog#FullAccessConfirmation {{ background: {t.bg}; }}
-    QDialog#FullAccessConfirmation QLabel[role="heading"] {{ font-size: 24px; }}
+    QDialog#FullAccessConfirmation QLabel[role="heading"] {{ font-family: "{family}"; font-size: 24px; }}
     QLabel#FullAccessScope {{ background: {t.surface}; color: {t.secondary};
         border-radius: 8px; padding: 10px 12px; font-size: 12px; }}
     QPushButton#ConfirmFullAccess {{ background: {permission_bg}; color: {permission_ink};
@@ -267,9 +283,9 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QLabel#MessageTimestamp {{ color: {t.secondary}; font-size: 12px; }}
     QLabel#ShortcutFooter {{ color: {t.secondary}; font-size: 12px; }}
     QLabel[role='section'] {{ color: {t.muted}; font-size: 12px; font-weight: 500; }}
-    QLabel[role='title'] {{ font-size: 18px; font-weight: 600; }}
-    QLabel[role='display'] {{ font-size: 30px; font-weight: 600; }}
-    QLabel[role='heading'] {{ font-size: 24px; font-weight: 600; }}
+    QLabel[role='title'] {{ font-family: "{family}"; font-size: 18px; font-weight: 600; }}
+    QLabel[role='display'] {{ font-family: "{family}"; font-size: 30px; font-weight: 600; }}
+    QLabel[role='heading'] {{ font-family: "{family}"; font-size: 24px; font-weight: 600; }}
     QLabel[role='badge'] {{ color: {t.secondary}; font-size: 12px; font-weight: 500; }}
     QLabel[role='error'] {{ color: {"#B4232F" if white else "#FF8A92"}; font-size: 12px; }}
     QFrame#Composer {{ background: {composer}; border: 1px solid {t.border}; border-radius: 12px; }}
@@ -321,7 +337,7 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QFrame#TourCard {{ background: {tour_card};
         border: 1px solid {t.border}; border-radius: 16px; }}
     QFrame#TourCard QLabel {{ background: transparent; }}
-    QFrame#TourCard QLabel#TourHeading {{ font-size: 20px; font-weight: 600; }}
+    QFrame#TourCard QLabel#TourHeading {{ font-family: "{family}"; font-size: 20px; font-weight: 600; }}
     QFrame#TourCard QLabel[role='muted'] {{ font-size: 13px; }}
     QPushButton#TourSkip, QPushButton#TourBack {{ border: none; background: transparent;
         color: {t.muted}; padding: 4px 8px; font-size: 13px; }}
