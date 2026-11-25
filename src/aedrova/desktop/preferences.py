@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from aedrova.agents.managed import ManagedClient, ai_access_mode, application_origin
-from aedrova.desktop.controls import AppDialog, ChoiceBox
+from aedrova.desktop.controls import AppDialog, ChoiceBox, CodingProviderChoice
 from aedrova.desktop.design_system import FlowActions
 from aedrova.desktop.dialogs import button, label
 
@@ -83,6 +83,7 @@ class SettingsDialog(AppDialog):
             row.addWidget(self.save)
             layout.addLayout(row)
         if self.user and scope == "workspace":
+            self.build_workspace_sections(section)
             from aedrova.desktop.bud_connectors import open_connectors
 
             layout = section(
@@ -308,7 +309,7 @@ class SettingsDialog(AppDialog):
             layout.addStretch(1)
             self.view.show_section("profile" if self.user else "appearance")
         elif self.user:
-            self.view.show_section("billing")
+            self.view.show_section("overview")
         if columns:
             columns[-1].addStretch(1)
         self.status = label(
@@ -338,6 +339,136 @@ class SettingsDialog(AppDialog):
         done = button("Done", role="primary")
         done.clicked.connect(self.accept)
         actions.addWidget(done)
+
+    def build_workspace_sections(self, section):
+        """Team controls that were previously only reachable from the account window."""
+        window, account, user = self.window, self.account, self.user
+        workspace = str(window.workspace_id)
+        snapshot = account.snapshot if account else {}
+        members = [m for m in snapshot.get("members", []) if str(m.get("workspace_id")) == workspace]
+        mine = next((m for m in members if str(m.get("user_id")) == str(user.id)), {})
+        self.is_admin = mine.get("role") in ("owner", "admin")
+        connected = bool(window.connected and window.connected.active)
+
+        layout = section(
+            "overview", "Overview", "Who and what this workspace is.", "spaces", "Workspace"
+        )
+        layout.addWidget(label(window.workspace.name, "heading"))
+        for caption, value in (
+            ("Your role", (mine.get("role") or "member").title()),
+            ("Members", str(len(members))),
+        ):
+            row = QHBoxLayout()
+            row.addWidget(label(caption, "muted"))
+            row.addStretch(1)
+            row.addWidget(label(value))
+            layout.addLayout(row)
+        layout.addStretch(1)
+
+        layout = section(
+            "members", "Members & invites", "Add people and manage their access.", "people"
+        )
+        self.invite_button = button("Invite teammates…", role="primary")
+        self.invite_button.setEnabled(self.is_admin and connected)
+        self.invite_button.clicked.connect(self.open_invites)
+        layout.addWidget(self.invite_button)
+        manage = button("Manage members and roles…", role="outline")
+        manage.clicked.connect(self.workspace_settings)
+        layout.addWidget(manage)
+        if not self.is_admin:
+            layout.addWidget(
+                label("Only owners and admins can invite people.", "muted", wrap=True)
+            )
+        layout.addStretch(1)
+
+        layout = section(
+            "agent",
+            "Aedrova agent",
+            "The name and coding agent your team talks to in this workspace.",
+            "work",
+        )
+        preference = next(
+            (
+                p
+                for p in snapshot.get("agent_preferences", [])
+                if str(p.get("workspace_id")) == workspace
+            ),
+            {},
+        )
+        layout.addWidget(label("Agent name", "muted"))
+        self.agent_name = QLineEdit(preference.get("nickname", ""))
+        self.agent_name.setMaxLength(32)
+        self.agent_name.setAccessibleName("Agent nickname")
+        layout.addWidget(self.agent_name)
+        layout.addWidget(label("Agent", "muted"))
+        self.agent_provider = CodingProviderChoice()
+        self.agent_provider.setAccessibleName("Aedrova agent")
+        index = self.agent_provider.findData(preference.get("provider", "auto"))
+        self.agent_provider.setCurrentIndex(
+            index if index >= 0 else self.agent_provider.findData("auto")
+        )
+        layout.addWidget(self.agent_provider)
+        self.save_agent = button("Save agent", role="primary")
+        self.save_agent.setEnabled(self.is_admin and connected)
+        self.save_agent.clicked.connect(self.save_agent_preferences)
+        layout.addWidget(self.save_agent)
+        if not self.is_admin:
+            layout.addWidget(
+                label("Only owners and admins can change the agent.", "muted", wrap=True)
+            )
+        layout.addStretch(1)
+
+        layout = section(
+            "history",
+            "Imported history",
+            "Bring earlier conversations into this workspace.",
+            "context",
+        )
+        slack = button("Import from Slack…", role="outline")
+        slack.setEnabled(self.is_admin and connected)
+        slack.clicked.connect(self.open_history)
+        layout.addWidget(slack)
+        layout.addStretch(1)
+
+    def open_invites(self):
+        from aedrova.desktop.team_invite import open_workspace_join_code
+
+        if open_workspace_join_code(self.window, self.window.workspace_id):
+            self.accept()
+        else:
+            self.status.setText("Only owners and admins can invite people.")
+
+    def open_history(self):
+        from aedrova.desktop.slack_history import open_slack_history
+
+        window = self.window
+        service = self.account.service if self.account else None
+        self.accept()
+        open_slack_history(window, service, window.workspace_id)
+
+    def save_agent_preferences(self):
+        connected = self.window.connected
+        if not connected or not connected.active or not self.is_admin:
+            return
+        workspace = str(self.window.workspace_id)
+        values = {
+            "p_workspace": workspace,
+            "p_nickname": self.agent_name.text().strip(),
+            "p_provider": self.agent_provider.currentData(),
+        }
+        self.save_agent.setEnabled(False)
+        self.status.setText("Saving the agent…")
+
+        def done(_):
+            self.save_agent.setEnabled(True)
+            self.status.setText("Agent saved.")
+            connected.refresh()
+
+        connected.enqueue(
+            ("agent-preferences", workspace),
+            lambda: self.account.service.rpc("set_agent_preferences", values),
+            done,
+        )
 
     def load_balance(self):
         if not self.user or not self.billing_origin or not self.window.connected:

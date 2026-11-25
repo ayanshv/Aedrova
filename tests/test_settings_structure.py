@@ -16,7 +16,14 @@ def test_personal_and_workspace_controls_are_separate(qtbot, tmp_path, monkeypat
     qtbot.addWidget(team)
     assert "profile" in personal.view.pages and "billing" not in personal.view.pages
     assert "integrations" not in personal.view.pages
-    assert set(team.view.pages) == {"integrations", "billing"}
+    assert set(team.view.pages) == {
+        "overview",
+        "members",
+        "agent",
+        "history",
+        "integrations",
+        "billing",
+    }
     assert not hasattr(team, "appearance")
     personal.show()
     personal.view.buttons["appearance"].click()
