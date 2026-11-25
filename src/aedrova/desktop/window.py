@@ -750,7 +750,7 @@ class AedrovaWindow(QMainWindow):
         self._load_channel()
         self.select_tab(0)
         if self.connected and self.connected.active:
-            self.connected.refresh()
+            self.connected.channel_changed()
 
     def _load_channel(self):
         if hasattr(self, "collaboration"):

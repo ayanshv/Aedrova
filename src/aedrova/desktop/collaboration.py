@@ -1370,7 +1370,13 @@ class Collaboration(QObject):
                 connected = self.connected()
                 service = connected.account.service
                 workspace = self.window.workspace_id
-                connected.enqueue(
+                finish = connected.dm_feedback(person.get("display_name", ""))
+
+                def opened(result):
+                    finish()
+                    connected.apply(result[1], [], workspace, result[0])
+
+                if not connected.enqueue(
                     ("profile-dm", person["user_id"]),
                     lambda: (
                         service.rpc(
@@ -1379,8 +1385,9 @@ class Collaboration(QObject):
                         ),
                         service.snapshot(),
                     ),
-                    lambda result: connected.apply(result[1], [], workspace, result[0]),
-                )
+                    opened,
+                ):
+                    finish()
                 dialog.accept()
 
             dm.clicked.connect(start)

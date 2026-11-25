@@ -410,6 +410,21 @@ class ConnectedDashboard(QObject):
             self.refresh()
         return True
 
+    def channel_changed(self):
+        """Show what is already known for the new channel, then sync it right away."""
+        if not self.active:
+            return
+        w = self.window
+        from aedrova.desktop.loading import set_loading
+
+        if w.channel_id in self.cache:
+            self.render_local_messages()
+        elif w.channel_id:
+            set_loading(self, w.message_stack, True, "feed")
+        # A sync for the previous channel may still be running; stop it so this one starts now.
+        self.sync_interrupt.set()
+        self.refresh()
+
     def refresh(self):
 
         if not isValid(self) or not isValid(self.window) or not isValid(self.account):
@@ -513,7 +528,11 @@ class ConnectedDashboard(QObject):
 
         def loaded(result):
             set_loading(self, w.message_stack, False)
-            if not self.active or result is None:
+            if not self.active:
+                return
+            if result is None:
+                # Interrupted by a newer request (such as a channel switch): sync again now.
+                QTimer.singleShot(0, self.refresh)
                 return
             snapshot, incoming, files, credentials, interactions, reply_history = result
             self.failures = 0
@@ -1134,6 +1153,22 @@ class ConnectedDashboard(QObject):
 
         self.enqueue((name, message_id, emoji, present), lambda: service.rpc(name, params), done)
 
+    def dm_feedback(self, name):
+        """Say at once that a conversation is opening; the returned call clears it."""
+        from aedrova.desktop.loading import set_loading
+
+        w = self.window
+        text = f"Opening your conversation with {name}…" if name else "Opening your conversation…"
+        w.notify(text)
+        set_loading(self, w.message_stack, True, "feed")
+
+        def finish():
+            set_loading(self, w.message_stack, False)
+            if w.notice.text() == text:
+                w.notice.hide()
+
+        return finish
+
     def start_dm(self):
         if not self.active:
             return
@@ -1179,7 +1214,11 @@ class ConnectedDashboard(QObject):
                 )
                 return identifier, service.snapshot()
 
+            person = next((p for p in people if p["user_id"] == recipient), {})
+            finish = self.dm_feedback(person.get("display_name", ""))
+
             def opened(result):
+                finish()
                 if (
                     not self.active
                     or self.window.workspace_id != workspace
@@ -1189,7 +1228,8 @@ class ConnectedDashboard(QObject):
                 identifier, data = result
                 self.apply(data, [], workspace, identifier)
 
-            self.enqueue(("dm", workspace, recipient), create, opened)
+            if not self.enqueue(("dm", workspace, recipient), create, opened):
+                finish()
 
 
 
