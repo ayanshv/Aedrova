@@ -89,6 +89,15 @@ def set_text_scale(value):
     TEXT_SCALE = min(1.6, max(0.8, float(value)))
 
 
+CLOCK_FORMAT = "system"
+
+
+def set_clock_format(value):
+    """'system', '12h' or '24h': how times of day read in messages."""
+    global CLOCK_FORMAT
+    CLOCK_FORMAT = value if value in ("system", "12h", "24h") else "system"
+
+
 def font(size=13, bold=False):
     result = system_font(max(9, round(size * TEXT_SCALE)))
     result.setWeight(QFont.Weight.DemiBold if bold else QFont.Weight.Normal)
@@ -205,9 +214,14 @@ def human_time(raw, now=None, *, clock_only=False):
             continue
     if moment is None:
         return raw
-    clock = QLocale.system().toString(
-        QTime(moment.hour, moment.minute), QLocale.FormatType.ShortFormat
-    )
+    if CLOCK_FORMAT == "24h":
+        clock = f"{moment.hour:02d}:{moment.minute:02d}"
+    elif CLOCK_FORMAT == "12h":
+        clock = f"{moment.hour % 12 or 12}:{moment.minute:02d} {'AM' if moment.hour < 12 else 'PM'}"
+    else:
+        clock = QLocale.system().toString(
+            QTime(moment.hour, moment.minute), QLocale.FormatType.ShortFormat
+        )
     if clock_only or "-" not in raw:
         return clock
     now = now or datetime.now()

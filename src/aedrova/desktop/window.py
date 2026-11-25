@@ -1443,6 +1443,7 @@ class AedrovaWindow(QMainWindow):
         from aedrova.desktop import conversation
 
         conversation.set_text_scale(self.settings.value("textScale", 1.0, type=float))
+        conversation.set_clock_format(self.settings.value("clockFormat", "system"))
         conversation.MessageEditor.send_requires_modifier = self.settings.value(
             "sendWithModifier", False, type=bool
         )

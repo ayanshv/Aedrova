@@ -41,6 +41,29 @@ class SettingsDialog(AppDialog):
         outer.addWidget(self.view, 1)
 
         columns = []
+        self.text_size_boxes = []
+
+        def text_size_box():
+            """A message text size choice. Every copy stays in step with the saved setting."""
+            box = ChoiceBox()
+            box.setAccessibleName("Message text size")
+            for text, value in (("Small", 0.9), ("Default", 1.0), ("Large", 1.15), ("Larger", 1.3)):
+                box.addItem(text, value)
+            current = window.settings.value("textScale", 1.0, type=float)
+            box.setCurrentIndex(min(range(4), key=lambda i: abs(box.itemData(i) - current)))
+
+            def changed():
+                window.settings.setValue("textScale", box.currentData())
+                window.apply_message_preferences()
+                for other in self.text_size_boxes:
+                    if other is not box:
+                        other.blockSignals(True)
+                        other.setCurrentIndex(box.currentIndex())
+                        other.blockSignals(False)
+
+            box.currentIndexChanged.connect(changed)
+            self.text_size_boxes.append(box)
+            return box
 
         def section(key, title, detail="", symbol="settings", group="Preferences"):
             if columns:
@@ -56,7 +79,27 @@ class SettingsDialog(AppDialog):
             layout = section(
                 "profile", "Profile", "Your identity across workspaces.", "people", "Account"
             )
+            profile = account.snapshot.get("user_profile", {})
+            shown_name = profile.get("display_name") or (
+                getattr(self.user, "user_metadata", None) or {}
+            ).get("full_name", "")
+            layout.addWidget(label(shown_name or "Your name", "title"))
             layout.addWidget(label(getattr(self.user, "email", None) or "Google account"))
+            mine_rows = [
+                m
+                for m in account.snapshot.get("members", [])
+                if str(m.get("user_id")) == str(self.user.id)
+            ]
+            layout.addWidget(
+                label(
+                    "Member of "
+                    + str(len(mine_rows))
+                    + (" workspace" if len(mine_rows) == 1 else " workspaces")
+                    + ". Signed in with Google.",
+                    "muted",
+                    wrap=True,
+                )
+            )
             layout.addWidget(
                 label(
                     "Email and sign-in security are managed by your Google account.",
@@ -108,7 +151,32 @@ class SettingsDialog(AppDialog):
             self.appearance.currentIndexChanged.connect(
                 lambda: window.set_theme(self.appearance.currentData())
             )
+            layout.addWidget(label("Theme", "muted"))
             layout.addWidget(self.appearance)
+            layout.addWidget(
+                label(
+                    "System default follows your Mac or Windows light and dark setting.",
+                    "muted",
+                    wrap=True,
+                )
+            )
+            layout.addWidget(label("Message text size", "muted"))
+            layout.addWidget(text_size_box())
+            self.clock_format = ChoiceBox()
+            self.clock_format.setAccessibleName("Time format")
+            for text, value in (("System default", "system"), ("12-hour", "12h"), ("24-hour", "24h")):
+                self.clock_format.addItem(text, value)
+            self.clock_format.setCurrentIndex(
+                max(0, self.clock_format.findData(window.settings.value("clockFormat", "system")))
+            )
+
+            def change_clock():
+                window.settings.setValue("clockFormat", self.clock_format.currentData())
+                window.apply_message_preferences()
+
+            self.clock_format.currentIndexChanged.connect(change_clock)
+            layout.addWidget(label("Time format", "muted"))
+            layout.addWidget(self.clock_format)
             layout.addStretch(1)
             layout = section(
                 "accessibility",
@@ -124,28 +192,21 @@ class SettingsDialog(AppDialog):
             self.transparency.setChecked(window.reduced_transparency)
             self.transparency.toggled.connect(window.reduce_transparency_action.setChecked)
             layout.addWidget(self.transparency)
+            layout.addWidget(label("Message text size", "muted"))
+            layout.addWidget(text_size_box())
+            layout.addWidget(
+                label(
+                    "Buttons, messages and fields are labelled for screen readers such as "
+                    "VoiceOver and Narrator.",
+                    "muted",
+                    wrap=True,
+                )
+            )
+            layout.addStretch(1)
             layout = section(
                 "messages", "Messages", "How messages look and how you send them.", "context"
             )
-            self.text_size = ChoiceBox()
-            self.text_size.setAccessibleName("Message text size")
-            for text, value in (
-                ("Small", 0.9),
-                ("Default", 1.0),
-                ("Large", 1.15),
-                ("Larger", 1.3),
-            ):
-                self.text_size.addItem(text, value)
-            current = window.settings.value("textScale", 1.0, type=float)
-            self.text_size.setCurrentIndex(
-                min(range(4), key=lambda i: abs(self.text_size.itemData(i) - current))
-            )
-
-            def change_size():
-                window.settings.setValue("textScale", self.text_size.currentData())
-                window.apply_message_preferences()
-
-            self.text_size.currentIndexChanged.connect(change_size)
+            self.text_size = text_size_box()
             layout.addWidget(label("Message text size", "muted"))
             layout.addWidget(self.text_size)
             self.send_key = ChoiceBox()
@@ -195,7 +256,17 @@ class SettingsDialog(AppDialog):
             self.editor.currentTextChanged.connect(
                 lambda value: window.settings.setValue("editor", value)
             )
+            layout.addWidget(label("Open project files with", "muted"))
             layout.addWidget(self.editor)
+            layout.addWidget(
+                label(
+                    "Used whenever Aedrova opens a file or folder from a project, a build or an "
+                    "agent’s work.",
+                    "muted",
+                    wrap=True,
+                )
+            )
+            layout.addStretch(1)
             layout = section(
                 "language",
                 "Language & translation",

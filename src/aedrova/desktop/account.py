@@ -415,6 +415,18 @@ class AccountDialog(AppDialog):
             self.workspace_metrics[key] = value
             metrics.addWidget(card, 1)
         overview.addLayout(metrics)
+        overview.addSpacing(10)
+        overview.addWidget(label("Your role", "section"))
+        self.workspace_role = label("", wrap=True)
+        overview.addWidget(self.workspace_role)
+        overview.addSpacing(6)
+        overview.addWidget(label("Channels", "section"))
+        self.workspace_channel_names = label("", "muted", wrap=True)
+        overview.addWidget(self.workspace_channel_names)
+        overview.addSpacing(6)
+        overview.addWidget(label("People", "section"))
+        self.workspace_people = label("", wrap=True)
+        overview.addWidget(self.workspace_people)
         overview.addStretch(1)
 
         history = page.add_section(
@@ -1491,6 +1503,45 @@ class AccountDialog(AppDialog):
             self.show_simple_invite()
             self.status.setText("Choose your connected workspace above, then invite a teammate.")
 
+    def render_workspace_people(self, workspace):
+        """Fills the overview with your role, the channels and the first few people."""
+        snapshot = self.snapshot
+        user_id = str(self.service.user.id) if self.service and self.service.user else None
+        members = [m for m in snapshot.get("members", []) if m["workspace_id"] == workspace]
+        mine = next((m for m in members if str(m["user_id"]) == user_id), {})
+        self.workspace_role.setText((mine.get("role") or "member").title())
+        names = [
+            "# " + c["name"]
+            for c in snapshot.get("channels", [])
+            if c["workspace_id"] == workspace and not c.get("private")
+        ]
+        private = sum(
+            1 for c in snapshot.get("channels", [])
+            if c["workspace_id"] == workspace and c.get("private")
+        )
+        text = "   ".join(names[:8]) or "No channels yet."
+        if len(names) > 8:
+            text += f"   and {len(names) - 8} more"
+        if private:
+            text += f"\n{private} private channel{'s' if private != 1 else ''} you can see"
+        self.workspace_channel_names.setText(text)
+        directory = {
+            str(d["user_id"]): d.get("display_name") or "Teammate"
+            for d in snapshot.get("directory", [])
+            if d["workspace_id"] == workspace
+        }
+        rows = []
+        for member in sorted(
+            members,
+            key=lambda m: (("owner", "admin", "member").index(m["role"]) if m["role"] in ("owner", "admin", "member") else 3,
+                           directory.get(str(m["user_id"]), "").casefold()),
+        )[:6]:
+            name = directory.get(str(member["user_id"]), "Teammate")
+            rows.append(f"{name}  ·  {member['role'].title()}")
+        if len(members) > 6:
+            rows.append(f"and {len(members) - 6} more")
+        self.workspace_people.setText("\n".join(rows) or "No one has joined yet.")
+
     def render_workspace(self):
         workspace = self.workspace_id()
         if hasattr(self, "workspace_summary"):
@@ -1518,6 +1569,7 @@ class AccountDialog(AppDialog):
                 )
             for key, count in (("members", members), ("channels", channels), ("buds", buds)):
                 self.workspace_metrics[key].setText(str(count))
+            self.render_workspace_people(workspace)
 
         self.generated_code.clear()
         preference = next(
