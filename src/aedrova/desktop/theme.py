@@ -130,7 +130,7 @@ def permission_warning(theme):
     return "#ED8B4A", "#3C2B20" if theme.name == "dark" else "#FFF0E4"
 
 
-TITLE_FONT = "Plus Jakarta Sans"
+TITLE_FONT = "Aedrova Title"
 _title_font_family = None
 
 
@@ -138,7 +138,7 @@ def title_font_family():
     """Registers the bundled title font once and returns its family, or a system fallback."""
     global _title_font_family
     if _title_font_family is None:
-        path = Path(__file__).parent / "assets" / "fonts" / "PlusJakartaSans.ttf"
+        path = Path(__file__).parent / "assets" / "fonts" / "AedrovaTitle.ttf"
         found = QFontDatabase.addApplicationFont(str(path))
         families = QFontDatabase.applicationFontFamilies(found) if found >= 0 else []
         _title_font_family = families[0] if families else TITLE_FONT
