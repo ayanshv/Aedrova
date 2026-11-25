@@ -119,7 +119,9 @@ for a good first version. It should follow the launch gates in section 4, not pr
 | Item | Status | Notes |
 |---|---|---|
 | ★ iPhone companion through TestFlight and App Review | Open | First launch priority in the timeline. |
-| Android companion | Later | Separate track. |
+| ★ **Mobile launch gate: push notifications work on a real iPhone** | Open, blocked on owner | Code is built and committed (app, database migration, sender). Blocked on the owner: enable Push Notifications on the App ID, create the APNs key, set the five Render variables, and apply the migration to staging first. Pass only when a mention, a direct message and a reply each reach a real iPhone through TestFlight, tapping each opens the right conversation, the alert shows no message text, and signing out stops delivery. Steps: `docs/mobile-push.md` in the website repository. |
+| ★ Mobile launch gate: iPhone App Review basics verified on a real device | Open | Live Google and Apple sign-in, two-way sync with desktop, report and block, AI consent and account deletion, tested with a populated demo workspace. |
+| Android companion | Later | Separate track. No Android app exists yet. Needs the Android toolchain, a Play Console account and developer verification, and the same push gate through Firebase Cloud Messaging. |
 
 ## 10. Website, support and go-to-market
 
