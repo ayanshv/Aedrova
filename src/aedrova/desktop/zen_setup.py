@@ -589,7 +589,7 @@ class SetupPages(QFrame):
             not self.window.connected or self.window.workspace_id != self.workspace
         ):
             account.open_dashboard(require_profile=False)
-        self.flow.show_stage(PRIVACY)
+        self.flow.show_stage(self.flow.following(ACCOUNT))
         self.flow.raise_()
         self.flow.activateWindow()
 
@@ -668,7 +668,9 @@ class SetupPages(QFrame):
         self.disconnect_login()
         if self.flow.closed:
             return
-        self.flow.show_stage(PRIVACY if self.flow.profile_complete() else ACCOUNT)
+        self.flow.show_stage(
+            self.flow.following(ACCOUNT) if self.flow.profile_complete() else ACCOUNT
+        )
         self.flow.show()
         self.flow.raise_()
         self.flow.activateWindow()
@@ -709,7 +711,8 @@ class SetupPages(QFrame):
             and self.window.connected.active
         ):
             self.flow.workspace_selected = True
-            self.flow.show_stage(PROJECT if self.flow.created_workspace == self.workspace else GOAL)
+            created = self.flow.created_workspace == self.workspace
+            self.flow.show_stage(PROJECT if created or self.flow.shows_project() else GOAL)
         else:
             self.flow.show_stage(PROJECT)
         self.flow.show()

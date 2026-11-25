@@ -327,10 +327,13 @@ class ZenOnboarding(AppDialog):
 
     def cover_screen(self):
         """Fill the screen without macOS's full-screen Space, so file pickers and other windows
-        open on top of setup and focus never wanders off to another desktop."""
+        open on top of setup and focus never wanders off to another desktop.
+
+        The usable area leaves out the menu bar and a visible Dock or taskbar. The whole screen
+        would put the Back and Continue buttons underneath them."""
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
         screen = self.window.screen() or QApplication.primaryScreen()
-        self.setGeometry(screen.geometry())
+        self.setGeometry(screen.availableGeometry())
         self.appear_rise = 0
         self.covering = True
 
@@ -422,15 +425,15 @@ class ZenOnboarding(AppDialog):
         if self.theme_mode == "system":
             self.apply_appearance("system")
 
-    ORDER = (WELCOME, ACCOUNT, PRIVACY, THEME, PERMISSIONS, PROJECT, IMPORT, GOAL)
+    ORDER = (WELCOME, ACCOUNT, PROJECT, PRIVACY, THEME, PERMISSIONS, IMPORT, GOAL)
     ORDER_INDEX = {
         OPENING: -1,
         WELCOME: 0,
         ACCOUNT: 1,
-        PRIVACY: 2,
-        THEME: 3,
-        PERMISSIONS: 4,
-        PROJECT: 5,
+        PROJECT: 2,
+        PRIVACY: 3,
+        THEME: 4,
+        PERMISSIONS: 5,
         IMPORT: 6,
         GOAL: 7,
     }
@@ -569,15 +572,37 @@ class ZenOnboarding(AppDialog):
         """The appearance choice is part of first-run setup, not of reviewing it later."""
         return not self.window.settings.value(self.prefix + "/setup", False, type=bool)
 
-    def next_after_privacy(self):
-        if self.shows_theme():
-            return THEME
-        return self.next_after_theme()
+    def shows_project(self):
+        """First-run setup always walks through workspace and project right after the profile."""
+        return self.shows_theme() or self.setup.needs_workspace()
 
-    def next_after_theme(self):
+    def offers_import(self):
+        return bool(
+            self.created_workspace
+            and self.created_workspace == self.setup.workspace
+            and self.setup.can_import_history()
+        )
+
+    def sequence(self):
+        """The screens this person will see, in order, so Back and Continue always agree."""
+        stages = [ACCOUNT]
+        if self.shows_project():
+            stages.append(PROJECT)
+        stages.append(PRIVACY)
+        if self.shows_theme():
+            stages.append(THEME)
         if pending_kinds():
-            return PERMISSIONS
-        return GOAL if not self.setup.needs_workspace() else PROJECT
+            stages.append(PERMISSIONS)
+        if self.offers_import():
+            stages.append(IMPORT)
+        stages.append(GOAL)
+        return stages
+
+    def following(self, stage):
+        stages = self.sequence()
+        if stage not in stages:
+            return GOAL
+        return stages[min(stages.index(stage) + 1, len(stages) - 1)]
 
     def choose_theme(self, mode):
         self.window.set_theme(mode)
@@ -589,15 +614,11 @@ class ZenOnboarding(AppDialog):
         self.art.set_granted([kind for kind, row in rows.items() if row.state == "granted"])
 
     def go_back(self):
-        earlier = THEME if self.shows_theme() else PRIVACY
-        if self.stage == PERMISSIONS:
-            previous = earlier
-        elif self.stage == PROJECT:
-            previous = PERMISSIONS if pending_kinds() else earlier
+        stages = self.sequence()
+        if self.stage in stages and stages.index(self.stage) > 0:
+            previous = stages[stages.index(self.stage) - 1]
         else:
-            previous = {ACCOUNT: WELCOME, PRIVACY: ACCOUNT, THEME: PRIVACY, GOAL: PRIVACY}.get(
-                self.stage, WELCOME
-            )
+            previous = WELCOME
         self.show_stage(previous)
 
     def choose_goal(self, goal):
@@ -608,14 +629,8 @@ class ZenOnboarding(AppDialog):
         return IMPORT if self.setup.can_import_history() else GOAL
 
     def skip_step(self):
-        if self.stage == IMPORT:
-            self.show_stage(GOAL)
-        elif (
-            self.stage == PROJECT
-            and self.created_workspace
-            and self.created_workspace == self.setup.workspace
-        ):
-            self.show_stage(self.after_project())
+        if self.stage == IMPORT or (self.stage == PROJECT and self.setup.has_workspace()):
+            self.show_stage(self.following(self.stage))
         else:
             self.finish()
 
@@ -627,17 +642,11 @@ class ZenOnboarding(AppDialog):
         elif self.stage == OPENING:
             self.show_stage(WELCOME)
         elif self.stage == WELCOME:
-            self.show_stage(PRIVACY if self.profile_complete() else ACCOUNT)
+            self.show_stage(self.following(ACCOUNT) if self.profile_complete() else ACCOUNT)
         elif self.stage == ACCOUNT:
             self.setup.advance_profile()
-        elif self.stage == PRIVACY:
-            self.show_stage(self.next_after_privacy())
-        elif self.stage == THEME:
-            self.show_stage(self.next_after_theme())
-        elif self.stage == PERMISSIONS:
-            self.show_stage(GOAL if not self.setup.needs_workspace() else PROJECT)
-        elif self.stage == IMPORT:
-            self.show_stage(GOAL)
+        elif self.stage in (PRIVACY, THEME, PERMISSIONS, IMPORT):
+            self.show_stage(self.following(self.stage))
         elif self.setup.save():
             self.skip_step()
 

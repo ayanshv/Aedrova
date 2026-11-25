@@ -95,7 +95,9 @@ def test_welcome_goes_directly_to_account_and_apple_returns_to_profile(
     form = flow.setup.profile_form
     assert form.name.text() == "Maya Chen"
     flow.primary.click()
-    qtbot.waitUntil(lambda: flow.stage == PRIVACY)
+    qtbot.waitUntil(lambda: flow.stage == PROJECT)  # workspace and project follow the profile
+    flow.skip.click()
+    assert flow.stage == PRIVACY
     assert any(
         item.text() == "Signed in as maya@example.com" for item in flow.setup.findChildren(QLabel)
     )
@@ -148,6 +150,8 @@ def test_signed_in_profile_completion_opens_workspace_with_no_tour(qtbot, tmp_pa
     window.account_dialog.snapshot["user_profile"] = {"profile_completed": True}
     flow = show_setup(window, qtbot)
     flow.primary.click()
+    assert flow.stage == PROJECT
+    flow.skip.click()
     assert flow.stage == PRIVACY
     past_privacy(flow)
     assert flow.stage == GOAL
@@ -191,7 +195,7 @@ def test_project_starts_with_review_and_saves_only_after_confirmation(qtbot, tmp
     folder.mkdir()
     flow.setup.folder.setText(str(folder))
     flow.primary.click()
-    assert flow.closed
+    assert flow.stage == PRIVACY and not flow.closed  # setup carries on to the next screen
     saved = binding(window)
     assert saved["folder"] == str(folder) and saved["background_build"]
 
@@ -264,9 +268,7 @@ def test_profile_then_join_requires_a_real_workspace(fresh_window, qtbot, monkey
     account.authenticated(user)
     qtbot.waitUntil(lambda: flow.isVisible() and flow.setup.profile_form is not None)
     flow.primary.click()
-    qtbot.waitUntil(lambda: flow.stage == PRIVACY)
-    past_privacy(flow)
-    assert flow.stage == PROJECT
+    qtbot.waitUntil(lambda: flow.stage == PROJECT)  # straight after the profile
     assert flow.primary.isHidden() and flow.skip.isHidden()
     assert flow.setup.first_action is flow.setup.workspace_name
     assert not window.settings.value(flow.prefix + "/setup", False, type=bool)
@@ -327,8 +329,7 @@ def test_fresh_walkthrough_reviews_existing_profile_then_creates_and_invites(
     qtbot.waitUntil(lambda: flow.isVisible() and flow.setup.profile_form is not None)
     assert flow.setup.profile_form.name.text() == "Maya Chen"
     flow.primary.click()
-    qtbot.waitUntil(lambda: flow.stage == PRIVACY)
-    past_privacy(flow)
+    qtbot.waitUntil(lambda: flow.stage == PROJECT)
     assert flow.setup.create_button.isEnabled() is False
     flow.setup.workspace_name.setText("Buyer workspace")
     flow.setup.workspace_ack.setChecked(True)
@@ -339,6 +340,8 @@ def test_fresh_walkthrough_reviews_existing_profile_then_creates_and_invites(
     assert flow.stage == PROJECT and flow.created_workspace == created
     assert not invites
     flow.skip.click()
+    assert flow.stage == PRIVACY
+    past_privacy(flow)
     assert flow.stage == IMPORT  # a just-made workspace offers the optional Slack import
     flow.skip.click()
     assert flow.stage == GOAL
@@ -416,7 +419,8 @@ def test_review_after_first_run_skips_the_theme_choice(fresh_window, qtbot):
     assert flow.shows_theme()
     window.settings.setValue(flow.prefix + "/setup", True)
     assert not flow.shows_theme()
-    assert flow.next_after_privacy() != THEME
+    assert THEME not in flow.sequence()
+    assert not flow.shows_project() or flow.setup.needs_workspace()
 
 
 def test_every_step_has_a_scene_and_reduced_motion_holds_it_still(fresh_window, qtbot):
@@ -456,6 +460,20 @@ def test_back_is_offered_on_every_step_after_the_first(fresh_window, qtbot):
     flow.stage = THEME
     flow.back.click()
     assert shown == [PRIVACY]
+
+
+def test_account_workspace_and_project_follow_each_other_in_one_sequence(fresh_window, qtbot):
+    flow = show_setup(fresh_window, qtbot)
+    assert flow.shows_theme() and flow.shows_project()
+    stages = flow.sequence()
+    assert stages[:4] == [ACCOUNT, PROJECT, PRIVACY, THEME] and stages[-1] == GOAL
+    shown = []
+    flow.show_stage = shown.append
+    for earlier, later in zip(stages, stages[1:]):
+        assert flow.following(earlier) == later
+        flow.stage = later
+        flow.back.click()
+        assert shown.pop() == earlier
 
 
 def test_a_first_run_opens_on_the_motto_screen_alone(fresh_window, qtbot):
@@ -560,6 +578,20 @@ def test_setup_covers_the_screen_and_takes_focus_back_after_pickers(fresh_window
     assert flow.windowFlags() & Qt.WindowType.FramelessWindowHint
     assert not flow.isFullScreen()  # no macOS Space for file pickers to wander off to
     flow.setup.flow.regain_focus()
+
+
+def test_the_cover_leaves_room_for_a_visible_dock_so_the_buttons_stay_reachable(
+    fresh_window, qtbot, monkeypatch
+):
+    from PySide6.QtCore import QRect
+
+    flow = show_setup(fresh_window, qtbot)
+    full, usable = QRect(0, 0, 1440, 900), QRect(0, 25, 1440, 790)  # menu bar above, Dock below
+    fake = SimpleNamespace(geometry=lambda: full, availableGeometry=lambda: usable)
+    monkeypatch.setattr(fresh_window, "screen", lambda: fake)
+    flow.cover_screen()
+    assert flow.geometry() == usable
+    assert flow.geometry().bottom() < full.bottom()
 
 
 def test_a_first_run_opens_light_even_when_the_app_is_dark(fresh_window, qtbot):
