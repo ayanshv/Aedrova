@@ -80,8 +80,17 @@ from aedrova.desktop.theme import LIGHT, Theme, link_color
 MESSAGE_ROLE = Qt.ItemDataRole.UserRole + 1
 
 
+TEXT_SCALE = 1.0
+
+
+def set_text_scale(value):
+    """Scales every message font. Views must be laid out again after a change."""
+    global TEXT_SCALE
+    TEXT_SCALE = min(1.6, max(0.8, float(value)))
+
+
 def font(size=13, bold=False):
-    result = system_font(size)
+    result = system_font(max(9, round(size * TEXT_SCALE)))
     result.setWeight(QFont.Weight.DemiBold if bold else QFont.Weight.Normal)
     return result
 
@@ -1695,6 +1704,8 @@ class MessageView(QListView):
 
 
 class MessageEditor(QPlainTextEdit):
+    send_requires_modifier = False
+
     files_dropped = Signal(list)
 
     def dragEnterEvent(self, event):
@@ -1765,10 +1776,13 @@ class MessageEditor(QPlainTextEdit):
     def keyPressEvent(self, event):  # noqa: N802
         if self.completion and self.completion(event):
             return
-        if (
-            event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
-            and not event.modifiers() & Qt.KeyboardModifier.ShiftModifier
-        ):
+        modifiers = event.modifiers()
+        sends = (
+            bool(modifiers & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.MetaModifier))
+            if MessageEditor.send_requires_modifier
+            else not modifiers & Qt.KeyboardModifier.ShiftModifier
+        )
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and sends:
             if not event.isAutoRepeat():
                 self.submitted.emit()
             event.accept()

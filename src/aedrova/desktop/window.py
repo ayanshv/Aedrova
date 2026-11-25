@@ -62,6 +62,7 @@ class AedrovaWindow(QMainWindow):
         self.theme = LIGHT
         self.reduced_motion = self.settings.value("reduceMotion", False, type=bool)
         self.reduced_transparency = self.settings.value("reduceTransparency", False, type=bool)
+        self.apply_message_preferences(layout=False)
         QApplication.instance().setProperty("reduceMotion", self.reduced_motion)
         self.setFont(system_font())
         icon = app_icon()
@@ -1436,6 +1437,19 @@ class AedrovaWindow(QMainWindow):
     def toggle_sidebar(self):
         self.sidebar.setVisible(not self.sidebar.isVisible())
         QTimer.singleShot(0, self._adapt_thread)
+
+    def apply_message_preferences(self, *, layout=True):
+        """Applies the saved message text size and send key to the whole window."""
+        from aedrova.desktop import conversation
+
+        conversation.set_text_scale(self.settings.value("textScale", 1.0, type=float))
+        conversation.MessageEditor.send_requires_modifier = self.settings.value(
+            "sendWithModifier", False, type=bool
+        )
+        if layout:
+            for view in (self.messages, self.thread_messages):
+                view.doItemsLayout()
+                view.viewport().update()
 
     def set_theme(self, mode, *, persist=True):
         if mode not in ("system", "light", "dark"):

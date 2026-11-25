@@ -124,6 +124,66 @@ class SettingsDialog(AppDialog):
             self.transparency.toggled.connect(window.reduce_transparency_action.setChecked)
             layout.addWidget(self.transparency)
             layout = section(
+                "messages", "Messages", "How messages look and how you send them.", "context"
+            )
+            self.text_size = ChoiceBox()
+            self.text_size.setAccessibleName("Message text size")
+            for text, value in (
+                ("Small", 0.9),
+                ("Default", 1.0),
+                ("Large", 1.15),
+                ("Larger", 1.3),
+            ):
+                self.text_size.addItem(text, value)
+            current = window.settings.value("textScale", 1.0, type=float)
+            self.text_size.setCurrentIndex(
+                min(range(4), key=lambda i: abs(self.text_size.itemData(i) - current))
+            )
+
+            def change_size():
+                window.settings.setValue("textScale", self.text_size.currentData())
+                window.apply_message_preferences()
+
+            self.text_size.currentIndexChanged.connect(change_size)
+            layout.addWidget(label("Message text size", "muted"))
+            layout.addWidget(self.text_size)
+            self.send_key = ChoiceBox()
+            self.send_key.setAccessibleName("Send messages with")
+            self.send_key.addItem("Enter (Shift+Enter adds a line)", False)
+            self.send_key.addItem("Ctrl or Cmd+Enter (Enter adds a line)", True)
+            self.send_key.setCurrentIndex(
+                self.send_key.findData(window.settings.value("sendWithModifier", False, type=bool))
+            )
+
+            def change_send_key():
+                window.settings.setValue("sendWithModifier", self.send_key.currentData())
+                window.apply_message_preferences()
+
+            self.send_key.currentIndexChanged.connect(change_send_key)
+            layout.addWidget(label("Send messages with", "muted"))
+            layout.addWidget(self.send_key)
+            layout.addStretch(1)
+            layout = section(
+                "notifications",
+                "Notifications",
+                "Choose when Aedrova tells you about new activity.",
+                "activity",
+            )
+            self.activity_alerts = QCheckBox("Show an alert when there is new activity")
+            self.activity_alerts.setChecked(window.settings.value("notifyActivity", True, type=bool))
+            self.activity_alerts.toggled.connect(
+                lambda checked: window.settings.setValue("notifyActivity", checked)
+            )
+            layout.addWidget(self.activity_alerts)
+            layout.addWidget(
+                label(
+                    "Set your status to Busy to pause alerts without changing this.",
+                    "muted",
+                    wrap=True,
+                )
+            )
+            layout.addStretch(1)
+            layout = section(
                 "workflow", "Editor", "Your preferred app for opening project files.", "folder"
             )
             self.editor = ChoiceBox()
@@ -161,6 +221,12 @@ class SettingsDialog(AppDialog):
                 lambda: QDesktopServices.openUrl(QUrl("https://aedrova.com/data-controls"))
             )
             layout.addWidget(privacy)
+            self.share_typing = QCheckBox("Let teammates see when I’m typing")
+            self.share_typing.setChecked(window.settings.value("shareTyping", True, type=bool))
+            self.share_typing.toggled.connect(
+                lambda checked: window.settings.setValue("shareTyping", checked)
+            )
+            layout.addWidget(self.share_typing)
         self.billing_origin = application_origin()
         if self.user and scope == "workspace":
             layout = section(

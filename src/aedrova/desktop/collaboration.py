@@ -631,7 +631,12 @@ class Collaboration(QObject):
             ),
             {},
         )
-        if previous and fresh - self.notification_ids and own.get("availability") != "busy":
+        if (
+            previous
+            and fresh - self.notification_ids
+            and own.get("availability") != "busy"
+            and window.settings.value("notifyActivity", True, type=bool)
+        ):
             QTimer.singleShot(
                 0,
                 lambda: (
@@ -789,6 +794,8 @@ class Collaboration(QObject):
                     "profile", {"status": own.get("status", ""), "availability": availability}
                 )
     def typing(self, composer):
+        if not self.window.settings.value("shareTyping", True, type=bool):
+            return
         if (
             not self.connected()
             or getattr(self.connected().account.service, "collaboration_available", None)
