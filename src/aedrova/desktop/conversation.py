@@ -149,6 +149,38 @@ def reaction_chips(message, width, top):
     return result
 
 
+_CODE = re.compile(r"(```.*?```|~~~.*?~~~|`[^`\n]*`)", re.S)
+_BARE_URL = re.compile(r"(?<![\w/@<\[\"'=])(?<!\]\()(https?://[^\s<>]+)", re.I)
+_OPENING = {")": "(", "]": "[", "}": "{"}
+_TRAILING = ".,;:!?'\"*_~"
+
+
+def _link_end(url):
+    """Trim sentence punctuation and an unmatched closing bracket from a pasted address."""
+    while url:
+        last = url[-1]
+        if last in _TRAILING or (last in _OPENING and url.count(last) > url.count(_OPENING[last])):
+            url = url[:-1]
+            continue
+        break
+    return url
+
+
+def autolink_urls(text):
+    """Wrap bare web addresses as <links>, leaving code, existing links and images alone."""
+
+    def wrap(match):
+        url = _link_end(match.group(1))
+        if len(url) <= len("https://") or not urlsplit(url).hostname:
+            return match.group(0)
+        return "<" + url + ">" + match.group(1)[len(url) :]
+
+    pieces = _CODE.split(text)
+    for index in range(0, len(pieces), 2):  # odd pieces are code
+        pieces[index] = _BARE_URL.sub(wrap, pieces[index])
+    return "".join(pieces)
+
+
 def message_urls(body):
     return list(dict.fromkeys(re.findall(r"https?://[^\s<>\)]+", body)))[:3]
 
@@ -191,7 +223,7 @@ def markdown_document(text, *, base_font=None):
     document = SafeDocument()
     if base_font is not None:
         document.setDefaultFont(base_font)
-    document.setMarkdown(text, QTextDocument.MarkdownFeature.MarkdownNoHTML)
+    document.setMarkdown(autolink_urls(text), QTextDocument.MarkdownFeature.MarkdownNoHTML)
     return document
 
 
@@ -313,23 +345,9 @@ class MessageDelegate(QStyledItemDelegate):
                     text, long_words = shortened
             if hint:
                 text += "\n\n_" + hint + "_"
-            document.setMarkdown(text, QTextDocument.MarkdownFeature.MarkdownNoHTML)
-            previews = ""
-            for url in message_urls(message.body) if not message.agent else ():
-                parsed = urlsplit(url)
-                if parsed.hostname:
-                    title = parsed.hostname + (parsed.path[:70] if parsed.path != "/" else "")
-                    previews += (
-                        '<p style="margin-top:12px;">↗ <a href="'
-                        + escape(url, quote=True)
-                        + '">'
-                        + escape(title)
-                        + "</a><br><small>Link preview</small></p>"
-                    )
-            if previews:
-                preview_cursor = QTextCursor(document)
-                preview_cursor.movePosition(QTextCursor.MoveOperation.End)
-                preview_cursor.insertHtml(previews)
+            document.setMarkdown(
+                autolink_urls(text), QTextDocument.MarkdownFeature.MarkdownNoHTML
+            )
             if message.agent:
                 append_response_actions(
                     document, response_parts(message.body)[1], rating,
@@ -365,15 +383,18 @@ class MessageDelegate(QStyledItemDelegate):
                                 color = self.theme.muted
                             elif self.theme.name == "dark":
                                 color = link_color(True)
-                        anchor_ranges.append((fragment.position(), fragment.length(), color))
+                        web = urlsplit(action).scheme in ("http", "https")
+                        anchor_ranges.append((fragment.position(), fragment.length(), color, web))
                     fragments += 1
                 block = block.next()
-            for start, length, color in anchor_ranges:
+            for start, length, color, web in anchor_ranges:
                 cursor = QTextCursor(document)
                 cursor.setPosition(start)
                 cursor.setPosition(start + length, QTextCursor.MoveMode.KeepAnchor)
                 style = cursor.charFormat()
                 style.setForeground(QColor(color))
+                if web:
+                    style.setFontUnderline(True)  # an address reads as a link, as in any messenger
                 cursor.mergeCharFormat(style)
             document.setTextWidth(width)
             self.documents[key] = document
@@ -953,9 +974,16 @@ class MessageView(QListView):
             self.activate_reply_action(message.id, message.author, message.body, link)
             return True
         if link and urlsplit(link).scheme in ("https", "http"):
-            self.link_requested.emit(link)
+            self.open_link(link)
             return True
         return False
+
+    def open_link(self, url):
+        """A tapped address goes straight to the site in the person's browser."""
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+
+        QDesktopServices.openUrl(QUrl(url))
 
     def activate_reply_action(self, identifier, author, raw, link, *, row=None):
         if link.startswith(SOURCE_PREFIX):
@@ -1137,6 +1165,20 @@ class MessageView(QListView):
         )
         return (link, label) if label else None
 
+    def web_link_under(self, position):
+        hit = self.text_hit(position)
+        if not hit:
+            return False
+        index, document, _ = hit
+        rect = self.visualRect(index)
+        link = document.documentLayout().anchorAt(
+            QPointF(
+                position.x() - rect.x() - 74,
+                position.y() - rect.top() - self.delegate.body_offset(index),
+            )
+        )
+        return bool(link) and urlsplit(link).scheme in ("http", "https")
+
     def update_action_tip(self, position):
         found = self.action_under(position)
         if getattr(self, "hover_tip", None) is None:
@@ -1165,6 +1207,11 @@ class MessageView(QListView):
             return
         super().mouseMoveEvent(event)
         self.update_action_tip(event.position().toPoint())
+        self.viewport().setCursor(
+            Qt.CursorShape.PointingHandCursor
+            if self.web_link_under(event.position().toPoint())
+            else Qt.CursorShape.ArrowCursor
+        )
         index = self.indexAt(event.position().toPoint())
         if not index.isValid():
             self.reaction_bar.hide()
