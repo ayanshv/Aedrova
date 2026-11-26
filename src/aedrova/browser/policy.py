@@ -30,6 +30,14 @@ SENSITIVE_NAME = re.compile(
     r"ssn|social.?security|iban|routing|account.?number|pin\b|secret|token|api.?key",
     re.I,
 )
+DOT_LOOKALIKES = {0x3002: ".", 0xFF0E: ".", 0xFF61: "."}
+NUMERIC_PART = r"(?:0x[0-9a-f]+|[0-9]+)"
+NUMERIC_HOST = re.compile(rf"{NUMERIC_PART}(?:\.{NUMERIC_PART})*", re.I)
+CANONICAL_IPV4 = re.compile(
+    r"(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])"
+)
+# Data can leave through a page's address or a search box even on a site the person approved.
+CARRY_LIMIT = 48
 SENSITIVE_AUTOCOMPLETE = re.compile(
     r"cc-|current-password|new-password|one-time-code|webauthn", re.I
 )
@@ -62,8 +70,14 @@ def check_url(url, *, resolver=socket.getaddrinfo):
     parts = urlsplit(candidate)
     if parts.scheme.lower() not in ALLOWED_SCHEMES:
         raise Refusal("Only web addresses (http and https) can be opened here.")
-    host = (parts.hostname or "").rstrip(".").lower()
+    # Chromium reads these full-width and ideographic dots as ordinary dots, so a name like
+    # "example.com\u3002localhost" is really example.com.localhost.
+    host = (parts.hostname or "").translate(DOT_LOOKALIKES).rstrip(".").lower()
     if not host or parts.username or parts.password:
+        raise Refusal("That address is not allowed.")
+    if NUMERIC_HOST.fullmatch(host) and not CANONICAL_IPV4.fullmatch(host):
+        # Octal, hex and single-number spellings (0177.0.0.1, 0x7f.1, 2130706433) are read by
+        # browsers as other addresses than a plain resolver reports, so they never open.
         raise Refusal("That address is not allowed.")
     if host == "localhost" or host.endswith((".localhost", ".local", ".internal", ".lan", ".home")):
         raise Refusal("Local network addresses are blocked.")
@@ -106,20 +120,29 @@ def risky_click(info):
     return bool(RISKY_CLICK.search(text)) or (info.get("type") or "").lower() == "submit"
 
 
-def decide(mode, action, *, host=None, approved=(), info=None):
+def carries_data(url):
+    """A long query or fragment can smuggle text out to a site, so it is never waved through."""
+    parts = urlsplit(url or "")
+    return len(parts.query) + len(parts.fragment) > CARRY_LIMIT
+
+
+def decide(mode, action, *, host=None, approved=(), info=None, url=None, text=""):
     """'allow' or 'ask'. Hard refusals are raised by check_url and sensitive_field instead."""
     if action not in ACTIONS:
         raise Refusal("That browser action is not available.")
     if mode == "full":
         return "allow"
     new_site = action in NAVIGATE and host not in set(approved)
+    if action in NAVIGATE and carries_data(url):
+        return "ask"
     if mode == "auto":
         if new_site:
             return "ask"
         if action in INTERACT:
             return "ask" if risky_click(info or {}) else "allow"
         if action in ENTER:
-            return "allow" if (info or {}).get("type") == "search" else "ask"
+            quiet = (info or {}).get("type") == "search" and len(text or "") <= CARRY_LIMIT
+            return "allow" if quiet else "ask"
         return "allow"
     # "ask" and anything unknown are treated as the most careful mode.
     if new_site or action in INTERACT or action in ENTER:

@@ -42,17 +42,21 @@ def storage_path():
 
 
 def is_local_host(host):
+    """True for names and addresses that point at this machine or a private network."""
+    import ipaddress
+
     from aedrova.browser.policy import is_public_address
 
+    host = (host or "").strip("[]").rstrip(".").lower()
     if not host:
         return False
     if host == "localhost" or host.endswith((".localhost", ".local", ".internal")):
         return True
-    return (
-        host.replace(".", "").replace(":", "").isalnum()
-        and (host[0].isdigit() or ":" in host or host.startswith("["))
-        and not is_public_address(host.strip("[]"))
-    )
+    try:
+        ipaddress.ip_address(host.split("%")[0])
+    except ValueError:
+        return False  # an ordinary name, even one that starts with a digit
+    return not is_public_address(host)
 
 
 class GlobeMark(QWidget):

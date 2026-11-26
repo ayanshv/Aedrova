@@ -53,7 +53,7 @@ installer itself was not re-tested. The owner confirmed that contact@aedrova.com
 | Item | Status | Notes |
 |---|---|---|
 | ★ Beta terms and a privacy notice that match the product | Done | Owner confirmed counsel reviewed the browser additions. PR #81 merged after CI and the updated sections were verified at www.aedrova.com. The staging-domain copies still used the earlier text at the November 24 check. |
-| ★ Test web content steering an agent | Open | The browser and web search read untrusted pages while the agent can read files. Try instruction-injection pages, and consider defaulting testers to "Ask for approval". |
+| ★ Test web content steering an agent | Partial | November 25: 110 attack-style checks (`tests/test_prompt_injection.py`) found and fixed six gaps in the browser rules; see `docs/prompt-injection-check-2026-11-25.md`. No live model run yet: this Mac's Codex login cannot use its configured model. Needs: a working model, then `scripts/live_injection_check.py`; decide the default access mode for testers (Approve for me recommended). |
 | Account deletion and data export | Partial | The privacy page promises both. A documented manual process is enough for a beta. |
 | Confirm the browser, Slack import and web search defaults for testers | Owner | Decide what is on for the first cohort. |
 

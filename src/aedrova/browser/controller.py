@@ -165,7 +165,7 @@ class BrowserController(QObject):
             self.after_load(lambda: self.do_read({}, done))
             self.panel.view.load(self.panel.page.url().fromUserInput(url))
 
-        if decide(self.mode(), "open", host=host, approved=self.panel.approved) == "ask":
+        if decide(self.mode(), "open", host=host, approved=self.panel.approved, url=url) == "ask":
             self.ask_then(f"Let Aedrova open {host}?", go, done)
         else:
             go()
@@ -272,7 +272,7 @@ class BrowserController(QObject):
                 self.run_script(script, typed)
 
             host = self.panel.current_host()
-            if decide(self.mode(), "type", host=host, info=info) == "ask":
+            if decide(self.mode(), "type", host=host, info=info, text=text) == "ask":
                 shown = text if len(text) <= 40 else text[:40] + "…"
                 self.ask_then(f"Let Aedrova type “{shown}” on {host}?", go, done)
             else:
