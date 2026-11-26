@@ -33,6 +33,7 @@ from PySide6.QtGui import (
     QPainter,
     QPainterPath,
     QPalette,
+    QPen,
     QPixmap,
     QTextBlockFormat,
     QTextCharFormat,
@@ -53,6 +54,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QStyle,
     QStyledItemDelegate,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -78,6 +80,7 @@ from aedrova.desktop.response_actions import (
 from aedrova.desktop.theme import LIGHT, Theme, link_color
 
 MESSAGE_ROLE = Qt.ItemDataRole.UserRole + 1
+UNREAD_HEIGHT = 38  # room above the first unread message for the "New messages" line
 
 
 TEXT_SCALE = 1.0
@@ -102,6 +105,28 @@ def font(size=13, bold=False):
     result = system_font(max(9, round(size * TEXT_SCALE)))
     result.setWeight(QFont.Weight.DemiBold if bold else QFont.Weight.Normal)
     return result
+
+
+def paint_unread_line(painter, rect, theme):
+    """A hairline either side of a quiet label, between what you have seen and what you have not."""
+    painter.save()
+    color = QColor(theme.link)
+    hairline = QColor(color)
+    hairline.setAlpha(90)
+    label = "New messages"
+    painter.setFont(font(11, True))
+    width = QFontMetrics(font(11, True)).horizontalAdvance(label)
+    left, right = rect.x() + 28, rect.right() - 28
+    middle = (left + right) / 2
+    y = rect.y() + UNREAD_HEIGHT / 2 + 5
+    painter.setPen(QPen(hairline, 1))
+    painter.drawLine(QPointF(left, y), QPointF(middle - width / 2 - 12, y))
+    painter.drawLine(QPointF(middle + width / 2 + 12, y), QPointF(right, y))
+    painter.setPen(color)
+    painter.drawText(
+        QRectF(middle - width / 2 - 4, y - 11, width + 8, 22), Qt.AlignmentFlag.AlignCenter, label
+    )
+    painter.restore()
 
 
 class ConversationModel(QAbstractListModel):
@@ -426,11 +451,17 @@ class MessageDelegate(QStyledItemDelegate):
         self.documents.move_to_end(key)
         return self.documents[key]
 
+    def unread_extra(self, index):
+        message = index.data(MESSAGE_ROLE)
+        return UNREAD_HEIGHT if message and message.id == getattr(self.view, "unread_id", "") else 0
+
     def grouped(self, index):
         """Group nearby messages by actual sender, without merging their data or actions."""
         if index.row() == 0:
             return False
         message = index.data(MESSAGE_ROLE)
+        if message.id == getattr(self.view, "unread_id", ""):
+            return False
         previous = index.model().index(index.row() - 1, 0).data(MESSAGE_ROLE)
         if (
             not previous
@@ -461,7 +492,8 @@ class MessageDelegate(QStyledItemDelegate):
         return False
 
     def body_offset(self, index):
-        return 5 if self.grouped(index) else 14 + QFontMetrics(font(14, True)).height() + 6
+        base = 5 if self.grouped(index) else 14 + QFontMetrics(font(14, True)).height() + 6
+        return base + self.unread_extra(index)
 
     def sizeHint(self, option, index):  # noqa: N802
         message = index.data(MESSAGE_ROLE)
@@ -491,6 +523,11 @@ class MessageDelegate(QStyledItemDelegate):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = option.rect
         painter.setClipRect(rect)
+        extra = self.unread_extra(index)
+        if extra:
+            paint_unread_line(painter, rect, t)
+            rect = rect.adjusted(0, extra, 0, 0)
+        offset = self.body_offset(index) - extra
         animation = self.view.send_animations.get(message.id)
         if animation is not None:
             progress = float(animation.currentValue() or 0)
@@ -517,7 +554,7 @@ class MessageDelegate(QStyledItemDelegate):
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawRoundedRect(focus, 7, 7)
         grouped = self.grouped(index)
-        x, y = rect.x() + 74, rect.y() + self.body_offset(index)
+        x, y = rect.x() + 74, rect.y() + offset
         if grouped and hovered:
             painter.setPen(QColor(t.secondary))
             painter.setFont(font(9))
@@ -615,7 +652,7 @@ class MessageDelegate(QStyledItemDelegate):
                 )
         document = self.document(message, rect.width() - 94)
         painter.save()
-        painter.translate(rect.x() + 74, rect.y() + self.body_offset(index))
+        painter.translate(rect.x() + 74, rect.y() + offset)
         self.view.paint_text_selection(painter, message, document)
         context = QAbstractTextDocumentLayout.PaintContext()
         context.palette.setColor(
@@ -624,7 +661,7 @@ class MessageDelegate(QStyledItemDelegate):
         document.documentLayout().draw(painter, context)
         painter.restore()
         x = rect.x() + 74
-        bottom = rect.y() + self.body_offset(index) + document.size().height()
+        bottom = rect.y() + offset + document.size().height()
         if message.attachment:
             voice = message.attachment.lower().endswith(".wav")
             playback = getattr(self.view, "voice_playback", {})
@@ -736,6 +773,36 @@ class MessageDelegate(QStyledItemDelegate):
         painter.restore()
 
 
+class UnreadJump(QToolButton):
+    """A small round up arrow that returns to the first unread message."""
+
+    SIZE = 34
+
+    def __init__(self, view):
+        super().__init__(view.viewport())
+        self.view = view
+        self.setObjectName("UnreadJump")
+        self.setFixedSize(self.SIZE, self.SIZE)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip("Jump to first unread message")
+        self.setAccessibleName("Jump to first unread message")
+        self.hide()
+
+    def paintEvent(self, event):  # noqa: N802
+        t = self.view.delegate.theme
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        box = QRectF(self.rect()).adjusted(1, 1, -1, -1)
+        painter.setBrush(QColor(t.surface))
+        painter.setPen(QPen(QColor(t.border), 1))
+        painter.drawEllipse(box)
+        painter.setPen(QPen(QColor(t.link), 2, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        cx, cy = box.center().x(), box.center().y()
+        painter.drawLine(QPointF(cx, cy + 6), QPointF(cx, cy - 6))
+        painter.drawLine(QPointF(cx - 5, cy - 1), QPointF(cx, cy - 6))
+        painter.drawLine(QPointF(cx + 5, cy - 1), QPointF(cx, cy - 6))
+
+
 class MessageView(QListView):
     thread_requested = Signal(str)
     reaction_requested = Signal(str, str, bool)
@@ -789,6 +856,10 @@ class MessageView(QListView):
         self.setModel(self.conversation_model)
         self.delegate = MessageDelegate(self)
         self.setItemDelegate(self.delegate)
+        self.unread_id = ""
+        self.unread_jump = UnreadJump(self)
+        self.unread_jump.clicked.connect(self.jump_to_unread)
+        self.verticalScrollBar().valueChanged.connect(lambda *_: self.update_unread_jump())
         self.clicked.connect(self._clicked_message)
         self.reaction_bar = QFrame(self.viewport())
         self.reaction_bar.setObjectName("ReactionBar")
@@ -1711,10 +1782,43 @@ class MessageView(QListView):
                     self.doItemsLayout()
                     bar.setValue(bar.value() + self.visualRect(index).top() - offset)
                     break
+        self.update_unread_jump()
+
+    def set_unread(self, message_id):
+        """Mark where the "New messages" line goes for this visit ('' for none)."""
+        if message_id == self.unread_id:
+            return
+        self.unread_id = message_id
+        self.doItemsLayout()
+        self.viewport().update()
+        self.update_unread_jump()
+
+    def unread_index(self):
+        if not self.unread_id:
+            return None
+        for row, message in enumerate(self.conversation_model.messages):
+            if message.id == self.unread_id:
+                return self.model().index(row)
+        return None
+
+    def update_unread_jump(self):
+        index = self.unread_index()
+        above = index is not None and self.visualRect(index).top() + UNREAD_HEIGHT <= 0
+        self.unread_jump.setVisible(above)
+        if above:
+            self.unread_jump.move(self.viewport().width() - self.unread_jump.width() - 16, 12)
+            self.unread_jump.raise_()
+
+    def jump_to_unread(self):
+        index = self.unread_index()
+        if index is not None:
+            self._cancel_scroll()
+            self.scrollTo(index, QListView.ScrollHint.PositionAtTop)
 
     def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
         self.scheduleDelayedItemsLayout()
+        self.update_unread_jump()
 
 
 class MessageEditor(QPlainTextEdit):

@@ -621,6 +621,17 @@ class ConnectedDashboard(QObject):
 
         self.enqueue(("older", channel, parent, before), operation, loaded)
 
+    def note_unread_line(self, w, count):
+        """Place the "New messages" line once per visit to a channel, before reading clears it."""
+        key = (w.workspace_id, w.channel_id)
+        if getattr(self, "unread_visit", None) != key:
+            self.unread_visit = key
+            self.unread_message = ""
+            theirs = [m for m in w.channel.messages if not m.mine]
+            if 0 < count <= len(theirs):
+                self.unread_message = theirs[-count].id
+        w.messages.set_unread(self.unread_message)
+
     def apply(self, snapshot, rows, workspace_id, channel_id):
         teammate_dialog = getattr(self.window, "teammates_dialog", None)
         if teammate_dialog and not teammate_dialog.closed:
@@ -715,6 +726,7 @@ class ConnectedDashboard(QObject):
                 if count:
                     item.setText(item.text() + f"  ({count})")
                 item.setToolTip(f"{count} unread messages")
+        self.note_unread_line(w, unread.get(w.channel_id, 0))
         w._load_channel()
         if old_workspace != w.workspace_id or not getattr(self, "pages_ready", False):
             w._render_pages()
