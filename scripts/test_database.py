@@ -134,7 +134,8 @@ try {
    'supabase/tests/beta_allowlist.sql',
    'supabase/migrations/202611240001_mobile_push.sql',
    'supabase/tests/mobile_push.sql',
-   'supabase/migrations/202611250001_push_sender_access.sql']) {
+   'supabase/migrations/202611250001_push_sender_access.sql',
+   'supabase/migrations/202611260001_android_push.sql']) {
   let sql = fs.readFileSync(file,'utf8');
   // Reproduce the already-activated original function, then verify its additive
   // conflict-response upgrade before running the lifecycle tests.
