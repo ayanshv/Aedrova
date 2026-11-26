@@ -594,6 +594,32 @@ def test_the_cover_leaves_room_for_a_visible_dock_so_the_buttons_stay_reachable(
     assert flow.geometry().bottom() < full.bottom()
 
 
+def test_the_buttons_sit_well_above_the_bottom_edge_even_when_the_dock_hides_itself(
+    fresh_window, qtbot, monkeypatch
+):
+    """A Dock that auto-hides is not subtracted from the usable area and slides up over the edge."""
+    from PySide6.QtCore import QPoint, QRect
+
+    from aedrova.desktop.zen_onboarding import DOCK_CLEARANCE
+
+    flow = show_setup(fresh_window, qtbot)
+    usable = QRect(0, 25, 1440, 875)  # a hidden Dock leaves the whole screen below the menu bar
+    fake = SimpleNamespace(geometry=lambda: usable, availableGeometry=lambda: usable)
+    monkeypatch.setattr(fresh_window, "screen", lambda: fake)
+    flow.cover_screen()
+    flow.show()
+    qtbot.wait(50)
+    for stage in (WELCOME, ACCOUNT):
+        flow.show_stage(stage)
+        qtbot.wait(20)
+        bottom = flow.actions.mapTo(flow, QPoint(0, flow.actions.height())).y()
+        assert flow.height() - bottom >= DOCK_CLEARANCE
+    flow.leave_cover()
+    qtbot.wait(20)
+    bottom = flow.actions.mapTo(flow, QPoint(0, flow.actions.height())).y()
+    assert flow.height() - bottom < DOCK_CLEARANCE  # an ordinary window keeps the tighter layout
+
+
 def test_a_first_run_opens_light_even_when_the_app_is_dark(fresh_window, qtbot):
     fresh_window.set_theme("dark")
     flow = SetupDialog(fresh_window)

@@ -185,6 +185,13 @@ class FeatureRow(QFrame):
         self.style().polish(self)
 
 
+# A Dock or taskbar that hides itself is not left out of the usable screen area, and it slides up
+# over whatever sits at the bottom edge. In the full-screen cover, Back and Continue stay this far
+# above that edge so they can always be clicked.
+DOCK_CLEARANCE = 96
+PANEL_MARGINS = (44, 30, 36, 26)
+
+
 class ZenOnboarding(AppDialog):
     def __init__(self, window):
         super().__init__(window)
@@ -231,7 +238,8 @@ class ZenOnboarding(AppDialog):
         shell.addWidget(panel, 100)
         shell.addStretch(1)
         left = QVBoxLayout(panel)
-        left.setContentsMargins(44, 30, 36, 26)
+        left.setContentsMargins(*PANEL_MARGINS)
+        self.panel_layout = left
         left.setSpacing(0)
         self.top = QWidget()
         top = QHBoxLayout(self.top)
@@ -334,6 +342,8 @@ class ZenOnboarding(AppDialog):
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
         screen = self.window.screen() or QApplication.primaryScreen()
         self.setGeometry(screen.availableGeometry())
+        left, top, right, bottom = PANEL_MARGINS
+        self.panel_layout.setContentsMargins(left, top, right, bottom + DOCK_CLEARANCE)
         self.appear_rise = 0
         self.covering = True
 
@@ -342,6 +352,7 @@ class ZenOnboarding(AppDialog):
         if not getattr(self, "covering", False):
             return
         self.covering = False
+        self.panel_layout.setContentsMargins(*PANEL_MARGINS)
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint, False)
         screen = (self.window.screen() or QApplication.primaryScreen()).availableGeometry()
         width, height = min(980, screen.width() - 120), min(680, screen.height() - 120)
