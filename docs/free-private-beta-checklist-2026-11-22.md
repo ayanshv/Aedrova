@@ -12,6 +12,11 @@ the OpenAI spending cap, Render alert and backups for the selected beta database
 covers counsel review and deployment of the policies. Gate 12 covers the monitored feedback
 address, invite message and known issues. The live Slack export test is waived for this beta.
 
+November 24: the owner reported the private beta launched and the remaining setup completed.
+The [live download](https://aedrova-beta-staging.onrender.com/download) presents the beta
+password form to signed-out visitors, and the staging readiness endpoint passed. The gated
+installer itself was not re-tested. The owner confirmed that contact@aedrova.com is monitored.
+
 ## 1. Getting people in
 
 | Item | Status | Notes |
@@ -29,7 +34,7 @@ address, invite message and known issues. The live Slack export test is waived f
 | ★ Mac: Developer ID signing, notarization, a clean-machine install test | Partial | November 23 staging DMG and app passed signature, stapling and Gatekeeper checks. The exact DMG also passed checksum and Gatekeeper in the cloned Mac VM. A separate installation reached the account screen with fresh app settings and showed both sign-in options. Complete the authenticated walkthrough and verify the gated website download before release. |
 | ★ Packaging check with the new browser engine | Partial | The bundled Qt WebEngine helper passed deep signature validation. Launch the browser panel from the installed signed app in the VM to verify it runs. |
 | Windows build | Partial | A preview installer exists. For a private beta an unsigned build with SmartScreen instructions is workable; say so in the guide, or limit the first cohort to Mac. |
-| ★ One environment for the beta | Owner | Pick the Supabase and Render projects testers will use and point the build at them. Do not mix staging and beta data. |
+| ★ One environment for the beta | Done | Owner selected Aedrova Staging in Supabase and aedrova-beta-staging in Render. |
 | Update path | Partial | The app checks for updates but does not install them. Plan on "download the new build" and tell testers. |
 
 ## 3. The database and services
@@ -38,8 +43,8 @@ address, invite message and known issues. The live Slack export test is waived f
 |---|---|---|
 | ★ Apply every migration to the beta project, in order | Owner | Includes join codes, shared chat activity, chat safety, shared pins, Slack history and Slack channels. Run the embedded test script first (`scripts/test_database.py`). |
 | ★ Backups you control | Partial | Supabase showed seven scheduled backups for Aedrova Staging, most recent November 23, 2026 at 08:15 UTC. An isolated restore and coverage of Storage files still need verification. Confirm the selected project before release. |
-| ★ Render capacity and a spend limit | Owner | In the selected beta service, check Metrics for memory and enable failure emails under Settings → Notifications. Verify who receives them. [Render notifications](https://render.com/docs/notifications) |
-| ★ AI spending cap at the provider | Owner | In Settings → Projects → the project billed for the beta gateway → Limits, set the approved monthly amount, turn on Enforce a hard limit and add a 50% alert. [OpenAI project limits](https://help.openai.com/en/articles/9186755-managing-projects-in-the-api-platform) |
+| ★ Render capacity and a spend limit | Partial | Staging has its own failure notification override and the workspace destination is Email. Render lists 512 MB RAM and 0.15 CPU on the current Free instance. |
+| ★ AI spending cap at the provider | Owner confirmed | OpenAI showed an enforced $100 monthly limit and a $50 alert in Aedrova Beta. Owner reported the remaining setup complete. Live requests billed to that project were not checked after handoff. |
 | Kill switches | Partial | The browser has `browser/enabled`. Make sure you can also switch off AI, web search and Slack import quickly. |
 | Monitoring that reaches a person | Partial | Render emails exist. Send them somewhere you will see them. |
 
@@ -47,7 +52,7 @@ address, invite message and known issues. The live Slack export test is waived f
 
 | Item | Status | Notes |
 |---|---|---|
-| ★ Beta terms and a privacy notice that match the product | Owner | The pages exist. Have counsel review the new browser sections, then deploy. Say plainly: beta, data can be lost, AI sends content to providers. |
+| ★ Beta terms and a privacy notice that match the product | Done | Owner confirmed counsel reviewed the browser additions. PR #81 merged after CI and the updated sections were verified at www.aedrova.com. The staging-domain copies still used the earlier text at the November 24 check. |
 | ★ Test web content steering an agent | Open | The browser and web search read untrusted pages while the agent can read files. Try instruction-injection pages, and consider defaulting testers to "Ask for approval". |
 | Account deletion and data export | Partial | The privacy page promises both. A documented manual process is enough for a beta. |
 | Confirm the browser, Slack import and web search defaults for testers | Owner | Decide what is on for the first cohort. |
@@ -67,7 +72,7 @@ address, invite message and known issues. The live Slack export test is waived f
 
 | Item | Status | Notes |
 |---|---|---|
-| ★ A feedback and bug channel | Partial | The live support page lists contact@aedrova.com. Confirm the mailbox is monitored and that the signed app links to it. Ask for version and OS and keep private message content out of reports. |
+| ★ A feedback and bug channel | Done | Owner confirmed contact@aedrova.com is monitored. The desktop support action links to this address. Ask for version and OS and keep private message content out of reports. |
 | Crash and error reports | Open | Optional for a dozen testers if you can ask them to send the log. |
 | A short list of known issues | Partial | Draft below. Confirm against the final beta installer before sending. |
 
@@ -77,8 +82,8 @@ address, invite message and known issues. The live Slack export test is waived f
 
 Hi [first name],
 
-We’d like you to try Aedrova with your team. Download the Mac beta from [private download
-link] and follow the access instructions in this invite. Open the DMG, drag Aedrova to
+We’d like you to try Aedrova with your team. Download the [Mac beta](https://aedrova-beta-staging.onrender.com/download)
+and follow the access instructions in this invite. Open the DMG, drag Aedrova to
 Applications, then open Aedrova and click **Get started**. You can create a workspace or
 join your team with a workspace code.
 
