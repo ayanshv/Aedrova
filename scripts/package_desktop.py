@@ -124,6 +124,8 @@ for asset in (
 asset_args.extend(
     [
         "--add-data",
+        f"{ROOT / 'src/aedrova/desktop/assets/fonts'}:aedrova/desktop/assets/fonts",
+        "--add-data",
         f"{ROOT / 'src/aedrova/desktop/assets/onboarding'}:aedrova/desktop/assets/onboarding",
         "--add-data",
         f"{ROOT / 'src/aedrova/desktop/assets/buds'}:aedrova/desktop/assets/buds",
