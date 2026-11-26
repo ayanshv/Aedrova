@@ -49,6 +49,10 @@ def main():
     app.setApplicationName("Aedrova")
     app.setOrganizationName("Aedrova")
     app.setStyle("Fusion")
+    from aedrova.desktop.theme import RoundedTooltips
+
+    app.tooltip_filter = RoundedTooltips(app)
+    app.installEventFilter(app.tooltip_filter)
     icon = app_icon()
     if not icon.isNull():
         app.setWindowIcon(icon)

@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtGui import QColor, QFontDatabase, QPalette
 
 
@@ -205,7 +206,8 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
 
     QWidget {{ color: {t.text}; font-size: 14px; }}
     QFrame#Topbar {{ border-bottom: 1px solid {t.border}; }}
-    QFrame#GettingStarted {{ background: {t.surface}; border: 0; border-radius: 12px; }}
+    QFrame#GettingStarted {{ background: {t.surface}; border: 1px solid {t.border};
+        border-radius: 14px; }}
     QFrame#ChannelHeader {{ border-bottom: 1px solid {t.border}; }}
     QWidget#SettingsSection {{ border-bottom: 1px solid {t.border}; }}
     QLabel#AgentIdentity {{ color: {t.accent_text}; background: {t.accent_bg};
@@ -505,10 +507,22 @@ def stylesheet(t: Theme, *, reduced_transparency=False):
     QPushButton[chip="true"]:checked {{ border: 1px solid {t.accent}; color: {t.link}; }}
     QPlainTextEdit#AgentCommandOutput {{ background: transparent; border: none;
         padding: 4px; font-size: 12px; }}
-    QToolTip {{ background: {t.surface if white else overlay}; color: {t.text};
-        border: none; border-radius: 8px; padding: 8px 12px; }}
+    QAbstractButton {{ outline: none; }}
+    QToolTip {{ background: {t.surface}; color: {t.text}; border: 1px solid {t.border};
+        border-radius: 10px; padding: 5px 9px; font-size: 12px; }}
     QListWidget#DotList {{ border: none; border-radius: 12px;
         background: {t.surface}; padding: 5px; }}
     QListWidget#DotList::item {{ padding: 8px 10px; border: none; border-radius: 8px; }}
     QListWidget#DotList::item:selected {{ background: {t.accent_bg}; color: {t.accent_text}; }}
     """
+
+
+class RoundedTooltips(QObject):
+    """Tooltips are drawn as small rounded cards, without the square window frame behind them."""
+
+    def eventFilter(self, obj, event):  # noqa: N802
+        if event.type() == QEvent.Type.Polish and obj.metaObject().className() == "QTipLabel":
+            obj.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+            obj.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
+            obj.setWindowFlag(Qt.WindowType.NoDropShadowWindowHint, True)
+        return False

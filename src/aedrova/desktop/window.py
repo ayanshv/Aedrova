@@ -62,6 +62,9 @@ class AedrovaWindow(QMainWindow):
         self.theme = LIGHT
         self.reduced_motion = self.settings.value("reduceMotion", False, type=bool)
         self.reduced_transparency = self.settings.value("reduceTransparency", False, type=bool)
+        from aedrova.desktop.popup_depth import set_reduced_transparency
+
+        set_reduced_transparency(self.reduced_transparency)
         self.apply_message_preferences(layout=False)
         QApplication.instance().setProperty("reduceMotion", self.reduced_motion)
         self.setFont(system_font())
@@ -1514,6 +1517,9 @@ class AedrovaWindow(QMainWindow):
         self._apply_materials()
 
     def set_reduced_transparency(self, reduced):
+        from aedrova.desktop.popup_depth import set_reduced_transparency
+
+        set_reduced_transparency(reduced)
         self.reduced_transparency = reduced
         self.setStyleSheet(stylesheet(self.theme, reduced_transparency=reduced))
         self.settings.setValue("reduceTransparency", reduced)

@@ -24,7 +24,12 @@ from aedrova.desktop.icons import icon
 from aedrova.desktop.zen_theme import visual_theme
 
 WASH_LIGHT = ("#FFD3E8", "#DCD0FF", "#FFE3CF", "#D2E8FF")
-WASH_DARK = ("#2A2D42", "#243241", "#312E3E", "#233436")
+# Dark mode uses the same two soft glows as the iPhone workspace list: blue from the top left,
+# teal from the top right. Each is (colour, opacity, reach as a share of the width, x, y).
+GLOW_DARK = (
+    ("#4D80FA", 0.20, 0.9, 0.0, 0.0),
+    ("#40C7C7", 0.14, 0.82, 1.0, 0.0),
+)
 PERMISSION_ORDER = ("microphone", "camera", "screen")
 PERMISSION_GLYPHS = {"microphone": "microphone", "camera": "camera", "screen": "screen"}
 
@@ -111,7 +116,20 @@ class AuroraSurface(QWidget):
         dark = base.lightness() < 128
         width, height = size.width(), size.height()
         radius = max(width, height) * 0.62
-        for index, hex_color in enumerate(WASH_DARK if dark else WASH_LIGHT):
+        if dark:
+            drift = 0.03 * math.sin(self.phase)
+            for hex_color, opacity, reach, x, y in GLOW_DARK:
+                center = QPointF(width * (x + drift * (1 - 2 * x)), height * y)
+                gradient = QRadialGradient(center, width * reach)
+                color = QColor(hex_color)
+                color.setAlphaF(min(1.0, opacity * (1.5 if self.opening else 1.0)))
+                gradient.setColorAt(0.0, color)
+                color.setAlpha(0)
+                gradient.setColorAt(1.0, color)
+                painter.fillRect(image.rect(), gradient)
+            painter.end()
+            return image
+        for index, hex_color in enumerate(WASH_LIGHT):
             angle = self.phase * (0.8 + index * 0.25) + index * 1.7 + self.bias
             center = QPointF(
                 width * (0.36 + 0.24 * math.cos(angle)),
@@ -124,7 +142,7 @@ class AuroraSurface(QWidget):
             color.setAlpha(0)
             gradient.setColorAt(1.0, color)
             painter.fillRect(image.rect(), gradient)
-        if not dark and not self.opening:
+        if not self.opening:
             fade = QLinearGradient(0, 0, 0, height * 0.55)
             fade.setColorAt(0.0, QColor(255, 255, 255, 235))
             fade.setColorAt(1.0, QColor(255, 255, 255, 0))

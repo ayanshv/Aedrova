@@ -1,10 +1,17 @@
 """Soft native popup depth, painted inside transparent, unclipped window margins."""
 
 from PySide6.QtCore import QEvent, QRectF, Qt
-from PySide6.QtGui import QColor, QPainter, QPalette
+from PySide6.QtGui import QColor, QPainter, QPalette, QPen
 from PySide6.QtWidgets import QApplication, QWidget
 
 PADDING = (24, 20, 24, 28)
+# Reduce Transparency swaps the glass for a solid card. The window keeps this in step.
+reduced_transparency = False
+
+
+def set_reduced_transparency(value):
+    global reduced_transparency
+    reduced_transparency = bool(value)
 
 
 def surface_color(widget):
@@ -40,8 +47,13 @@ def paint_depth(painter, rect, widget):
             14 + spread,
             14 + spread,
         )
+    # Matte, like the iPhone cards: a solid neutral fill, one flat hairline, no sheen or gradient.
     painter.setBrush(fill)
     painter.drawRoundedRect(surface, 14, 14)
+    hairline = QColor(255, 255, 255, 26) if dark else QColor(20, 30, 50, 30)
+    painter.setPen(QPen(hairline, 1))
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+    painter.drawRoundedRect(surface.adjusted(0.5, 0.5, -0.5, -0.5), 13.5, 13.5)
 
 
 class PopupDepth(QWidget):
