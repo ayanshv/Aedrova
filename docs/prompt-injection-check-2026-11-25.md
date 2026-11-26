@@ -47,7 +47,8 @@ in code. `scripts/live_injection_check.py` is a live version against a real mode
   labelled untrusted evidence. Their wording was checked for the label, not attacked with a model.
 - **Codex's own sandbox.** File and network limits inside a build are Codex's, not tested here.
 
-## Recommendation for testers
+## Default for testers
 
-Default the first cohort to Approve for me, or Ask for approval for anyone who gives the agent
-project files. Tell them Full access trusts every page the agent reads.
+New projects already start in Ask for approval, the strictest mode, and the owner decided to keep
+it for the first cohort. Testers can raise it themselves in the composer. Tell them Full access
+trusts every page the agent reads.
